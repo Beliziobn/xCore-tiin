@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --font-chau: 'Chau Philomene One', sans-serif;
+  --font-sans: 'Chau Philomene One', sans-serif;
+  --font-mono: 'Chau Philomene One', monospace, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  font-family: 'Chau Philomene One', sans-serif !important;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    font-family: 'Chau Philomene One', sans-serif !important;
+    color: #0F172A;
+    background-color: #FFFFFF;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6,
+  p, span, a, button, input, select, textarea,
+  label, div, small, strong, em, b, i,
+  th, td, li, ul, ol, nav, footer, header, main, section,
+  legend, caption, code, pre, time, figure, figcaption {
+    font-family: 'Chau Philomene One', sans-serif !important;
+  }
+
+  button, input, select, textarea {
+    font-family: 'Chau Philomene One', sans-serif !important;
+  }
+}
+
+.font-chau {
+  font-family: 'Chau Philomene One', sans-serif !important;
+}
+
+/* Custom crisp light scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FFFFFF;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3B82F6;
+}
