@@ -9,7 +9,10 @@ import {
   AlertCircle, 
   Sparkles, 
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck,
+  Building2,
+  GraduationCap
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import type { UserAccount } from '../../types';
@@ -366,37 +369,40 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       type="button"
                       id="preset-admin-btn"
                       onClick={() => handleFillPreset('admin')}
-                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
                         selectedRole === 'admin'
-                          ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      👑 Admin Fred
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Admin</span>
                     </button>
                     <button
                       type="button"
                       id="preset-diretor-btn"
                       onClick={() => handleFillPreset('diretor')}
-                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
                         selectedRole === 'diretor'
-                          ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      🏫 Dir. Carl
+                      <Building2 className="w-4 h-4" />
+                      <span>Diretor</span>
                     </button>
                     <button
                       type="button"
                       id="preset-professor-btn"
                       onClick={() => handleFillPreset('professor')}
-                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
                         selectedRole === 'professor'
-                          ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      👨‍🏫 Prof. Santar
+                      <GraduationCap className="w-4 h-4" />
+                      <span>Professor</span>
                     </button>
                   </div>
                 </div>
