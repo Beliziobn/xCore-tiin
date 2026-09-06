@@ -80,13 +80,13 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
 
           {/* Action Button: only visible if user has NOT started a session */}
           {!isLoggedIn && (
-            <div className="mt-7 flex items-center gap-4">
+            <div className="mt-7 flex flex-wrap items-center gap-3 sm:gap-4">
               <button
-                id="hero-comecar-btn"
+                id="hero-entrar-btn"
                 onClick={onOpenGetStarted}
                 className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white hover:text-white font-black text-[11px] uppercase tracking-[0.2em] px-7 py-3 rounded-full transition-all duration-300 cursor-pointer flex items-center gap-2.5 group shadow-md hover:shadow-xl active:scale-95"
               >
-                <span className="text-white">Começar</span>
+                <span className="text-white">Entrar na Central</span>
                 <span className="group-hover:translate-x-1 transition-transform text-white">→</span>
               </button>
             </div>

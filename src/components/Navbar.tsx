@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 
 interface NavbarProps {
   onOpenGetStarted: () => void;
+  onNavigateToLogin?: () => void;
+  onNavigateToRegister?: () => void;
   onOpenAbout: () => void;
   onOpenProfile: () => void;
   onOpenSupport: () => void;
@@ -42,6 +44,8 @@ const mockNotifications: NotificationItem[] = [
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenGetStarted,
+  onNavigateToLogin,
+  onNavigateToRegister,
   onOpenAbout,
   onOpenProfile,
   onOpenSupport,
@@ -143,31 +147,189 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {showPagesDropdown && (
               <div className="absolute top-full left-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                {activeRole === 'professor' ? (
+                {activeRole === 'admin' ? (
                   <>
                     <button
-                      onClick={() => onSelectPage('estatisticas')}
+                      onClick={() => {
+                        onSelectPage('admin-dashboard');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <Home className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Painel Central Admin</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('admin-estatisticas');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <Award className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <span>Estatísticas da Rede</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('admin-escolas');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Minhas Escolas</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('admin-directores');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <span>Meus Directores</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('admin-professores');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Meus Professores</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('admin-alunos');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Meus Alunos</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('admin-perfil');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Perfil do Administrador</span>
+                    </button>
+                  </>
+                ) : activeRole === 'diretor' ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-dashboard');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <Award className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Painel do Diretor</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-estatisticas');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <Award className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <span>Analisa suas estatísticas</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-professores');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Meus Professores</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-alunos');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Meus Alunos</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-salas');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <Home className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Minhas Salas</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-classes');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <span>Minhas Classes</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-perfil');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <span>Perfil do Director</span>
+                    </button>
+                  </>
+                ) : activeRole === 'professor' ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        onSelectPage('estatisticas');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <Award className="w-3.5 h-3.5 text-[#5067fc]" />
                       <span>Analisa suas estatísticas</span>
                     </button>
                     <button
-                      onClick={() => onSelectPage('minha-turma')}
+                      onClick={() => {
+                        onSelectPage('minha-turma');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <Users className="w-3.5 h-3.5 text-[#5067fc]" />
                       <span>Minha Turma (4ª Classe)</span>
                     </button>
                     <button
-                      onClick={() => onSelectPage('perfil-professor')}
+                      onClick={() => {
+                        onSelectPage('perfil-professor');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <User className="w-3.5 h-3.5 text-[#5067fc]" />
                       <span>Perfil do Professor</span>
                     </button>
                     <button
-                      onClick={() => onSelectPage('perfil-aluno')}
+                      onClick={() => {
+                        onSelectPage('perfil-aluno');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <BookOpen className="w-3.5 h-3.5 text-[#27c1dc]" />
@@ -177,28 +339,40 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ) : (
                   <>
                     <button
-                      onClick={() => onSelectPage('escolas')}
+                      onClick={() => {
+                        onSelectPage('escolas');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <Award className="w-3.5 h-3.5 text-[#3B82F6]" />
                       <span>Rede de Escolas</span>
                     </button>
                     <button
-                      onClick={() => onSelectPage('professores')}
+                      onClick={() => {
+                        onSelectPage('professores');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <Users className="w-3.5 h-3.5 text-[#3B82F6]" />
                       <span>Portal dos Professores</span>
                     </button>
                     <button
-                      onClick={() => onSelectPage('alunos')}
+                      onClick={() => {
+                        onSelectPage('alunos');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <BookOpen className="w-3.5 h-3.5 text-[#3B82F6]" />
                       <span>Ambiente do Aluno</span>
                     </button>
                     <button
-                      onClick={() => onSelectPage('calendario')}
+                      onClick={() => {
+                        onSelectPage('calendario');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
                     >
                       <Calendar className="w-3.5 h-3.5 text-[#3B82F6]" />
@@ -220,7 +394,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             id="nav-meu-perfil"
-            onClick={onOpenProfile}
+            onClick={() => {
+              if (activeRole === 'admin') {
+                onSelectPage('admin-perfil');
+              } else if (activeRole === 'diretor') {
+                onSelectPage('diretor-perfil');
+              } else {
+                onOpenProfile();
+              }
+            }}
             className="hover:text-slate-950 transition-colors cursor-pointer"
           >
             Meu perfil
@@ -313,13 +495,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
           ) : (
-            <button
-              id="navbar-comecar-btn"
-              onClick={onOpenGetStarted}
-              className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-bold text-[10px] uppercase tracking-[0.2em] px-5 py-2 rounded-full transition-all duration-300 cursor-pointer shadow-sm hover:shadow flex items-center gap-1.5 active:scale-95"
-            >
-              Começar
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="navbar-entrar-btn"
+                onClick={onNavigateToLogin || onOpenGetStarted}
+                className="text-slate-700 hover:text-slate-950 hover:bg-slate-100 font-bold text-[10px] uppercase tracking-[0.15em] px-3.5 sm:px-4 py-2 rounded-full transition-all duration-200 cursor-pointer"
+              >
+                Entrar
+              </button>
+              <button
+                id="navbar-comecar-btn"
+                onClick={onNavigateToRegister || onOpenGetStarted}
+                className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-bold text-[10px] uppercase tracking-[0.15em] px-4 sm:px-5 py-2 rounded-full transition-all duration-300 cursor-pointer shadow-sm hover:shadow flex items-center gap-1.5 active:scale-95"
+              >
+                Começar
+              </button>
+            </div>
           )}
 
           {/* Mobile menu hamburger */}
@@ -345,7 +536,139 @@ export const Navbar: React.FC<NavbarProps> = ({
               <X className="w-4 h-4" />
             </button>
           </div>
-          {activeRole === 'professor' ? (
+          {activeRole === 'admin' ? (
+            <>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-dashboard');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Painel Central Admin
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-estatisticas');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Estatísticas da Rede
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-escolas');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Minhas Escolas
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-directores');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Meus Directores
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-professores');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Meus Professores
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-alunos');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Meus Alunos
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-perfil');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Perfil do Administrador
+              </button>
+            </>
+          ) : activeRole === 'diretor' ? (
+            <>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-dashboard');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Painel do Diretor
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-estatisticas');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Analisa suas estatísticas
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-professores');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Meus Professores
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-alunos');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Meus Alunos
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-salas');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Minhas Salas
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-classes');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Minhas Classes
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-perfil');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Perfil do Director
+              </button>
+            </>
+          ) : activeRole === 'professor' ? (
             <>
               <button
                 onClick={() => {
@@ -455,15 +778,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Sair da Conta ({currentUser.firstName})
               </button>
             ) : (
-              <button
-                onClick={() => {
-                  onOpenGetStarted();
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-black uppercase tracking-[0.2em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer"
-              >
-                Começar Agora
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  id="mobile-entrar-btn"
+                  onClick={() => {
+                    (onNavigateToLogin || onOpenGetStarted)();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer border border-slate-200"
+                >
+                  Entrar
+                </button>
+                <button
+                  id="mobile-comecar-btn"
+                  onClick={() => {
+                    (onNavigateToRegister || onOpenGetStarted)();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer shadow-sm"
+                >
+                  Começar
+                </button>
+              </div>
             )}
           </div>
         </div>
