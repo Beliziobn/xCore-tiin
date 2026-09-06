@@ -55,7 +55,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
   const ySteps = [5000, 3750, 2500, 1250, 0];
 
   return (
-    <div id="admin-statistics-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-statistics-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero Header: "Analisa as suas estatísticas" matching 9.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

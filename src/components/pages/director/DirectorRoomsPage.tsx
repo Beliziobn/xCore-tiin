@@ -58,7 +58,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   };
 
   return (
-    <div id="director-rooms-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-rooms-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Minhas Salas" matching 15.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

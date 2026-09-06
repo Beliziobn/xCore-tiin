@@ -37,7 +37,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
   const activeDirector = directors.find((d) => d.id === selectedDirectorId) || filteredDirectors[0] || directors[0];
 
   return (
-    <div id="admin-directors-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-directors-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero Header: "Meus Directores" */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

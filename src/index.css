@@ -21,6 +21,9 @@
   --color-ink: #0b1020;
   --color-ink-soft: #475569;
 
+  /* Global page surface — soft off-white to avoid harsh pure white */
+  --color-background: #f7f3f3;
+
   --radius: 0.875rem;
 }
 
@@ -30,7 +33,7 @@
   #root {
     font-family: var(--font-sans);
     color: var(--color-ink);
-    background-color: #ffffff;
+    background-color: var(--color-background);
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

@@ -81,7 +81,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   };
 
   return (
-    <div id="director-teachers-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-teachers-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Meus Professores" matching 11.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

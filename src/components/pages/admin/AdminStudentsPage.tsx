@@ -72,7 +72,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
   }, [schools, schoolFilter]);
 
   return (
-    <div id="admin-students-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-students-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero Header: "Meus alunos" matching 14.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

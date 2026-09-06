@@ -19,7 +19,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
   isLoggedIn,
 }) => {
   return (
-    <div id="director-statistics-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-statistics-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Analisa as suas estatísticas" matching 5.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

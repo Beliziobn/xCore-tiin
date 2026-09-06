@@ -187,7 +187,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div id="auth-full-page" className="min-h-screen w-full bg-[#f8fafc] text-slate-900 flex flex-col justify-between selection:bg-[#5067fc] selection:text-white">
+    <div id="auth-full-page" className="min-h-screen w-full bg-[#f7f3f3] text-slate-900 flex flex-col justify-between selection:bg-[#5067fc] selection:text-white">
       {/* Top Header Bar */}
       <header className="w-full bg-[#4f67ff] border-b border-white/10 px-4 sm:px-8 py-3.5 shadow-sm sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex items-center justify-between">

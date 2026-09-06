@@ -100,7 +100,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   };
 
   return (
-    <div id="director-students-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-students-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Meus alunos" matching 13.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

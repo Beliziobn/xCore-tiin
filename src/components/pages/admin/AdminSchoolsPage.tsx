@@ -144,7 +144,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
   }, [activeSchool, currentMunicipalityData]);
 
   return (
-    <div id="admin-schools-page" className="w-full min-h-screen bg-white">
+    <div id="admin-schools-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* 1. Hero Header Banner matching Texto do seu parágrafo (1).png */}
       <section
         id="schools-hero-banner"

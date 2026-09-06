@@ -20,7 +20,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   const totalTeachers = schools.reduce((acc, s) => acc + s.teachersCount, 0);
 
   return (
-    <div id="admin-profile-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-profile-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

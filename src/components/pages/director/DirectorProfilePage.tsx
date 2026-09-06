@@ -31,7 +31,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
   };
 
   return (
-    <div id="director-profile-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-profile-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Perfil do Director" matching 19.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

@@ -58,7 +58,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
   };
 
   return (
-    <div id="director-classes-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-classes-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Minhas Classes" matching 20.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}

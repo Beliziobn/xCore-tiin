@@ -39,7 +39,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
   const activeTeacher = teachers.find((t) => t.id === selectedTeacherId) || filteredTeachers[0] || teachers[0];
 
   return (
-    <div id="admin-teachers-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-teachers-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero Header: "Meus Professores" matching 12.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
