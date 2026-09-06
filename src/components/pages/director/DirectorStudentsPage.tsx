@@ -1,18 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle, AlertCircle, FileCheck, FileX, ChevronDown } from 'lucide-react';
+import { Search, Plus, Filter, CheckCircle, AlertCircle, FileCheck, FileX, ChevronDown, ShieldCheck } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorStudentsData as initialStudents } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
-import type { DirectorStudent } from '../../../types';
+import type { DirectorStudent, AdminStudent } from '../../../types';
 
 interface DirectorStudentsPageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
+  onAddStudentGlobal?: (student: AdminStudent) => void;
 }
 
 export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
+  onAddStudentGlobal,
 }) => {
   const [students, setStudents] = useState<DirectorStudent[]>(initialStudents);
   const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || 'std-1');
@@ -70,6 +72,31 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
     };
     setStudents((prev) => [formatted, ...prev]);
     setSelectedStudentId(formatted.id);
+
+    if (onAddStudentGlobal) {
+      const adminFormatted: AdminStudent = {
+        id: formatted.id,
+        name: formatted.name,
+        gender: 'F',
+        gradeClass: formatted.gradeClass,
+        room: formatted.room,
+        turma: formatted.turma || 'Turma A',
+        guardianName: formatted.guardianName,
+        location: formatted.location,
+        presenceRate: formatted.presenceRate,
+        hasDocuments: formatted.hasDocuments,
+        documentType: formatted.documentType,
+        numeroDocumento: formatted.numeroDocumento,
+        dataNascimento: formatted.dataNascimento,
+        idade: formatted.idade,
+        condicaoMatricula: formatted.condicaoMatricula,
+        foto: formatted.foto,
+        anexoDocumentoNome: formatted.anexoDocumentoNome,
+        performanceScore: formatted.performanceScore,
+        schoolName: 'Escola Modelo Central',
+      };
+      onAddStudentGlobal(adminFormatted);
+    }
   };
 
   return (
@@ -84,6 +111,29 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Institutional Authority Card */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-black text-slate-900 block text-xs sm:text-sm">
+                Competência da Direção Escolar: Matrícula e Validação de Documentos
+              </span>
+              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5">
+                A matrícula e conferência de BI ou Cédula de Nascimento dos estudantes é realizada exclusivamente pelo Diretor e sua secretaria, garantindo a integridade dos registros oficiais da rede.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="whitespace-nowrap px-4 py-2 bg-[#5067fc] hover:bg-[#4359eb] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+          >
+            Matricular Novo Aluno
+          </button>
+        </div>
+
         {/* Filter Bar matching 13.png: Filtro: Alunos v, Search, Cadastrar button */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
           {/* Left: Filtro Dropdown */}

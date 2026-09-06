@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 
 interface NavbarProps {
@@ -9,6 +9,8 @@ interface NavbarProps {
   onOpenAbout: () => void;
   onOpenProfile: () => void;
   onOpenSupport: () => void;
+  onOpenChat?: () => void;
+  unreadChatCount?: number;
   onSelectPage: (page: string) => void;
   currentUser?: UserAccount | null;
   onLogout?: () => void;
@@ -49,6 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAbout,
   onOpenProfile,
   onOpenSupport,
+  onOpenChat,
+  unreadChatCount = 0,
   onSelectPage,
   currentUser,
   onLogout,
@@ -407,6 +411,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Meu perfil
           </button>
+
+          {onOpenChat && (
+            <button
+              id="nav-chat-suporte"
+              onClick={onOpenChat}
+              className="hover:text-slate-950 transition-colors cursor-pointer flex items-center gap-1.5 text-[#5067fc] font-bold"
+              title="Abrir Chat de Suporte e Ajuda"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Suporte & Chat</span>
+              {unreadChatCount !== undefined && unreadChatCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Right CTA Actions */}
@@ -756,6 +775,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Meu Perfil
           </button>
+          {onOpenChat && (
+            <button
+              onClick={() => {
+                onOpenChat();
+                setMobileMenuOpen(false);
+              }}
+              className="text-left py-2 px-3 bg-[#5067fc]/10 text-[#5067fc] rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-[#5067fc]" />
+                <span>Chat de Suporte & Ajuda</span>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </button>
+          )}
           <button
             onClick={() => {
               onOpenSupport();

@@ -1,18 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle2, Clock, Calendar, ChevronDown } from 'lucide-react';
+import { Search, Plus, Filter, CheckCircle2, Clock, Calendar, ChevronDown, ShieldCheck } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
-import type { DirectorTeacher } from '../../../types';
+import type { DirectorTeacher, AdminTeacher } from '../../../types';
 
 interface DirectorTeachersPageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
+  onAddTeacherGlobal?: (teacher: AdminTeacher) => void;
 }
 
 export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
+  onAddTeacherGlobal,
 }) => {
   const [teachers, setTeachers] = useState<DirectorTeacher[]>(initialTeachers);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(teachers[0]?.id || 'prof-1');
@@ -59,6 +61,23 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
     };
     setTeachers((prev) => [formatted, ...prev]);
     setSelectedTeacherId(formatted.id);
+
+    if (onAddTeacherGlobal) {
+      const adminFormatted: AdminTeacher = {
+        id: formatted.id,
+        name: formatted.name,
+        phone: '+244 923 000 000',
+        subject: formatted.subject,
+        gradeClass: formatted.gradeClass,
+        room: formatted.room,
+        schoolName: formatted.schoolName || 'Escola Modelo Central',
+        location: formatted.location || 'Pavilhão 1 - Bloco B',
+        turma: formatted.turma,
+        category: 'Professor Primário Efetivo',
+        presenceRate: 100,
+      };
+      onAddTeacherGlobal(adminFormatted);
+    }
   };
 
   return (
@@ -73,6 +92,29 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Institutional Authority Card */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-black text-slate-900 block text-xs sm:text-sm">
+                Autonomia do Diretor: Cadastro Oficial de Professores
+              </span>
+              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5">
+                Por diretriz de segurança uCore, o cadastro e alocação de turmas dos docentes é realizado diretamente pela Direção Escolar com validação presencial.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="whitespace-nowrap px-4 py-2 bg-[#5067fc] hover:bg-[#4359eb] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+          >
+            Cadastrar Novo Docente
+          </button>
+        </div>
+
         {/* Filter Bar matching 11.png: Filtro: Professores v, Search, Cadastrar button */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
           {/* Left: Filtro Dropdown */}

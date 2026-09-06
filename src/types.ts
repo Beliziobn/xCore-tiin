@@ -212,6 +212,7 @@ export interface AdminSchool {
   category: 'Ensino Primário' | 'Iº Ciclo' | 'IIº Ciclo' | 'Polivalente';
   phone: string;
   email: string;
+  logoSvg?: string;
 }
 
 export interface AdminTeacher {
@@ -262,6 +263,49 @@ export interface AdminDirector {
   teachersCount: number;
   studentsCount: number;
   location: string;
+}
+
+export type ChatRole = 'admin' | 'diretor' | 'professor' | 'suporte';
+
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  schoolId?: string;
+  schoolName?: string;
+  senderId: string;
+  senderName: string;
+  senderRole: ChatRole;
+  senderAvatar?: string;
+  content: string;
+  timestamp: string;
+  status?: 'sent' | 'delivered' | 'read';
+  attachmentName?: string;
+  attachmentSize?: string;
+  attachmentType?: 'image' | 'pdf' | 'document' | 'other';
+  attachmentUrl?: string;
+  isHelpRequest?: boolean;
+}
+
+export interface ChatChannelMember {
+  id: string;
+  name: string;
+  role: string;
+  avatar?: string;
+  online?: boolean;
+}
+
+export interface ChatChannel {
+  id: string;
+  schoolName: string;
+  name: string;
+  category: string;
+  description: string;
+  iconType: 'support' | 'shield' | 'school' | 'user' | 'bell';
+  targetAudience: string;
+  unreadCount: number;
+  lastMessageSnippet?: string;
+  lastMessageTime?: string;
+  members?: ChatChannelMember[];
 }
 
 

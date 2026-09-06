@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, UserCheck, School, Phone, Mail, Award, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Search, Plus, UserCheck, School, Phone, Mail, Award, CheckCircle2, ChevronRight, ShieldCheck } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminDirector, AdminSchool } from '../../../types';
 
@@ -47,6 +47,29 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Security Delegation Banner */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-black text-slate-900 block text-xs sm:text-sm">
+                Competência do Administrador: Homologação e Posse de Diretores de Escola
+              </span>
+              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5">
+                O Administrador cadastra e credencia os <strong>Diretores de Escola</strong>, delegando-lhes a autoridade exclusiva para cadastrar professores e matricular alunos de cada escola com segurança.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onOpenRegisterModal}
+            className="whitespace-nowrap px-4 py-2 bg-[#5067fc] hover:bg-[#4359eb] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+          >
+            Homologar Novo Diretor
+          </button>
+        </div>
+
         {/* Filter and Action Bar */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
           {/* Left: Filter dropdown */}

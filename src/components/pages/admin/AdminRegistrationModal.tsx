@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { X, School, User, Users, CheckCircle2 } from 'lucide-react';
+import { X, School, User, Users, CheckCircle2, ShieldCheck, ShieldAlert, MapPin, Sparkles, Image as ImageIcon } from 'lucide-react';
 import type { AdminSchool, AdminTeacher, AdminStudent, AdminDirector } from '../../../types';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import { QUESSUA_ZONES_LIST } from '../../../data/municipalitiesData';
+import { SvgAiLogoModal } from './SvgAiLogoModal';
 
 export type AdminModalType = 'school' | 'teacher' | 'student' | 'director' | null;
 
@@ -33,7 +35,10 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
   const [classesCount, setClassesCount] = useState('8');
   const [roomsCount, setRoomsCount] = useState('10');
   const [turmasCount, setTurmasCount] = useState('14');
-  const [location, setLocation] = useState('');
+  const [schoolZone, setSchoolZone] = useState<string>('Quêssua');
+  const [schoolAddress, setSchoolAddress] = useState<string>('');
+  const [schoolLogoSvg, setSchoolLogoSvg] = useState<string | null>(null);
+  const [isSvgModalOpen, setIsSvgModalOpen] = useState(false);
   const [studentsWithDocs, setStudentsWithDocs] = useState('320');
   const [studentsWithoutDocs, setStudentsWithoutDocs] = useState('45');
   const [performanceRate, setPerformanceRate] = useState('82');
@@ -124,7 +129,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
       classesCount: parseInt(classesCount, 10) || 6,
       roomsCount: parseInt(roomsCount, 10) || 8,
       turmasCount: parseInt(turmasCount, 10) || 12,
-      location: location.trim() || 'Luanda, Angola',
+      location: `${schoolZone} - ${schoolAddress.trim() || 'Zona Principal'}`,
       studentsWithDocs: parseInt(studentsWithDocs, 10) || 200,
       studentsWithoutDocs: parseInt(studentsWithoutDocs, 10) || 30,
       performanceRate: Math.min(100, Math.max(0, parseInt(performanceRate, 10) || 80)),
@@ -132,6 +137,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
       category,
       phone,
       email: email.trim() || `${schoolName.toLowerCase().replace(/\s+/g, '')}@ucore.edu.ao`,
+      logoSvg: schoolLogoSvg || undefined,
     };
     onAddSchool?.(newSchool);
     onClose();
@@ -370,17 +376,103 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Localização / Bairro
-                </label>
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Ex: Cazenga - Av. 11 de Novembro, Luanda"
-                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]"
-                />
+              <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-[#5067fc]" />
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Localização no Município do Quêssua *
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Zona do Município *
+                    </label>
+                    <select
+                      value={schoolZone}
+                      onChange={(e) => setSchoolZone(e.target.value)}
+                      className="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5067fc] font-semibold text-slate-800 cursor-pointer shadow-sm"
+                    >
+                      {QUESSUA_ZONES_LIST.map((zone) => (
+                        <option key={zone} value={zone}>
+                          {zone}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Bairro / Rua / Ponto de Referência
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolAddress}
+                      onChange={(e) => setSchoolAddress(e.target.value)}
+                      placeholder="Ex: Bairro Central, Rua Principal, Sector 2"
+                      className="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5067fc] shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-blue-100/80 text-slate-600">
+                  <span>Localização no cadastro:</span>
+                  <span className="font-bold text-[#5067fc] bg-white px-2.5 py-0.5 rounded-md border border-blue-200 shadow-xs">
+                    {schoolZone} - {schoolAddress.trim() || 'Zona Central'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Brasão / Logotipo Vetorial SVG AI */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#5067fc]" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Brasão / Logotipo Oficial (SVG AI)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSvgModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-[#5067fc] hover:bg-[#4054e0] text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {schoolLogoSvg ? 'Alterar Brasão SVG' : 'Gerar com SVG AI'}
+                  </button>
+                </div>
+
+                {schoolLogoSvg ? (
+                  <div className="flex items-center gap-4 p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+                    <div 
+                      className="w-16 h-16 shrink-0 rounded-xl p-1 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden"
+                      dangerouslySetInnerHTML={{ __html: schoolLogoSvg }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800">Selo Vetorial Vinculado</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                          SVG Ativo
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                        Este vetor heráldico será exibido na ficha cadastral e mapa de Quêssua.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSchoolLogoSvg(null)}
+                      className="text-xs text-rose-600 hover:text-rose-700 font-semibold cursor-pointer px-2 py-1 hover:bg-rose-50 rounded-lg"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    Opcional: utilize a API SVG AI para gerar um brasão vetorial exclusivo com símbolos de sabedoria e referências ao Quêssua.
+                  </p>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex justify-end gap-3">
@@ -405,6 +497,13 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
           {/* TEACHER FORM */}
           {type === 'teacher' && (
             <form onSubmit={handleSubmitTeacher} className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-amber-900">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block">Homologação Administrativa de Docente:</span>
+                  Na hierarquia uCore, o cadastro presencial de professores é de competência do Diretor de cada Escola. Este registro pelo Admin será processado como homologação extraordinária de rede vinculada à Direção da escola designada.
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -710,6 +809,13 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
           {/* DIRECTOR FORM */}
           {type === 'director' && (
             <form onSubmit={handleSubmitDirector} className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-blue-950">
+                <ShieldCheck className="w-4 h-4 text-[#5067fc] shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block">Investidura de Autoridade Escolar:</span>
+                  Ao cadastrar e homologar este Diretor de Escola, ele assumirá a posse administrativa e a autorização de segurança para cadastrar professores e matricular alunos em sua unidade escolar.
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Nome do Diretor *
@@ -772,6 +878,15 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* SvgAiLogoModal */}
+      <SvgAiLogoModal
+        isOpen={isSvgModalOpen}
+        onClose={() => setIsSvgModalOpen(false)}
+        defaultSchoolName={schoolName || 'Escola do Quêssua'}
+        defaultZone={schoolZone}
+        onApplyLogo={(svg) => setSchoolLogoSvg(svg)}
+      />
     </div>
   );
 };

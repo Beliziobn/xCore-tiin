@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, User as UserIcon, School, Phone, BookOpen, Check, ChevronRight } from 'lucide-react';
+import { Search, Plus, User as UserIcon, School, Phone, BookOpen, Check, ChevronRight, ShieldCheck } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminTeacher } from '../../../types';
 
@@ -49,6 +49,29 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Security Hierarchy Banner */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-black text-slate-900 block text-xs sm:text-sm">
+                Segurança Institucional uCore: Gestão Descentralizada de Docentes
+              </span>
+              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5">
+                O Admin homologa os <strong>Diretores de Escola</strong>, que realizam a admissão presencial e o cadastro oficial de professores em suas respectivas unidades.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onOpenRegisterModal()}
+            className="whitespace-nowrap px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-blue-200 text-[#5067fc] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+          >
+            Homologar Docente Extraordinário
+          </button>
+        </div>
+
         {/* Filter and Action Bar matching 12.png */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
           {/* Left: Filter dropdown */}

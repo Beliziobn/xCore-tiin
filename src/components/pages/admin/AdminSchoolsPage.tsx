@@ -1,356 +1,670 @@
-import React, { useState } from 'react';
-import { Search, Plus, School as SchoolIcon, Filter, Check, ChevronRight } from 'lucide-react';
-import { Hero } from '../../Hero';
+import React, { useState, useMemo } from 'react';
+import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Sparkles } from 'lucide-react';
+import heroImg from '../../../assets/images/hero_teacher_students_1788685346634.jpg';
+import { QuessuaMunicipalitiesMap } from './QuessuaMunicipalitiesMap';
+import {
+  QUESSUA_ZONES_LIST,
+  computeMunicipalitySummaries,
+  getZoneFromSchoolLocation,
+  MunicipalitySummary,
+} from '../../../data/municipalitiesData';
 import type { AdminSchool } from '../../../types';
+import { SvgAiLogoModal } from './SvgAiLogoModal';
 
 interface AdminSchoolsPageProps {
   onOpenGetStarted: () => void;
   schools: AdminSchool[];
   onOpenRegisterModal: () => void;
+  onUpdateSchool?: (school: AdminSchool) => void;
   isLoggedIn?: boolean;
 }
 
 export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
-  onOpenGetStarted,
   schools,
   onOpenRegisterModal,
-  isLoggedIn,
+  onUpdateSchool,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>(schools[0]?.id || '');
+  const [selectedMunicipality, setSelectedMunicipality] = useState<string>('Quêssua');
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
+  const [isSvgModalOpen, setIsSvgModalOpen] = useState(false);
+  const [svgTargetSchool, setSvgTargetSchool] = useState<AdminSchool | null>(null);
 
-  // Filtered schools list
-  const filteredSchools = schools.filter((school) => {
-    const matchesSearch =
-      school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      school.directorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      school.location.toLowerCase().includes(searchTerm.toLowerCase());
+  // Compute aggregated summaries for all Quêssua zones
+  const summaries = useMemo(() => computeMunicipalitySummaries(schools), [schools]);
 
-    if (!matchesSearch) return false;
+  // Network overall total summary for Quêssua
+  const networkSummary: MunicipalitySummary = useMemo(() => {
+    const totalTeachers = schools.reduce((acc, s) => acc + (s.teachersCount || 0), 0);
+    const totalClasses = schools.reduce((acc, s) => acc + (s.classesCount || 0), 0);
+    const totalRooms = schools.reduce((acc, s) => acc + (s.roomsCount || 0), 0);
+    const totalTurmas = schools.reduce((acc, s) => acc + (s.turmasCount || 0), 0);
+    const totalDocs = schools.reduce((acc, s) => acc + (s.studentsWithDocs || 0), 0);
+    const totalNoDocs = schools.reduce((acc, s) => acc + (s.studentsWithoutDocs || 0), 0);
+    const avgPerf = schools.length
+      ? Math.round(schools.reduce((acc, s) => acc + (s.performanceRate || 0), 0) / schools.length)
+      : 84;
+    const avgAtt = schools.length
+      ? Math.round((schools.reduce((acc, s) => acc + (s.attendanceRate || 0), 0) / schools.length) * 10) / 10
+      : 96.5;
 
-    if (categoryFilter === 'all') return true;
-    if (categoryFilter === 'low-performance') return school.performanceRate < 70;
-    if (categoryFilter === 'high-performance') return school.performanceRate >= 85;
-    return school.category === categoryFilter;
-  });
+    return {
+      id: 'rede-total',
+      name: 'Município do Quêssua (Todas as Zonas)',
+      schoolsCount: schools.length,
+      directorsCount: schools.filter((s) => !!s.directorName).length,
+      teachersCount: totalTeachers,
+      classesCount: totalClasses,
+      roomsCount: totalRooms,
+      turmasCount: totalTurmas,
+      locationDescription: 'Município do Quêssua (7 Zonas)',
+      studentsWithDocs: totalDocs,
+      studentsWithoutDocs: totalNoDocs,
+      performanceRate: avgPerf,
+      attendanceRate: avgAtt,
+      schools: schools,
+    };
+  }, [schools]);
 
-  // Selected school to display in the 10-card layout matching 10.png
-  const activeSchool = schools.find((s) => s.id === selectedSchoolId) || filteredSchools[0] || schools[0];
+  // Current municipality / zone data
+  const currentMunicipalityData =
+    selectedMunicipality === 'Todas as Escolas'
+      ? networkSummary
+      : summaries[selectedMunicipality] || summaries['Quêssua'] || networkSummary;
+
+  // Filter schools within municipality or across all based on search and category
+  const schoolsToDisplay = useMemo(() => {
+    const baseList =
+      selectedMunicipality === 'Todas as Escolas'
+        ? schools
+        : currentMunicipalityData.schools;
+
+    return baseList.filter((school) => {
+      const matchesSearch =
+        searchTerm.trim() === '' ||
+        school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        school.directorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        school.location.toLowerCase().includes(searchTerm.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      if (categoryFilter === 'all') return true;
+      if (categoryFilter === 'professores') return school.teachersCount > 0;
+      if (categoryFilter === 'directores') return !!school.directorName;
+      if (categoryFilter === 'high-performance') return school.performanceRate >= 85;
+      if (categoryFilter === 'low-performance') return school.performanceRate < 70;
+      return school.category === categoryFilter;
+    });
+  }, [schools, currentMunicipalityData, selectedMunicipality, searchTerm, categoryFilter]);
+
+  // Active individual school if selected
+  const activeSchool = useMemo(() => {
+    if (!selectedSchoolId) return null;
+    return schools.find((s) => s.id === selectedSchoolId) || null;
+  }, [selectedSchoolId, schools]);
+
+  // Values to display in the cards (either specific school or active municipality)
+  const displayValues = useMemo(() => {
+    if (activeSchool) {
+      return {
+        name: activeSchool.name,
+        subtitle: activeSchool.category,
+        schoolsCount: '1 Escola',
+        directorsCount: activeSchool.directorName || '1 Director',
+        classesCount: activeSchool.classesCount,
+        teachersCount: activeSchool.teachersCount,
+        roomsCount: activeSchool.roomsCount,
+        turmasCount: activeSchool.turmasCount,
+        location: activeSchool.location,
+        performanceRate: `${activeSchool.performanceRate}%`,
+        studentsWithDocs: activeSchool.studentsWithDocs.toLocaleString('pt-AO'),
+        studentsWithoutDocs: activeSchool.studentsWithoutDocs.toLocaleString('pt-AO'),
+        attendanceRate: `${activeSchool.attendanceRate}%`,
+        isIndividualSchool: true,
+      };
+    }
+
+    return {
+      name: currentMunicipalityData.name,
+      subtitle: `${currentMunicipalityData.schoolsCount} escolas cadastradas`,
+      schoolsCount: `${currentMunicipalityData.schoolsCount}`,
+      directorsCount: `${currentMunicipalityData.directorsCount}`,
+      classesCount: currentMunicipalityData.classesCount,
+      teachersCount: currentMunicipalityData.teachersCount,
+      roomsCount: currentMunicipalityData.roomsCount,
+      turmasCount: currentMunicipalityData.turmasCount,
+      location: currentMunicipalityData.locationDescription,
+      performanceRate: `${currentMunicipalityData.performanceRate}%`,
+      studentsWithDocs: currentMunicipalityData.studentsWithDocs.toLocaleString('pt-AO'),
+      studentsWithoutDocs: currentMunicipalityData.studentsWithoutDocs.toLocaleString('pt-AO'),
+      attendanceRate: `${currentMunicipalityData.attendanceRate}%`,
+      isIndividualSchool: false,
+    };
+  }, [activeSchool, currentMunicipalityData]);
 
   return (
-    <div id="admin-schools-page" className="w-full min-h-screen bg-[#fcfcfd]">
-      {/* Hero Header: "Minhas escolas" matching 10.png */}
-      <Hero
-        onOpenGetStarted={onOpenGetStarted}
-        isLoggedIn={isLoggedIn}
-        customTitle="Minhas escolas"
-        customSubtitle=""
-      />
+    <div id="admin-schools-page" className="w-full min-h-screen bg-white">
+      {/* 1. Hero Header Banner matching Texto do seu parágrafo (1).png */}
+      <section
+        id="schools-hero-banner"
+        className="relative w-full bg-[#4f67ff] border-b border-[#3b52e6] pt-8 sm:pt-12 pb-12 sm:pb-16 px-4 overflow-hidden flex flex-col items-center justify-center text-center shadow-[0_10px_30px_rgba(79,103,255,0.2)]"
+      >
+        {/* Soft background aura */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-white/10 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Filter and Action Bar matching 10.png */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          {/* Left: Filter dropdown */}
+        {/* Central Graphic with Teacher, Students and Yellow Sun */}
+        <div className="relative w-[240px] h-[240px] sm:w-[310px] sm:h-[310px] md:w-[340px] md:h-[340px] flex items-center justify-center select-none">
+          {/* Subtle concentric rings */}
+          <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-white/20 scale-105 pointer-events-none" />
+          <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-dashed border-white/35 scale-115 pointer-events-none animate-[spin_60s_linear_infinite]" />
+
+          {/* Decorative Squiggle Lines (Cyan & Amber) */}
+          <div className="absolute -top-3 right-2 sm:right-6 z-20 pointer-events-none opacity-95">
+            <svg width="90" height="45" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M5 15C20 5 35 25 50 15C65 5 80 25 95 15C105 8 112 12 115 15"
+                stroke="#27c1dc"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M10 32C25 22 40 42 55 32C70 22 85 42 100 32C108 27 114 30 118 32"
+                stroke="#FBBF24"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+
+          {/* Warm Sun Circle */}
+          <div className="absolute inset-0 m-auto w-[220px] h-[220px] sm:w-[280px] sm:h-[280px] rounded-full bg-[#FBBF24] shadow-[0_15px_40px_rgba(251,191,36,0.35)]" />
+
+          {/* Teacher and Students Round Photo cutout */}
+          <div className="relative w-[220px] h-[220px] sm:w-[280px] sm:h-[280px] rounded-full overflow-hidden border-4 border-white shadow-2xl flex items-end justify-center group">
+            <img
+              src={heroImg}
+              alt="Professora e alunos uCore"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-500"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Main Body Content matching Texto do seu parágrafo (1).png */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        {/* Filter and Search Bar matching Texto do seu parágrafo (1).png */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-10 pb-4 border-b border-slate-100">
+          {/* Left: Filter selector dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Filtro:</span>
+            <span className="text-xs font-black text-slate-800 tracking-tight whitespace-nowrap">
+              Filtro:
+            </span>
             <div className="relative">
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5067fc] cursor-pointer"
+                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#5067fc] cursor-pointer"
               >
-                <option value="all">Todas as Escolas ({schools.length})</option>
+                <option value="all">Todas as Escolas</option>
+                <option value="professores">Professores</option>
+                <option value="directores">Directores</option>
                 <option value="Ensino Primário">Ensino Primário</option>
                 <option value="Iº Ciclo">Iº Ciclo</option>
                 <option value="IIº Ciclo">IIº Ciclo</option>
-                <option value="Polivalente">Complexos Polivalentes</option>
+                <option value="Polivalente">Polivalente</option>
                 <option value="high-performance">Alto Desempenho (≥ 85%)</option>
-                <option value="low-performance">Menor Desempenho (&lt; 70%)</option>
+                <option value="low-performance">Baixo Desempenho (&lt; 70%)</option>
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-600 text-[10px]">
                 ▼
               </div>
             </div>
           </div>
 
           {/* Center: Search input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="relative flex-1 max-w-lg">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar escola, diretor ou localização..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]"
+              placeholder="Pesquisar"
+              className="w-full pl-10 pr-4 py-2 bg-slate-100/90 border border-slate-200 rounded-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]"
             />
           </div>
 
-          {/* Right: Cyan "Cadastrar" Button matching 10.png */}
-          <button
-            id="admin-btn-cadastrar-escola"
-            onClick={onOpenRegisterModal}
-            className="flex items-center justify-center gap-2 bg-[#27c1dc] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            Cadastrar
-          </button>
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setSvgTargetSchool(null);
+                setIsSvgModalOpen(true);
+              }}
+              className="flex items-center justify-center gap-2 bg-[#5067fc] hover:bg-[#4054e0] text-white text-xs font-bold tracking-wide px-4 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Sparkles className="w-4 h-4" />
+              Gerador SVG AI
+            </button>
+
+            <button
+              id="admin-btn-cadastrar-escola"
+              onClick={onOpenRegisterModal}
+              className="flex items-center justify-center gap-2 bg-[#27c1dc] hover:bg-[#20b2cc] text-white text-xs font-bold tracking-wide px-6 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              Cadastrar
+            </button>
+          </div>
         </div>
 
-        {/* School Selector Pills */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Selecione a Escola para Visualizar Detalhes ({filteredSchools.length} de {schools.length}):
-            </span>
+        {/* 3. Interactive Map & Municipality Summary Section matching Texto do seu parágrafo (1).png */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center mb-12">
+          {/* Left Column (Map) */}
+          <div className="lg:col-span-6 flex flex-col items-center justify-center p-4 rounded-3xl bg-slate-50/50 border border-slate-100">
+            <QuessuaMunicipalitiesMap
+              selectedMunicipality={selectedMunicipality}
+              onSelectMunicipality={(zone) => {
+                setSelectedMunicipality(zone);
+                setSelectedSchoolId(null);
+              }}
+              municipalitiesSummary={summaries}
+            />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-            {filteredSchools.map((school) => {
-              const isSelected = school.id === activeSchool?.id;
-              return (
+
+          {/* Right Column (Toque no mapa + Nome, Nº Escolas, Nº Directores cards) */}
+          <div className="lg:col-span-6 flex flex-col justify-center space-y-6">
+            {/* Title & Prompt text */}
+            <div>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                Toque no mapa
+              </h2>
+              <p className="text-base sm:text-lg font-bold text-slate-800 mt-1">
+                para ver as escolas na sua zona de Quêssua.
+              </p>
+            </div>
+
+            {/* If user has drilled down to an individual school, provide a reset pill */}
+            {activeSchool && (
+              <div className="flex items-center gap-2">
                 <button
-                  key={school.id}
-                  onClick={() => setSelectedSchoolId(school.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border ${
-                    isSelected
-                      ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-sm'
-                      : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
-                  }`}
+                  onClick={() => setSelectedSchoolId(null)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer border border-slate-200"
                 >
-                  <SchoolIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-[#5067fc]'}`} />
-                  <span>{school.name}</span>
-                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Voltar à Zona de {selectedMunicipality}
                 </button>
-              );
-            })}
+              </div>
+            )}
+
+            {/* Cards Grid matching layout in image: Row with [Nome] and [Nº Escolas], and wide [Nº Directores] */}
+            <div className="space-y-4">
+              {/* Row: Nome & Nº Escolas */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                {/* Card: Nome */}
+                <div className="sm:col-span-5 flex flex-col">
+                  <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
+                    Nome
+                  </span>
+                  <div className="bg-[#4f67ff] text-white rounded-2xl p-5 min-h-[110px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                    <span className="text-base sm:text-lg font-bold leading-tight line-clamp-2 px-1">
+                      {displayValues.name}
+                    </span>
+                    <span className="text-[10px] text-blue-200 font-semibold mt-1">
+                      {displayValues.subtitle}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card: Nº Escolas */}
+                <div className="sm:col-span-7 flex flex-col">
+                  <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
+                    Nº Escolas
+                  </span>
+                  <div className="bg-[#4f67ff] text-white rounded-2xl p-5 min-h-[110px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                    <span className="text-3xl sm:text-4xl font-black">
+                      {displayValues.schoolsCount}
+                    </span>
+                    <span className="text-[10px] text-blue-200 font-semibold mt-1">
+                      Unidades de Ensino Ativas
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Wide Card: Nº Directores */}
+              <div className="flex flex-col">
+                <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
+                  Nº Directores
+                </span>
+                <div className="bg-[#4f67ff] text-white rounded-2xl p-5 min-h-[100px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-[#27c1dc]" />
+                    <span className="text-3xl sm:text-4xl font-black">
+                      {displayValues.directorsCount}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-blue-200 font-semibold mt-1">
+                    {activeSchool ? 'Director(a) Titular da Instituição' : 'Directores Homologados em Exercício'}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {activeSchool && (
-          <div className="space-y-6">
-            {/* Top Row: 7 Blue Cards with Cyan Badges matching 10.png */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-              {/* Card 1: [Nome] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nome
+        {/* 4. First Metrics Row (6 Cards) matching Texto do seu parágrafo (1).png */}
+        <div className="mb-10">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            {/* Card 1: Nº Classes */}
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
+                Nº Classes
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <span className="text-2xl sm:text-3xl font-black">
+                  {displayValues.classesCount}
                 </span>
-                <span className="text-xs sm:text-sm font-bold my-auto leading-snug px-1">
-                  {activeSchool.name}
+                <span className="text-[10px] text-blue-200 font-medium mt-1">
+                  Níveis de Ensino
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium">{activeSchool.category}</span>
-              </div>
-
-              {/* Card 2: [Nº professores] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nº professores
-                </span>
-                <span className="text-2xl sm:text-3xl font-black my-auto">
-                  {activeSchool.teachersCount}
-                </span>
-                <span className="text-[9px] text-blue-200 font-medium">Docentes Ativos</span>
-              </div>
-
-              {/* Card 3: [Nº Classes] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nº Classes
-                </span>
-                <span className="text-2xl sm:text-3xl font-black my-auto">
-                  {activeSchool.classesCount}
-                </span>
-                <span className="text-[9px] text-blue-200 font-medium">Níveis Oferecidos</span>
-              </div>
-
-              {/* Card 4: [Nº Salas] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nº Salas
-                </span>
-                <span className="text-2xl sm:text-3xl font-black my-auto">
-                  {activeSchool.roomsCount}
-                </span>
-                <span className="text-[9px] text-blue-200 font-medium">Salas Físicas</span>
-              </div>
-
-              {/* Card 5: [Nº Turmas] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nº Turmas
-                </span>
-                <span className="text-2xl sm:text-3xl font-black my-auto">
-                  {activeSchool.turmasCount}
-                </span>
-                <span className="text-[9px] text-blue-200 font-medium">Turmas Ativas</span>
-              </div>
-
-              {/* Card 6: [Nome dos Directores] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nome dos Directores
-                </span>
-                <span className="text-xs sm:text-sm font-bold my-auto leading-snug px-1">
-                  {activeSchool.directorName}
-                </span>
-                <span className="text-[9px] text-blue-200 font-medium">{activeSchool.phone}</span>
-              </div>
-
-              {/* Card 7: [Localização] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Localização
-                </span>
-                <span className="text-[11px] sm:text-xs font-semibold my-auto leading-tight px-1 text-white/95">
-                  {activeSchool.location}
-                </span>
-                <span className="text-[9px] text-blue-200 font-medium">Luanda, Angola</span>
               </div>
             </div>
 
-            {/* Bottom Row: 3 Large Blue Cards with Cyan Badges matching 10.png */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-              {/* Bottom Card 1: [Nº alunos com Documentos] */}
-              <div className="bg-[#5067fc] text-white rounded-2xl p-6 flex flex-col items-center justify-between min-h-[160px] text-center shadow-md">
-                <span className="bg-[#27c1dc] text-white text-[11px] font-black uppercase px-3.5 py-1 rounded-md shadow-2xs">
-                  Nº alunos com Documentos
+            {/* Card 2: Nº Professor */}
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
+                Nº Professor
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <span className="text-2xl sm:text-3xl font-black">
+                  {displayValues.teachersCount}
                 </span>
-                <div className="my-auto py-2">
-                  <span className="text-4xl sm:text-5xl font-black tracking-tight">
-                    {activeSchool.studentsWithDocs}
-                  </span>
-                  <p className="text-xs text-blue-100 mt-1 font-medium">
-                    {Math.round((activeSchool.studentsWithDocs / (activeSchool.studentsWithDocs + activeSchool.studentsWithoutDocs)) * 100)}% da população escolar regularizada
-                  </p>
-                </div>
-                <span className="text-[10px] text-blue-200 uppercase font-semibold tracking-wider">
-                  BI, Cédulas e Registros Homologados
+                <span className="text-[10px] text-blue-200 font-medium mt-1">
+                  Corpo Docente
                 </span>
               </div>
+            </div>
 
-              {/* Bottom Card 2: [Nº alunos sem Documentos] */}
-              <div className="bg-[#5067fc] text-white rounded-2xl p-6 flex flex-col items-center justify-between min-h-[160px] text-center shadow-md">
-                <span className="bg-[#27c1dc] text-white text-[11px] font-black uppercase px-3.5 py-1 rounded-md shadow-2xs">
-                  Nº alunos sem Documentos
+            {/* Card 3: Nº Salas */}
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
+                Nº Salas
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <span className="text-2xl sm:text-3xl font-black">
+                  {displayValues.roomsCount}
                 </span>
-                <div className="my-auto py-2">
-                  <span className="text-4xl sm:text-5xl font-black tracking-tight">
-                    {activeSchool.studentsWithoutDocs}
-                  </span>
-                  <p className="text-xs text-blue-100 mt-1 font-medium">
-                    {Math.round((activeSchool.studentsWithoutDocs / (activeSchool.studentsWithDocs + activeSchool.studentsWithoutDocs)) * 100)}% pendentes de certidão
-                  </p>
-                </div>
-                <span className="text-[10px] text-rose-200 uppercase font-semibold tracking-wider">
-                  Acompanhamento de Registro Civil
+                <span className="text-[10px] text-blue-200 font-medium mt-1">
+                  Salas Físicas
                 </span>
               </div>
+            </div>
 
-              {/* Bottom Card 3: [Desempenho das Escolas] */}
-              <div className="bg-[#5067fc] text-white rounded-2xl p-6 flex flex-col items-center justify-between min-h-[160px] text-center shadow-md">
-                <span className="bg-[#27c1dc] text-white text-[11px] font-black uppercase px-3.5 py-1 rounded-md shadow-2xs">
-                  Desempenho das Escolas
+            {/* Card 4: Nº Turmas */}
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
+                Nº Turmas
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <span className="text-2xl sm:text-3xl font-black">
+                  {displayValues.turmasCount}
                 </span>
-                <div className="my-auto py-2">
-                  <span className="text-4xl sm:text-5xl font-black tracking-tight">
-                    {activeSchool.performanceRate}%
+                <span className="text-[10px] text-blue-200 font-medium mt-1">
+                  Turmas Ativas
+                </span>
+              </div>
+            </div>
+
+            {/* Card 5: Localização */}
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
+                Localização
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <MapPin className="w-4 h-4 text-[#27c1dc] mb-1" />
+                <span className="text-xs sm:text-sm font-bold leading-tight line-clamp-2 px-1">
+                  {displayValues.location}
+                </span>
+                <span className="text-[9px] text-blue-200 font-medium mt-1">
+                  Luanda, Angola
+                </span>
+              </div>
+            </div>
+
+            {/* Card 6: Desempenho das Escolas */}
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
+                Desempenho das Escolas
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <div className="flex items-center gap-1">
+                  <Award className="w-4 h-4 text-[#FBBF24]" />
+                  <span className="text-2xl sm:text-3xl font-black">
+                    {displayValues.performanceRate}
                   </span>
-                  <p className="text-xs text-blue-100 mt-1 font-medium">
-                    Presença média dos alunos: {activeSchool.attendanceRate}%
-                  </p>
                 </div>
-                <span className={`text-[10px] uppercase font-bold tracking-wider ${
-                  activeSchool.performanceRate >= 80 ? 'text-emerald-300' : 'text-amber-300'
-                }`}>
-                  {activeSchool.performanceRate >= 80 ? 'Classificação: Elevado Desempenho' : 'Classificação: Apoio Prioritário'}
+                <span className="text-[10px] text-blue-200 font-medium mt-1">
+                  Taxa Média ({displayValues.attendanceRate} presença)
                 </span>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Complete Network Schools Table */}
-        <div className="mt-12 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-            <h4 className="text-sm font-bold text-slate-800">
-              Listagem Geral das Escolas Integradas à Central uCore ({filteredSchools.length})
-            </h4>
-            <span className="text-xs text-slate-500 font-medium">
-              Clique em qualquer linha para inspecionar os cartões da unidade
-            </span>
+        {/* 5. Second Metrics Row (2 Documents Status Cards) matching Texto do seu parágrafo (1).png */}
+        <div className="mb-14">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto sm:mx-0">
+            {/* Card 1: Nº alunos com Documentos */}
+            <div className="flex flex-col">
+              <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
+                Nº alunos com Documentos
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-6 min-h-[160px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <span className="text-4xl sm:text-5xl font-black tracking-tight">
+                  {displayValues.studentsWithDocs}
+                </span>
+                <span className="text-xs text-blue-100 font-semibold mt-2">
+                  Regularizados com BI e Cédula
+                </span>
+                <span className="text-[10px] text-emerald-300 font-black uppercase tracking-wider mt-1 bg-white/10 px-2.5 py-0.5 rounded-full">
+                  Documentação Homologada
+                </span>
+              </div>
+            </div>
+
+            {/* Card 2: Nº alunos sem Documentos */}
+            <div className="flex flex-col">
+              <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
+                Nº alunos sem Documentos
+              </span>
+              <div className="bg-[#4f67ff] text-white rounded-2xl p-6 min-h-[160px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
+                <span className="text-4xl sm:text-5xl font-black tracking-tight text-amber-200">
+                  {displayValues.studentsWithoutDocs}
+                </span>
+                <span className="text-xs text-blue-100 font-semibold mt-2">
+                  Pendentes de Registro Civil
+                </span>
+                <span className="text-[10px] text-amber-300 font-black uppercase tracking-wider mt-1 bg-white/10 px-2.5 py-0.5 rounded-full">
+                  Em Processo de Emissão
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. Schools Explorer in Selected Municipality */}
+        <div className="mt-8 pt-8 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <SchoolIcon className="w-5 h-5 text-[#5067fc]" />
+                <span>
+                  Escolas em {selectedMunicipality === 'Todas as Escolas' ? 'Toda a Rede' : selectedMunicipality}
+                </span>
+                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                  {schoolsToDisplay.length} {schoolsToDisplay.length === 1 ? 'escola' : 'escolas'}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Clique em qualquer escola para inspecionar os seus indicadores individuais em tempo real.
+              </p>
+            </div>
+
+            {activeSchool && (
+              <button
+                onClick={() => setSelectedSchoolId(null)}
+                className="self-start sm:self-auto text-xs font-bold text-[#5067fc] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Mostrar Média da Zona
+              </button>
+            )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider">
-                <tr>
-                  <th className="p-3.5">Escola</th>
-                  <th className="p-3.5">Diretor(a)</th>
-                  <th className="p-3.5 text-center">Professores</th>
-                  <th className="p-3.5 text-center">Salas</th>
-                  <th className="p-3.5 text-center">Turmas</th>
-                  <th className="p-3.5 text-center">Total Alunos</th>
-                  <th className="p-3.5 text-center">Com Doc</th>
-                  <th className="p-3.5 text-center">Sem Doc</th>
-                  <th className="p-3.5 text-center">Desempenho</th>
-                  <th className="p-3.5">Localização</th>
-                  <th className="p-3.5 text-right">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredSchools.map((s) => {
-                  const isSelected = s.id === activeSchool?.id;
-                  const totalStudents = s.studentsWithDocs + s.studentsWithoutDocs;
-                  return (
-                    <tr
-                      key={s.id}
-                      onClick={() => setSelectedSchoolId(s.id)}
-                      className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-50/80 font-medium' : ''
-                      }`}
-                    >
-                      <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
-                        <SchoolIcon className={`w-4 h-4 ${isSelected ? 'text-[#5067fc]' : 'text-slate-400'}`} />
-                        {s.name}
-                      </td>
-                      <td className="p-3.5 text-slate-700">{s.directorName}</td>
-                      <td className="p-3.5 text-center font-bold text-slate-800">{s.teachersCount}</td>
-                      <td className="p-3.5 text-center text-slate-700">{s.roomsCount}</td>
-                      <td className="p-3.5 text-center text-slate-700">{s.turmasCount}</td>
-                      <td className="p-3.5 text-center font-bold text-slate-900">{totalStudents}</td>
-                      <td className="p-3.5 text-center text-emerald-600 font-bold">{s.studentsWithDocs}</td>
-                      <td className="p-3.5 text-center text-rose-600 font-bold">{s.studentsWithoutDocs}</td>
-                      <td className="p-3.5 text-center">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            s.performanceRate >= 80
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {s.performanceRate}%
+          {schoolsToDisplay.length === 0 ? (
+            <div className="bg-slate-50 rounded-2xl p-8 text-center border border-dashed border-slate-200">
+              <SchoolIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-700">Nenhuma escola encontrada para os filtros atuais.</p>
+              <p className="text-xs text-slate-500 mt-1">Experimente limpar a pesquisa ou selecionar outra zona.</p>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setCategoryFilter('all');
+                  setSelectedMunicipality('Todas as Escolas');
+                }}
+                className="mt-4 px-4 py-2 bg-[#5067fc] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs hover:bg-[#3f54de]"
+              >
+                Ver Todas as Escolas
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {schoolsToDisplay.map((school) => {
+                const isSelected = school.id === selectedSchoolId;
+                return (
+                  <div
+                    key={school.id}
+                    onClick={() => {
+                      setSelectedSchoolId(school.id);
+                      window.scrollTo({ top: 380, behavior: 'smooth' });
+                    }}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-blue-50/80 border-[#5067fc] ring-2 ring-[#5067fc]/20 shadow-md'
+                        : 'bg-white hover:bg-slate-50/80 border-slate-200 hover:border-slate-300 shadow-xs'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-black text-[#5067fc] uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md">
+                          {school.category}
                         </span>
-                      </td>
-                      <td className="p-3.5 text-slate-500 max-w-xs truncate">{s.location}</td>
-                      <td className="p-3.5 text-right">
+                        <div className="flex items-center gap-1.5">
+                          {school.logoSvg ? (
+                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              SVG
+                            </span>
+                          ) : null}
+                          <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                            {school.performanceRate}% Desempenho
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-2.5">
+                        {school.logoSvg ? (
+                          <div 
+                            className="w-10 h-10 shrink-0 rounded-xl p-0.5 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shadow-2xs"
+                            dangerouslySetInnerHTML={{ __html: school.logoSvg }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            title="Gerar Brasão com SVG AI"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSvgTargetSchool(school);
+                              setIsSvgModalOpen(true);
+                            }}
+                            className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 hover:bg-blue-50 border border-dashed border-slate-300 hover:border-[#5067fc] flex items-center justify-center text-slate-400 hover:text-[#5067fc] transition-colors cursor-pointer"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                        )}
+                        <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                          {school.name}
+                        </h4>
+                      </div>
+
+                      <div className="mt-2.5 space-y-1 text-xs text-slate-600">
+                        <div className="flex items-center gap-1.5">
+                          <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">Director: <strong>{school.directorName}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{school.location}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-3 text-slate-500 font-semibold text-[11px]">
+                        <span>{school.teachersCount} Profs</span>
+                        <span>•</span>
+                        <span>{school.turmasCount} Turmas</span>
+                        <span>•</span>
+                        <span>{school.studentsWithDocs + school.studentsWithoutDocs} Alunos</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedSchoolId(s.id);
+                            setSvgTargetSchool(school);
+                            setIsSvgModalOpen(true);
                           }}
-                          className="text-[#5067fc] font-bold hover:underline inline-flex items-center gap-1"
+                          className="text-[11px] font-bold text-[#5067fc] hover:underline flex items-center gap-1"
                         >
-                          Ver <ChevronRight className="w-3.5 h-3.5" />
+                          <Sparkles className="w-3 h-3" />
+                          Brasão
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        <div className="flex items-center gap-1 text-[#5067fc] font-bold">
+                          <span>{isSelected ? 'Ativa' : 'Ver'}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* SvgAiLogoModal */}
+      <SvgAiLogoModal
+        isOpen={isSvgModalOpen}
+        onClose={() => {
+          setIsSvgModalOpen(false);
+          setSvgTargetSchool(null);
+        }}
+        defaultSchoolName={svgTargetSchool ? svgTargetSchool.name : `Escolas de ${selectedMunicipality}`}
+        defaultZone={selectedMunicipality}
+        onApplyLogo={(svgCode) => {
+          if (svgTargetSchool && onUpdateSchool) {
+            onUpdateSchool({
+              ...svgTargetSchool,
+              logoSvg: svgCode,
+            });
+          }
+        }}
+      />
     </div>
   );
 };

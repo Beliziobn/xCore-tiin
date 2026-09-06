@@ -47,6 +47,12 @@ import {
   defaultDisciplinasList
 } from './data/teacherData';
 
+// Chat System Components & Mock Data
+import { SupportChatModal } from './components/chat/SupportChatModal';
+import { FloatingChatButton } from './components/chat/FloatingChatButton';
+import { initialChatChannels, initialChatMessages } from './data/chatData';
+import { realtimeChat } from './utils/realtimeChat';
+
 import type { 
   EducationalModule, 
   UserAccount, 
@@ -56,7 +62,10 @@ import type {
   AdminSchool,
   AdminTeacher,
   AdminStudent,
-  AdminDirector
+  AdminDirector,
+  ChatMessage,
+  ChatChannel,
+  ChatRole
 } from './types';
 
 export default function App() {
@@ -172,6 +181,130 @@ export default function App() {
     }
     return 'diretor'; // default to diretor as requested by user
   });
+
+  // Chat System Dynamic State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatChannels, setChatChannels] = useState<ChatChannel[]>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_chat_channels_v3');
+      if (saved) return JSON.parse(saved);
+
+      const oldSaved = localStorage.getItem('ucore_chat_channels');
+      if (oldSaved) {
+        const parsed = JSON.parse(oldSaved);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((c: ChatChannel) => typeof c.schoolName === 'string' && c.schoolName.length > 0)) {
+          return parsed;
+        }
+      }
+      return initialChatChannels;
+    } catch {
+      return initialChatChannels;
+    }
+  });
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_chat_messages');
+      return saved ? JSON.parse(saved) : initialChatMessages;
+    } catch {
+      return initialChatMessages;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_chat_messages', JSON.stringify(chatMessages));
+    } catch {
+      // ignore
+    }
+  }, [chatMessages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_chat_channels_v3', JSON.stringify(chatChannels));
+      localStorage.setItem('ucore_chat_channels', JSON.stringify(chatChannels));
+    } catch {
+      // ignore
+    }
+  }, [chatChannels]);
+
+  // Real-time synchronization across browser tabs and windows
+  useEffect(() => {
+    const unsub = realtimeChat.subscribeMessages((newMsg) => {
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+
+      setChatChannels((prev) =>
+        prev.map((c) =>
+          c.id === newMsg.channelId
+            ? {
+                ...c,
+                lastMessageSnippet: `${newMsg.senderName.split(' ')[0]}: ${newMsg.content}`,
+                lastMessageTime: 'Agora',
+              }
+            : c
+        )
+      );
+    });
+
+    return () => {
+      unsub();
+    };
+  }, []);
+
+  const unreadChatCount = useMemo(() => {
+    return chatChannels.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+  }, [chatChannels]);
+
+  const handleSendMessage = (
+    channelId: string,
+    content: string,
+    senderRole: ChatRole,
+    senderName: string,
+    schoolName?: string,
+    attachment?: {
+      name: string;
+      size: string;
+      type: 'image' | 'pdf' | 'document' | 'other';
+      url: string;
+    }
+  ) => {
+    const newMsg: ChatMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      channelId,
+      senderId: currentUser?.id || `user-${senderName.toLowerCase().replace(/\s+/g, '-')}`,
+      senderName,
+      senderRole,
+      schoolName,
+      content,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sent',
+      attachmentName: attachment?.name,
+      attachmentSize: attachment?.size,
+      attachmentType: attachment?.type,
+      attachmentUrl: attachment?.url,
+    };
+
+    setChatMessages((prev) => {
+      if (prev.some((m) => m.id === newMsg.id)) return prev;
+      return [...prev, newMsg];
+    });
+
+    setChatChannels((prev) =>
+      prev.map((c) =>
+        c.id === channelId
+          ? {
+              ...c,
+              lastMessageSnippet: `${senderName.split(' ')[0]}: ${content || (attachment ? `[${attachment.name}]` : '')}`,
+              lastMessageTime: 'Agora',
+              unreadCount: 0,
+            }
+          : c
+      )
+    );
+  };
 
   const [allSessions, setAllSessions] = useState<Record<string, SessionProfile>>(() => {
     try {
@@ -495,6 +628,10 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           schools={adminSchools}
           onOpenRegisterModal={() => setAdminModalType('school')}
+          onUpdateSchool={(updated) => {
+            setAdminSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+            showToast(`Brasão da escola "${updated.name}" atualizado com sucesso!`);
+          }}
           isLoggedIn={isSessionStarted}
         />
       );
@@ -560,6 +697,10 @@ export default function App() {
         <DirectorTeachersPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          onAddTeacherGlobal={(teacher) => {
+            setAdminTeachers((prev) => [teacher, ...prev]);
+            showToast(`Professor(a) "${teacher.name}" cadastrado(a) pela Direção Escolar com sucesso!`);
+          }}
         />
       );
     }
@@ -568,6 +709,10 @@ export default function App() {
         <DirectorStudentsPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          onAddStudentGlobal={(student) => {
+            setAdminStudents((prev) => [student, ...prev]);
+            showToast(`Aluno(a) "${student.name}" matriculado(a) pela Direção Escolar com sucesso!`);
+          }}
         />
       );
     }
@@ -872,6 +1017,8 @@ export default function App() {
           }
         }}
         onOpenSupport={() => setInfoModalType('support')}
+        onOpenChat={() => setIsChatOpen(true)}
+        unreadChatCount={unreadChatCount}
         onSelectPage={handleSelectPage}
         currentUser={currentUser}
         onLogout={handleLogout}
@@ -886,6 +1033,12 @@ export default function App() {
         onOpenAbout={() => setInfoModalType('about')}
         onOpenTerms={() => setInfoModalType('terms')}
         onOpenSupport={() => setInfoModalType('support')}
+      />
+
+      {/* Floating Support Chat Button */}
+      <FloatingChatButton
+        onClick={() => setIsChatOpen(true)}
+        unreadCount={unreadChatCount}
       />
 
       {/* Card Detail Modal */}
@@ -942,6 +1095,21 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenGetStarted={() => handleOpenAuth('login')}
+        onOpenChat={() => {
+          setInfoModalType(null);
+          setIsChatOpen(true);
+        }}
+      />
+
+      {/* Live Support & Assistance Chat Modal */}
+      <SupportChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        currentUser={currentUser}
+        activeRole={activeRole}
+        channels={chatChannels}
+        messages={chatMessages}
+        onSendMessage={handleSendMessage}
       />
     </div>
   );

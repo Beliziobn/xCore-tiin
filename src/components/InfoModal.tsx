@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ShieldCheck, Mail, MapPin, Phone, Info, User, CheckCircle, LogOut } from 'lucide-react';
+import { X, ShieldCheck, Mail, MapPin, Phone, Info, User, CheckCircle, LogOut, MessageSquare } from 'lucide-react';
 import type { UserAccount } from '../types';
 
 export type InfoModalType = 'about' | 'terms' | 'support' | 'profile' | null;
@@ -10,6 +10,7 @@ interface InfoModalProps {
   currentUser?: UserAccount | null;
   onLogout?: () => void;
   onOpenGetStarted?: () => void;
+  onOpenChat?: () => void;
 }
 
 export const InfoModal: React.FC<InfoModalProps> = ({
@@ -18,6 +19,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
   currentUser,
   onLogout,
   onOpenGetStarted,
+  onOpenChat,
 }) => {
   if (!type) return null;
 
@@ -135,6 +137,21 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                     <span className="text-xs font-black text-slate-950">Segunda a Sexta, das 07:00 às 19:00</span>
                   </div>
                 </div>
+
+                {onOpenChat && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        onClose();
+                        onOpenChat();
+                      }}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-[#5067fc] to-[#27c1dc] hover:from-[#4359eb] hover:to-[#1fb3cd] text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Abrir Chat de Suporte & Ajuda em Tempo Real
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
