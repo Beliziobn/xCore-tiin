@@ -9,7 +9,10 @@ import {
   AlertCircle, 
   Sparkles, 
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck,
+  Building2,
+  GraduationCap
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import type { UserAccount } from '../../types';
@@ -184,7 +187,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div id="auth-full-page" className="min-h-screen w-full bg-[#f8fafc] text-slate-900 flex flex-col justify-between selection:bg-[#5067fc] selection:text-white">
+    <div id="auth-full-page" className="min-h-screen w-full bg-[#f7f3f3] text-slate-900 flex flex-col justify-between selection:bg-[#5067fc] selection:text-white">
       {/* Top Header Bar */}
       <header className="w-full bg-[#4f67ff] border-b border-white/10 px-4 sm:px-8 py-3.5 shadow-sm sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -204,7 +207,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </svg>
             </div>
             <span className="text-xl font-black tracking-tight text-white uppercase">
-              u<span className="text-[#27c1dc]">Core</span>
+              u<span className="text-[#4f67ff]">Core</span>
             </span>
           </button>
 
@@ -366,37 +369,40 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       type="button"
                       id="preset-admin-btn"
                       onClick={() => handleFillPreset('admin')}
-                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
                         selectedRole === 'admin'
-                          ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      👑 Admin Fred
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Admin</span>
                     </button>
                     <button
                       type="button"
                       id="preset-diretor-btn"
                       onClick={() => handleFillPreset('diretor')}
-                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
                         selectedRole === 'diretor'
-                          ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      🏫 Dir. Carl
+                      <Building2 className="w-4 h-4" />
+                      <span>Diretor</span>
                     </button>
                     <button
                       type="button"
                       id="preset-professor-btn"
                       onClick={() => handleFillPreset('professor')}
-                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
                         selectedRole === 'professor'
-                          ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      👨‍🏫 Prof. Santar
+                      <GraduationCap className="w-4 h-4" />
+                      <span>Professor</span>
                     </button>
                   </div>
                 </div>
@@ -502,7 +508,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div className="max-w-md mx-auto w-full space-y-5">
                 {/* Heading */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-[#27c1dc] tracking-widest bg-cyan-50 px-2.5 py-1 rounded-full mb-2">
+                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-[#4f67ff] tracking-widest bg-blue-50 px-2.5 py-1 rounded-full mb-2">
                     Novo Cadastro Escolar
                   </div>
                   <h1 className="text-3xl sm:text-4xl font-black uppercase text-slate-900 tracking-tight">

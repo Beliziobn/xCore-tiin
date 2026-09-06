@@ -39,7 +39,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
   const activeTeacher = teachers.find((t) => t.id === selectedTeacherId) || filteredTeachers[0] || teachers[0];
 
   return (
-    <div id="admin-teachers-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-teachers-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero Header: "Meus Professores" matching 12.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -112,7 +112,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
           <button
             id="admin-btn-cadastrar-professor"
             onClick={onOpenRegisterModal}
-            className="flex items-center justify-center gap-2 bg-[#27c1dc] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center justify-center gap-2 bg-[#4f67ff] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             Cadastrar
@@ -138,7 +138,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {/* Card 1: [Nome] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Nome
                 </span>
                 <span className="text-xs sm:text-sm font-bold my-auto leading-snug px-1">
@@ -151,7 +151,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
               {/* Card 2: [Telefone] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Telefone
                 </span>
                 <span className="text-xs sm:text-sm font-bold my-auto leading-tight px-1 font-mono">
@@ -162,7 +162,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
               {/* Card 3: [Classe] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Classe
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
@@ -173,7 +173,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
               {/* Card 4: [Sala] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Sala
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
@@ -184,7 +184,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
               {/* Card 5: [Turma] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Turma
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
@@ -195,7 +195,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
               {/* Card 6: [Categoria] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Categoria
                 </span>
                 <span className="text-[11px] sm:text-xs font-bold my-auto leading-snug px-1">
@@ -206,7 +206,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
               {/* Card 7: [Localização] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Localização
                 </span>
                 <span className="text-[11px] sm:text-xs font-semibold my-auto leading-tight px-1">

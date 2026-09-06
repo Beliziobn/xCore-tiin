@@ -243,7 +243,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
           </button>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-white/20">
-            <GraduationCap className="w-3.5 h-3.5 text-[#27c1dc]" />
+            <GraduationCap className="w-3.5 h-3.5 text-[#4f67ff]" />
             Secretaria & Matrículas • uCore
           </div>
 

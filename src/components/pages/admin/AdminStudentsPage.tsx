@@ -72,7 +72,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
   }, [schools, schoolFilter]);
 
   return (
-    <div id="admin-students-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-students-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero Header: "Meus alunos" matching 14.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -160,7 +160,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
           <button
             id="admin-btn-cadastrar-aluno"
             onClick={onOpenRegisterModal}
-            className="flex items-center justify-center gap-2 bg-[#27c1dc] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center justify-center gap-2 bg-[#4f67ff] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             Cadastrar
@@ -186,7 +186,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {/* Card 1: [Nome] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Nome
                 </span>
                 <span className="text-xs sm:text-sm font-bold my-auto leading-snug px-1">
@@ -199,7 +199,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Card 2: [Classe] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Classe
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
@@ -210,7 +210,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Card 3: [Sala] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Sala
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
@@ -221,7 +221,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Card 4: [Turma] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Turma
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
@@ -232,7 +232,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Card 5: [Nome dos Encarregados] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Nome dos Encarregados
                 </span>
                 <span className="text-[11px] sm:text-xs font-bold my-auto leading-tight px-1">
@@ -243,7 +243,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Card 6: [Localização] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Localização
                 </span>
                 <span className="text-[11px] sm:text-xs font-semibold my-auto leading-tight px-1">
@@ -254,7 +254,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Card 7: [Presença] */}
               <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
-                <span className="bg-[#27c1dc] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Presença
                 </span>
                 <span className="text-2xl sm:text-3xl font-black my-auto">
@@ -268,7 +268,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {/* Bottom Card 1: [Nº alunos com Documentos] */}
               <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#27c1dc] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
                   Nº alunos com Documentos
                 </span>
                 <div className="my-auto py-2">
@@ -284,7 +284,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Bottom Card 2: [Nº alunos sem Documentos] */}
               <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#27c1dc] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
                   Nº alunos sem Documentos
                 </span>
                 <div className="my-auto py-2">
@@ -300,7 +300,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Bottom Card 3: [Desempenho do aluno] */}
               <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#27c1dc] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
                   Desempenho do aluno
                 </span>
                 <div className="my-auto py-2">
@@ -316,7 +316,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
               {/* Bottom Card 4: [Presença dos alunos] */}
               <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#27c1dc] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
+                <span className="bg-[#4f67ff] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
                   Presença dos alunos
                 </span>
                 <div className="my-auto py-2">

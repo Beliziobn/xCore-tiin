@@ -112,8 +112,8 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
             <X className="w-5 h-5" />
           </button>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#27c1dc]/10 text-[#0284c7] text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-[#27c1dc]/30">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#27c1dc]" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#4f67ff]/10 text-[#0284c7] text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-[#4f67ff]/30">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#4f67ff]" />
             Gabinete de Direção • uCore
           </div>
 
@@ -268,7 +268,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                       id="doc-check"
                       checked={hasDocuments}
                       onChange={(e) => setHasDocuments(e.target.checked)}
-                      className="w-4 h-4 text-[#27c1dc] rounded-sm focus:ring-[#27c1dc]"
+                      className="w-4 h-4 text-[#4f67ff] rounded-sm focus:ring-[#4f67ff]"
                     />
                     <label htmlFor="doc-check" className="text-xs font-bold text-slate-800 cursor-pointer">
                       Documentação completa apresentada (BI / Cédula / Certidão)
@@ -320,7 +320,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2.5 rounded-full bg-[#27c1dc] hover:bg-[#1fb0c8] text-white text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-full bg-[#4f67ff] hover:bg-[#3547cf] text-white text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2"
                 >
                   {isSubmitting ? (
                     <span>Salvando...</span>

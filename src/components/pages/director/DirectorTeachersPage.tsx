@@ -81,7 +81,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   };
 
   return (
-    <div id="director-teachers-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-teachers-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Meus Professores" matching 11.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -93,7 +93,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Institutional Authority Card */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-blue-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
               <ShieldCheck className="w-5 h-5" />
@@ -179,7 +179,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
           <button
             id="btn-cadastrar-professor"
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar</span>
@@ -210,7 +210,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
           {/* Card 1: [Nome] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
               Nome
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
@@ -225,7 +225,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Card 2: [Nome da Escola] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
               Nome da Escola
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
@@ -238,7 +238,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Card 3: [Classe] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
               Classe
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
@@ -251,7 +251,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Card 4: [Sala] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
               Sala
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
@@ -264,7 +264,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Card 5: [Turma] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
               Turma
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
@@ -277,7 +277,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Card 6: [Nome dos Directores] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
               Nome dos Directores
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
@@ -290,7 +290,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Card 7: [Localização] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
               Localização
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
@@ -306,7 +306,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Card: [Presença dos Professores] */}
           <div className="lg:col-span-4 flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Presença dos Professores
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[260px]">
@@ -343,7 +343,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Card: [Horário das Aulas] */}
           <div className="lg:col-span-8 flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Horário das Aulas
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[260px]">

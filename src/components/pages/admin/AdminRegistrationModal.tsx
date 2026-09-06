@@ -485,7 +485,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-[#27c1dc] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#4f67ff] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Salvar e Adicionar à Rede
@@ -622,7 +622,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-[#27c1dc] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#4f67ff] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Cadastrar Professor
@@ -797,7 +797,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-[#27c1dc] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#4f67ff] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Matricular Aluno
@@ -868,7 +868,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-[#27c1dc] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#4f67ff] hover:bg-[#1fb3cd] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Homologar Diretor

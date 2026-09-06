@@ -55,7 +55,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
   const ySteps = [5000, 3750, 2500, 1250, 0];
 
   return (
-    <div id="admin-statistics-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-statistics-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero Header: "Analisa as suas estatísticas" matching 9.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -169,7 +169,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-4">
-                  <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Alunos
                   </span>
                 </div>
@@ -238,7 +238,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Desempenho das escolas
                   </span>
                   <span className="text-xs font-bold text-[#5067fc] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
@@ -311,7 +311,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Presença
                   </span>
                   <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
@@ -399,7 +399,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Alunos sem documentos
                   </span>
                   <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
@@ -471,7 +471,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Alunos com documentos
                   </span>
                   <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">

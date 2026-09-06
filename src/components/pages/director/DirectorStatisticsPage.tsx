@@ -19,7 +19,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
   isLoggedIn,
 }) => {
   return (
-    <div id="director-statistics-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-statistics-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Analisa as suas estatísticas" matching 5.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -100,7 +100,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 1: [Alunos] (Gênero) */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Alunos
                 </span>
               </div>
@@ -131,10 +131,10 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                   <div className="flex flex-col items-center gap-1 group">
                     <span className="text-[11px] font-bold text-[#0284c7]">741</span>
                     <div
-                      className="w-11 bg-[#27c1dc] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
+                      className="w-11 bg-[#4f67ff] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
                       style={{ height: '42px' }}
                     />
-                    <div className="text-xs mt-1 text-[#27c1dc] font-bold text-center">
+                    <div className="text-xs mt-1 text-[#4f67ff] font-bold text-center">
                       <span className="text-lg leading-none">♂</span>
                     </div>
                   </div>
@@ -148,7 +148,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 2: [Desempenho dos alunos] (2017.1 to 2019.2) */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Desempenho dos alunos
                 </span>
               </div>
@@ -196,7 +196,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 3: [Presença] (EAD vs Presencial Trend lines) */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Presença
                 </span>
               </div>
@@ -270,7 +270,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 4: [Alunos sem documentos] */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Alunos sem documentos
                 </span>
               </div>
@@ -300,10 +300,10 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                   <div className="flex flex-col items-center gap-1 group">
                     <span className="text-[11px] font-bold text-[#0284c7]">741</span>
                     <div
-                      className="w-12 bg-[#27c1dc] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
+                      className="w-12 bg-[#4f67ff] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
                       style={{ height: '38px' }}
                     />
-                    <div className="text-xs mt-1 text-[#27c1dc] font-bold">
+                    <div className="text-xs mt-1 text-[#4f67ff] font-bold">
                       <span className="text-lg leading-none">♂</span>
                     </div>
                   </div>
@@ -317,7 +317,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 5: [Alunos com documentos] */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Alunos com documentos
                 </span>
               </div>
@@ -347,10 +347,10 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                   <div className="flex flex-col items-center gap-1 group">
                     <span className="text-[11px] font-bold text-[#0284c7]">741</span>
                     <div
-                      className="w-12 bg-[#27c1dc] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
+                      className="w-12 bg-[#4f67ff] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
                       style={{ height: '38px' }}
                     />
-                    <div className="text-xs mt-1 text-[#27c1dc] font-bold">
+                    <div className="text-xs mt-1 text-[#4f67ff] font-bold">
                       <span className="text-lg leading-none">♂</span>
                     </div>
                   </div>

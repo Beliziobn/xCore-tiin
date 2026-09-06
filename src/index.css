@@ -1,56 +1,84 @@
 @import "tailwindcss";
 
 @theme {
+  /* Type system — professional pairing */
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
   --font-chau: 'Chau Philomene One', sans-serif;
-  --font-sans: 'Chau Philomene One', sans-serif;
-  --font-mono: 'Chau Philomene One', monospace, sans-serif;
-}
 
-*,
-*::before,
-*::after {
-  font-family: 'Chau Philomene One', sans-serif !important;
+  /* Brand color system — one primary, one accent, disciplined neutrals */
+  --color-brand: #4f67ff;
+  --color-brand-600: #4056ea;
+  --color-brand-700: #3547cf;
+  --color-brand-50: #eef1ff;
+  --color-brand-100: #dfe4ff;
+
+  /* Accent lives inside the brand hue — a lighter periwinkle, used sparingly for tonal depth only */
+  --color-accent: #6d84ff;
+  --color-accent-600: #4f67ff;
+  --color-accent-50: #eef1ff;
+
+  --color-ink: #0b1020;
+  --color-ink-soft: #475569;
+
+  /* Global page surface — soft off-white to avoid harsh pure white */
+  --color-background: #f7f3f3;
+
+  --radius: 0.875rem;
 }
 
 @layer base {
   html,
   body,
   #root {
-    font-family: 'Chau Philomene One', sans-serif !important;
-    color: #0F172A;
-    background-color: #FFFFFF;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background-color: var(--color-background);
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  h1, h2, h3, h4, h5, h6,
-  p, span, a, button, input, select, textarea,
-  label, div, small, strong, em, b, i,
-  th, td, li, ul, ol, nav, footer, header, main, section,
-  legend, caption, code, pre, time, figure, figcaption {
-    font-family: 'Chau Philomene One', sans-serif !important;
+  /* Display font for headings — restrained, modern, technical */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
-  button, input, select, textarea {
-    font-family: 'Chau Philomene One', sans-serif !important;
+  /* Body copy and controls use the humanist sans for legibility */
+  p, span, a, li, label, small, strong, em, td, th,
+  input, select, textarea, button {
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background-color: var(--color-brand);
+    color: #ffffff;
   }
 }
 
+/* Optional utilities kept for explicit use */
 .font-chau {
-  font-family: 'Chau Philomene One', sans-serif !important;
+  font-family: var(--font-chau);
+}
+.font-display {
+  font-family: var(--font-display);
 }
 
-/* Custom crisp light scrollbar */
+/* Refined, minimal scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #FFFFFF;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 4px;
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3B82F6;
+  background: var(--color-brand);
 }

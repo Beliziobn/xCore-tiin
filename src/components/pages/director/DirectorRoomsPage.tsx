@@ -58,7 +58,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   };
 
   return (
-    <div id="director-rooms-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="director-rooms-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero: "Minhas Salas" matching 15.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -151,7 +151,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
           <button
             id="btn-cadastrar-sala"
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar</span>
@@ -183,7 +183,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
           {/* Card 1: [Nº Salas] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Nº Salas
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -199,7 +199,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
 
           {/* Card 2: [Nº Turmas] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Nº Turmas
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -217,7 +217,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
 
           {/* Card 3: [Periodo] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Periodo
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -235,7 +235,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
 
           {/* Card 4: [Classes] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Classes
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -253,7 +253,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
 
           {/* Card 5: [Nome dos Professores] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Nome dos Professores
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">

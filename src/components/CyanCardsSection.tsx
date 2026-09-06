@@ -97,11 +97,14 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
   return (
     <section id="cyan-modules-section" className="w-full pt-16 pb-24 px-4 sm:px-8 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="mb-10 border-b border-slate-200 pb-6">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tighter text-slate-950">
-          MÓDULOS UCORE
+      <div className="mb-10 pb-6 border-b border-slate-200">
+        <span className="text-xs font-semibold tracking-[0.14em] uppercase text-[#4f67ff]">
+          Módulos
+        </span>
+        <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance">
+          Tudo o que a sua escola precisa
         </h2>
-        <p className="text-xs sm:text-sm uppercase tracking-[0.1em] text-slate-500 mt-2 max-w-xl font-medium">
+        <p className="text-sm text-slate-500 mt-3 max-w-xl leading-relaxed">
           Sistemas unificados para gestão integrada de secretarias, corpo docente e comunidade escolar.
         </p>
       </div>
@@ -113,22 +116,27 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
             key={module.id}
             id={`cyan-card-${module.id}`}
             onClick={() => handleModuleClick(module)}
-            className="h-72 sm:h-80 bg-[#14C5E9] hover:bg-[#3B82F6] rounded-[28px] shadow-[0_8px_30px_rgba(20,197,233,0.3)] hover:shadow-[0_12px_40px_rgba(59,130,246,0.4)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col justify-between p-6 text-white group border border-white/20 relative"
+            className="h-72 sm:h-80 bg-white hover:border-[#4f67ff]/40 rounded-2xl shadow-[0_1px_2px_rgba(11,16,32,0.04)] hover:shadow-[0_20px_40px_-16px_rgba(79,103,255,0.35)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between p-6 group border border-slate-200 relative"
           >
-            {!isLoggedIn && (
-              <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-black/20 backdrop-blur-xs flex items-center justify-center text-white/90">
-                <Lock className="w-3.5 h-3.5" />
+            <div className="flex items-start justify-between">
+              <div className="w-11 h-11 rounded-xl bg-[#eef1ff] group-hover:bg-[#4f67ff] flex items-center justify-center text-[#4f67ff] group-hover:text-white font-display font-bold text-sm transition-colors duration-300">
+                {String(idx + 1).padStart(2, '0')}
               </div>
-            )}
-            <div className="w-10 h-10 rounded-full bg-black/15 flex items-center justify-center text-white font-black text-xs tracking-wider">
-              0{idx + 1}
+              {!isLoggedIn && (
+                <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                  <Lock className="w-3.5 h-3.5" />
+                </div>
+              )}
             </div>
             <div>
-              <h4 className="font-black text-xl text-white uppercase tracking-tight group-hover:translate-x-1 transition-transform">
+              <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-slate-400 mb-1.5">
+                {module.subtitle}
+              </p>
+              <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-snug">
                 {module.title}
               </h4>
-              <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-white/80 mt-1">
-                {module.subtitle}
+              <p className="text-sm text-slate-500 mt-2 leading-relaxed line-clamp-3">
+                {module.description}
               </p>
             </div>
           </div>

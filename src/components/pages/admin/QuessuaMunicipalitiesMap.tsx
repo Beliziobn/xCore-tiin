@@ -56,7 +56,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
             if (isSelected) {
               fillColor = '#4f67fc'; // Royal blue
             } else if (isHovered) {
-              fillColor = '#27c1dc'; // Vibrant cyan
+              fillColor = '#4f67ff'; // Vibrant cyan
             }
 
             return (
@@ -170,7 +170,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
           <div
             className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-slate-900/90 text-white px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 shadow-lg backdrop-blur-sm animate-in fade-in zoom-in-95 duration-150 border border-slate-700/50"
           >
-            <MapPin className="w-3.5 h-3.5 text-[#27c1dc]" />
+            <MapPin className="w-3.5 h-3.5 text-[#4f67ff]" />
             <span className="font-bold">{hoveredZone}</span>
             <span className="text-slate-300 border-l border-slate-700 pl-2">
               {municipalitiesSummary[hoveredZone]?.schoolsCount || 0} escolas

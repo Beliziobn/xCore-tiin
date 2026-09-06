@@ -579,10 +579,10 @@ export default function App() {
   // If user navigated to Login or Register, render the dedicated full page!
   if (currentPage === 'login' || currentPage === 'register') {
     return (
-      <div className="min-h-screen bg-white text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
+      <div className="min-h-screen bg-[#f7f3f3] text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
         {toastMessage && (
           <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-[#27c1dc] animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-[#4f67ff] animate-ping" />
             <span>{toastMessage}</span>
           </div>
         )}
@@ -990,11 +990,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
+    <div className="min-h-screen bg-[#f7f3f3] text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
       {/* Toast Alert Notification */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-[#27c1dc] animate-ping" />
+          <span className="w-2 h-2 rounded-full bg-[#4f67ff] animate-ping" />
           <span>{toastMessage}</span>
         </div>
       )}

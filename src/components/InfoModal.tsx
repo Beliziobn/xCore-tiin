@@ -145,7 +145,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                         onClose();
                         onOpenChat();
                       }}
-                      className="w-full py-3 px-4 bg-gradient-to-r from-[#5067fc] to-[#27c1dc] hover:from-[#4359eb] hover:to-[#1fb3cd] text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-3 px-4 bg-gradient-to-r from-[#5067fc] to-[#4f67ff] hover:from-[#4359eb] hover:to-[#1fb3cd] text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
                       <MessageSquare className="w-4 h-4" />
                       Abrir Chat de Suporte & Ajuda em Tempo Real

@@ -20,7 +20,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   const totalTeachers = schools.reduce((acc, s) => acc + s.teachersCount, 0);
 
   return (
-    <div id="admin-profile-page" className="w-full min-h-screen bg-[#fcfcfd]">
+    <div id="admin-profile-page" className="w-full min-h-screen bg-[#f7f3f3]">
       {/* Hero */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -33,7 +33,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
         {/* Profile Card */}
         <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-md">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 pb-8 border-b border-slate-100">
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-[#5067fc] to-[#27c1dc] text-white font-black text-3xl flex items-center justify-center shadow-lg">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-[#5067fc] to-[#4f67ff] text-white font-black text-3xl flex items-center justify-center shadow-lg">
               AF
             </div>
             <div className="text-center sm:text-left flex-1">

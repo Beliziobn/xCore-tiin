@@ -29,11 +29,20 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
   return (
     <section
       id="ucore-hero-section"
-      className="relative w-full bg-[#4f67ff] rounded-b-[12px] border-b border-[#3b52e6] shadow-[0_10px_30px_rgba(79,103,255,0.2)] pt-10 sm:pt-16 pb-16 sm:pb-24 px-4 sm:px-8 lg:px-16 overflow-hidden"
+      className="relative w-full bg-gradient-to-br from-[#4f67ff] via-[#4a60fb] to-[#3547cf] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(79,103,255,0.55)] pt-10 sm:pt-16 pb-16 sm:pb-24 px-4 sm:px-8 lg:px-16 overflow-hidden"
     >
+      {/* Fine grid texture for depth */}
+      <div
+        className="absolute inset-0 opacity-[0.07] pointer-events-none"
+        style={{
+          backgroundImage:
+            'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
+          backgroundSize: '56px 56px',
+        }}
+      />
       {/* Subtle ambient lighting with scroll shift */}
       <div
-        className="absolute top-0 right-1/4 w-96 h-96 bg-white/10 rounded-full blur-[120px] pointer-events-none transition-transform duration-100 ease-out"
+        className="absolute -top-20 right-1/4 w-[28rem] h-[28rem] bg-[#8b9dff]/25 rounded-full blur-[130px] pointer-events-none transition-transform duration-100 ease-out"
         style={{ transform: `translateY(${scrollY * 0.15}px)` }}
       />
 
@@ -54,23 +63,32 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
             </div>
           ) : (
             <>
+              {/* Eyebrow */}
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3.5 py-1.5 backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#8b9dff]" />
+                <span className="text-[11px] font-semibold tracking-[0.14em] uppercase text-white/85">
+                  Plataforma de Gestão Educacional
+                </span>
+              </div>
+
               {/* Main Headline */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.1]">
+              <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.05] text-balance">
                 Bem-vindo à<br />
-                <span className="text-white">Central uCore</span>
+                <span className="text-[#c9d2ff]">Central uCore</span>
               </h1>
 
               {/* Subtitle */}
-              <div className="mt-4 max-w-xl text-white/90">
-                <p className="text-xs sm:text-sm font-medium tracking-wide text-white/90 leading-relaxed">
-                  Priorizamos a melhor organização da Educação
+              <div className="mt-5 max-w-md">
+                <p className="text-sm sm:text-base font-normal text-white/75 leading-relaxed">
+                  Organizamos escolas, professores e alunos num só lugar — dados
+                  claros e decisões pedagógicas mais rápidas.
                 </p>
               </div>
 
               {/* Dynamic Session Greeting */}
               {greeting && (
                 <div className="mt-6 sm:mt-8">
-                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white drop-shadow-sm">
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white drop-shadow-sm">
                     {greeting}
                   </h2>
                 </div>
@@ -80,15 +98,18 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
 
           {/* Action Button: only visible if user has NOT started a session */}
           {!isLoggedIn && (
-            <div className="mt-7 flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4">
               <button
                 id="hero-entrar-btn"
                 onClick={onOpenGetStarted}
-                className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white hover:text-white font-black text-[11px] uppercase tracking-[0.2em] px-7 py-3 rounded-full transition-all duration-300 cursor-pointer flex items-center gap-2.5 group shadow-md hover:shadow-xl active:scale-95"
+                className="bg-white hover:bg-[#f3f5ff] text-[#3547cf] font-semibold text-sm px-7 py-3.5 rounded-full transition-all duration-300 cursor-pointer flex items-center gap-2.5 group shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)] hover:shadow-[0_14px_36px_-8px_rgba(0,0,0,0.45)] active:scale-[0.98]"
               >
-                <span className="text-white">Entrar na Central</span>
-                <span className="group-hover:translate-x-1 transition-transform text-white">→</span>
+                <span>Entrar na Central</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
               </button>
+              <span className="text-xs text-white/60 font-medium">
+                Acesso para Administração, Direção e Docentes
+              </span>
             </div>
           )}
         </div>
@@ -99,42 +120,35 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
             className="relative w-[280px] h-[280px] sm:w-[360px] sm:h-[360px] md:w-[390px] md:h-[390px] flex items-center justify-center transition-transform duration-100 ease-out"
             style={{ transform: `translateY(${Math.min(40, scrollY * 0.12)}px)` }}
           >
-            {/* Architectural decorative frames */}
-            <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-white/20 scale-110 pointer-events-none" />
+            {/* Concentric brand rings */}
+            <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-white/15 scale-110 pointer-events-none" />
             <div
-              className="absolute inset-0 m-auto w-full h-full rounded-full border border-dashed border-white/40 scale-125 pointer-events-none transition-transform duration-200"
+              className="absolute inset-0 m-auto w-full h-full rounded-full border border-dashed border-white/25 scale-125 pointer-events-none transition-transform duration-200"
               style={{ transform: `rotate(${scrollY * 0.05}deg) scale(1.25)` }}
             />
 
-            {/* Wavy line decorative SVG pattern */}
-            <div className="absolute -top-3 right-4 sm:right-8 z-20 pointer-events-none opacity-90">
-              <svg width="100" height="50" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M5 15C20 5 35 25 50 15C65 5 80 25 95 15C105 8 112 12 115 15"
-                  stroke="#27c1dc"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M10 32C25 22 40 42 55 32C70 22 85 42 100 32C108 27 114 30 118 32"
-                  stroke="#FBBF24"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-
-            {/* Main background circle */}
-            <div className="absolute inset-0 m-auto w-[260px] h-[260px] sm:w-[330px] sm:h-[330px] rounded-full bg-[#FBBF24] shadow-[0_15px_40px_rgba(251,191,36,0.35)]" />
+            {/* Accent-lit backing disc */}
+            <div className="absolute inset-0 m-auto w-[260px] h-[260px] sm:w-[330px] sm:h-[330px] rounded-full bg-gradient-to-br from-[#6d84ff] to-[#3547cf] shadow-[0_24px_60px_-12px_rgba(53,71,207,0.5)]" />
 
             {/* Teacher & students cut out image */}
-            <div className="relative w-[260px] h-[260px] sm:w-[330px] sm:h-[330px] rounded-full overflow-hidden border-4 border-white shadow-2xl flex items-end justify-center group">
+            <div className="relative w-[260px] h-[260px] sm:w-[330px] sm:h-[330px] rounded-full overflow-hidden border-4 border-white/90 shadow-2xl flex items-end justify-center group">
               <img
                 src={heroImg}
                 alt="Professora e alunos felizes na Central uCore"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-500"
               />
+            </div>
+
+            {/* Floating stat chip */}
+            <div className="absolute -bottom-2 -left-2 sm:left-0 z-20 bg-white rounded-2xl shadow-[0_16px_40px_-12px_rgba(11,16,32,0.35)] px-4 py-3 flex items-center gap-3 border border-slate-100">
+              <div className="w-9 h-9 rounded-xl bg-[#eef1ff] flex items-center justify-center text-[#4f67ff] font-bold text-sm font-display">
+                +12
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold text-slate-900 font-display">Escolas ativas</p>
+                <p className="text-[11px] text-slate-500 font-medium">Gestão centralizada</p>
+              </div>
             </div>
           </div>
         </div>

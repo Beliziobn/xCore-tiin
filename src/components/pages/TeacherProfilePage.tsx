@@ -71,7 +71,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
         <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-5 gap-3.5 sm:gap-4">
           {/* 1. Nº Turma */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Nº Turma
             </span>
             <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
@@ -81,7 +81,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
           {/* 2. Periodo */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Periodo
             </span>
             <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
@@ -91,7 +91,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
           {/* 3. Classe */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Classe
             </span>
             <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
@@ -101,7 +101,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
           {/* 4. Sala */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Sala
             </span>
             <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
@@ -111,7 +111,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
           {/* 5. Telefone */}
           <div className="flex flex-col items-start group col-span-2 sm:col-span-1">
-            <span className="inline-block bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Telefone
             </span>
             <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
@@ -125,7 +125,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 items-start">
         {/* Left Column: Cyan Badge "Nº de alunos" over Blue Card (matching 18.png) */}
         <div className="lg:col-span-3 flex flex-col items-start">
-          <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Nº de alunos
           </span>
           <div className="w-full bg-[#5067fc] text-white rounded-[24px] p-6 shadow-[0_12px_32px_rgba(80,103,252,0.25)] flex flex-col items-center justify-center min-h-[200px] text-center">

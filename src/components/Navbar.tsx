@@ -99,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Dynamic Scroll Progress Bar */}
         <div
           id="navbar-scroll-progress"
-          className="absolute top-0 left-0 h-[3px] bg-[#27c1dc] transition-all duration-100 ease-out shadow-[0_0_8px_#27c1dc]"
+          className="absolute top-0 left-0 h-[3px] bg-[#4f67ff] transition-all duration-100 ease-out shadow-[0_0_8px_#4f67ff]"
           style={{ width: `${scrollProgress}%` }}
         />
 
@@ -170,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <Award className="w-3.5 h-3.5 text-[#4f67ff]" />
                       <span>Estatísticas da Rede</span>
                     </button>
                     <button
@@ -190,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <User className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <User className="w-3.5 h-3.5 text-[#4f67ff]" />
                       <span>Meus Directores</span>
                     </button>
                     <button
@@ -243,7 +243,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <Award className="w-3.5 h-3.5 text-[#4f67ff]" />
                       <span>Analisa suas estatísticas</span>
                     </button>
                     <button
@@ -283,7 +283,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <BookOpen className="w-3.5 h-3.5 text-[#4f67ff]" />
                       <span>Minhas Classes</span>
                     </button>
                     <button
@@ -336,7 +336,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#27c1dc]" />
+                      <BookOpen className="w-3.5 h-3.5 text-[#4f67ff]" />
                       <span>Perfil do Aluno (Albert)</span>
                     </button>
                   </>
@@ -525,7 +525,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="navbar-comecar-btn"
                 onClick={onNavigateToRegister || onOpenGetStarted}
-                className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-bold text-[10px] uppercase tracking-[0.15em] px-4 sm:px-5 py-2 rounded-full transition-all duration-300 cursor-pointer shadow-sm hover:shadow flex items-center gap-1.5 active:scale-95"
+                className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-bold text-[10px] uppercase tracking-[0.15em] px-4 sm:px-5 py-2 rounded-full transition-all duration-300 cursor-pointer shadow-sm hover:shadow flex items-center gap-1.5 active:scale-95"
               >
                 Começar
               </button>
@@ -829,7 +829,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     (onNavigateToRegister || onOpenGetStarted)();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer shadow-sm"
+                  className="w-full bg-[#4f67ff] hover:bg-[#3547cf] text-white font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer shadow-sm"
                 >
                   Começar
                 </button>
