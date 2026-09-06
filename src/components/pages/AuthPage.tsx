@@ -207,7 +207,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </svg>
             </div>
             <span className="text-xl font-black tracking-tight text-white uppercase">
-              u<span className="text-[#27c1dc]">Core</span>
+              u<span className="text-[#4f67ff]">Core</span>
             </span>
           </button>
 
@@ -508,7 +508,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div className="max-w-md mx-auto w-full space-y-5">
                 {/* Heading */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-[#27c1dc] tracking-widest bg-cyan-50 px-2.5 py-1 rounded-full mb-2">
+                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-[#4f67ff] tracking-widest bg-blue-50 px-2.5 py-1 rounded-full mb-2">
                     Novo Cadastro Escolar
                   </div>
                   <h1 className="text-3xl sm:text-4xl font-black uppercase text-slate-900 tracking-tight">

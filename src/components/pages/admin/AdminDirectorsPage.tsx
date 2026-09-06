@@ -107,7 +107,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
           <button
             id="admin-btn-cadastrar-director"
             onClick={onOpenRegisterModal}
-            className="flex items-center justify-center gap-2 bg-[#27c1dc] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center justify-center gap-2 bg-[#4f67ff] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             Cadastrar
@@ -125,7 +125,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="text-xl sm:text-2xl font-black">{activeDirector.name}</h3>
-                    <span className="bg-[#27c1dc] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded shadow-xs">
+                    <span className="bg-[#4f67ff] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded shadow-xs">
                       {activeDirector.status}
                     </span>
                   </div>

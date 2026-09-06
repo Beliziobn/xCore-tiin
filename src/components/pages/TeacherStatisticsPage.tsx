@@ -136,7 +136,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           {/* Chart 1: Alunos (Gênero) */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex flex-col">
             <div className="mb-4">
-              <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
+              <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
                 Alunos
               </span>
             </div>
@@ -192,7 +192,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           {/* Chart 2: Desempenho dos alunos (Semestres) */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex flex-col">
             <div className="mb-4">
-              <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
+              <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
                 Desempenho dos alunos
               </span>
             </div>
@@ -248,7 +248,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           {/* Chart 3: Presença (EAD vs Presencial) */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex flex-col">
             <div className="mb-4">
-              <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
+              <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
                 Presença
               </span>
             </div>
@@ -322,7 +322,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           {/* Chart 4: Alunos sem documentos */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex flex-col">
             <div className="mb-4">
-              <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
+              <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
                 Alunos sem documentos
               </span>
             </div>
@@ -366,7 +366,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           {/* Chart 5: Alunos com documentos */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex flex-col">
             <div className="mb-4">
-              <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
+              <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
                 Alunos com documentos
               </span>
             </div>

@@ -133,7 +133,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
           <button
             id="btn-cadastrar-classe"
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar</span>
@@ -164,7 +164,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
           {/* Card 1: [Nome] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Nome
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -180,7 +180,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
 
           {/* Card 2: [Periodo] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Periodo
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -198,7 +198,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
 
           {/* Card 3: [Sala] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Sala
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -214,7 +214,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
 
           {/* Card 4: [Nº Alunos] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Nº Alunos
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
@@ -232,7 +232,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
 
           {/* Card 5: [Nome dos Professores] */}
           <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
               Nome dos Professores
             </span>
             <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">

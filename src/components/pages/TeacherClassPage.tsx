@@ -71,7 +71,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 mb-14">
         {/* 1. Nº Turma */}
         <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Nº Turma
           </span>
           <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
@@ -81,7 +81,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
 
         {/* 2. Periodo */}
         <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Periodo
           </span>
           <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
@@ -91,7 +91,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
 
         {/* 3. Classe */}
         <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Classe
           </span>
           <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
@@ -101,7 +101,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
 
         {/* 4. Sala */}
         <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Sala
           </span>
           <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-3 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
@@ -111,7 +111,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
 
         {/* 5. Nº Alunos */}
         <div className="flex flex-col items-start group col-span-2 sm:col-span-1">
-          <span className="inline-block bg-[#27c1dc] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Nº Alunos
           </span>
           <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
@@ -172,7 +172,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
               onClick={() => setFilterDoc('docs')}
               className={`px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${
                 filterDoc === 'docs'
-                  ? 'bg-[#27c1dc] text-white shadow-xs'
+                  ? 'bg-[#4f67ff] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -287,7 +287,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
 
                 <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-[#27c1dc]" />
+                    <Award className="w-3.5 h-3.5 text-[#4f67ff]" />
                     <span className="text-xs font-bold text-slate-700">Média:</span>
                     <span className="text-xs font-black text-[#5067fc]">{avgMedia} val</span>
                   </div>

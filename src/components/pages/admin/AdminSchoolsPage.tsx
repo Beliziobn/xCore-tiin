@@ -164,7 +164,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             <svg width="90" height="45" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M5 15C20 5 35 25 50 15C65 5 80 25 95 15C105 8 112 12 115 15"
-                stroke="#27c1dc"
+                stroke="#4f67ff"
                 strokeWidth="3.5"
                 strokeLinecap="round"
               />
@@ -251,7 +251,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             <button
               id="admin-btn-cadastrar-escola"
               onClick={onOpenRegisterModal}
-              className="flex items-center justify-center gap-2 bg-[#27c1dc] hover:bg-[#20b2cc] text-white text-xs font-bold tracking-wide px-6 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-2 bg-[#4f67ff] hover:bg-[#20b2cc] text-white text-xs font-bold tracking-wide px-6 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               Cadastrar
@@ -340,7 +340,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 </span>
                 <div className="bg-[#4f67ff] text-white rounded-2xl p-5 min-h-[100px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
                   <div className="flex items-center gap-2">
-                    <UserCheck className="w-5 h-5 text-[#27c1dc]" />
+                    <UserCheck className="w-5 h-5 text-[#4f67ff]" />
                     <span className="text-3xl sm:text-4xl font-black">
                       {displayValues.directorsCount}
                     </span>
@@ -423,7 +423,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 Localização
               </span>
               <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <MapPin className="w-4 h-4 text-[#27c1dc] mb-1" />
+                <MapPin className="w-4 h-4 text-[#4f67ff] mb-1" />
                 <span className="text-xs sm:text-sm font-bold leading-tight line-clamp-2 px-1">
                   {displayValues.location}
                 </span>

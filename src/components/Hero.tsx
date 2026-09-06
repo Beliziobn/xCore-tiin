@@ -42,7 +42,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
       />
       {/* Subtle ambient lighting with scroll shift */}
       <div
-        className="absolute -top-20 right-1/4 w-[28rem] h-[28rem] bg-[#17b6d4]/20 rounded-full blur-[130px] pointer-events-none transition-transform duration-100 ease-out"
+        className="absolute -top-20 right-1/4 w-[28rem] h-[28rem] bg-[#8b9dff]/25 rounded-full blur-[130px] pointer-events-none transition-transform duration-100 ease-out"
         style={{ transform: `translateY(${scrollY * 0.15}px)` }}
       />
 
@@ -65,7 +65,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
             <>
               {/* Eyebrow */}
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3.5 py-1.5 backdrop-blur-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#17b6d4]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#8b9dff]" />
                 <span className="text-[11px] font-semibold tracking-[0.14em] uppercase text-white/85">
                   Plataforma de Gestão Educacional
                 </span>
@@ -128,7 +128,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenGetStarted, greeting, isLogged
             />
 
             {/* Accent-lit backing disc */}
-            <div className="absolute inset-0 m-auto w-[260px] h-[260px] sm:w-[330px] sm:h-[330px] rounded-full bg-gradient-to-br from-[#17b6d4] to-[#4f67ff] shadow-[0_24px_60px_-12px_rgba(23,182,212,0.5)]" />
+            <div className="absolute inset-0 m-auto w-[260px] h-[260px] sm:w-[330px] sm:h-[330px] rounded-full bg-gradient-to-br from-[#6d84ff] to-[#3547cf] shadow-[0_24px_60px_-12px_rgba(53,71,207,0.5)]" />
 
             {/* Teacher & students cut out image */}
             <div className="relative w-[260px] h-[260px] sm:w-[330px] sm:h-[330px] rounded-full overflow-hidden border-4 border-white/90 shadow-2xl flex items-end justify-center group">

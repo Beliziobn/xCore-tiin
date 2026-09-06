@@ -13,9 +13,10 @@
   --color-brand-50: #eef1ff;
   --color-brand-100: #dfe4ff;
 
-  --color-accent: #17b6d4;
-  --color-accent-600: #109cb8;
-  --color-accent-50: #e6f9fd;
+  /* Accent lives inside the brand hue — a lighter periwinkle, used sparingly for tonal depth only */
+  --color-accent: #6d84ff;
+  --color-accent-600: #4f67ff;
+  --color-accent-50: #eef1ff;
 
   --color-ink: #0b1020;
   --color-ink-soft: #475569;

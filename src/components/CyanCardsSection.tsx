@@ -129,7 +129,7 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
               )}
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[#17b6d4] mb-1.5">
+              <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-slate-400 mb-1.5">
                 {module.subtitle}
               </p>
               <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-snug">

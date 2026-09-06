@@ -92,7 +92,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               {/* Card 1: [Nome da Escola] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
                   Nome da Escola
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
@@ -104,7 +104,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
               {/* Card 2: [Periodos] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
                   Periodos
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
@@ -116,7 +116,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
               {/* Card 3: [Classes] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
                   Classes
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
@@ -128,7 +128,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
               {/* Card 4: [Salas] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
                   Salas
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
@@ -140,7 +140,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
               {/* Card 5: [Telefone] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
                   Telefone
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
@@ -152,7 +152,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
               {/* Card 6: [Turmas] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
                   Turmas
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
@@ -167,7 +167,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {/* Card 7: [Nº de alunos] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
                   Nº de alunos
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[140px]">
@@ -181,7 +181,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
               {/* Card 8: [Nº de Professores] */}
               <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#27c1dc] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
+                <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
                   Nº de Professores
                 </span>
                 <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[140px]">
@@ -260,7 +260,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-full bg-[#27c1dc] hover:bg-[#1fb0c8] text-white font-black uppercase tracking-wider"
+                  className="px-5 py-2 rounded-full bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black uppercase tracking-wider"
                 >
                   Salvar
                 </button>
