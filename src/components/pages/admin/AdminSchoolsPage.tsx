@@ -259,10 +259,10 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
         </div>
 
-        {/* 3. Interactive Map & Municipality Summary Section matching Texto do seu parágrafo (1).png */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center mb-12">
-          {/* Left Column (Map) */}
-          <div className="lg:col-span-6 flex flex-col items-center justify-center p-4 rounded-3xl bg-slate-50/50 border border-slate-100">
+        {/* 3. Interactive Map & Municipality Summary Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch mb-12">
+          {/* Left Column (Map Card Container) */}
+          <div className="lg:col-span-6 flex flex-col items-center justify-between p-5 sm:p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all">
             <QuessuaMunicipalitiesMap
               selectedMunicipality={selectedMunicipality}
               onSelectMunicipality={(zone) => {
@@ -274,13 +274,17 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
 
           {/* Right Column (Toque no mapa + Nome, Nº Escolas, Nº Directores cards) */}
-          <div className="lg:col-span-6 flex flex-col justify-center space-y-6">
+          <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
             {/* Title & Prompt text */}
             <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-xs font-bold text-[#4f67ff] mb-2.5">
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Georreferenciação Municipal</span>
+              </div>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
                 Toque no mapa
               </h2>
-              <p className="text-base sm:text-lg font-bold text-slate-800 mt-1">
+              <p className="text-base sm:text-lg font-bold text-slate-700 mt-1">
                 para ver as escolas na sua zona de Quêssua.
               </p>
             </div>
@@ -290,15 +294,15 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelectedSchoolId(null)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer border border-slate-200"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all cursor-pointer shadow-xs"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
                   Voltar à Zona de {selectedMunicipality}
                 </button>
               </div>
             )}
 
-            {/* Cards Grid matching layout in image: Row with [Nome] and [Nº Escolas], and wide [Nº Directores] */}
+            {/* Cards Grid matching layout: Row with [Nome] and [Nº Escolas], and wide [Nº Directores] */}
             <div className="space-y-4">
               {/* Row: Nome & Nº Escolas */}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
@@ -307,11 +311,11 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                   <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
                     Nome
                   </span>
-                  <div className="bg-[#4f67ff] text-white rounded-2xl p-5 min-h-[110px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                    <span className="text-base sm:text-lg font-bold leading-tight line-clamp-2 px-1">
+                  <div className="bg-gradient-to-br from-[#4f67ff] to-[#3b52e6] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-blue-500/20 border border-white/15">
+                    <span className="text-base sm:text-lg font-black leading-tight line-clamp-2 px-1">
                       {displayValues.name}
                     </span>
-                    <span className="text-[10px] text-blue-200 font-semibold mt-1">
+                    <span className="text-[11px] text-blue-100 font-semibold mt-1">
                       {displayValues.subtitle}
                     </span>
                   </div>
@@ -322,11 +326,11 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                   <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
                     Nº Escolas
                   </span>
-                  <div className="bg-[#4f67ff] text-white rounded-2xl p-5 min-h-[110px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                    <span className="text-3xl sm:text-4xl font-black">
+                  <div className="bg-gradient-to-br from-[#4f67ff] to-[#3b52e6] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-blue-500/20 border border-white/15">
+                    <span className="text-3xl sm:text-4xl font-black font-display">
                       {displayValues.schoolsCount}
                     </span>
-                    <span className="text-[10px] text-blue-200 font-semibold mt-1">
+                    <span className="text-[11px] text-blue-100 font-semibold mt-1">
                       Unidades de Ensino Ativas
                     </span>
                   </div>
@@ -338,14 +342,14 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
                   Nº Directores
                 </span>
-                <div className="bg-[#4f67ff] text-white rounded-2xl p-5 min-h-[100px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="w-5 h-5 text-[#4f67ff]" />
-                    <span className="text-3xl sm:text-4xl font-black">
+                <div className="bg-gradient-to-br from-[#4f67ff] to-[#3b52e6] text-white rounded-2xl p-5 min-h-[105px] flex flex-col items-center justify-center text-center shadow-md shadow-blue-500/20 border border-white/15">
+                  <div className="flex items-center gap-2.5">
+                    <UserCheck className="w-6 h-6 text-amber-300 shrink-0" />
+                    <span className="text-3xl sm:text-4xl font-black font-display">
                       {displayValues.directorsCount}
                     </span>
                   </div>
-                  <span className="text-[10px] text-blue-200 font-semibold mt-1">
+                  <span className="text-[11px] text-blue-100 font-semibold mt-1">
                     {activeSchool ? 'Director(a) Titular da Instituição' : 'Directores Homologados em Exercício'}
                   </span>
                 </div>
