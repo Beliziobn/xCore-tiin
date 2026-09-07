@@ -11,6 +11,7 @@ import {
 import type { AdminSchool } from '../../../types';
 import { SvgAiLogoModal } from './SvgAiLogoModal';
 import { StatCardItem } from '../../StatCardItem';
+import { SectionShader } from '../../SectionShader';
 
 interface AdminSchoolsPageProps {
   onOpenGetStarted: () => void;
@@ -149,13 +150,14 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
       {/* 1. Hero Header Banner matching Texto do seu parágrafo (1).png */}
       <section
         id="schools-hero-banner"
-        className="relative w-full bg-[#4f67ff] border-b border-[#3b52e6] pt-8 sm:pt-12 pb-12 sm:pb-16 px-4 overflow-hidden flex flex-col items-center justify-center text-center shadow-[0_10px_30px_rgba(79,103,255,0.2)]"
+        className="relative w-full bg-[#f75142] border-b border-[#e04436] pt-8 sm:pt-12 pb-12 sm:pb-16 px-4 overflow-hidden flex flex-col items-center justify-center text-center shadow-[0_10px_30px_rgba(247,81,66,0.2)]"
       >
+        <SectionShader variant="coral" />
         {/* Soft background aura */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-white/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-white/10 rounded-full blur-[100px] pointer-events-none z-[1]" />
 
         {/* Central Graphic with Teacher, Students and Yellow Sun */}
-        <div className="relative w-[240px] h-[240px] sm:w-[310px] sm:h-[310px] md:w-[340px] md:h-[340px] flex items-center justify-center select-none">
+        <div className="relative z-10 w-[240px] h-[240px] sm:w-[310px] sm:h-[310px] md:w-[340px] md:h-[340px] flex items-center justify-center select-none">
           {/* Subtle concentric rings */}
           <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-white/20 scale-105 pointer-events-none" />
           <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-dashed border-white/35 scale-115 pointer-events-none animate-[spin_60s_linear_infinite]" />
@@ -165,7 +167,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             <svg width="90" height="45" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M5 15C20 5 35 25 50 15C65 5 80 25 95 15C105 8 112 12 115 15"
-                stroke="#4f67ff"
+                stroke="#f75142"
                 strokeWidth="3.5"
                 strokeLinecap="round"
               />
@@ -196,7 +198,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
       {/* 2. Main Body Content matching Texto do seu parágrafo (1).png */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Filter and Search Bar matching Texto do seu parágrafo (1).png */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-10 pb-4 border-b border-slate-100">
+        <div className="reveal-up flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-10 pb-4 border-b border-slate-100">
           {/* Left: Filter selector dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-black text-slate-800 tracking-tight whitespace-nowrap">
@@ -206,7 +208,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#5067fc] cursor-pointer"
+                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
               >
                 <option value="all">Todas as Escolas</option>
                 <option value="professores">Professores</option>
@@ -232,7 +234,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Pesquisar"
-              className="w-full pl-10 pr-4 py-2 bg-slate-100/90 border border-slate-200 rounded-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]"
+              className="w-full pl-10 pr-4 py-2 bg-slate-100/90 border border-slate-200 rounded-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
             />
           </div>
 
@@ -243,7 +245,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 setSvgTargetSchool(null);
                 setIsSvgModalOpen(true);
               }}
-              className="flex items-center justify-center gap-2 bg-[#5067fc] hover:bg-[#4054e0] text-white text-xs font-bold tracking-wide px-4 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold tracking-wide px-4 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
             >
               <Sparkles className="w-4 h-4" />
               Gerador SVG AI
@@ -252,7 +254,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             <button
               id="admin-btn-cadastrar-escola"
               onClick={onOpenRegisterModal}
-              className="flex items-center justify-center gap-2 bg-[#4f67ff] hover:bg-[#20b2cc] text-white text-xs font-bold tracking-wide px-6 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-2 bg-[#e04436] hover:bg-[#c9372a] text-white text-xs font-bold tracking-wide px-6 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               Cadastrar
@@ -261,7 +263,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
         </div>
 
         {/* 3. Interactive Map & Municipality Summary Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch mb-12">
+        <div className="reveal-up grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch mb-12">
           {/* Left Column (Map Card Container) */}
           <div className="lg:col-span-6 flex flex-col items-center justify-between p-5 sm:p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all">
             <QuessuaMunicipalitiesMap
@@ -278,7 +280,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
             {/* Title & Prompt text */}
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-xs font-bold text-[#4f67ff] mb-2.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fef2f1] border border-[#fee4e2] text-xs font-bold text-[#f75142] mb-2.5">
                 <MapPin className="w-3.5 h-3.5" />
                 <span>Georreferenciação Municipal</span>
               </div>
@@ -312,11 +314,11 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                   <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
                     Nome
                   </span>
-                  <div className="bg-gradient-to-br from-[#4f67ff] to-[#3b52e6] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-blue-500/20 border border-white/15">
+                  <div className="bg-gradient-to-br from-[#f75142] to-[#e04436] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-[#f75142]/20 border border-white/15">
                     <span className="text-base sm:text-lg font-black leading-tight line-clamp-2 px-1">
                       {displayValues.name}
                     </span>
-                    <span className="text-[11px] text-blue-100 font-semibold mt-1">
+                    <span className="text-[11px] text-[#fee4e2] font-semibold mt-1">
                       {displayValues.subtitle}
                     </span>
                   </div>
@@ -327,11 +329,11 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                   <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
                     Nº Escolas
                   </span>
-                  <div className="bg-gradient-to-br from-[#4f67ff] to-[#3b52e6] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-blue-500/20 border border-white/15">
+                  <div className="bg-gradient-to-br from-[#f75142] to-[#e04436] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-[#f75142]/20 border border-white/15">
                     <span className="text-3xl sm:text-4xl font-black font-display">
                       {displayValues.schoolsCount}
                     </span>
-                    <span className="text-[11px] text-blue-100 font-semibold mt-1">
+                    <span className="text-[11px] text-[#fee4e2] font-semibold mt-1">
                       Unidades de Ensino Ativas
                     </span>
                   </div>
@@ -343,14 +345,14 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
                   Nº Directores
                 </span>
-                <div className="bg-gradient-to-br from-[#4f67ff] to-[#3b52e6] text-white rounded-2xl p-5 min-h-[105px] flex flex-col items-center justify-center text-center shadow-md shadow-blue-500/20 border border-white/15">
+                <div className="bg-gradient-to-br from-[#f75142] to-[#e04436] text-white rounded-2xl p-5 min-h-[105px] flex flex-col items-center justify-center text-center shadow-md shadow-[#f75142]/20 border border-white/15">
                   <div className="flex items-center gap-2.5">
                     <UserCheck className="w-6 h-6 text-amber-300 shrink-0" />
                     <span className="text-3xl sm:text-4xl font-black font-display">
                       {displayValues.directorsCount}
                     </span>
                   </div>
-                  <span className="text-[11px] text-blue-100 font-semibold mt-1">
+                  <span className="text-[11px] text-[#fee4e2] font-semibold mt-1">
                     {activeSchool ? 'Director(a) Titular da Instituição' : 'Directores Homologados em Exercício'}
                   </span>
                 </div>
@@ -477,7 +479,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <SchoolIcon className="w-5 h-5 text-[#5067fc]" />
+                <SchoolIcon className="w-5 h-5 text-[#f75142]" />
                 <span>
                   Escolas em {selectedMunicipality === 'Todas as Escolas' ? 'Toda a Rede' : selectedMunicipality}
                 </span>
@@ -493,7 +495,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             {activeSchool && (
               <button
                 onClick={() => setSelectedSchoolId(null)}
-                className="self-start sm:self-auto text-xs font-bold text-[#5067fc] hover:underline flex items-center gap-1 cursor-pointer"
+                className="self-start sm:self-auto text-xs font-bold text-[#f75142] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Mostrar Média da Zona
@@ -512,7 +514,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                   setCategoryFilter('all');
                   setSelectedMunicipality('Todas as Escolas');
                 }}
-                className="mt-4 px-4 py-2 bg-[#5067fc] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs hover:bg-[#3f54de]"
+                className="mt-4 px-4 py-2 bg-[#f75142] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs hover:bg-[#3f54de]"
               >
                 Ver Todas as Escolas
               </button>
@@ -530,18 +532,18 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                     }}
                     className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                       isSelected
-                        ? 'bg-blue-50/80 border-[#5067fc] ring-2 ring-[#5067fc]/20 shadow-md'
+                        ? 'bg-[#fef2f1]/80 border-[#f75142] ring-2 ring-[#f75142]/20 shadow-md'
                         : 'bg-white hover:bg-slate-50/80 border-slate-200 hover:border-slate-300 shadow-xs'
                     }`}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-black text-[#5067fc] uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md">
+                        <span className="text-xs font-black text-[#f75142] uppercase tracking-wider bg-[#fef2f1] px-2 py-0.5 rounded-md">
                           {school.category}
                         </span>
                         <div className="flex items-center gap-1.5">
                           {school.logoSvg ? (
-                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-[#f75142] bg-[#fef2f1] border border-[#fee4e2] px-1.5 py-0.5 rounded flex items-center gap-1">
                               <Sparkles className="w-2.5 h-2.5" />
                               SVG
                             </span>
@@ -567,7 +569,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                               setSvgTargetSchool(school);
                               setIsSvgModalOpen(true);
                             }}
-                            className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 hover:bg-blue-50 border border-dashed border-slate-300 hover:border-[#5067fc] flex items-center justify-center text-slate-400 hover:text-[#5067fc] transition-colors cursor-pointer"
+                            className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 hover:bg-[#fef2f1] border border-dashed border-slate-300 hover:border-[#f75142] flex items-center justify-center text-slate-400 hover:text-[#f75142] transition-colors cursor-pointer"
                           >
                             <Sparkles className="w-4 h-4" />
                           </button>
@@ -606,12 +608,12 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                             setSvgTargetSchool(school);
                             setIsSvgModalOpen(true);
                           }}
-                          className="text-[11px] font-bold text-[#5067fc] hover:underline flex items-center gap-1"
+                          className="text-[11px] font-bold text-[#f75142] hover:underline flex items-center gap-1"
                         >
                           <Sparkles className="w-3 h-3" />
                           Brasão
                         </button>
-                        <div className="flex items-center gap-1 text-[#5067fc] font-bold">
+                        <div className="flex items-center gap-1 text-[#f75142] font-bold">
                           <span>{isSelected ? 'Ativa' : 'Ver'}</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </div>

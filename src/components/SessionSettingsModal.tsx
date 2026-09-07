@@ -38,7 +38,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white text-slate-900 rounded-3xl max-w-xl w-full shadow-[0_25px_70px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden relative max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="bg-[#5067fc] text-white p-6 relative shrink-0">
+        <div className="bg-[#f75142] text-white p-6 relative shrink-0">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
@@ -75,7 +75,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
               <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
                 Escopo de Atuação
               </span>
-              <span className="font-bold text-[#5067fc]">{session.unit}</span>
+              <span className="font-bold text-[#f75142]">{session.unit}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
@@ -94,7 +94,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
             {/* Toggle 1: Auto Sync */}
             <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
               <div className="flex items-start gap-3">
-                <RefreshCw className="w-4 h-4 text-[#5067fc] mt-0.5 shrink-0" />
+                <RefreshCw className="w-4 h-4 text-[#f75142] mt-0.5 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-900 text-xs">Sincronização Automática em Tempo Real</p>
                   <p className="text-[11px] text-slate-500">
@@ -109,14 +109,14 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
                   onChange={(e) => setSettings({ ...settings, autoSync: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#5067fc]"></div>
+                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#f75142]"></div>
               </label>
             </div>
 
             {/* Toggle 2: Email Alerts */}
             <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
               <div className="flex items-start gap-3">
-                <Bell className="w-4 h-4 text-[#5067fc] mt-0.5 shrink-0" />
+                <Bell className="w-4 h-4 text-[#f75142] mt-0.5 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-900 text-xs">Alertas Críticos por E-mail</p>
                   <p className="text-[11px] text-slate-500">
@@ -131,14 +131,14 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
                   onChange={(e) => setSettings({ ...settings, emailAlerts: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#5067fc]"></div>
+                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#f75142]"></div>
               </label>
             </div>
 
             {/* Toggle 3: Percentages */}
             <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
               <div className="flex items-start gap-3">
-                <Eye className="w-4 h-4 text-[#5067fc] mt-0.5 shrink-0" />
+                <Eye className="w-4 h-4 text-[#f75142] mt-0.5 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-900 text-xs">Exibir Indicadores em Percentual</p>
                   <p className="text-[11px] text-slate-500">
@@ -153,7 +153,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
                   onChange={(e) => setSettings({ ...settings, showPercentages: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#5067fc]"></div>
+                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#f75142]"></div>
               </label>
             </div>
           </div>
@@ -194,7 +194,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
             </button>
             <button
               onClick={handleSave}
-              className="px-6 py-2 rounded-full bg-[#5067fc] hover:bg-[#4359eb] text-white text-xs font-bold shadow transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-6 py-2 rounded-full bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold shadow transition-all cursor-pointer flex items-center gap-1.5"
             >
               <Save className="w-3.5 h-3.5" />
               Salvar Configurações

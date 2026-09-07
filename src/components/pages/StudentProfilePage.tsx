@@ -96,7 +96,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-100">
         <button
           onClick={handleBack}
-          className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#5067fc] bg-slate-50 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-full transition-all cursor-pointer"
+          className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#f75142] bg-slate-50 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-full transition-all cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Voltar para Minha Turma</span>
@@ -106,14 +106,14 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           {hasPrev && onSelectAnotherStudent && (
             <button
               onClick={() => onSelectAnotherStudent(allStudents[currentIndex - 1])}
-              className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-[#5067fc] bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-[#f75142] bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full transition-all cursor-pointer"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>Anterior</span>
             </button>
           )}
 
-          <span className="text-[10px] uppercase font-black tracking-[0.2em] bg-blue-50 text-[#5067fc] border border-blue-200 px-3 py-1 rounded-full">
+          <span className="text-[10px] uppercase font-black tracking-[0.2em] bg-[#fef2f1] text-[#f75142] border border-[#fee4e2] px-3 py-1 rounded-full">
             Ficha Individual • Aluno Nº {currentStudent.numeroChamada || 1}
           </span>
 

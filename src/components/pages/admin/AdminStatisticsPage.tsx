@@ -69,7 +69,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
         {/* Real Data Scope Selector Bar */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#5067fc]/10 flex items-center justify-center text-[#5067fc]">
+            <div className="w-10 h-10 rounded-xl bg-[#f75142]/10 flex items-center justify-center text-[#f75142]">
               <Filter className="w-5 h-5" />
             </div>
             <div>
@@ -87,7 +87,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <select
               value={selectedSchoolFilter}
               onChange={(e) => setSelectedSchoolFilter(e.target.value)}
-              className="w-full sm:w-64 px-3 py-2 text-xs font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5067fc] cursor-pointer"
+              className="w-full sm:w-64 px-3 py-2 text-xs font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
             >
               <option value="all">Toda a Rede Central ({schools.length} Escolas)</option>
               {schools.map((s) => (
@@ -157,7 +157,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-4">
-                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Alunos
                   </span>
                 </div>
@@ -198,11 +198,11 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
 
                   {/* Male Bar (Cyan/Teal) */}
                   <div className="flex flex-col items-center gap-1 group">
-                    <span className="text-[11px] font-bold text-[#0284c7] group-hover:scale-110 transition-transform">
+                    <span className="text-[11px] font-bold text-[#f75142] group-hover:scale-110 transition-transform">
                       {stats.maleStudentsCount.toLocaleString()}
                     </span>
                     <div
-                      className="w-9 sm:w-11 bg-[#0284c7] rounded-t-sm hover:brightness-110 transition-all cursor-pointer shadow-xs"
+                      className="w-9 sm:w-11 bg-[#f75142] rounded-t-sm hover:brightness-110 transition-all cursor-pointer shadow-xs"
                       style={{
                         height: `${Math.min(160, Math.max(25, (stats.maleStudentsCount / 5000) * 160))}px`,
                       }}
@@ -226,10 +226,10 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Desempenho das escolas
                   </span>
-                  <span className="text-xs font-bold text-[#5067fc] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                  <span className="text-xs font-bold text-[#f75142] bg-[#fef2f1] px-2 py-0.5 rounded-full border border-[#fee4e2]">
                     Média: {stats.overallPerformanceRate}%
                   </span>
                 </div>
@@ -249,7 +249,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
                       <div className="flex items-end gap-1 h-32">
                         {/* % Aprovação (Blue) */}
                         <div
-                          className="w-3 sm:w-3.5 bg-[#5067fc] rounded-t-xs hover:brightness-110 transition-all cursor-pointer"
+                          className="w-3 sm:w-3.5 bg-[#f75142] rounded-t-xs hover:brightness-110 transition-all cursor-pointer"
                           style={{ height: `${item.aprovacao * 1.25}px` }}
                           title={`${item.period} - Aprovação: ${item.aprovacao}%`}
                         />
@@ -270,7 +270,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
                 {/* Legend matching 9.png */}
                 <div className="flex items-center justify-center gap-4 mt-3 text-[10px] font-medium text-slate-600">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-xs bg-[#5067fc]" />
+                    <span className="w-2.5 h-2.5 rounded-xs bg-[#f75142]" />
                     <span>%Aprovação - Q. Amb I</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -299,7 +299,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Presença
                   </span>
                   <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
@@ -334,7 +334,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
                     {/* Presencial Line (Blue) */}
                     <polyline
                       fill="none"
-                      stroke="#5067fc"
+                      stroke="#f75142"
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -348,10 +348,10 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
                     <circle cx="290" cy="85" r="3.5" fill="#f97316" />
 
                     {/* Presencial markers */}
-                    <circle cx="10" cy="90" r="3.5" fill="#5067fc" />
-                    <circle cx="85" cy="94" r="3.5" fill="#5067fc" />
-                    <circle cx="210" cy="90" r="3.5" fill="#5067fc" />
-                    <circle cx="290" cy="90" r="3.5" fill="#5067fc" />
+                    <circle cx="10" cy="90" r="3.5" fill="#f75142" />
+                    <circle cx="85" cy="94" r="3.5" fill="#f75142" />
+                    <circle cx="210" cy="90" r="3.5" fill="#f75142" />
+                    <circle cx="290" cy="90" r="3.5" fill="#f75142" />
                   </svg>
                 </div>
 
@@ -369,7 +369,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
                   <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
                     EAD / Híbrido
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#fee4e2] text-[#f75142] border border-[#f86f63]/30">
                     Presencial
                   </span>
                 </div>
@@ -387,7 +387,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Alunos sem documentos
                   </span>
                   <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
@@ -431,11 +431,11 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
 
                   {/* Male Bar */}
                   <div className="flex flex-col items-center gap-1 group">
-                    <span className="text-[11px] font-bold text-[#0284c7] group-hover:scale-110 transition-transform">
+                    <span className="text-[11px] font-bold text-[#f75142] group-hover:scale-110 transition-transform">
                       {stats.maleWithoutDocs.toLocaleString()}
                     </span>
                     <div
-                      className="w-10 sm:w-12 bg-[#0284c7] rounded-t-sm hover:brightness-110 transition-all cursor-pointer shadow-xs"
+                      className="w-10 sm:w-12 bg-[#f75142] rounded-t-sm hover:brightness-110 transition-all cursor-pointer shadow-xs"
                       style={{
                         height: `${Math.min(150, Math.max(20, (stats.maleWithoutDocs / 2000) * 150))}px`,
                       }}
@@ -459,7 +459,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
+                  <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-md shadow-2xs">
                     Alunos com documentos
                   </span>
                   <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
@@ -503,11 +503,11 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
 
                   {/* Male Bar */}
                   <div className="flex flex-col items-center gap-1 group">
-                    <span className="text-[11px] font-bold text-[#0284c7] group-hover:scale-110 transition-transform">
+                    <span className="text-[11px] font-bold text-[#f75142] group-hover:scale-110 transition-transform">
                       {stats.maleWithDocs.toLocaleString()}
                     </span>
                     <div
-                      className="w-10 sm:w-12 bg-[#0284c7] rounded-t-sm hover:brightness-110 transition-all cursor-pointer shadow-xs"
+                      className="w-10 sm:w-12 bg-[#f75142] rounded-t-sm hover:brightness-110 transition-all cursor-pointer shadow-xs"
                       style={{
                         height: `${Math.min(150, Math.max(25, (stats.maleWithDocs / 4500) * 150))}px`,
                       }}

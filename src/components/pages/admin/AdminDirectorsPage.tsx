@@ -48,9 +48,9 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Security Delegation Banner */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800">
+        <div className="mb-6 p-4 bg-gradient-to-r from-[#fef2f1] to-[#fef2f1] border border-[#fee4e2] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-[#f75142] text-white flex items-center justify-center shrink-0 shadow-xs">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -64,7 +64,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
           </div>
           <button
             onClick={onOpenRegisterModal}
-            className="whitespace-nowrap px-4 py-2 bg-[#5067fc] hover:bg-[#4359eb] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+            className="whitespace-nowrap px-4 py-2 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
           >
             Homologar Novo Diretor
           </button>
@@ -79,7 +79,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5067fc] cursor-pointer"
+                className="appearance-none bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
               >
                 <option value="all">Todos os Directores ({directors.length})</option>
                 <option value="Ativo">Em Exercício / Ativo</option>
@@ -99,7 +99,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Pesquisar diretor, escola ou telefone..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
             />
           </div>
 
@@ -107,7 +107,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
           <button
             id="admin-btn-cadastrar-director"
             onClick={onOpenRegisterModal}
-            className="flex items-center justify-center gap-2 bg-[#4f67ff] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             Cadastrar
@@ -116,7 +116,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
 
         {/* Selected Director Card Grid */}
         {activeDirector && (
-          <div className="mb-10 bg-gradient-to-r from-[#5067fc] to-[#435bf7] rounded-2xl p-6 sm:p-8 text-white shadow-lg">
+          <div className="mb-10 bg-gradient-to-r from-[#f75142] to-[#e04436] rounded-2xl p-6 sm:p-8 text-white shadow-lg">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-white/20">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center border border-white/30 text-white font-black text-2xl shadow-inner">
@@ -125,11 +125,11 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="text-xl sm:text-2xl font-black">{activeDirector.name}</h3>
-                    <span className="bg-[#4f67ff] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded shadow-xs">
+                    <span className="bg-[#c9372a] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded shadow-xs">
                       {activeDirector.status}
                     </span>
                   </div>
-                  <p className="text-xs text-blue-100 flex items-center gap-2">
+                  <p className="text-xs text-[#fee4e2] flex items-center gap-2">
                     <School className="w-3.5 h-3.5" />
                     <span>{activeDirector.schoolName}</span>
                     <span>•</span>
@@ -140,11 +140,11 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
 
               <div className="flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-1.5 bg-white/10 px-3 py-2 rounded-xl border border-white/15">
-                  <Phone className="w-4 h-4 text-blue-200" />
+                  <Phone className="w-4 h-4 text-[#fee4e2]" />
                   <span>{activeDirector.phone}</span>
                 </div>
                 <div className="flex items-center gap-1.5 bg-white/10 px-3 py-2 rounded-xl border border-white/15">
-                  <Mail className="w-4 h-4 text-blue-200" />
+                  <Mail className="w-4 h-4 text-[#fee4e2]" />
                   <span>{activeDirector.email}</span>
                 </div>
               </div>
@@ -153,19 +153,19 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
             {/* Quick Director Metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6">
               <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-blue-200">Docentes sob Gestão</span>
+                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Docentes sob Gestão</span>
                 <div className="text-2xl font-black mt-0.5">{activeDirector.teachersCount} Professores</div>
               </div>
               <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-blue-200">Alunos Matriculados</span>
+                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Alunos Matriculados</span>
                 <div className="text-2xl font-black mt-0.5">{activeDirector.studentsCount} Alunos</div>
               </div>
               <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-blue-200">Avaliação Institucional</span>
+                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Avaliação Institucional</span>
                 <div className="text-2xl font-black mt-0.5">{activeDirector.performanceRating}%</div>
               </div>
               <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-blue-200">Sede da Unidade</span>
+                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Sede da Unidade</span>
                 <div className="text-xs font-semibold mt-1 truncate">{activeDirector.location}</div>
               </div>
             </div>
@@ -205,12 +205,12 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
                     <tr
                       key={d.id}
                       onClick={() => setSelectedDirectorId(d.id)}
-                      className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-50/80 font-medium' : ''
+                      className={`hover:bg-[#fef2f1]/50 cursor-pointer transition-colors ${
+                        isSelected ? 'bg-[#fef2f1]/80 font-medium' : ''
                       }`}
                     >
                       <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
-                        <UserCheck className={`w-4 h-4 ${isSelected ? 'text-[#5067fc]' : 'text-slate-400'}`} />
+                        <UserCheck className={`w-4 h-4 ${isSelected ? 'text-[#f75142]' : 'text-slate-400'}`} />
                         {d.name}
                       </td>
                       <td className="p-3.5 text-slate-700 font-medium">{d.schoolName}</td>
@@ -235,7 +235,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
                             e.stopPropagation();
                             setSelectedDirectorId(d.id);
                           }}
-                          className="text-[#5067fc] font-bold hover:underline inline-flex items-center gap-1"
+                          className="text-[#f75142] font-bold hover:underline inline-flex items-center gap-1"
                         >
                           Ver <ChevronRight className="w-3.5 h-3.5" />
                         </button>

@@ -94,9 +94,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     <>
       {isScrolled && <div className="w-full h-[76px]" aria-hidden="true" />}
       <header
-        className={`w-full transition-all duration-300 ${
+        id="siteHeader"
+        className={`site-header w-full transition-all duration-300 ${
           isScrolled
-            ? 'fixed top-0 left-0 right-0 z-50 bg-[#f75142] shadow-[0_8px_30px_rgba(247,81,66,0.25)] border-b border-[#e54536]'
+            ? 'fixed top-0 left-0 right-0 z-50 bg-[#f75142] shadow-[0_8px_30px_rgba(247,81,66,0.25)] border-b border-[#e54536] is-scrolled'
             : 'relative z-30 bg-[#f75142] border-b border-[#e54536]'
         }`}
       >
@@ -159,7 +160,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Home className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <Home className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Painel Central Admin</span>
                     </button>
                     <button
@@ -169,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#4f67ff]" />
+                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Estatísticas da Rede</span>
                     </button>
                     <button
@@ -179,7 +180,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Minhas Escolas</span>
                     </button>
                     <button
@@ -189,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <User className="w-3.5 h-3.5 text-[#4f67ff]" />
+                      <User className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Meus Directores</span>
                     </button>
                     <button
@@ -199,7 +200,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <User className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Meus Professores</span>
                     </button>
                     <button
@@ -209,7 +210,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Users className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <Users className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Meus Alunos</span>
                     </button>
                     <button
@@ -219,7 +220,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <User className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Perfil do Administrador</span>
                     </button>
                   </>
@@ -232,7 +233,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Painel do Diretor</span>
                     </button>
                     <button
@@ -242,7 +243,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#4f67ff]" />
+                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Analisa suas estatísticas</span>
                     </button>
                     <button
@@ -252,7 +253,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <User className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Meus Professores</span>
                     </button>
                     <button
@@ -262,7 +263,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Users className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <Users className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Meus Alunos</span>
                     </button>
                     <button
@@ -272,7 +273,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Home className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <Home className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Minhas Salas</span>
                     </button>
                     <button
@@ -282,7 +283,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#4f67ff]" />
+                      <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Minhas Classes</span>
                     </button>
                     <button
@@ -292,7 +293,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <User className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Perfil do Director</span>
                     </button>
                   </>
@@ -305,7 +306,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Analisa suas estatísticas</span>
                     </button>
                     <button
@@ -315,7 +316,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <Users className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <Users className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Minha Turma (4ª Classe)</span>
                     </button>
                     <button
@@ -325,7 +326,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <User className="w-3.5 h-3.5 text-[#5067fc]" />
+                      <User className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Perfil do Professor</span>
                     </button>
                     <button
@@ -335,7 +336,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#4f67ff]" />
+                      <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
                       <span>Perfil do Aluno (Albert)</span>
                     </button>
                   </>
@@ -779,10 +780,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onOpenChat();
                 setMobileMenuOpen(false);
               }}
-              className="text-left py-2 px-3 bg-[#5067fc]/10 text-[#5067fc] rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+              className="text-left py-2 px-3 bg-[#f75142]/10 text-[#f75142] rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
             >
               <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-[#5067fc]" />
+                <MessageSquare className="w-4 h-4 text-[#f75142]" />
                 <span>Chat de Suporte & Ajuda</span>
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -827,7 +828,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     (onNavigateToRegister || onOpenGetStarted)();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full bg-[#4f67ff] hover:bg-[#3547cf] text-white font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer shadow-sm"
+                  className="w-full bg-[#f75142] hover:bg-[#e04436] text-white font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer shadow-sm"
                 >
                   Começar
                 </button>

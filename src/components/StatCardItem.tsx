@@ -56,7 +56,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
           }
         }}
         aria-label={`${card.title}: ${card.value}. Clique para ver mais`}
-        className={`relative bg-white border-2 border-dashed border-slate-300 p-4 sm:p-5 flex flex-col items-center justify-between shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_35px_-8px_rgba(247,81,66,0.22)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group select-none w-full mx-auto ${
+        className={`reveal-up relative bg-white border-2 border-dashed border-slate-300 p-4 sm:p-5 flex flex-col items-center justify-between shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_35px_-8px_rgba(247,81,66,0.22)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group select-none w-full mx-auto ${
           isSmall
             ? 'rounded-[26px] sm:rounded-[28px] max-w-[260px] min-h-[260px]'
             : 'rounded-[32px] sm:rounded-[36px] max-w-[310px] min-h-[350px]'
@@ -120,7 +120,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
       id={elementId}
       role="article"
       aria-label={`${card.title}: ${card.value}. Indicador informativo`}
-      className={`relative bg-white border-2 border-dashed border-slate-300 p-4 sm:p-5 flex flex-col items-center shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] cursor-default select-none w-full mx-auto ${
+      className={`reveal-up relative bg-white border-2 border-dashed border-slate-300 p-4 sm:p-5 flex flex-col items-center shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] cursor-default select-none w-full mx-auto ${
         isSmall
           ? 'rounded-[26px] sm:rounded-[28px] max-w-[260px] min-h-[210px]'
           : 'rounded-[32px] sm:rounded-[36px] max-w-[310px] min-h-[300px]'

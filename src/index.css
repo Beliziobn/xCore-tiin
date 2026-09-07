@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+:root {
+  --coral-light: #ff6a4a;
+  --coral-base: #f2593c;
+  --coral-deep: #c93f26;
+  --navy: #0e1b2c;
+  --navy-soft: rgba(14, 27, 44, 0.72);
+  --cream: #f2eee7;
+  --header-height: 84px;
+  --header-height-compact: 64px;
+}
+
 @theme {
   /* Type system — professional pairing */
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
@@ -93,3 +104,76 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-brand);
 }
+
+/* ---------- Header & Section Shader ---------- */
+/* Shader mounts into this layer. It fills the section and sits
+   behind the content. If WebGPU/the shader module fails to
+   load, this div keeps the plain coral background from the section
+   visible underneath it, so the section still looks intentional. */
+.header-shader {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.header-shader canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* ---------- Smooth scroll (Lenis) housekeeping ---------- */
+/* Recommended by Lenis: while it's driving the scroll, native
+   scroll-behavior must stay off or the two fight each other. */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+html.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+html.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* ---------- Header compact on scroll ---------- */
+.site-header {
+  transition: height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.35s ease;
+}
+
+.site-header.is-scrolled {
+  box-shadow: 0 8px 24px rgba(14, 27, 44, 0.18);
+}
+
+/* ---------- Scroll reveal ---------- */
+.reveal-up {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0s);
+  will-change: opacity, transform;
+}
+
+.reveal-up.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-link, .cta-button, .site-header {
+    transition: none;
+  }
+  .reveal-up {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+

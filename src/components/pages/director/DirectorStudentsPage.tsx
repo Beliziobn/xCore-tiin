@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle, AlertCircle, FileCheck, FileX, ChevronDown, ShieldCheck } from 'lucide-react';
+import { Search, Plus, Filter, CheckCircle, AlertCircle, FileCheck, FileX, ChevronDown, ShieldCheck, GraduationCap } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorStudentsData as initialStudents } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
@@ -113,9 +113,9 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Institutional Authority Card */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-blue-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="mb-6 p-4 bg-gradient-to-r from-[#fef2f1] to-[#fef2f1] border border-[#fee4e2] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-[#f75142] text-white flex items-center justify-center shrink-0 shadow-xs">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -129,21 +129,21 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="whitespace-nowrap px-4 py-2 bg-[#5067fc] hover:bg-[#4359eb] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+            className="whitespace-nowrap px-4 py-2 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
           >
             Matricular Novo Aluno
           </button>
         </div>
 
         {/* Filter Bar matching 13.png: Filtro: Alunos v, Search, Cadastrar button */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="reveal-up flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
           {/* Left: Filtro Dropdown */}
           <div className="relative">
             <button
               onClick={() => setFilterDropdownOpen((prev) => !prev)}
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
             >
-              <Filter className="w-3.5 h-3.5 text-[#5067fc]" />
+              <Filter className="w-3.5 h-3.5 text-[#f75142]" />
               <span>
                 Filtro: {docFilter === 'all' ? 'Alunos' : docFilter === 'with-docs' ? 'Com Documentos' : 'Sem Documentos'}
               </span>
@@ -193,7 +193,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
               placeholder="Pesquisar aluno por nome, classe, encarregado ou sala..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#5067fc] focus:ring-2 focus:ring-[#5067fc]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
             />
           </div>
 
@@ -201,143 +201,176 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
           <button
             id="btn-cadastrar-aluno"
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar</span>
           </button>
         </div>
 
-        {/* Quick Student Selector Chips */}
-        <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
-            Ficha de Aluno:
-          </span>
-          {filteredStudents.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setSelectedStudentId(s.id)}
-              className={`text-xs px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                currentStudent?.id === s.id
-                  ? 'bg-[#5067fc] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <span>{s.name.split(' ')[0]} {s.name.split(' ')[1] || ''}</span>
-              <span className={`w-2 h-2 rounded-full ${s.hasDocuments ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-            </button>
-          ))}
-        </div>
+        {/* Informações do Aluno - Sem cards pesados, mantendo organização e máxima legibilidade */}
+        <div className="reveal-up bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 mb-8 shadow-xs">
+          {/* Header com dados do aluno e seletor rápido */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-5 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#fef2f1] text-[#f75142] border border-[#fee4e2] flex items-center justify-center font-bold">
+                <GraduationCap className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  Ficha do Aluno Selecionado
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Dados cadastrais, alocação escolar e situação documental
+                </p>
+              </div>
+            </div>
 
-        {/* First Row: 7 Cards with Cyan Badges matching 13.png */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
-          {/* Card 1: [Nome] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Nome
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                  currentStudent?.hasDocuments
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                }`}
+              >
+                {currentStudent?.hasDocuments ? 'Documentação Regular' : 'Pendente de Documentos'}
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Student Selector Chips */}
+          <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
+              Alternar Aluno:
             </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
+            {filteredStudents.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedStudentId(s.id)}
+                className={`text-xs px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                  currentStudent?.id === s.id
+                    ? 'bg-[#f75142] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <span>
+                  {s.name.split(' ')[0]} {s.name.split(' ')[1] || ''}
+                </span>
+                <span className={`w-2 h-2 rounded-full ${s.hasDocuments ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              </button>
+            ))}
+          </div>
+
+          {/* Grid de Informações: 7 colunas organizadas sem cartões pesados */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-y-4 gap-x-6 pt-4 border-t border-slate-100">
+            {/* 1. Nome */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Nome
+              </span>
               <div className="flex items-center gap-2 mb-1">
                 {currentStudent?.foto && (
-                  <img src={currentStudent.foto} alt={currentStudent.name} className="w-8 h-8 rounded-full object-cover border border-white/30 shrink-0" />
+                  <img
+                    src={currentStudent.foto}
+                    alt={currentStudent.name}
+                    className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                  />
                 )}
-                <h5 className="font-bold text-sm leading-snug break-words">
+                <span className="text-sm font-bold text-slate-900 leading-snug break-words">
                   {currentStudent?.name || 'Albertina Kassoma'}
-                </h5>
+                </span>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                 {currentStudent?.idade && (
-                  <span className="text-[9px] bg-white/20 px-1.5 py-0.2 rounded font-bold">
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold">
                     {currentStudent.idade} anos
                   </span>
                 )}
                 {currentStudent?.condicaoMatricula && (
-                  <span className="text-[9px] bg-white/20 px-1.5 py-0.2 rounded font-bold">
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold">
                     {currentStudent.condicaoMatricula === 'repetente' ? 'Repetente' : '1ª Vez'}
                   </span>
                 )}
-                <span className="text-[9px] text-white/80">
-                  {currentStudent?.documentType || 'Matrícula Regular'}
-                </span>
               </div>
             </div>
-          </div>
 
-          {/* Card 2: [Classe] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Classe
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-black text-base sm:text-lg">
+            {/* 2. Classe */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Classe
+              </span>
+              <span className="text-sm font-black text-slate-900">
                 {currentStudent?.gradeClass || '4ª Classe'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-0.5">Ciclo Primário</span>
+              </span>
+              <span className="text-xs text-slate-500 mt-0.5">
+                Ciclo Primário
+              </span>
             </div>
-          </div>
 
-          {/* Card 3: [Sala] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Sala
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-black text-base sm:text-lg">
+            {/* 3. Sala */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Sala
+              </span>
+              <span className="text-sm font-black text-slate-900">
                 {currentStudent?.room || 'Sala 03'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-0.5">Bloco B</span>
+              </span>
+              <span className="text-xs text-slate-500 mt-0.5">
+                Bloco B
+              </span>
             </div>
-          </div>
 
-          {/* Card 4: [Turma] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Turma
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-black text-base sm:text-lg">
+            {/* 4. Turma */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Turma
+              </span>
+              <span className="text-sm font-black text-slate-900">
                 {currentStudent?.turma || 'Turma A'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-0.5">Turno Manhã</span>
+              </span>
+              <span className="text-xs text-slate-500 mt-0.5">
+                Turno Manhã
+              </span>
             </div>
-          </div>
 
-          {/* Card 5: [Nome dos Professores] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Nome dos Professores
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-bold text-xs sm:text-sm leading-tight">
+            {/* 5. Nome dos Professores */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Nome dos Professores
+              </span>
+              <span className="text-sm font-bold text-slate-900 leading-tight">
                 {currentStudent?.teacherName || 'Santar Goes'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-1">Professor Regente</span>
+              </span>
+              <span className="text-xs text-slate-500 mt-0.5">
+                Professor Regente
+              </span>
             </div>
-          </div>
 
-          {/* Card 6: [Nome dos Encarregados] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Nome dos Encarregados
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-bold text-xs leading-tight">
+            {/* 6. Nome dos Encarregados */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Nome dos Encarregados
+              </span>
+              <span className="text-sm font-bold text-slate-900 leading-tight">
                 {currentStudent?.guardianName || 'Manuel Kassoma'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-1">Contato Autorizado</span>
+              </span>
+              <span className="text-xs text-slate-500 mt-0.5">
+                {currentStudent?.guardianPhone || 'Contato Autorizado'}
+              </span>
             </div>
-          </div>
 
-          {/* Card 7: [Localização] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Localização
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-bold text-xs leading-tight">
+            {/* 7. Localização */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Localização
+              </span>
+              <span className="text-sm font-bold text-slate-900 leading-tight">
                 {currentStudent?.location || 'Bairro Modelo - Rua 12'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-1">Área de Cobertura</span>
+              </span>
+              <span className="text-xs text-slate-500 mt-0.5">
+                Área de Cobertura
+              </span>
             </div>
           </div>
         </div>

@@ -33,14 +33,14 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
         {/* Profile Card */}
         <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-md">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 pb-8 border-b border-slate-100">
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-[#5067fc] to-[#4f67ff] text-white font-black text-3xl flex items-center justify-center shadow-lg">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-[#f75142] to-[#e04436] text-white font-black text-3xl flex items-center justify-center shadow-lg">
               AF
             </div>
             <div className="text-center sm:text-left flex-1">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Admin. Fred</h2>
-                  <p className="text-sm font-semibold text-[#5067fc]">
+                  <p className="text-sm font-semibold text-[#f75142]">
                     Superintendente & Administrador Geral da Rede Central uCore
                   </p>
                 </div>
@@ -70,7 +70,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 Escolas Sob Gestão
               </span>
               <div className="text-3xl font-black text-slate-900 mt-1">{schools.length}</div>
-              <span className="text-[10px] text-[#5067fc] font-semibold">100% Integradas</span>
+              <span className="text-[10px] text-[#f75142] font-semibold">100% Integradas</span>
             </div>
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 text-center">
               <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
@@ -84,27 +84,27 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 Estudantes Ativos
               </span>
               <div className="text-3xl font-black text-slate-900 mt-1">{totalStudents.toLocaleString()}</div>
-              <span className="text-[10px] text-blue-600 font-semibold">Matrículas Homologadas</span>
+              <span className="text-[10px] text-[#f75142] font-semibold">Matrículas Homologadas</span>
             </div>
           </div>
 
           {/* Institutional Directives */}
-          <div className="space-y-4 text-xs text-slate-600 bg-blue-50/50 rounded-2xl p-6 border border-blue-100">
+          <div className="space-y-4 text-xs text-slate-600 bg-[#fef2f1]/60 rounded-2xl p-6 border border-[#fee4e2]">
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Building className="w-4 h-4 text-[#5067fc]" />
+              <Building className="w-4 h-4 text-[#f75142]" />
               Diretrizes Estruturais da Gestão Central uCore
             </h4>
             <p className="leading-relaxed">
               "Priorizamos a melhor organização da Educação em toda a malha escolar. Nosso objetivo estratégico compreende a regularização civil de 100% dos educandos, monitoramento diário da presença de docentes e alunos e acompanhamento contínuo dos índices de aprovação escolar."
             </p>
             <div className="flex flex-wrap gap-2 pt-2">
-              <span className="bg-white px-3 py-1 rounded-full border border-blue-200 text-[#5067fc] font-bold text-[10px]">
+              <span className="bg-white px-3 py-1 rounded-full border border-[#fee4e2] text-[#f75142] font-bold text-[10px]">
                 Gestão 2026
               </span>
-              <span className="bg-white px-3 py-1 rounded-full border border-blue-200 text-emerald-700 font-bold text-[10px]">
+              <span className="bg-white px-3 py-1 rounded-full border border-[#fee4e2] text-emerald-700 font-bold text-[10px]">
                 Registo Civil Ativo
               </span>
-              <span className="bg-white px-3 py-1 rounded-full border border-blue-200 text-slate-700 font-bold text-[10px]">
+              <span className="bg-white px-3 py-1 rounded-full border border-[#fee4e2] text-slate-700 font-bold text-[10px]">
                 Auditoria Periódica
               </span>
             </div>
@@ -113,7 +113,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
           <div className="mt-8 flex justify-end">
             <button
               onClick={onNavigateToStatistics}
-              className="px-6 py-2.5 bg-[#5067fc] hover:bg-[#435bf7] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer transition-all"
+              className="px-6 py-2.5 bg-[#f75142] hover:bg-[#c9372a] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer transition-all"
             >
               Acessar Painel Estatístico Global &rarr;
             </button>

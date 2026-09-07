@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, GraduationCap } from 'lucide-react';
 import heroImg from '../assets/images/hero_creative_desk.png';
+import { SectionShader } from './SectionShader';
 
 interface HeroProps {
   onOpenGetStarted: () => void;
@@ -48,8 +49,9 @@ export const Hero: React.FC<HeroProps> = ({
         id="ucore-hero-section"
         className="relative w-full bg-gradient-to-br from-[#f75142] via-[#e54536] to-[#c9372a] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(247,81,66,0.45)] pt-10 sm:pt-14 pb-12 sm:pb-16 px-4 sm:px-8 lg:px-16 overflow-hidden"
       >
+        <SectionShader variant="coral" />
         <div
-          className="absolute inset-0 opacity-[0.07] pointer-events-none"
+          className="absolute inset-0 opacity-[0.07] pointer-events-none z-[1]"
           style={{
             backgroundImage:
               'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
@@ -80,9 +82,10 @@ export const Hero: React.FC<HeroProps> = ({
       id="ucore-hero-section"
       className="relative w-full bg-background overflow-hidden px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-16 sm:pb-20"
     >
-      <div className="max-w-5xl mx-auto flex flex-col items-center">
+      <SectionShader variant="subtle" className="opacity-70" />
+      <div className="max-w-5xl mx-auto flex flex-col items-center relative z-10">
         {/* Heading */}
-        <div className="text-center">
+        <div className="text-center reveal-up">
           {greeting ? (
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-slate-950 leading-[1.02] text-balance">
               {greeting}
@@ -98,7 +101,7 @@ export const Hero: React.FC<HeroProps> = ({
         </div>
 
         {/* Hero Image Showcase with White Contour and Attached Centered Stat Cards */}
-        <div className="mt-12 sm:mt-16 w-full max-w-4xl px-4 sm:px-8">
+        <div className="mt-12 sm:mt-16 w-full max-w-4xl px-4 sm:px-8 reveal-up" data-reveal-delay="0.15">
           <div
             className="relative w-full transition-transform duration-100 ease-out"
             style={{ transform: `translateY(${floatSlow * 0.25}px)` }}

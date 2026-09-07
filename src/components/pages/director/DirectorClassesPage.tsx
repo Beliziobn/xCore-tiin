@@ -78,7 +78,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
               onClick={() => setFilterDropdownOpen((prev) => !prev)}
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
             >
-              <Filter className="w-3.5 h-3.5 text-[#5067fc]" />
+              <Filter className="w-3.5 h-3.5 text-[#f75142]" />
               <span>
                 Filtro: {filterCycle === 'all' ? 'classes' : filterCycle === 'primario' ? '1ª à 4ª Classe' : '5ª à 9ª Classe'}
               </span>
@@ -126,7 +126,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
               placeholder="Pesquisar classe por nome, sala ou professor regente..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#5067fc] focus:ring-2 focus:ring-[#5067fc]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
             />
           </div>
 
@@ -134,7 +134,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
           <button
             id="btn-cadastrar-classe"
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar</span>
@@ -152,7 +152,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
               onClick={() => setSelectedClassId(c.id)}
               className={`text-xs px-4 py-1.5 rounded-full font-bold transition-all whitespace-nowrap cursor-pointer ${
                 currentClass?.id === c.id
-                  ? 'bg-[#5067fc] text-white shadow-xs'
+                  ? 'bg-[#f75142] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -228,7 +228,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
         <div id="class-syllabus-section" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
-              <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#5067fc]">
+              <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#f75142]">
                 Gestão da Classe • uCore
               </span>
               <h3 className="text-xl font-black text-slate-900 mt-0.5">

@@ -47,7 +47,7 @@ const ZONE_COLOR_PALETTES: Record<string, { baseFrom: string; baseTo: string; st
     baseFrom: '#e6f0ff',
     baseTo: '#d8e7fc',
     stroke: '#c1dbfb',
-    accent: '#4f67ff',
+    accent: '#f75142',
   },
   'Cassembele': {
     baseFrom: '#e3ecfd',
@@ -59,13 +59,13 @@ const ZONE_COLOR_PALETTES: Record<string, { baseFrom: string; baseTo: string; st
     baseFrom: '#e7effe',
     baseTo: '#d6e6fc',
     stroke: '#c0dafa',
-    accent: '#38bdf8',
+    accent: '#f75142',
   },
   'Quêssua': {
     baseFrom: '#dae7fc',
     baseTo: '#cadcfb',
     stroke: '#b0cff7',
-    accent: '#4f67ff',
+    accent: '#f75142',
   },
   'Quizanga': {
     baseFrom: '#e8effe',
@@ -119,7 +119,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
       {/* 1. Header Toolbar inside map component */}
       <div className="w-full flex items-center justify-between pb-3 mb-2 border-b border-slate-200/60 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#4f67ff] animate-pulse" />
+          <div className="w-2.5 h-2.5 rounded-full bg-[#f75142] animate-pulse" />
           <span className="font-extrabold text-slate-800 tracking-tight">
             Cartografia Territorial de Quêssua
           </span>
@@ -182,12 +182,12 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
             {/* Soft Ambient Map Shadow for Active Zone */}
             <filter id="quessuaSelectedGlow" x="-30%" y="-30%" width="160%" height="160%">
               <feDropShadow dx="0" dy="7" stdDeviation="10" floodColor="#3851eb" floodOpacity="0.5" />
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#4f67ff" floodOpacity="0.3" />
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#f75142" floodOpacity="0.3" />
             </filter>
 
             {/* Hover Filter for Soft Elevation */}
             <filter id="quessuaHoverElevation" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="5" stdDeviation="6" floodColor="#4f67ff" floodOpacity="0.32" />
+              <feDropShadow dx="0" dy="5" stdDeviation="6" floodColor="#f75142" floodOpacity="0.32" />
             </filter>
 
             {/* Subtle Pin Marker Shadow */}
@@ -201,7 +201,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                 baseFrom: '#e0ecfe',
                 baseTo: '#d0e1fc',
                 stroke: '#b9d4fa',
-                accent: '#4f67ff',
+                accent: '#f75142',
               };
 
               return (
@@ -236,14 +236,14 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
             {/* Selected Zone Gradient (Royal Indigo Luminous) */}
             <linearGradient id="grad-selected-zone" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#5d75ff" />
-              <stop offset="50%" stopColor="#4f67ff" />
+              <stop offset="50%" stopColor="#f75142" />
               <stop offset="100%" stopColor="#384ee6" />
             </linearGradient>
 
             {/* Hover Zone Gradient */}
             <linearGradient id="grad-hover-zone" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#7a90ff" />
-              <stop offset="100%" stopColor="#4f67ff" />
+              <stop offset="100%" stopColor="#f75142" />
             </linearGradient>
 
             {/* Subtle background grid pattern */}
@@ -268,7 +268,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
             <circle cx="0" cy="0" r="20" fill="none" stroke="#64748b" strokeWidth="0.5" />
             {/* 4 points needle */}
             {/* North Point (Royal Blue) */}
-            <polygon points="0,-24 4,-4 0,0 -4,-4" fill="#4f67ff" />
+            <polygon points="0,-24 4,-4 0,0 -4,-4" fill="#f75142" />
             {/* South Point */}
             <polygon points="0,24 4,4 0,0 -4,4" fill="#94a3b8" />
             {/* East Point */}
@@ -276,7 +276,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
             {/* West Point */}
             <polygon points="-24,0 -4,4 0,0 -4,-4" fill="#cbd5e1" />
             {/* Center dot */}
-            <circle cx="0" cy="0" r="2.5" fill="#ffffff" stroke="#4f67ff" strokeWidth="1" />
+            <circle cx="0" cy="0" r="2.5" fill="#ffffff" stroke="#f75142" strokeWidth="1" />
             {/* N indicator */}
             <text x="0" y="-28" textAnchor="middle" fill="#0f172a" fontSize="10" fontWeight="900" fontFamily="Space Grotesk, sans-serif">
               N
@@ -393,7 +393,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                       cy="0"
                       r={isSelected ? '15' : isHovered ? '13' : '11'}
                       fill={isSelected ? '#fbbf24' : isHovered ? '#ffffff' : '#ffffff'}
-                      stroke={isSelected ? '#ffffff' : isHovered ? '#4f67ff' : '#4f67ff'}
+                      stroke={isSelected ? '#ffffff' : isHovered ? '#f75142' : '#f75142'}
                       strokeWidth={isSelected ? '2.5' : '2'}
                       filter="url(#quessuaPinShadow)"
                       className="transition-all duration-200"
@@ -404,7 +404,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                       x="0"
                       y="3.5"
                       textAnchor="middle"
-                      fill={isSelected ? '#78350f' : isHovered ? '#4f67ff' : '#0f172a'}
+                      fill={isSelected ? '#78350f' : isHovered ? '#f75142' : '#0f172a'}
                       fontSize={isSelected ? '12' : isHovered ? '11' : '10'}
                       fontWeight="900"
                       fontFamily="Space Grotesk, sans-serif"
@@ -490,7 +490,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                     {hoveredZone}
                   </span>
                 </div>
-                <span className="text-[10px] font-bold text-blue-300 bg-blue-950/80 px-2 py-0.5 rounded-full border border-blue-800/60">
+                <span className="text-[10px] font-bold text-rose-200 bg-[#002133]/90 px-2 py-0.5 rounded-full border border-[#f75142]/40">
                   {activeHoveredData.schoolsCount} {activeHoveredData.schoolsCount === 1 ? 'Escola' : 'Escolas'}
                 </span>
               </div>
@@ -507,9 +507,9 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                 </div>
               </div>
 
-              <div className="mt-2 text-[9.5px] text-blue-200/90 font-medium flex items-center justify-between">
+              <div className="mt-2 text-[9.5px] text-rose-100/90 font-medium flex items-center justify-between">
                 <span>Clique para filtrar zona</span>
-                <ChevronRight className="w-3 h-3 text-blue-400" />
+                <ChevronRight className="w-3 h-3 text-[#f75142]" />
               </div>
             </div>
           </div>
@@ -525,7 +525,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
             onClick={() => onSelectMunicipality('Todas as Escolas')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
               selectedMunicipality === 'Todas as Escolas'
-                ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-md shadow-blue-500/25'
+                ? 'bg-[#f75142] text-white border-[#f75142] shadow-md shadow-[#f75142]/25'
                 : 'bg-white text-slate-700 hover:bg-slate-100/80 border-slate-200/80'
             }`}
           >
@@ -552,8 +552,8 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                 onClick={() => onSelectMunicipality(zone)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
                   isSelected
-                    ? 'bg-[#4f67ff] text-white border-[#4f67ff] shadow-md shadow-blue-500/25 scale-[1.02]'
-                    : 'bg-white text-slate-700 hover:bg-blue-50/60 border-slate-200/80 hover:border-blue-300'
+                    ? 'bg-[#f75142] text-white border-[#f75142] shadow-md shadow-[#f75142]/25 scale-[1.02]'
+                    : 'bg-white text-slate-700 hover:bg-[#fef2f1] border-slate-200/80 hover:border-[#f75142]/40'
                 }`}
               >
                 <span>{zone}</span>
@@ -582,7 +582,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
               <span className="text-[10px] font-bold text-slate-700">Zona Selecionada</span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#4f67ff] border border-white inline-block shadow-2xs" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#f75142] border border-white inline-block shadow-2xs" />
               <span className="text-[10px] font-semibold text-slate-600">Densidade Ativa</span>
             </span>
           </div>

@@ -25,19 +25,19 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-100">
         <button
           onClick={onBackToStats}
-          className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#5067fc] bg-slate-50 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-full transition-all cursor-pointer"
+          className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#f75142] bg-slate-50 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-full transition-all cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Voltar ao Painel</span>
         </button>
 
         <div className="flex items-center gap-3">
-          <span className="text-[10px] uppercase font-black tracking-[0.2em] bg-blue-50 text-[#5067fc] border border-blue-200 px-3 py-1 rounded-full">
+          <span className="text-[10px] uppercase font-black tracking-[0.2em] bg-[#fef2f1] text-[#f75142] border border-[#fee4e2] px-3 py-1 rounded-full">
             Perfil do Docente
           </span>
           <button
             onClick={onNavigateToClass}
-            className="text-xs font-bold text-white bg-[#5067fc] hover:bg-[#4359eb] px-4 py-2 rounded-full transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
+            className="text-xs font-bold text-white bg-[#f75142] hover:bg-[#e04436] px-4 py-2 rounded-full transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
           >
             <span>Aceder à Minha Turma</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -49,10 +49,10 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-12 items-start">
         {/* Left Column: Big Blue Teacher Card (matching 18.png) */}
         <div className="lg:col-span-4 flex flex-col items-center">
-          <div className="relative w-full bg-[#5067fc] text-white rounded-[26px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)]">
+          <div className="relative w-full bg-[#f75142] text-white rounded-[26px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(247,81,66,0.25)]">
             {/* Circular badge on top matching 18.png with Users icon */}
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#5067fc]/20">
-              <Users className="w-7 h-7 text-[#5067fc]" strokeWidth={2.4} />
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#f75142]/20">
+              <Users className="w-7 h-7 text-[#f75142]" strokeWidth={2.4} />
             </div>
 
             <div className="text-xs uppercase tracking-[0.2em] text-white/80 font-bold mb-1">
@@ -72,50 +72,50 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
         <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-5 gap-3.5 sm:gap-4">
           {/* 1. Nº Turma */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Nº Turma
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-2xl sm:text-3xl font-black">{teacher.turma}</span>
             </div>
           </div>
 
           {/* 2. Periodo */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Periodo
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-base sm:text-lg font-black">{teacher.periodo}</span>
             </div>
           </div>
 
           {/* 3. Classe */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Classe
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-2xl sm:text-3xl font-black">{teacher.classe}</span>
             </div>
           </div>
 
           {/* 4. Sala */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Sala
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-sm sm:text-base font-black text-center">{teacher.sala}</span>
             </div>
           </div>
 
           {/* 5. Telefone */}
           <div className="flex flex-col items-start group col-span-2 sm:col-span-1">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Telefone
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-xs sm:text-sm font-mono font-bold text-center">{teacher.telefone}</span>
             </div>
           </div>
@@ -160,7 +160,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
             <div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <Clock className="w-5 h-5 text-[#5067fc]" />
+                <Clock className="w-5 h-5 text-[#f75142]" />
                 <span>Horário Semanal de Aulas & Disciplinas</span>
               </h3>
               <p className="text-xs text-slate-500 font-medium">
@@ -175,7 +175,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
                   onClick={() => setSelectedDay(h.dia)}
                   className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                     selectedDay === h.dia
-                      ? 'bg-[#5067fc] text-white shadow-xs'
+                      ? 'bg-[#f75142] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -201,7 +201,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">
                     {s.tempo}
                   </span>
-                  <span className="text-sm font-black text-[#5067fc]">{s.disc}</span>
+                  <span className="text-sm font-black text-[#f75142]">{s.disc}</span>
                   <span className="text-[10px] font-bold text-slate-500 mt-2">Sala 04</span>
                 </div>
               ));
@@ -217,7 +217,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
             <button
               onClick={onNavigateToClass}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#5067fc] hover:text-[#4359eb] bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-full transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#f75142] hover:text-[#e04436] bg-[#fef2f1] hover:bg-[#fee4e2] px-4 py-2 rounded-full transition-all cursor-pointer shrink-0"
             >
               <span>Ver Lista da Turma</span>
               <ArrowRight className="w-3.5 h-3.5" />

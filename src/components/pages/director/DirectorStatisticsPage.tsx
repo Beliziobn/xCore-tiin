@@ -87,7 +87,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 1: [Alunos] (Gênero) */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Alunos
                 </span>
               </div>
@@ -116,12 +116,12 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
 
                   {/* Male Bar: 741 */}
                   <div className="flex flex-col items-center gap-1 group">
-                    <span className="text-[11px] font-bold text-[#0284c7]">741</span>
+                    <span className="text-[11px] font-bold text-[#f75142]">741</span>
                     <div
-                      className="w-11 bg-[#4f67ff] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
+                      className="w-11 bg-[#f75142] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
                       style={{ height: '42px' }}
                     />
-                    <div className="text-xs mt-1 text-[#4f67ff] font-bold text-center">
+                    <div className="text-xs mt-1 text-[#f75142] font-bold text-center">
                       <span className="text-lg leading-none">♂</span>
                     </div>
                   </div>
@@ -135,7 +135,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 2: [Desempenho dos alunos] (2017.1 to 2019.2) */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Desempenho dos alunos
                 </span>
               </div>
@@ -148,7 +148,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                       <div className="flex items-end gap-1 h-36">
                         {/* % Aprovação (Blue) */}
                         <div
-                          className="w-3 sm:w-3.5 bg-[#5067fc] rounded-t-xs hover:brightness-110 transition-all cursor-pointer"
+                          className="w-3 sm:w-3.5 bg-[#f75142] rounded-t-xs hover:brightness-110 transition-all cursor-pointer"
                           style={{ height: `${item.approval * 1.35}px` }}
                           title={`${item.semester} - Aprovação: ${item.approval}%`}
                         />
@@ -169,7 +169,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                 {/* Legend matching 5.png */}
                 <div className="flex items-center justify-center gap-4 mt-3 text-[10px] font-medium text-slate-600">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-xs bg-[#5067fc]" />
+                    <span className="w-2.5 h-2.5 rounded-xs bg-[#f75142]" />
                     <span>%Aprovação - Q.Amb I</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -183,7 +183,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 3: [Presença] (EAD vs Presencial Trend lines) */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Presença
                 </span>
               </div>
@@ -211,7 +211,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                     {/* Presencial Line (Blue) */}
                     <polyline
                       fill="none"
-                      stroke="#5067fc"
+                      stroke="#f75142"
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -223,7 +223,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                       <circle key={`ead-${i}`} cx={cx} cy={cy} r="3" fill="#f97316" />
                     ))}
                     {[[10, 90], [76, 94], [142, 94], [208, 90], [295, 90]].map(([cx, cy], i) => (
-                      <circle key={`pre-${i}`} cx={cx} cy={cy} r="3" fill="#5067fc" />
+                      <circle key={`pre-${i}`} cx={cx} cy={cy} r="3" fill="#f75142" />
                     ))}
                   </svg>
                 </div>
@@ -244,7 +244,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                     <span>EAD</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-xs bg-[#5067fc]" />
+                    <span className="w-2.5 h-2.5 rounded-xs bg-[#f75142]" />
                     <span>Presencial</span>
                   </div>
                 </div>
@@ -257,7 +257,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 4: [Alunos sem documentos] */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Alunos sem documentos
                 </span>
               </div>
@@ -285,12 +285,12 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
 
                   {/* Male Bar */}
                   <div className="flex flex-col items-center gap-1 group">
-                    <span className="text-[11px] font-bold text-[#0284c7]">741</span>
+                    <span className="text-[11px] font-bold text-[#f75142]">741</span>
                     <div
-                      className="w-12 bg-[#4f67ff] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
+                      className="w-12 bg-[#f75142] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
                       style={{ height: '38px' }}
                     />
-                    <div className="text-xs mt-1 text-[#4f67ff] font-bold">
+                    <div className="text-xs mt-1 text-[#f75142] font-bold">
                       <span className="text-lg leading-none">♂</span>
                     </div>
                   </div>
@@ -304,7 +304,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             {/* Chart 5: [Alunos com documentos] */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
               <div className="mb-4">
-                <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
+                <span className="inline-block bg-[#f75142] text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-md shadow-2xs">
                   Alunos com documentos
                 </span>
               </div>
@@ -332,12 +332,12 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
 
                   {/* Male Bar */}
                   <div className="flex flex-col items-center gap-1 group">
-                    <span className="text-[11px] font-bold text-[#0284c7]">741</span>
+                    <span className="text-[11px] font-bold text-[#f75142]">741</span>
                     <div
-                      className="w-12 bg-[#4f67ff] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
+                      className="w-12 bg-[#f75142] rounded-t-sm transition-all duration-500 group-hover:brightness-110"
                       style={{ height: '38px' }}
                     />
-                    <div className="text-xs mt-1 text-[#4f67ff] font-bold">
+                    <div className="text-xs mt-1 text-[#f75142] font-bold">
                       <span className="text-lg leading-none">♂</span>
                     </div>
                   </div>

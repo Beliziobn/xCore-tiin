@@ -52,6 +52,7 @@ import { SupportChatModal } from './components/chat/SupportChatModal';
 import { FloatingChatButton } from './components/chat/FloatingChatButton';
 import { initialChatChannels, initialChatMessages } from './data/chatData';
 import { realtimeChat } from './utils/realtimeChat';
+import { initSmoothScroll, scrollToTop, refreshScrollReveals } from './utils/scrollManager';
 
 import type { 
   EducationalModule, 
@@ -253,6 +254,21 @@ export default function App() {
       unsub();
     };
   }, []);
+
+  // Initialize Lenis global smooth scrolling and scroll reveals across all pages
+  useEffect(() => {
+    const cleanup = initSmoothScroll();
+    return cleanup;
+  }, []);
+
+  // When switching page or view, smoothly reset scroll to top and refresh reveals
+  useEffect(() => {
+    scrollToTop(true);
+    const timer = setTimeout(() => {
+      refreshScrollReveals();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [currentPage, currentView]);
 
   const unreadChatCount = useMemo(() => {
     return chatChannels.reduce((acc, c) => acc + (c.unreadCount || 0), 0);

@@ -147,9 +147,9 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
         aria-modal="true"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-linear-to-r from-blue-50/80 to-indigo-50/80">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-linear-to-r from-[#fef2f1]/80 to-[#fee4e2]/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#5067fc] text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+            <div className="w-10 h-10 rounded-2xl bg-[#f75142] text-white flex items-center justify-center shadow-md shadow-[#f75142]/20">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
@@ -157,7 +157,7 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
                 <h3 className="text-base sm:text-lg font-bold text-slate-900">
                   Gerador de Brasão & Logotipo Escolar (SVG AI)
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-blue-100 text-[#5067fc] border border-blue-200">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-[#fee4e2] text-[#f75142] border border-[#f86f63]/30">
                   API v1
                 </span>
               </div>
@@ -180,7 +180,7 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
           {/* Preset Suggestions */}
           <div>
             <div className="flex items-center gap-2 mb-2.5">
-              <Palette className="w-4 h-4 text-[#5067fc]" />
+              <Palette className="w-4 h-4 text-[#f75142]" />
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Modelos de Inspiração (Presets Heráldicos)
               </span>
@@ -191,11 +191,11 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
                   key={idx}
                   type="button"
                   onClick={() => setPrompt(preset.prompt)}
-                  className="p-3 text-left rounded-2xl border border-slate-200 hover:border-[#5067fc] bg-slate-50/60 hover:bg-blue-50/40 transition-all cursor-pointer group flex items-start gap-2.5"
+                  className="p-3 text-left rounded-2xl border border-slate-200 hover:border-[#f75142] bg-slate-50/60 hover:bg-[#fef2f1] transition-all cursor-pointer group flex items-start gap-2.5"
                 >
-                  <Shield className="w-4 h-4 text-slate-400 group-hover:text-[#5067fc] shrink-0 mt-0.5" />
+                  <Shield className="w-4 h-4 text-slate-400 group-hover:text-[#f75142] shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-xs font-bold text-slate-800 group-hover:text-[#5067fc]">
+                    <h4 className="text-xs font-bold text-slate-800 group-hover:text-[#f75142]">
                       {preset.title}
                     </h4>
                     <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
@@ -231,7 +231,7 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Descreva as cores, símbolos (livro, sol, escudo, tocha, ramos) e estilo do brasão..."
-              className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc] text-slate-800"
+              className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142] text-slate-800"
             />
 
             <div className="flex items-center justify-between">
@@ -242,7 +242,7 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
                 type="button"
                 onClick={handleGenerate}
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#5067fc] hover:bg-[#4054e0] text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 disabled:opacity-50 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold rounded-xl shadow-md shadow-[#f75142]/20 disabled:opacity-50 transition-all cursor-pointer"
               >
                 {loading ? (
                   <>
@@ -290,7 +290,7 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
                     onClick={() => setActiveTab('preview')}
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       activeTab === 'preview'
-                        ? 'bg-white text-[#5067fc] shadow-xs'
+                        ? 'bg-white text-[#f75142] shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -302,7 +302,7 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
                     onClick={() => setActiveTab('code')}
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       activeTab === 'code'
-                        ? 'bg-white text-[#5067fc] shadow-xs'
+                        ? 'bg-white text-[#f75142] shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -381,7 +381,7 @@ export const SvgAiLogoModal: React.FC<SvgAiLogoModalProps> = ({
               <button
                 type="button"
                 onClick={handleApply}
-                className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-[#5067fc] hover:bg-[#4054e0] rounded-xl shadow-md shadow-blue-500/20 cursor-pointer transition-all"
+                className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-[#f75142] hover:bg-[#e04436] rounded-xl shadow-md shadow-[#f75142]/20 cursor-pointer transition-all"
               >
                 <Check className="w-4 h-4" />
                 Aplicar Brasão à Escola

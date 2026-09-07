@@ -45,7 +45,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
   const nonClickableCount = session.cards.filter((c) => c.isClickable === false).length;
 
   return (
-    <section id="stats-section" className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 pb-20">
+    <section id="stats-section" className="reveal-up relative z-20 max-w-5xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 pb-20">
       {/* Informative Banner when not logged in */}
       {!isLoggedIn && (
         <div 

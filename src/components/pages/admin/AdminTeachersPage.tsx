@@ -50,9 +50,9 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Security Hierarchy Banner */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800">
+        <div className="mb-6 p-4 bg-gradient-to-r from-[#fef2f1] to-[#fef2f1] border border-[#fee4e2] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-[#f75142] text-white flex items-center justify-center shrink-0 shadow-xs">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -66,7 +66,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
           </div>
           <button
             onClick={() => onOpenRegisterModal()}
-            className="whitespace-nowrap px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-blue-200 text-[#5067fc] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+            className="whitespace-nowrap px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-[#fee4e2] text-[#f75142] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
           >
             Homologar Docente Extraordinário
           </button>
@@ -81,7 +81,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
               <select
                 value={schoolFilter}
                 onChange={(e) => setSchoolFilter(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5067fc] cursor-pointer"
+                className="appearance-none bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
               >
                 <option value="all">Todos os Professores ({teachers.length})</option>
                 {availableSchools.map((school) => (
@@ -104,7 +104,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Pesquisar professor, escola, telefone ou disciplina..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
             />
           </div>
 
@@ -112,7 +112,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
           <button
             id="admin-btn-cadastrar-professor"
             onClick={onOpenRegisterModal}
-            className="flex items-center justify-center gap-2 bg-[#4f67ff] hover:bg-[#20b2cc] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             Cadastrar
@@ -125,7 +125,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
             Professor Inspecionado em Destaque:
           </span>
           {activeTeacher && (
-            <span className="text-xs font-bold text-[#5067fc] bg-blue-50 px-3 py-1 rounded-full border border-blue-100 flex items-center gap-1.5">
+            <span className="text-xs font-bold text-[#f75142] bg-[#fef2f1] px-3 py-1 rounded-full border border-[#fee4e2] flex items-center gap-1.5">
               <School className="w-3.5 h-3.5" />
               {activeTeacher.schoolName}
             </span>
@@ -137,82 +137,82 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
             {/* Top Row: 7 Blue Cards with Cyan Badges matching 12.png */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {/* Card 1: [Nome] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
+                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Nome
                 </span>
                 <span className="text-xs sm:text-sm font-bold my-auto leading-snug px-1">
                   {activeTeacher.name}
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium truncate w-full px-1">
+                <span className="text-[9px] text-[#fee4e2] font-medium truncate w-full px-1">
                   {activeTeacher.subject}
                 </span>
               </div>
 
               {/* Card 2: [Telefone] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
+                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Telefone
                 </span>
                 <span className="text-xs sm:text-sm font-bold my-auto leading-tight px-1 font-mono">
                   {activeTeacher.phone}
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium">Linha Direta</span>
+                <span className="text-[9px] text-[#fee4e2] font-medium">Linha Direta</span>
               </div>
 
               {/* Card 3: [Classe] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
+                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Classe
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
                   {activeTeacher.gradeClass}
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium">Nível Letivo</span>
+                <span className="text-[9px] text-[#fee4e2] font-medium">Nível Letivo</span>
               </div>
 
               {/* Card 4: [Sala] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
+                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Sala
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
                   {activeTeacher.room}
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium">Espaço Físico</span>
+                <span className="text-[9px] text-[#fee4e2] font-medium">Espaço Físico</span>
               </div>
 
               {/* Card 5: [Turma] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
+                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Turma
                 </span>
                 <span className="text-base sm:text-lg font-black my-auto">
                   {activeTeacher.turma}
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium">Grupo Atribuído</span>
+                <span className="text-[9px] text-[#fee4e2] font-medium">Grupo Atribuído</span>
               </div>
 
               {/* Card 6: [Categoria] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
+                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Categoria
                 </span>
                 <span className="text-[11px] sm:text-xs font-bold my-auto leading-snug px-1">
                   {activeTeacher.category}
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium">Estatuto Carreira</span>
+                <span className="text-[9px] text-[#fee4e2] font-medium">Estatuto Carreira</span>
               </div>
 
               {/* Card 7: [Localização] */}
-              <div className="bg-[#5067fc] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
-                <span className="bg-[#4f67ff] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
+              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
+                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
                   Localização
                 </span>
                 <span className="text-[11px] sm:text-xs font-semibold my-auto leading-tight px-1">
                   {activeTeacher.location}
                 </span>
-                <span className="text-[9px] text-blue-200 font-medium">{activeTeacher.schoolName.split(' ')[0]}</span>
+                <span className="text-[9px] text-[#fee4e2] font-medium">{activeTeacher.schoolName.split(' ')[0]}</span>
               </div>
             </div>
           </div>
@@ -251,12 +251,12 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                     <tr
                       key={t.id}
                       onClick={() => setSelectedTeacherId(t.id)}
-                      className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-50/80 font-medium' : ''
+                      className={`hover:bg-[#fef2f1]/50 cursor-pointer transition-colors ${
+                        isSelected ? 'bg-[#fef2f1]/80 font-medium' : ''
                       }`}
                     >
                       <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
-                        <UserIcon className={`w-4 h-4 ${isSelected ? 'text-[#5067fc]' : 'text-slate-400'}`} />
+                        <UserIcon className={`w-4 h-4 ${isSelected ? 'text-[#f75142]' : 'text-slate-400'}`} />
                         {t.name}
                       </td>
                       <td className="p-3.5 text-slate-700 font-medium">{t.schoolName}</td>
@@ -278,7 +278,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                             e.stopPropagation();
                             setSelectedTeacherId(t.id);
                           }}
-                          className="text-[#5067fc] font-bold hover:underline inline-flex items-center gap-1"
+                          className="text-[#f75142] font-bold hover:underline inline-flex items-center gap-1"
                         >
                           Ver <ChevronRight className="w-3.5 h-3.5" />
                         </button>
