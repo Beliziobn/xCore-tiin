@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Sparkles, Layers, FileCheck, ArrowUpRight, BarChart3 } from 'lucide-react';
-import heroImg from '../../../assets/images/hero_teacher_students_1788685346634.jpg';
+import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Layers, FileCheck, ArrowUpRight, BarChart3 } from 'lucide-react';
+import { Hero } from '../../Hero';
 import { QuessuaMunicipalitiesMap } from './QuessuaMunicipalitiesMap';
 import {
   QUESSUA_ZONES_LIST,
@@ -9,7 +9,6 @@ import {
   MunicipalitySummary,
 } from '../../../data/municipalitiesData';
 import type { AdminSchool } from '../../../types';
-import { SvgAiLogoModal } from './SvgAiLogoModal';
 import { StatCardItem } from '../../StatCardItem';
 import { SectionShader } from '../../SectionShader';
 
@@ -25,13 +24,13 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
   schools,
   onOpenRegisterModal,
   onUpdateSchool,
+  onOpenGetStarted,
+  isLoggedIn,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>('Quêssua');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
-  const [isSvgModalOpen, setIsSvgModalOpen] = useState(false);
-  const [svgTargetSchool, setSvgTargetSchool] = useState<AdminSchool | null>(null);
 
   // Compute aggregated summaries for all Quêssua zones
   const summaries = useMemo(() => computeMunicipalitySummaries(schools), [schools]);
@@ -145,55 +144,24 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
     };
   }, [activeSchool, currentMunicipalityData]);
 
+  // Document regularization calculation for the census section
+  const docsStats = useMemo(() => {
+    const withDocs = activeSchool ? activeSchool.studentsWithDocs : (currentMunicipalityData.studentsWithDocs || 0);
+    const withoutDocs = activeSchool ? activeSchool.studentsWithoutDocs : (currentMunicipalityData.studentsWithoutDocs || 0);
+    const total = withDocs + withoutDocs;
+    const rate = total > 0 ? Math.round((withDocs / total) * 100) : 0;
+    return { withDocs, withoutDocs, total, rate };
+  }, [activeSchool, currentMunicipalityData]);
+
   return (
     <div id="admin-schools-page" className="w-full min-h-screen bg-[#f7f3f3]">
-      {/* 1. Hero Header Banner matching Texto do seu parágrafo (1).png */}
-      <section
-        id="schools-hero-banner"
-        className="relative w-full bg-[#f75142] border-b border-[#e04436] pt-8 sm:pt-12 pb-12 sm:pb-16 px-4 overflow-hidden flex flex-col items-center justify-center text-center shadow-[0_10px_30px_rgba(247,81,66,0.2)]"
-      >
-        <SectionShader variant="coral" />
-        {/* Soft background aura */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-white/10 rounded-full blur-[100px] pointer-events-none z-[1]" />
-
-        {/* Central Graphic with Teacher, Students and Yellow Sun */}
-        <div className="relative z-10 w-[240px] h-[240px] sm:w-[310px] sm:h-[310px] md:w-[340px] md:h-[340px] flex items-center justify-center select-none">
-          {/* Subtle concentric rings */}
-          <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-white/20 scale-105 pointer-events-none" />
-          <div className="absolute inset-0 m-auto w-full h-full rounded-full border border-dashed border-white/35 scale-115 pointer-events-none animate-[spin_60s_linear_infinite]" />
-
-          {/* Decorative Squiggle Lines (Cyan & Amber) */}
-          <div className="absolute -top-3 right-2 sm:right-6 z-20 pointer-events-none opacity-95">
-            <svg width="90" height="45" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M5 15C20 5 35 25 50 15C65 5 80 25 95 15C105 8 112 12 115 15"
-                stroke="#f75142"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="M10 32C25 22 40 42 55 32C70 22 85 42 100 32C108 27 114 30 118 32"
-                stroke="#FBBF24"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-
-          {/* Warm Sun Circle */}
-          <div className="absolute inset-0 m-auto w-[220px] h-[220px] sm:w-[280px] sm:h-[280px] rounded-full bg-[#FBBF24] shadow-[0_15px_40px_rgba(251,191,36,0.35)]" />
-
-          {/* Teacher and Students Round Photo cutout */}
-          <div className="relative w-[220px] h-[220px] sm:w-[280px] sm:h-[280px] rounded-full overflow-hidden border-4 border-white shadow-2xl flex items-end justify-center group">
-            <img
-              src={heroImg}
-              alt="Professora e alunos uCore"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-500"
-            />
-          </div>
-        </div>
-      </section>
+      {/* Hero Header matching "Minhas Salas" (DirectorRoomsPage) */}
+      <Hero
+        onOpenGetStarted={onOpenGetStarted}
+        isLoggedIn={isLoggedIn}
+        customTitle="Minhas Escolas"
+        customSubtitle=""
+      />
 
       {/* 2. Main Body Content matching Texto do seu parágrafo (1).png */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -240,17 +208,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
 
           {/* Right: Action Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setSvgTargetSchool(null);
-                setIsSvgModalOpen(true);
-              }}
-              className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold tracking-wide px-4 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Sparkles className="w-4 h-4" />
-              Gerador SVG AI
-            </button>
-
             <button
               id="admin-btn-cadastrar-escola"
               onClick={onOpenRegisterModal}
@@ -352,184 +309,297 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
         </div>
 
-        {/* 4. Indicadores Estruturais e Pedagógicos da Rede - Sem caixa de card, integrado e legível */}
-        <div className="mb-10 pb-8 border-b border-slate-200/80">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-4 border-b border-slate-200/80">
-            <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                Indicadores de Infraestrutura & Capacidade da Rede
-              </h4>
-              <p className="text-[11px] text-slate-500">
-                Métricas consolidadas de salas, turmas e quadro docente em {displayValues.name}
-              </p>
+        {/* 4. Indicadores Estruturais e Pedagógicos da Rede */}
+        <div id="admin-infrastructure-indicators" className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-6 sm:p-7 mb-8 transition-all">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-5 mb-5 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center border border-[#fee4e2] shadow-2xs shrink-0">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                    Infraestrutura & Capacidade Pedagógica
+                  </h4>
+                  <span className="text-[10px] font-bold bg-[#fef2f1] text-[#f75142] px-2 py-0.5 rounded-md border border-[#fee4e2]">
+                    Rede Ativa
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Salas, turmas, classes e corpo docente alocados em <span className="font-semibold text-slate-700">{displayValues.name}</span>
+                </p>
+              </div>
             </div>
-            <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200/70">
-              Dados em Tempo Real
-            </span>
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-full shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Atualização em tempo real
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-5 gap-x-6 pt-1">
+          {/* 6 Grid Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
             {/* 1. Classes */}
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Classes Letivas
-              </span>
-              <span className="text-2xl font-black text-slate-900 tracking-tight">
-                {displayValues.classesCount}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">Níveis de Ensino</span>
+            <div className="bg-slate-50/70 hover:bg-slate-50 border border-slate-200/70 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Classes
+                </span>
+                <SchoolIcon className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight block">
+                  {displayValues.classesCount}
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  Níveis de Ensino
+                </span>
+              </div>
             </div>
 
             {/* 2. Professores */}
             <div
-              className="flex flex-col cursor-pointer group"
               onClick={() => {
                 setCategoryFilter('professores');
                 document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
               }}
+              className="bg-slate-50/70 hover:bg-[#fef2f1]/60 border border-slate-200/70 hover:border-[#fee4e2] rounded-2xl p-4 flex flex-col justify-between transition-all cursor-pointer group"
             >
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 group-hover:text-[#f75142] transition-colors">
-                  Corpo Docente
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-[#f75142] transition-colors">
+                  Docentes
                 </span>
-                <ArrowUpRight className="w-3 h-3 text-slate-400 group-hover:text-[#f75142] mb-1 transition-colors" />
+                <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#f75142] transition-colors" />
               </div>
-              <span className="text-2xl font-black text-slate-900 tracking-tight group-hover:text-[#f75142] transition-colors">
-                {displayValues.teachersCount}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">Professores em Função</span>
+              <div>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 group-hover:text-[#f75142] tracking-tight block transition-colors">
+                  {displayValues.teachersCount}
+                </span>
+                <span className="text-[11px] text-slate-500 group-hover:text-slate-600 font-medium block mt-0.5">
+                  Em Exercício
+                </span>
+              </div>
             </div>
 
             {/* 3. Salas */}
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Salas de Aula
-              </span>
-              <span className="text-2xl font-black text-slate-900 tracking-tight">
-                {displayValues.roomsCount}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">Espaços Pedagógicos</span>
+            <div className="bg-slate-50/70 hover:bg-slate-50 border border-slate-200/70 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Salas
+                </span>
+                <Layers className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight block">
+                  {displayValues.roomsCount}
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  Espaços Físicos
+                </span>
+              </div>
             </div>
 
             {/* 4. Turmas */}
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Turmas Formadas
-              </span>
-              <span className="text-2xl font-black text-slate-900 tracking-tight">
-                {displayValues.turmasCount}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">Grupos Registados</span>
+            <div className="bg-slate-50/70 hover:bg-slate-50 border border-slate-200/70 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Turmas
+                </span>
+                <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight block">
+                  {displayValues.turmasCount}
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  Formadas na Rede
+                </span>
+              </div>
             </div>
 
-            {/* 5. Localização */}
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Região
-              </span>
-              <span className="text-lg font-black text-slate-900 truncate tracking-tight" title={displayValues.location}>
-                {displayValues.location.split(',')[0] || 'Quêssua'}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">Área Municipal</span>
+            {/* 5. Região */}
+            <div className="bg-slate-50/70 hover:bg-slate-50 border border-slate-200/70 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Região
+                </span>
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 truncate tracking-tight block" title={displayValues.location}>
+                  {displayValues.location.split(',')[0] || 'Quêssua'}
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  Zona Municipal
+                </span>
+              </div>
             </div>
 
             {/* 6. Desempenho */}
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Desempenho Geral
-              </span>
-              <span className="text-2xl font-black text-emerald-700 tracking-tight">
-                {displayValues.performanceRate}
-              </span>
-              <span className="text-[11px] text-emerald-600 font-semibold mt-0.5">Aproveitamento Médio</span>
+            <div className="bg-emerald-50/50 hover:bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                  Aproveitamento
+                </span>
+                <Award className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <div>
+                <span className="text-2xl sm:text-3xl font-black text-emerald-800 tracking-tight block">
+                  {displayValues.performanceRate}
+                </span>
+                <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
+                  Média Geral
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 5. Situação Documental dos Alunos - Sem caixa de card, integrado e legível */}
-        <div className="mb-12 pb-8 border-b border-slate-200/80">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-4 border-b border-slate-200/80">
-            <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                Censo Documental & Regularização Discente
-              </h4>
-              <p className="text-[11px] text-slate-500">
-                Acompanhamento de registro civil, certidões e cédulas dos alunos na rede
-              </p>
+        {/* 5. Situação Documental dos Alunos */}
+        <div id="admin-documentation-census" className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-6 sm:p-7 mb-10 transition-all">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-5 mb-5 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 shadow-2xs shrink-0">
+                <FileCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                    Censo Documental & Regularização de Alunos
+                  </h4>
+                  <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200">
+                    Registo Civil
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Acompanhamento de Certidões, B.I. e assiduidade dos discentes na rede
+                </p>
+              </div>
             </div>
+
             <button
               onClick={() => {
                 setCategoryFilter('all');
                 document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#f75142] hover:text-[#e04436] bg-[#fef2f1] hover:bg-[#fee4e2] px-3.5 py-1.5 rounded-xl border border-[#fee4e2] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 text-xs font-bold text-[#f75142] hover:text-[#e04436] bg-[#fef2f1] hover:bg-[#fee4e2] px-3.5 py-2 rounded-xl border border-[#fee4e2] transition-colors cursor-pointer shrink-0"
             >
-              <span>Ver no Explorador de Escolas</span>
+              <span>Explorar no Catálogo</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-1">
-            {/* 1. Alunos com Documentos */}
-            <div className="flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                  Alunos com Documentos
+          {/* Regularization Ratio Progress Bar */}
+          <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/70 mb-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Taxa de Regularização Documental
                 </span>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  {docsStats.rate}% Concluído
+                </span>
+              </div>
+              <span className="text-xs text-slate-500 font-medium">
+                Total auditado: <strong className="text-slate-800">{docsStats.total.toLocaleString('pt-AO')} alunos</strong>
+              </span>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="w-full h-3 rounded-full bg-slate-200 overflow-hidden flex shadow-inner">
+              <div
+                style={{ width: `${docsStats.rate}%` }}
+                className="h-full bg-emerald-500 transition-all duration-500"
+                title={`${docsStats.rate}% com documentos`}
+              />
+              <div
+                style={{ width: `${100 - docsStats.rate}%` }}
+                className="h-full bg-amber-400 transition-all duration-500"
+                title={`${100 - docsStats.rate}% pendentes`}
+              />
+            </div>
+
+            <div className="flex items-center justify-between mt-2.5 text-[11px] text-slate-600 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                Regularizados: {displayValues.studentsWithDocs} ({docsStats.rate}%)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                Pendentes: {displayValues.studentsWithoutDocs} ({100 - docsStats.rate}%)
+              </span>
+            </div>
+          </div>
+
+          {/* 3 Detailed Indicator Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 1. Alunos com Documentos */}
+            <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                    Alunos com Documentos
+                  </span>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Regularizados
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl sm:text-4xl font-black text-emerald-950 tracking-tight">
                     {displayValues.studentsWithDocs}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">regularizados</span>
+                  <span className="text-xs text-emerald-700 font-semibold">alunos</span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Estudantes com Certidão de Nascimento ou B.I. homologado</p>
-              </div>
-              <div className="mt-3">
-                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Certidão / B.I. Válido
-                </span>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                  Estudantes com Certidão de Nascimento, Assento de Nascimento ou Bilhete de Identidade oficial homologado.
+                </p>
               </div>
             </div>
 
             {/* 2. Alunos sem Documentos */}
-            <div className="flex flex-col justify-between">
+            <div className="bg-amber-50/40 border border-amber-200/80 rounded-2xl p-5 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                  Alunos sem Documentos
-                </span>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">
+                    Alunos sem Documentos
+                  </span>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                    Em Tratamento
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl sm:text-4xl font-black text-amber-950 tracking-tight">
                     {displayValues.studentsWithoutDocs}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">pendentes</span>
+                  <span className="text-xs text-amber-700 font-semibold">pendentes</span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Estudantes sem registo civil oficial encaminhados para apoio</p>
-              </div>
-              <div className="mt-3">
-                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                  Pendente de Registro Civil
-                </span>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                  Estudantes encaminhados para a brigada de registo civil e cartórios para emissão célere de documentos.
+                </p>
               </div>
             </div>
 
             {/* 3. Assiduidade / Regularização Geral */}
-            <div className="flex flex-col justify-between">
+            <div className="bg-blue-50/40 border border-blue-200/80 rounded-2xl p-5 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                  Taxa de Frequência Escolar
-                </span>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-800">
+                    Taxa de Frequência Escolar
+                  </span>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                    Assiduidade Média
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl sm:text-4xl font-black text-blue-950 tracking-tight">
                     {displayValues.attendanceRate}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">assiduidade</span>
+                  <span className="text-xs text-blue-700 font-semibold">presença</span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Frequência média dos alunos na unidade territorial</p>
-              </div>
-              <div className="mt-3">
-                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  Presença Coletiva
-                </span>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                  Média consolidada de presença dos discentes em sala de aula durante o ano letivo corrente.
+                </p>
               </div>
             </div>
           </div>
@@ -603,12 +673,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                           {school.category}
                         </span>
                         <div className="flex items-center gap-1.5">
-                          {school.logoSvg ? (
-                            <span className="text-[10px] font-bold text-[#f75142] bg-[#fef2f1] border border-[#fee4e2] px-1.5 py-0.5 rounded flex items-center gap-1">
-                              <Sparkles className="w-2.5 h-2.5" />
-                              SVG
-                            </span>
-                          ) : null}
                           <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
                             {school.performanceRate}% Desempenho
                           </span>
@@ -622,18 +686,9 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                             dangerouslySetInnerHTML={{ __html: school.logoSvg }}
                           />
                         ) : (
-                          <button
-                            type="button"
-                            title="Gerar Brasão com SVG AI"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSvgTargetSchool(school);
-                              setIsSvgModalOpen(true);
-                            }}
-                            className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 hover:bg-[#fef2f1] border border-dashed border-slate-300 hover:border-[#f75142] flex items-center justify-center text-slate-400 hover:text-[#f75142] transition-colors cursor-pointer"
-                          >
-                            <Sparkles className="w-4 h-4" />
-                          </button>
+                          <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                            <SchoolIcon className="w-5 h-5 text-slate-400" />
+                          </div>
                         )}
                         <h4 className="text-sm font-bold text-slate-900 leading-snug">
                           {school.name}
@@ -662,18 +717,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSvgTargetSchool(school);
-                            setIsSvgModalOpen(true);
-                          }}
-                          className="text-[11px] font-bold text-[#f75142] hover:underline flex items-center gap-1"
-                        >
-                          <Sparkles className="w-3 h-3" />
-                          Brasão
-                        </button>
                         <div className="flex items-center gap-1 text-[#f75142] font-bold">
                           <span>{isSelected ? 'Ativa' : 'Ver'}</span>
                           <ChevronRight className="w-3.5 h-3.5" />
@@ -687,25 +730,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           )}
         </div>
       </div>
-
-      {/* SvgAiLogoModal */}
-      <SvgAiLogoModal
-        isOpen={isSvgModalOpen}
-        onClose={() => {
-          setIsSvgModalOpen(false);
-          setSvgTargetSchool(null);
-        }}
-        defaultSchoolName={svgTargetSchool ? svgTargetSchool.name : `Escolas de ${selectedMunicipality}`}
-        defaultZone={selectedMunicipality}
-        onApplyLogo={(svgCode) => {
-          if (svgTargetSchool && onUpdateSchool) {
-            onUpdateSchool({
-              ...svgTargetSchool,
-              logoSvg: svgCode,
-            });
-          }
-        }}
-      />
     </div>
   );
 };

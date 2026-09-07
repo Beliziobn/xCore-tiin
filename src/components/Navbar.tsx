@@ -158,70 +158,63 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onSelectPage('admin-dashboard');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Home className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Painel Central Admin</span>
+                      Painel Central Admin
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('admin-estatisticas');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Estatísticas da Rede</span>
+                      Estatísticas da Rede
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('admin-escolas');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Minhas Escolas</span>
+                      Minhas Escolas
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('admin-directores');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <User className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Meus Directores</span>
+                      Meus Directores
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('admin-professores');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <User className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Meus Professores</span>
+                      Meus Professores
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('admin-alunos');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Users className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Meus Alunos</span>
+                      Meus Alunos
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('admin-perfil');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <User className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Perfil do Administrador</span>
+                      Perfil do Administrador
                     </button>
                   </>
                 ) : activeRole === 'diretor' ? (
@@ -231,70 +224,73 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onSelectPage('diretor-dashboard');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Painel do Diretor</span>
+                      Painel do Diretor
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('diretor-estatisticas');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Analisa suas estatísticas</span>
+                      Analisa suas estatísticas
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('diretor-professores');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <User className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Meus Professores</span>
+                      Meus Professores
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-presenca');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    >
+                      <span>Presença Professores (Ponto)</span>
+                      <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('diretor-alunos');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Users className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Meus Alunos</span>
+                      Meus Alunos
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('diretor-salas');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Home className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Minhas Salas</span>
+                      Minhas Salas
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('diretor-classes');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Minhas Classes</span>
+                      Minhas Classes
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('diretor-perfil');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <User className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Perfil do Director</span>
+                      Perfil do Director
                     </button>
                   </>
                 ) : activeRole === 'professor' ? (
@@ -304,40 +300,46 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onSelectPage('estatisticas');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Analisa suas estatísticas</span>
+                      Analisa suas estatísticas
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('minha-turma');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Users className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Minha Turma (4ª Classe)</span>
+                      Minha Turma (4ª Classe)
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('professor-presenca');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    >
+                      <span>Presença dos Alunos (Chamada)</span>
+                      <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('perfil-professor');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <User className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Perfil do Professor</span>
+                      Perfil do Professor
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('perfil-aluno');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Perfil do Aluno (Albert)</span>
+                      Perfil do Aluno (Albert)
                     </button>
                   </>
                 ) : (
@@ -347,40 +349,36 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onSelectPage('escolas');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Award className="w-3.5 h-3.5 text-[#3B82F6]" />
-                      <span>Rede de Escolas</span>
+                      Rede de Escolas
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('professores');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Users className="w-3.5 h-3.5 text-[#3B82F6]" />
-                      <span>Portal dos Professores</span>
+                      Portal dos Professores
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('alunos');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-[#3B82F6]" />
-                      <span>Ambiente do Aluno</span>
+                      Ambiente do Aluno
                     </button>
                     <button
                       onClick={() => {
                         onSelectPage('calendario');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 flex items-center gap-2.5 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      <Calendar className="w-3.5 h-3.5 text-[#3B82F6]" />
-                      <span>Calendário Letivo 2026</span>
+                      Calendário Letivo 2026
                     </button>
                   </>
                 )}
@@ -651,6 +649,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => {
+                  onSelectPage('diretor-presenca');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-[#f75142] bg-rose-50/50 hover:bg-rose-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+              >
+                <span>Presença Professores (Ponto)</span>
+                <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
+              </button>
+              <button
+                onClick={() => {
                   onSelectPage('diretor-alunos');
                   setMobileMenuOpen(false);
                 }}
@@ -705,6 +713,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
               >
                 Minha Turma (4ª Classe)
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('professor-presenca');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-[#f75142] bg-rose-50/50 hover:bg-rose-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+              >
+                <span>Presença dos Alunos (Chamada)</span>
+                <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
               </button>
               <button
                 onClick={() => {

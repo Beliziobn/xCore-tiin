@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, BookOpen, Layers, Users, ChevronDown, CheckCircle2, Award } from 'lucide-react';
+import { Search, Plus, Filter, BookOpen, Layers, Users, ChevronDown, CheckCircle2, Award, Ban, AlertCircle } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorClassesData as initialClasses } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorClass } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
+import { MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
 
 interface DirectorClassesPageProps {
   onOpenGetStarted: () => void;
@@ -35,6 +36,10 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
         matchesCycle = ['1ª Classe', '2ª Classe', '3ª Classe', '4ª Classe'].includes(c.name);
       } else if (filterCycle === 'secundario') {
         matchesCycle = ['5ª Classe', '6ª Classe', '7ª Classe', '8ª Classe', '9ª Classe'].includes(c.name);
+      } else if (filterCycle === 'modulo') {
+        matchesCycle = c.category === 'modulo' || c.name.startsWith('Módulo');
+      } else if (filterCycle === 'praeer') {
+        matchesCycle = c.category === 'praeer' || c.name.startsWith('PRAEER');
       }
 
       return matchesSearch && matchesCycle;
@@ -48,11 +53,16 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
     const formatted: DirectorClass = {
       id: newClass.id,
       name: newClass.gradeClass,
+      category: newClass.gradeClass.startsWith('Módulo') ? 'modulo' : newClass.gradeClass.startsWith('PRAEER') ? 'praeer' : 'regular',
       period: newClass.period === 'Tarde' ? 'Tarde' : 'Manhã e Tarde',
       room: newClass.room,
-      studentCount: newClass.studentCount || 48,
+      studentCount: newClass.studentCount || 45,
       teachers: ['Prof. Regente Alocado'],
       turmas: ['Turma A', 'Turma B'],
+      turmasDetails: [
+        { name: 'Turma A', studentCount: Math.min(45, newClass.studentCount || 45), maxCapacity: 45, shift: 'Manhã', room: newClass.room, isFull: (newClass.studentCount || 45) >= 45 },
+        { name: 'Turma B', studentCount: 0, maxCapacity: 45, shift: 'Tarde', room: newClass.room, isFull: false },
+      ],
     };
     setClassesList((prev) => [formatted, ...prev]);
     setSelectedClassId(formatted.id);
@@ -80,13 +90,19 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
             >
               <Filter className="w-3.5 h-3.5 text-[#f75142]" />
               <span>
-                Filtro: {filterCycle === 'all' ? 'classes' : filterCycle === 'primario' ? '1ª à 4ª Classe' : '5ª à 9ª Classe'}
+                Filtro: {
+                  filterCycle === 'all' ? 'Todas as Classes' :
+                  filterCycle === 'primario' ? '1ª à 4ª Classe' :
+                  filterCycle === 'secundario' ? '5ª à 9ª Classe' :
+                  filterCycle === 'modulo' ? 'Módulos 1, 2 e 3' :
+                  'PRAEER Etapas 1, 2 e 3'
+                }
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
             </button>
 
             {filterDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-30 animate-in fade-in">
+              <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-30 animate-in fade-in">
                 <button
                   onClick={() => {
                     setFilterCycle('all');
@@ -94,7 +110,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                   }}
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
                 >
-                  Todas as Classes (1ª à 9ª)
+                  Todas as Classes e Módulos
                 </button>
                 <button
                   onClick={() => {
@@ -103,7 +119,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                   }}
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
                 >
-                  Ensino Primário (1ª à 4ª)
+                  Ensino Primário (1ª à 4ª Classe)
                 </button>
                 <button
                   onClick={() => {
@@ -112,7 +128,25 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                   }}
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
                 >
-                  Ensino Secundário (5ª à 9ª)
+                  Ensino Secundário (5ª à 9ª Classe)
+                </button>
+                <button
+                  onClick={() => {
+                    setFilterCycle('modulo');
+                    setFilterDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
+                >
+                  Módulos de Aceleração (1, 2 e 3)
+                </button>
+                <button
+                  onClick={() => {
+                    setFilterCycle('praeer');
+                    setFilterDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
+                >
+                  PRAEER (Etapa 1, 2 e 3)
                 </button>
               </div>
             )}
@@ -246,7 +280,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Turmas Atendidas</span>
               <p className="font-semibold text-slate-800">
-                {currentClass?.turmas?.join(' e ') || 'Turma A e Turma B'} (Manhã e Tarde).
+                {currentClass?.turmas?.join(' e ') || 'Turma A e Turma B'} ({currentClass?.period || 'Manhã e Tarde'}).
               </p>
             </div>
             <div>
@@ -260,6 +294,101 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
               <p className="font-semibold text-slate-800">
                 Avaliação contínua por projetos, frequência controlada diariamente e relatório trimestral aos encarregados.
               </p>
+            </div>
+          </div>
+
+          {/* Turmas Capacity & 45-Student Limit Enforcement Section */}
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#f75142]">
+                  Lotação das Turmas • Teto Legal de 45 Alunos
+                </span>
+                <h4 className="text-base font-black text-slate-900 mt-0.5">
+                  Quadro de Vagas por Turma ({currentClass?.name})
+                </h4>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
+                  Capacidade Máxima: <strong>45 Alunos / Turma</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(currentClass?.turmasDetails || currentClass?.turmas?.map((t, idx) => ({
+                name: t,
+                studentCount: idx === 0 ? 45 : 38,
+                maxCapacity: 45,
+                shift: idx === 0 ? 'Manhã' : 'Tarde',
+                room: currentClass?.room || 'Sala 01',
+                isFull: idx === 0,
+              })) || []).map((turmaItem) => {
+                const isFull = (turmaItem.studentCount ?? 0) >= MAX_TURMA_CAPACITY;
+                const remaining = Math.max(0, MAX_TURMA_CAPACITY - (turmaItem.studentCount ?? 0));
+                return (
+                  <div
+                    key={turmaItem.name}
+                    className={`p-4 rounded-xl border transition-all ${
+                      isFull
+                        ? 'bg-rose-50/70 border-rose-200 shadow-2xs'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm text-slate-900">
+                          {turmaItem.name}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          • {turmaItem.shift || currentClass?.period} ({turmaItem.room || currentClass?.room})
+                        </span>
+                      </div>
+                      {isFull ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                          <Ban className="w-3 h-3" />
+                          <span>Inelegível (Lotada)</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{remaining} {remaining === 1 ? 'Vaga Aberta' : 'Vagas Abertas'}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-slate-600">Ocupação Atual:</span>
+                        <span className={isFull ? 'font-black text-rose-700' : 'font-bold text-slate-800'}>
+                          {turmaItem.studentCount} / {MAX_TURMA_CAPACITY} alunos
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            isFull ? 'bg-rose-600' : 'bg-emerald-600'
+                          }`}
+                          style={{ width: `${Math.min(100, ((turmaItem.studentCount ?? 0) / MAX_TURMA_CAPACITY) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 mt-2.5 leading-relaxed">
+                      {isFull ? (
+                        <span className="text-rose-800 font-medium">
+                          ⚠️ Atingiu o teto de 45 alunos. O sistema bloqueia automaticamente novas matrículas nesta turma.
+                        </span>
+                      ) : (
+                        <span className="text-emerald-800 font-medium">
+                          Elegível para receber até {remaining} novo(s) estudante(s) via módulo de matrículas.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

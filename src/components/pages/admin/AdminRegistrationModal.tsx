@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { X, School, User, Users, CheckCircle2, ShieldCheck, ShieldAlert, MapPin, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { X, School, User, Users, CheckCircle2, ShieldCheck, ShieldAlert, MapPin } from 'lucide-react';
 import type { AdminSchool, AdminTeacher, AdminStudent, AdminDirector } from '../../../types';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
 import { QUESSUA_ZONES_LIST } from '../../../data/municipalitiesData';
-import { SvgAiLogoModal } from './SvgAiLogoModal';
 
 export type AdminModalType = 'school' | 'teacher' | 'student' | 'director' | null;
 
@@ -37,8 +36,6 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
   const [turmasCount, setTurmasCount] = useState('14');
   const [schoolZone, setSchoolZone] = useState<string>('Quêssua');
   const [schoolAddress, setSchoolAddress] = useState<string>('');
-  const [schoolLogoSvg, setSchoolLogoSvg] = useState<string | null>(null);
-  const [isSvgModalOpen, setIsSvgModalOpen] = useState(false);
   const [studentsWithDocs, setStudentsWithDocs] = useState('320');
   const [studentsWithoutDocs, setStudentsWithoutDocs] = useState('45');
   const [performanceRate, setPerformanceRate] = useState('82');
@@ -137,7 +134,6 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
       category,
       phone,
       email: email.trim() || `${schoolName.toLowerCase().replace(/\s+/g, '')}@ucore.edu.ao`,
-      logoSvg: schoolLogoSvg || undefined,
     };
     onAddSchool?.(newSchool);
     onClose();
@@ -422,57 +418,6 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
                     {schoolZone} - {schoolAddress.trim() || 'Zona Central'}
                   </span>
                 </div>
-              </div>
-
-              {/* Brasão / Logotipo Vetorial SVG AI */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#f75142]" />
-                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Brasão / Logotipo Oficial (SVG AI)
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsSvgModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {schoolLogoSvg ? 'Alterar Brasão SVG' : 'Gerar com SVG AI'}
-                  </button>
-                </div>
-
-                {schoolLogoSvg ? (
-                  <div className="flex items-center gap-4 p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
-                    <div 
-                      className="w-16 h-16 shrink-0 rounded-xl p-1 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden"
-                      dangerouslySetInnerHTML={{ __html: schoolLogoSvg }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-800">Selo Vetorial Vinculado</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                          SVG Ativo
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                        Este vetor heráldico será exibido na ficha cadastral e mapa de Quêssua.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSchoolLogoSvg(null)}
-                      className="text-xs text-rose-600 hover:text-rose-700 font-semibold cursor-pointer px-2 py-1 hover:bg-rose-50 rounded-lg"
-                    >
-                      Remover
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-slate-500">
-                    Opcional: utilize a API SVG AI para gerar um brasão vetorial exclusivo com símbolos de sabedoria e referências ao Quêssua.
-                  </p>
-                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex justify-end gap-3">
@@ -878,15 +823,6 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
           )}
         </div>
       </div>
-
-      {/* SvgAiLogoModal */}
-      <SvgAiLogoModal
-        isOpen={isSvgModalOpen}
-        onClose={() => setIsSvgModalOpen(false)}
-        defaultSchoolName={schoolName || 'Escola do Quêssua'}
-        defaultZone={schoolZone}
-        onApplyLogo={(svg) => setSchoolLogoSvg(svg)}
-      />
     </div>
   );
 };

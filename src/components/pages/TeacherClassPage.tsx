@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ArrowLeft, GraduationCap, Phone, User, CheckCircle2, AlertCircle, Plus, Eye, Award, Sparkles, RefreshCw, FileText } from 'lucide-react';
+import { Search, ArrowLeft, GraduationCap, Phone, User, CheckCircle2, AlertCircle, Plus, Eye, Award, Sparkles, RefreshCw, FileText, CalendarCheck, Lock } from 'lucide-react';
 import { StudentProfile } from '../../data/teacherData';
 import { StudentRegistrationModal } from '../modals/StudentRegistrationModal';
 import type { StudentRegistrationData } from '../../types';
@@ -9,6 +9,7 @@ interface TeacherClassPageProps {
   onBackToStats: () => void;
   onSelectStudent: (student: StudentProfile) => void;
   onAddStudent?: (newStudent: StudentRegistrationData) => void;
+  onNavigateToAttendance?: () => void;
   students: StudentProfile[];
 }
 
@@ -16,6 +17,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
   onBackToStats,
   onSelectStudent,
   onAddStudent,
+  onNavigateToAttendance,
   students,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -145,6 +147,17 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {onNavigateToAttendance && (
+              <button
+                id="btn-fazer-chamada"
+                onClick={onNavigateToAttendance}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-4 py-2 rounded-full transition-all shadow-2xs cursor-pointer active:scale-95"
+                title="Abrir diário de chamada e presença dos alunos"
+              >
+                <CalendarCheck className="w-4 h-4 text-[#f75142]" />
+                <span>Fazer Chamada / Presença</span>
+              </button>
+            )}
             <button
               onClick={() => setIsRegisterModalOpen(true)}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#f75142] hover:bg-[#e04436] px-4 py-2 rounded-full transition-all shadow-xs cursor-pointer active:scale-95"

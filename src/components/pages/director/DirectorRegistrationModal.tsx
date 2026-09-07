@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, Plus, ShieldCheck, User, Users, Home, BookOpen } from 'lucide-react';
+import { X, CheckCircle, Plus, ShieldCheck, User, Users, Home, BookOpen, AlertCircle } from 'lucide-react';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import { CLASS_GROUPS, MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
 
 interface DirectorRegistrationModalProps {
   isOpen: boolean;
@@ -174,8 +175,14 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                     onChange={(e) => setGradeClass(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-[#f75142] outline-none text-xs font-semibold text-slate-900 bg-white"
                   >
-                    {['1ª Classe', '2ª Classe', '3ª Classe', '4ª Classe', '5ª Classe', '6ª Classe', '7ª Classe', '8ª Classe', '9ª Classe'].map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                    {CLASS_GROUPS.map((group) => (
+                      <optgroup key={group.group} label={group.group}>
+                        {group.items.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>

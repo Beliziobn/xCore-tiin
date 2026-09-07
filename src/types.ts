@@ -174,14 +174,27 @@ export interface DirectorRoom {
   type: 'Regular' | 'Laboratório' | 'Recursos Multifuncionais (AEE)' | 'Biblioteca';
 }
 
+export const MAX_TURMA_CAPACITY = 45;
+
+export interface TurmaDetail {
+  name: string;
+  studentCount: number;
+  maxCapacity: number;
+  shift?: string;
+  room?: string;
+  isFull?: boolean;
+}
+
 export interface DirectorClass {
   id: string;
-  name: string; // "1ª Classe", "4ª Classe", etc.
+  name: string; // "1ª Classe", "4ª Classe", "Módulo 1", "PRAEER Etapa 1", etc.
+  category?: 'regular' | 'modulo' | 'praeer';
   period: string; // "Manhã" | "Tarde" | "Manhã e Tarde"
   room: string; // "Sala 03"
   studentCount: number; // e.g. 48
   teachers: string[];
   turmas: string[];
+  turmasDetails?: TurmaDetail[];
 }
 
 export interface DirectorProfileInfo {

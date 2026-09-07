@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle, CheckCircle2, Clock, Calendar, ChevronDown, ShieldCheck, UserCheck } from 'lucide-react';
+import { Search, Plus, Filter, CheckCircle, CheckCircle2, Clock, Calendar, ChevronDown, ShieldCheck, UserCheck, Lock } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
@@ -10,12 +10,14 @@ interface DirectorTeachersPageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
   onAddTeacherGlobal?: (teacher: AdminTeacher) => void;
+  onNavigateToAttendance?: () => void;
 }
 
 export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
   onAddTeacherGlobal,
+  onNavigateToAttendance,
 }) => {
   const [teachers, setTeachers] = useState<DirectorTeacher[]>(initialTeachers);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(teachers[0]?.id || 'prof-1');
@@ -176,15 +178,28 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
             />
           </div>
 
-          {/* Right: Cadastrar Button (Cyan pill) */}
-          <button
-            id="btn-cadastrar-professor"
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Cadastrar</span>
-          </button>
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
+            {onNavigateToAttendance && (
+              <button
+                id="btn-livro-ponto"
+                onClick={onNavigateToAttendance}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-2xs hover:shadow active:scale-95 flex items-center justify-center gap-2"
+                title="Abrir livro de ponto dos professores"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Livro de Ponto</span>
+              </button>
+            )}
+            <button
+              id="btn-cadastrar-professor"
+              onClick={() => setIsModalOpen(true)}
+              className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cadastrar</span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Teacher Selector Chips */}

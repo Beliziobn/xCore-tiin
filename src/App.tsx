@@ -18,6 +18,7 @@ import { DirectorStudentsPage } from './components/pages/director/DirectorStuden
 import { DirectorRoomsPage } from './components/pages/director/DirectorRoomsPage';
 import { DirectorClassesPage } from './components/pages/director/DirectorClassesPage';
 import { DirectorProfilePage } from './components/pages/director/DirectorProfilePage';
+import { DirectorAttendancePage } from './components/pages/director/DirectorAttendancePage';
 
 // Admin Pages & Components
 import { AdminStatisticsPage } from './components/pages/admin/AdminStatisticsPage';
@@ -38,6 +39,7 @@ import {
 import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
 import { TeacherClassPage } from './components/pages/TeacherClassPage';
 import { TeacherProfilePage } from './components/pages/TeacherProfilePage';
+import { TeacherAttendancePage } from './components/pages/TeacherAttendancePage';
 import { StudentProfilePage } from './components/pages/StudentProfilePage';
 import { 
   initialStudentsData, 
@@ -548,6 +550,11 @@ export default function App() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
+      if (pageId === 'professor-presenca' || pageId === 'chamada' || pageId === 'presenca-alunos' || pageId === 'presenca') {
+        setCurrentView('professor-presenca');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       if (pageId === 'estatisticas' || pageId === 'professor-estatisticas') {
         setCurrentView('professor-estatisticas');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -572,9 +579,15 @@ export default function App() {
       pageId === 'diretor-alunos' ||
       pageId === 'diretor-salas' ||
       pageId === 'diretor-classes' ||
-      pageId === 'diretor-perfil'
+      pageId === 'diretor-perfil' ||
+      pageId === 'diretor-presenca'
     ) {
       setCurrentView(pageId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (pageId === 'ponto-professores' || pageId === 'presenca-professores' || (pageId === 'presenca' && activeRole === 'diretor')) {
+      setCurrentView('diretor-presenca');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -675,7 +688,7 @@ export default function App() {
           onOpenRegisterModal={() => setAdminModalType('school')}
           onUpdateSchool={(updated) => {
             setAdminSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-            showToast(`Brasão da escola "${updated.name}" atualizado com sucesso!`);
+            showToast(`Dados da escola "${updated.name}" atualizados com sucesso!`);
           }}
           isLoggedIn={isSessionStarted}
         />
@@ -742,6 +755,10 @@ export default function App() {
         <DirectorTeachersPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          onNavigateToAttendance={() => {
+            setCurrentView('diretor-presenca');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           onAddTeacherGlobal={(teacher) => {
             setAdminTeachers((prev) => [teacher, ...prev]);
             showToast(`Professor(a) "${teacher.name}" cadastrado(a) pela Direção Escolar com sucesso!`);
@@ -783,6 +800,27 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
         />
+      );
+    }
+    if (currentView === 'diretor-presenca') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Livro de Ponto dos Professores"
+            isLoggedIn={isSessionStarted}
+          />
+          <DirectorAttendancePage
+            onBackToTeachers={() => {
+              setCurrentView('diretor-professores');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToDashboard={() => {
+              setCurrentView('diretor-estatisticas');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </div>
       );
     }
 
@@ -828,6 +866,10 @@ export default function App() {
           <TeacherClassPage
             onBackToStats={() => {
               setCurrentView('professor-estatisticas');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToAttendance={() => {
+              setCurrentView('professor-presenca');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSelectStudent={(student) => {
@@ -878,6 +920,34 @@ export default function App() {
               showToast(`Aluno(a) ${newStudent.name} matriculado(a) com sucesso!`);
             }}
             students={teacherStudents}
+          />
+        </div>
+      );
+    }
+    if (currentView === 'professor-presenca') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Presença dos Alunos"
+            isLoggedIn={isSessionStarted}
+          />
+          <TeacherAttendancePage
+            onBackToClass={() => {
+              setCurrentView('professor-turma');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToStudent={(studentId) => {
+              if (studentId) {
+                const found = teacherStudents.find((s) => s.id === studentId);
+                if (found) setSelectedStudent(found);
+              }
+              setCurrentView('aluno-perfil');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            students={teacherStudents}
+            teacherName={teacherProfile.name}
+            turmaName={teacherProfile.turma}
           />
         </div>
       );

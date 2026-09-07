@@ -18,9 +18,20 @@ import {
   RefreshCw,
   Clock,
   Trash2,
-  FileCheck
+  FileCheck,
+  AlertTriangle,
+  Ban
 } from 'lucide-react';
 import type { StudentDocumentType, StudentRegistrationData } from '../../types';
+import {
+  CLASS_GROUPS,
+  STANDARD_TURMAS,
+  getTurmaOccupancy,
+  isTurmaFull,
+  getTurmaRemainingSlots,
+  incrementTurmaOccupancy,
+  MAX_TURMA_CAPACITY
+} from '../../data/classesConfig';
 
 interface StudentRegistrationModalProps {
   isOpen: boolean;
@@ -70,7 +81,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   // Photo
   const [foto, setFoto] = useState<string | undefined>(undefined);
 
-  // Parents and Guardian
+  // Parental and Guardian info
   const [nomePai, setNomePai] = useState('');
   const [nomeMae, setNomeMae] = useState('');
   const [encarregado, setEncarregado] = useState('');
@@ -79,6 +90,11 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   const [telefoneAlternativo, setTelefoneAlternativo] = useState('');
   const [endereco, setEndereco] = useState('');
   const [observacoes, setObservacoes] = useState('');
+
+  // Turma capacity state & validation
+  const currentOccupancy = getTurmaOccupancy(classe, turma);
+  const isCurrentTurmaFull = currentOccupancy >= MAX_TURMA_CAPACITY;
+  const remainingSlots = Math.max(0, MAX_TURMA_CAPACITY - currentOccupancy);
 
   // UI States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -185,6 +201,13 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       return;
     }
 
+    // Strict 45-students turma capacity enforcement
+    if (isCurrentTurmaFull) {
+      setErrorNotice(`A ${turma} da ${classe} já atingiu a lotação máxima de ${MAX_TURMA_CAPACITY} alunos e está inelegível para novas matrículas. Por favor, selecione outra turma com vagas.`);
+      setActiveTab('academico');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const studentPayload: StudentRegistrationData = {
@@ -219,6 +242,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       setSuccessNotice(true);
 
       setTimeout(() => {
+        incrementTurmaOccupancy(classe, turma);
         onSuccess(studentPayload);
         onClose();
         setSuccessNotice(false);
@@ -654,42 +678,59 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Classe *
+                        Classe / Módulo / Etapa *
                       </label>
                       <select
                         value={classe}
-                        onChange={(e) => setClasse(e.target.value)}
+                        onChange={(e) => {
+                          setClasse(e.target.value);
+                          setErrorNotice(null);
+                        }}
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       >
-                        <option value="Iniciação">Iniciação</option>
-                        <option value="1ª Classe">1ª Classe</option>
-                        <option value="2ª Classe">2ª Classe</option>
-                        <option value="3ª Classe">3ª Classe</option>
-                        <option value="4ª Classe">4ª Classe</option>
-                        <option value="5ª Classe">5ª Classe</option>
-                        <option value="6ª Classe">6ª Classe</option>
-                        <option value="7ª Classe">7ª Classe</option>
-                        <option value="8ª Classe">8ª Classe</option>
-                        <option value="9ª Classe">9ª Classe</option>
+                        {CLASS_GROUPS.map((group) => (
+                          <optgroup key={group.group} label={group.group}>
+                            {group.items.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Turma *
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                          Turma *
+                        </label>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Máx: 45 alunos
+                        </span>
+                      </div>
                       <select
                         value={turma}
-                        onChange={(e) => setTurma(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
+                        onChange={(e) => {
+                          setTurma(e.target.value);
+                          setErrorNotice(null);
+                        }}
+                        className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl font-bold focus:bg-white focus:outline-none focus:ring-2 transition-colors ${
+                          isCurrentTurmaFull
+                            ? 'border-rose-400 bg-rose-50/50 text-rose-900 focus:ring-rose-200 focus:border-rose-500'
+                            : 'border-slate-200 text-slate-900 focus:ring-[#f75142]/20 focus:border-[#f75142]'
+                        }`}
                       >
-                        <option value="Turma A">Turma A</option>
-                        <option value="Turma B">Turma B</option>
-                        <option value="Turma C">Turma C</option>
-                        <option value="Turma D">Turma D</option>
-                        <option value="Turma Única">Turma Única</option>
-                        <option value="Turma 1">Turma 1</option>
-                        <option value="Turma 2">Turma 2</option>
+                        {STANDARD_TURMAS.map((t) => {
+                          const occ = getTurmaOccupancy(classe, t);
+                          const full = occ >= MAX_TURMA_CAPACITY;
+                          const rem = MAX_TURMA_CAPACITY - occ;
+                          return (
+                            <option key={t} value={t}>
+                              {t} — {full ? `🚨 LOTADA (${occ}/45 - Inelegível)` : `✅ ${occ}/45 alunos (${rem} ${rem === 1 ? 'vaga' : 'vagas'})`}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
@@ -704,6 +745,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       >
                         <option value="Manhã">Manhã (07h30 - 12h30)</option>
                         <option value="Tarde">Tarde (13h00 - 17h30)</option>
+                        <option value="Noite">Noite (18h00 - 21h30)</option>
                         <option value="Integral">Integral</option>
                       </select>
                     </div>
@@ -723,9 +765,73 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         <option value="Sala 04">Sala 04</option>
                         <option value="Sala 05">Sala 05</option>
                         <option value="Sala 06">Sala 06</option>
+                        <option value="Sala 07">Sala 07</option>
+                        <option value="Sala 08">Sala 08</option>
+                        <option value="Sala 09">Sala 09</option>
+                        <option value="Sala 10">Sala 10</option>
+                        <option value="Sala 11">Sala 11</option>
                       </select>
                     </div>
                   </div>
+
+                  {/* Turma Capacity Status & Ineligibility Banner (Strict 45-Student Limit) */}
+                  {isCurrentTurmaFull ? (
+                    <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-950 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in">
+                      <div className="p-2 bg-rose-200 text-rose-800 rounded-xl shrink-0 mt-0.5">
+                        <Ban className="w-5 h-5 text-rose-700" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-rose-800">
+                            Turma Inelegível • Limite Máximo Atingido (45/45 Alunos)
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white">
+                            Lotação Completa
+                          </span>
+                        </div>
+                        <p className="text-xs text-rose-900 mt-1 leading-relaxed">
+                          Uma turma tem de ter direito a <strong>apenas 45 alunos (não mais que isso)</strong>. Como a <strong>{turma}</strong> da <strong>{classe}</strong> já possui <strong>45 alunos matriculados</strong>, ela está <strong>estritamente inelegível para adicionar novos alunos</strong>.
+                        </p>
+                        <div className="mt-3 pt-2.5 border-t border-rose-200 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-bold text-rose-800">Turmas com vagas abertas:</span>
+                          {STANDARD_TURMAS.filter((t) => !isTurmaFull(classe, t)).slice(0, 3).map((avail) => (
+                            <button
+                              key={avail}
+                              type="button"
+                              onClick={() => {
+                                setTurma(avail);
+                                setErrorNotice(null);
+                              }}
+                              className="px-3 py-1 text-xs font-bold bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Mudar para {avail} ({getTurmaRemainingSlots(classe, avail)} vagas)</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-emerald-900 text-xs animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>
+                          <strong>{turma}</strong> está elegível: <strong>{currentOccupancy} de {MAX_TURMA_CAPACITY} alunos</strong> matriculados ({remainingSlots} {remainingSlots === 1 ? 'vaga disponível' : 'vagas disponíveis'}).
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="w-24 bg-emerald-200 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-emerald-600 h-full rounded-full transition-all"
+                            style={{ width: `${(currentOccupancy / MAX_TURMA_CAPACITY) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-black uppercase text-emerald-800">
+                          {currentOccupancy}/{MAX_TURMA_CAPACITY}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -885,22 +991,40 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeTab === 'geral') setActiveTab('documentos');
-                      else if (activeTab === 'documentos') setActiveTab('academico');
-                      else if (activeTab === 'academico') setActiveTab('familia');
+                      if (activeTab === 'geral') {
+                        setActiveTab('documentos');
+                      } else if (activeTab === 'documentos') {
+                        setActiveTab('academico');
+                      } else if (activeTab === 'academico') {
+                        if (isCurrentTurmaFull) {
+                          setErrorNotice(`A ${turma} da ${classe} já atingiu a capacidade máxima de ${MAX_TURMA_CAPACITY} alunos e está inelegível. Selecione uma turma com vagas antes de avançar.`);
+                          return;
+                        }
+                        setErrorNotice(null);
+                        setActiveTab('familia');
+                      }
                     }}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black uppercase tracking-wider rounded-xl text-xs cursor-pointer shadow-sm transition-all"
+                    className="w-full sm:w-auto px-6 py-2.5 bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black uppercase tracking-wider rounded-xl text-xs cursor-pointer shadow-sm transition-all flex items-center justify-center gap-2"
                   >
-                    Avançar
+                    <span>Avançar</span>
                   </button>
                 ) : (
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider rounded-xl text-xs cursor-pointer shadow-sm transition-all flex items-center justify-center gap-2"
+                    disabled={isSubmitting || isCurrentTurmaFull}
+                    className={`w-full sm:w-auto px-6 py-2.5 font-black uppercase tracking-wider rounded-xl text-xs shadow-sm transition-all flex items-center justify-center gap-2 ${
+                      isCurrentTurmaFull
+                        ? 'bg-rose-600 text-white cursor-not-allowed opacity-90'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                    }`}
                   >
                     {isSubmitting ? (
                       <span>Processando Matrícula...</span>
+                    ) : isCurrentTurmaFull ? (
+                      <>
+                        <Ban className="w-4 h-4" />
+                        <span>Turma Inelegível (45/45)</span>
+                      </>
                     ) : (
                       <>
                         <CheckCircle2 className="w-4 h-4" />

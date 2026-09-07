@@ -177,3 +177,141 @@ html.lenis.lenis-stopped {
   }
 }
 
+/* ---------- Hero & Sections ---------- */
+
+.hero {
+  padding: clamp(3rem, 8vw, 6rem) 0 clamp(2rem, 5vw, 3.5rem);
+  text-align: center;
+}
+
+.hero h1,
+.hero-heading {
+  font-family: 'Manrope', 'Inter', sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(2.5rem, 7vw, 4.5rem) !important;
+  letter-spacing: -0.02em !important;
+  color: var(--navy) !important;
+  margin: 0 !important;
+}
+
+.hero-subtitle {
+  margin: 0.75rem 0 0 !important;
+  font-size: clamp(1.05rem, 2vw, 1.3rem) !important;
+  color: rgba(14, 27, 44, 0.55) !important;
+}
+
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+}
+
+.stat-card {
+  flex: 1 1 180px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(14, 27, 44, 0.06);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  will-change: transform;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px) scale(1.03);
+  box-shadow: 0 20px 40px -8px rgba(247, 81, 66, 0.22);
+}
+
+.stat-card:active {
+  transform: translateY(-2px) scale(0.99);
+}
+
+.stat-number {
+  display: block;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--navy);
+}
+
+.stat-label {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: rgba(14, 27, 44, 0.55);
+}
+
+.feature-block {
+  padding: clamp(3rem, 7vw, 5rem) 0;
+  border-top: 1px solid rgba(14, 27, 44, 0.08);
+  max-width: 640px;
+}
+
+.feature-block--alt {
+  margin-left: auto;
+  text-align: right;
+}
+
+.feature-block h2 {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 1.75rem;
+  color: var(--navy);
+  margin: 0 0 0.75rem;
+}
+
+.feature-block p {
+  margin: 0;
+  color: rgba(14, 27, 44, 0.65);
+  line-height: 1.6;
+}
+
+/* ---------- Letter hover effect ---------- */
+/* .hover-text elements have their text split into one <span> per
+   character. In place of folding/compressing, the characters become
+   thicker and bolder on hover, preserving the original text color. */
+
+.hover-text {
+  display: inline-block;
+  cursor: default;
+}
+
+.hover-char {
+  display: inline-block;
+  transform-origin: center;
+  color: inherit;
+  -webkit-text-stroke: 0px currentColor;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              -webkit-text-stroke 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              text-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              font-weight 0.3s ease;
+  transition-delay: calc(var(--i, 0) * 16ms);
+}
+
+/* O texto fica mais grosso e negrito, mantendo a cor original */
+.hover-text:hover .hover-char,
+.hover-text:focus-visible .hover-char {
+  font-weight: 900 !important;
+  -webkit-text-stroke: 1.5px currentColor;
+  text-shadow: 0 0 0.8px currentColor;
+  transform: scale(1.04);
+}
+
+/* Letra individual em foco/hover ganha destaque extra */
+.hover-char:hover {
+  -webkit-text-stroke: 2px currentColor;
+  transform: scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hover-char {
+    transition: none;
+    transition-delay: 0s;
+  }
+  .hover-text:hover .hover-char,
+  .hover-text:focus-visible .hover-char,
+  .hover-char:hover {
+    transform: none;
+  }
+}
+

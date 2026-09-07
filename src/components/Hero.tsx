@@ -87,15 +87,62 @@ export const Hero: React.FC<HeroProps> = ({
         {/* Heading */}
         <div className="text-center reveal-up">
           {greeting ? (
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-slate-950 leading-[1.02] text-balance">
-              {greeting}
+            <h1
+              className="hero-heading font-extrabold tracking-[-0.02em] leading-[1.05] text-balance"
+              style={{
+                fontFamily: "'Manrope', 'Inter', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(2.5rem, 7vw, 4.5rem)',
+                letterSpacing: '-0.02em',
+                color: 'var(--navy)',
+                margin: 0,
+              }}
+            >
+              <span className="hover-text">
+                {greeting.split('').map((char, index) => (
+                  <span
+                    key={index}
+                    className="hover-char"
+                    style={{ '--i': index } as React.CSSProperties}
+                  >
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                ))}
+              </span>
             </h1>
           ) : (
-            <h1 className="text-5xl sm:text-7xl lg:text-[5.5rem] font-black tracking-tighter text-slate-950 leading-[0.98] text-balance">
-              Central uCore
+            <h1
+              className="hero-heading font-extrabold tracking-[-0.02em] leading-[1.05] text-balance"
+              style={{
+                fontFamily: "'Manrope', 'Inter', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(2.5rem, 7vw, 4.5rem)',
+                letterSpacing: '-0.02em',
+                color: 'var(--navy)',
+                margin: 0,
+              }}
+            >
+              <span className="hover-text">
+                {'Central uCore'.split('').map((char, index) => (
+                  <span
+                    key={index}
+                    className="hover-char"
+                    style={{ '--i': index } as React.CSSProperties}
+                  >
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                ))}
+              </span>
             </h1>
           )}
-          <p className="mt-5 sm:mt-6 text-lg sm:text-2xl font-medium text-slate-500 leading-relaxed text-pretty">
+          <p
+            className="hero-subtitle text-pretty"
+            style={{
+              margin: '0.75rem 0 0',
+              fontSize: 'clamp(1.05rem, 2vw, 1.3rem)',
+              color: 'rgba(14, 27, 44, 0.55)',
+            }}
+          >
             Uma gestão e organização melhor da educação
           </p>
         </div>
