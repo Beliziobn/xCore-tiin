@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 
 interface NavbarProps {
@@ -88,63 +88,53 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      {isScrolled && <div className="w-full h-16 sm:h-20" aria-hidden="true" />}
+      {isScrolled && <div className="w-full h-[76px]" aria-hidden="true" />}
       <header
-        className={`w-full transition-all duration-300 flex justify-center px-4 ${
+        className={`w-full transition-all duration-300 ${
           isScrolled
-            ? 'fixed top-0 left-0 right-0 z-50 bg-[#4f67ff]/90 backdrop-blur-lg py-2.5 shadow-[0_10px_30px_rgba(79,103,255,0.25)] border-b border-white/15'
-            : 'relative z-30 bg-[#4f67ff] pt-4 sm:pt-6 pb-2'
+            ? 'fixed top-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-xl shadow-[0_8px_30px_rgba(15,23,42,0.08)] border-b border-slate-200/70'
+            : 'relative z-30 bg-white border-b border-slate-200/70'
         }`}
       >
-        {/* Dynamic Scroll Progress Bar */}
-        <div
-          id="navbar-scroll-progress"
-          className="absolute top-0 left-0 h-[3px] bg-[#4f67ff] transition-all duration-100 ease-out shadow-[0_0_8px_#4f67ff]"
-          style={{ width: `${scrollProgress}%` }}
-        />
-
         <nav
           id="ucore-navbar"
-          className={`w-full max-w-4xl bg-white/95 backdrop-blur-md rounded-[12px] border border-slate-200/90 px-4 sm:px-6 flex items-center justify-between transition-all duration-300 ${
-            isScrolled
-              ? 'py-2 shadow-[0_8px_30px_rgba(0,0,0,0.12)]'
-              : 'py-2.5 sm:py-3 shadow-[0_4px_25px_rgba(0,0,0,0.06)]'
-          }`}
+          className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[76px] flex items-center justify-between"
         >
         {/* Logo */}
         <button
           id="logo-button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="flex items-center gap-2 group cursor-pointer focus:outline-none"
+          className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
         >
-          <div className="w-8 h-8 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-            <svg
-              className="w-4 h-4 text-white drop-shadow-xs"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
-            </svg>
+          <div className="w-10 h-10 rounded-xl bg-[#4f67ff] flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(79,103,255,0.6)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
+            <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-lg font-black tracking-tighter text-slate-950 uppercase flex items-center">
-            u<span className="text-[#3B82F6]">Core</span>
+          <span className="text-2xl font-black tracking-tight text-slate-950">
+            uCore
           </span>
         </button>
 
+        {/* Dynamic Scroll Progress Bar */}
+        <div
+          id="navbar-scroll-progress"
+          className="absolute bottom-0 left-0 h-[2px] bg-[#4f67ff] transition-all duration-100 ease-out"
+          style={{ width: `${scrollProgress}%` }}
+        />
+
         {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 text-[10px] uppercase tracking-[0.2em] font-bold text-slate-600">
+        <div className="hidden md:flex items-center gap-8 lg:gap-11 text-[15px] font-semibold text-slate-700">
           {/* Páginas dropdown */}
           <div className="relative">
             <button
               id="nav-paginas-dropdown"
               onClick={() => setShowPagesDropdown((prev) => !prev)}
               onBlur={() => setTimeout(() => setShowPagesDropdown(false), 200)}
-              className="flex items-center gap-1.5 hover:text-slate-950 transition-colors cursor-pointer py-1 uppercase"
+              className="flex items-center gap-1.5 hover:text-[#4f67ff] transition-colors cursor-pointer py-1"
             >
               <span>Paginas</span>
               <ChevronDown
-                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                  showPagesDropdown ? 'rotate-180 text-slate-950' : ''
+                className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                  showPagesDropdown ? 'rotate-180 text-[#4f67ff]' : ''
                 }`}
               />
             </button>
@@ -389,14 +379,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <button
-            id="nav-sobre"
-            onClick={onOpenAbout}
-            className="hover:text-slate-950 transition-colors cursor-pointer"
-          >
-            Sobre
-          </button>
-
-          <button
             id="nav-meu-perfil"
             onClick={() => {
               if (activeRole === 'admin') {
@@ -407,22 +389,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onOpenProfile();
               }
             }}
-            className="hover:text-slate-950 transition-colors cursor-pointer"
+            className="hover:text-[#4f67ff] transition-colors cursor-pointer"
           >
-            Meu perfil
+            Perfil
           </button>
 
           {onOpenChat && (
             <button
               id="nav-chat-suporte"
               onClick={onOpenChat}
-              className="hover:text-slate-950 transition-colors cursor-pointer flex items-center gap-1.5 text-[#5067fc] font-bold"
+              className="relative hover:text-[#4f67ff] transition-colors cursor-pointer"
               title="Abrir Chat de Suporte e Ajuda"
             >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Suporte & Chat</span>
+              <span>Chat</span>
               {unreadChatCount !== undefined && unreadChatCount > 0 && (
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="absolute -top-1 -right-2.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               )}
             </button>
           )}
@@ -435,12 +416,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="notification-bell-btn"
               onClick={() => setShowNotifications((prev) => !prev)}
-              className="relative p-2 rounded-full text-slate-500 hover:text-slate-950 hover:bg-slate-100 transition-colors cursor-pointer focus:outline-none"
+              className="relative p-2 rounded-full text-slate-600 hover:text-[#4f67ff] hover:bg-slate-100 transition-colors cursor-pointer focus:outline-none"
               title="Notificações"
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-6 h-6" strokeWidth={1.75} />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#3B82F6] rounded-full ring-2 ring-white animate-pulse" />
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#4f67ff] rounded-full ring-2 ring-white animate-pulse" />
               )}
             </button>
 
@@ -518,16 +499,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="navbar-entrar-btn"
                 onClick={onNavigateToLogin || onOpenGetStarted}
-                className="text-slate-700 hover:text-slate-950 hover:bg-slate-100 font-bold text-[10px] uppercase tracking-[0.15em] px-3.5 sm:px-4 py-2 rounded-full transition-all duration-200 cursor-pointer"
+                className="hidden sm:inline-flex text-slate-700 hover:text-[#4f67ff] font-semibold text-sm px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer"
               >
                 Entrar
               </button>
               <button
                 id="navbar-comecar-btn"
                 onClick={onNavigateToRegister || onOpenGetStarted}
-                className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-bold text-[10px] uppercase tracking-[0.15em] px-4 sm:px-5 py-2 rounded-full transition-all duration-300 cursor-pointer shadow-sm hover:shadow flex items-center gap-1.5 active:scale-95"
+                className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-bold text-sm px-5 sm:px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-[0_8px_20px_-6px_rgba(79,103,255,0.8)] hover:shadow-[0_10px_26px_-6px_rgba(79,103,255,0.95)] active:scale-95 whitespace-nowrap"
               >
-                Começar
+                Inscreva - se
               </button>
             </div>
           )}
