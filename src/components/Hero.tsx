@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Box, GraduationCap } from 'lucide-react';
 import heroImg from '../assets/images/hero_creative_desk.png';
 
 interface HeroProps {
@@ -73,7 +74,6 @@ export const Hero: React.FC<HeroProps> = ({
    * Homepage hero (white) — matches the uCore reference composition.
    * ------------------------------------------------------------------- */
   const floatSlow = Math.min(28, scrollY * 0.06);
-  const floatFast = Math.min(46, scrollY * 0.1);
 
   return (
     <section
@@ -97,20 +97,15 @@ export const Hero: React.FC<HeroProps> = ({
           </p>
         </div>
 
-        {/* Interlocking image composition */}
+        {/* Single-image collage — the photo forms one irregular silhouette
+            that contours around the info cards (same plane, no overlap). */}
         <div className="mt-10 sm:mt-14 w-full max-w-4xl">
-          <div className="relative w-full aspect-[96/60]">
-            {/* Main image */}
-            <div
-              className="absolute overflow-hidden rounded-[7%] shadow-[0_40px_90px_-40px_rgba(15,23,42,0.45)] transition-transform duration-100 ease-out"
-              style={{
-                left: '19%',
-                top: '2%',
-                width: '78%',
-                height: '96%',
-                transform: `translateY(${floatSlow * 0.3}px)`,
-              }}
-            >
+          <div
+            className="relative w-full aspect-[96/60] transition-transform duration-100 ease-out"
+            style={{ transform: `translateY(${floatSlow * 0.25}px)` }}
+          >
+            {/* ---- One continuous photo, clipped to a rounded rectangle ---- */}
+            <div className="absolute inset-0 overflow-hidden rounded-[6%] shadow-[0_40px_90px_-40px_rgba(15,23,42,0.45)]">
               <img
                 src={heroImg}
                 alt="Profissional da educação a organizar documentos numa secretária de trabalho"
@@ -119,67 +114,74 @@ export const Hero: React.FC<HeroProps> = ({
               />
             </div>
 
-            {/* Black rounded block — top-left */}
+            {/* ---- Background-colored "erasers" carve the silhouette so the
+                    photo genuinely recedes around each card (thin white gap) ---- */}
+            {/* top-left carve */}
             <div
-              className="absolute rounded-[16%] bg-slate-950 shadow-[0_30px_60px_-30px_rgba(15,23,42,0.6)] transition-transform duration-100 ease-out"
-              style={{
-                left: '4%',
-                top: '3%',
-                width: '26%',
-                height: '34%',
-                transform: `translateY(${-floatFast * 0.25}px)`,
-              }}
+              className="absolute bg-background"
+              style={{ left: '-1%', top: '-1%', width: '32%', height: '41%', borderRadius: '7%' }}
+            />
+            {/* right-edge notch carve */}
+            <div
+              className="absolute bg-background"
+              style={{ left: '88%', top: '30%', width: '16%', height: '27%', borderRadius: '32%' }}
+            />
+            {/* bottom-left carve */}
+            <div
+              className="absolute bg-background"
+              style={{ left: '-2%', top: '63.5%', width: '20.5%', height: '30%', borderRadius: '11%' }}
+            />
+            {/* bottom-right recess carve (scoop for the tags card) */}
+            <div
+              className="absolute bg-background"
+              style={{ left: '58%', top: '72%', width: '46%', height: '21%', borderRadius: '18%' }}
             />
 
-            {/* Small image tile — bottom-left (interlocking) */}
+            {/* ---- Info cards sit inside the carved negative space ---- */}
+            {/* Black stat card — top-left */}
             <div
-              className="absolute overflow-hidden rounded-[18%] border-4 border-background shadow-[0_24px_50px_-24px_rgba(15,23,42,0.4)] transition-transform duration-100 ease-out"
-              style={{
-                left: '3%',
-                top: '52%',
-                width: '23%',
-                height: '40%',
-                transform: `translateY(${floatFast * 0.3}px)`,
-              }}
+              className="absolute z-10 flex flex-col justify-between rounded-[9%] bg-slate-950 p-3 sm:p-5 shadow-[0_20px_45px_-26px_rgba(15,23,42,0.5)]"
+              style={{ left: '1.5%', top: '1.5%', width: '28%', height: '35.5%' }}
             >
-              <img
-                src={heroImg}
-                alt=""
-                aria-hidden="true"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-left"
-              />
+              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-white/10 flex items-center justify-center">
+                <Box className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" strokeWidth={2.5} />
+              </div>
+              <div>
+                <div className="text-xl sm:text-4xl font-black text-white leading-none tracking-tight">
+                  +2.5k
+                </div>
+                <div className="mt-1 text-[8px] sm:text-xs font-medium text-white/55">
+                  Alunos ativos
+                </div>
+              </div>
             </div>
 
-            {/* White notch — left edge bite */}
+            {/* White stat card — bottom-left */}
             <div
-              className="absolute rounded-[26%] bg-background"
-              style={{ left: '13%', top: '44%', width: '13%', height: '22%' }}
-            />
+              className="absolute z-10 flex flex-col justify-center rounded-[16%] bg-background border border-slate-200/80 p-2.5 sm:p-4 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.32)]"
+              style={{ left: '1.5%', top: '64.5%', width: '17.5%', height: '27%' }}
+            >
+              <GraduationCap className="w-4 h-4 sm:w-6 sm:h-6 text-[#4f67ff] mb-1" strokeWidth={2.25} />
+              <div className="text-base sm:text-2xl font-black text-slate-950 leading-none tracking-tight">
+                98%
+              </div>
+              <div className="mt-0.5 text-[7px] sm:text-[11px] font-medium text-slate-500">
+                Satisfação
+              </div>
+            </div>
 
-            {/* White notch tab — right edge (signature cut) */}
+            {/* Service tags card — bottom-right */}
             <div
-              className="absolute rounded-[30%] bg-background"
-              style={{ left: '90%', top: '34%', width: '13%', height: '26%' }}
-            />
-
-            {/* Floating service tags card — bottom-right */}
-            <div
-              className="absolute z-20 rounded-[8%] bg-background/85 backdrop-blur-md border border-slate-200/70 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.35)] p-3 sm:p-4 transition-transform duration-100 ease-out"
-              style={{
-                left: '52%',
-                top: '68%',
-                width: '45%',
-                transform: `translateY(${floatSlow * 0.5}px)`,
-              }}
+              className="absolute z-10 rounded-[10%] bg-background border border-slate-200/80 shadow-[0_16px_40px_-24px_rgba(15,23,42,0.3)] p-3 sm:p-4"
+              style={{ left: '60%', top: '75%', width: '42%' }}
             >
               <div className="flex flex-col gap-2">
                 {SERVICE_TAGS.map((row, i) => (
-                  <div key={i} className="flex flex-wrap gap-2">
+                  <div key={i} className="flex flex-wrap gap-1.5 sm:gap-2">
                     {row.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center rounded-full bg-background border border-slate-200 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-sm font-semibold text-slate-700 shadow-sm"
+                        className="inline-flex items-center rounded-full bg-slate-50 border border-slate-200 px-2 sm:px-3.5 py-0.5 sm:py-1.5 text-[9px] sm:text-sm font-semibold text-slate-700 shadow-sm"
                       >
                         {tag}
                       </span>
