@@ -35,27 +35,14 @@ export const StatCards: React.FC<StatCardsProps> = ({
   };
 
   const handleCardClick = (card: SessionCard) => {
-    if (!isLoggedIn) {
-      onRequireAuth?.(`Módulo de ${card.title}`);
-      return;
-    }
     onSelectCard(card);
   };
 
   const handleSettingsClick = () => {
-    if (!isLoggedIn) {
-      onRequireAuth?.('Configurações da Sessão');
-      return;
-    }
     onOpenSettings();
   };
 
   const handleRoleClick = (role: 'admin' | 'diretor' | 'professor') => {
-    if (!isLoggedIn) {
-      const roleName = role === 'diretor' ? 'Diretor' : role === 'professor' ? 'Professor' : 'Administrador';
-      onRequireAuth?.(`Sessão de ${roleName}`);
-      return;
-    }
     onChangeRole?.(role);
   };
 
@@ -188,9 +175,8 @@ export const StatCards: React.FC<StatCardsProps> = ({
             </p>
 
             {/* Exploration hint */}
-            <span className="mt-3 text-[10px] uppercase font-bold tracking-wider text-white/70 group-hover:text-white transition-colors flex items-center gap-1">
-              {!isLoggedIn && <Lock className="w-3 h-3 inline" />}
-              <span>{isLoggedIn ? 'Ver Detalhes →' : 'Iniciar Sessão p/ Aceder'}</span>
+            <span className="mt-3 text-[10px] uppercase font-bold tracking-wider text-white/80 group-hover:text-white transition-colors flex items-center gap-1">
+              <span>Aceder ao Módulo →</span>
             </span>
           </div>
         ))}

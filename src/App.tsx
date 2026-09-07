@@ -955,8 +955,17 @@ export default function App() {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                   return;
                 }
-                if (card.id.includes('aluno') || card.title.toLowerCase().includes('aluno')) {
+                if (card.id.includes('classe') || card.title.toLowerCase().includes('classe')) {
                   setCurrentView('professor-turma');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  return;
+                }
+                if (card.id.includes('aluno') || card.title.toLowerCase().includes('aluno')) {
+                  if (card.title.toLowerCase().includes('desempenho')) {
+                    setCurrentView('professor-estatisticas');
+                  } else {
+                    setCurrentView('professor-turma');
+                  }
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                   return;
                 }
