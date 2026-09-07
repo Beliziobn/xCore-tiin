@@ -120,7 +120,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           {hasNext && onSelectAnotherStudent && (
             <button
               onClick={() => onSelectAnotherStudent(allStudents[currentIndex + 1])}
-              className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-[#5067fc] bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-[#f75142] bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full transition-all cursor-pointer"
             >
               <span>Próximo</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -129,17 +129,17 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
         </div>
       </div>
 
-      {/* Top Section: Left Big Blue Card (Nome: Albert Golph) + 6 Badged Cards matching 17.png */}
+      {/* Top Section: Left Big Card (Nome: Albert Golph) + 6 Badged Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-12 items-start">
-        {/* Left Column: Big Blue Student Card (matching 17.png) */}
+        {/* Left Column: Big Student Card */}
         <div className="lg:col-span-4 flex flex-col items-center">
-          <div className="relative w-full bg-[#5067fc] text-white rounded-[26px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)]">
+          <div className="relative w-full bg-[#f75142] text-white rounded-[26px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(247,81,66,0.25)]">
             {/* Circular badge on top with user photo or icon */}
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#5067fc]/20 overflow-hidden">
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#f75142]/20 overflow-hidden">
               {currentStudent.foto ? (
                 <img src={currentStudent.foto} alt={currentStudent.name} className="w-full h-full object-cover" />
               ) : (
-                <User className="w-7 h-7 text-[#5067fc]" strokeWidth={2.4} />
+                <User className="w-7 h-7 text-[#f75142]" strokeWidth={2.4} />
               )}
             </div>
 
@@ -176,54 +176,54 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           </div>
         </div>
 
-        {/* Right Column: 6 Badged Cards matching 17.png */}
+        {/* Right Column: 6 Badged Cards */}
         <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4">
           {/* 1. Nº Turma */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Nº Turma
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-2xl sm:text-3xl font-black">{currentStudent.turma}</span>
             </div>
           </div>
 
           {/* 2. Periodo */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Periodo
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-base sm:text-lg font-black">{currentStudent.periodo}</span>
             </div>
           </div>
 
           {/* 3. Classe */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Classe
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-2xl sm:text-3xl font-black">{currentStudent.classe}</span>
             </div>
           </div>
 
           {/* 4. Sala */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Sala
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <span className="text-sm sm:text-base font-black text-center">{currentStudent.sala}</span>
             </div>
           </div>
 
           {/* 5. Nome do Encarregado */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Nome do Encarregado
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex flex-col items-center justify-center p-2 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex flex-col items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <input
                 type="text"
                 value={encarregado}
@@ -236,10 +236,10 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
 
           {/* 6. Telefone */}
           <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
               Telefone
             </span>
-            <div className="w-full bg-[#5067fc] text-white rounded-[20px] h-24 flex flex-col items-center justify-center p-2 shadow-[0_6px_20px_rgba(80,103,252,0.2)] group-hover:scale-[1.02] transition-transform">
+            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex flex-col items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
               <input
                 type="text"
                 value={telefone}
@@ -256,11 +256,11 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
       <div className="mb-10 bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <span className="inline-block bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-2xs">
               Registro Escolar
             </span>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#5067fc]" />
+            <h3 className="text-base sm:text-lg font-black text-[#002133] tracking-tight flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#f75142]" />
               <span>Ficha Biográfica & Documentação Legal do Aluno</span>
             </h3>
           </div>
@@ -312,14 +312,14 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
               Nascimento & Idade
             </span>
             <div className="font-black text-slate-800 text-sm flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-[#5067fc]" />
+              <Calendar className="w-4 h-4 text-[#f75142]" />
               <span>
                 {currentStudent.dataNascimento 
                   ? new Date(currentStudent.dataNascimento).toLocaleDateString('pt-PT') 
                   : '14/05/2016'}
               </span>
             </div>
-            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-blue-50 text-[#5067fc] font-black text-xs border border-blue-100">
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#fef2f1] text-[#f75142] font-black text-xs border border-[#f75142]/20">
               Idade Calculada: {currentStudent.idade ?? 10} Anos
             </div>
             <div className="text-[11px] text-slate-500 font-medium">
@@ -351,7 +351,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
               Residência & Observações
             </span>
             <div className="flex items-start gap-1 text-[11px] text-slate-700 font-medium">
-              <MapPin className="w-3.5 h-3.5 text-[#4f67ff] shrink-0 mt-0.5" />
+              <MapPin className="w-3.5 h-3.5 text-[#f75142] shrink-0 mt-0.5" />
               <span className="truncate" title={currentStudent.endereco || 'Bairro Palanca, Luanda'}>
                 {currentStudent.endereco || 'Bairro Palanca, Luanda'}
               </span>
@@ -368,14 +368,14 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
         </div>
       </div>
 
-      {/* Lower Section: Disciplinas (Left) & Notas (Right) matching 17.png */}
+      {/* Lower Section: Disciplinas (Left) & Notas (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 items-start">
-        {/* Left Column: Cyan Badge "Disciplinas" over Blue Container */}
+        {/* Left Column: Badge "Disciplinas" over Container */}
         <div className="lg:col-span-3 flex flex-col items-start">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#002133] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Disciplinas
           </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[24px] p-5 shadow-[0_12px_32px_rgba(80,103,252,0.25)] space-y-2">
+          <div className="w-full bg-[#f75142] text-white rounded-[24px] p-5 shadow-[0_12px_32px_rgba(247,81,66,0.25)] space-y-2">
             {currentStudent.disciplinas.map((disc, idx) => {
               const isSelected = disc === selectedSubject;
               return (
@@ -384,24 +384,24 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                   onClick={() => setSelectedSubject(disc)}
                   className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-between ${
                     isSelected
-                      ? 'bg-white text-[#5067fc] shadow-sm font-black'
+                      ? 'bg-white text-[#002133] font-black shadow-sm'
                       : 'bg-white/10 hover:bg-white/20 text-white'
                   }`}
                 >
                   <span className="truncate">{disc}</span>
-                  {isSelected && <Award className="w-3.5 h-3.5 text-[#5067fc] shrink-0" />}
+                  {isSelected && <Award className="w-3.5 h-3.5 text-[#002133] shrink-0" />}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Right Column: Cyan Badge "Notas" over Blue Container matching 17.png */}
+        {/* Right Column: Badge "Notas" over Container */}
         <div className="lg:col-span-9 flex flex-col items-start">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
+          <span className="inline-block bg-[#002133] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
             Notas
           </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[24px] p-5 sm:p-7 shadow-[0_12px_32px_rgba(80,103,252,0.25)] overflow-hidden">
+          <div className="w-full bg-[#f75142] text-white rounded-[24px] p-5 sm:p-7 shadow-[0_12px_32px_rgba(247,81,66,0.25)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -442,7 +442,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                             step="0.5"
                             value={grade.p1}
                             onChange={(e) => handleGradeChange(idx, 'p1', parseFloat(e.target.value))}
-                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#5067fc] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
+                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#002133] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
                           />
                         </td>
 
@@ -455,7 +455,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                             step="0.5"
                             value={grade.p2}
                             onChange={(e) => handleGradeChange(idx, 'p2', parseFloat(e.target.value))}
-                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#5067fc] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
+                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#002133] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
                           />
                         </td>
 
@@ -468,7 +468,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                             step="0.5"
                             value={grade.trabalho}
                             onChange={(e) => handleGradeChange(idx, 'trabalho', parseFloat(e.target.value))}
-                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#5067fc] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
+                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#002133] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
                           />
                         </td>
 
@@ -507,7 +507,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
         </div>
       </div>
 
-      {/* Bottom Right: Exact Cyan Button "Guarda" matching 17.png */}
+      {/* Bottom Right: Button "Guarda" */}
       <div className="flex items-center justify-between mt-6">
         {isSavedRecently ? (
           <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-200 text-xs font-bold animate-in fade-in">
@@ -520,10 +520,10 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           </div>
         )}
 
-        {/* The exact "Guarda" button from image 17.png */}
+        {/* The "Guarda" button */}
         <button
           onClick={handleSave}
-          className="bg-[#4f67ff] hover:bg-[#1fb3cc] text-white font-black text-xs sm:text-sm uppercase tracking-wider px-8 py-2.5 rounded-full shadow-[0_4px_16px_rgba(39,193,220,0.35)] hover:shadow-[0_6px_20px_rgba(39,193,220,0.45)] transition-all cursor-pointer active:scale-95 flex items-center gap-2"
+          className="bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black text-xs sm:text-sm uppercase tracking-wider px-8 py-2.5 rounded-full shadow-[0_4px_16px_rgba(247,81,66,0.35)] hover:shadow-[0_6px_20px_rgba(247,81,66,0.45)] transition-all cursor-pointer active:scale-95 flex items-center gap-2"
         >
           <Save className="w-4 h-4" />
           <span>Guarda</span>

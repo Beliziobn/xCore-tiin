@@ -421,6 +421,7 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setCurrentPage('home');
     setCurrentView('home');
     try {
       localStorage.removeItem('ucore_active_user');
@@ -450,6 +451,7 @@ export default function App() {
   };
 
   const handleSelectPage = (pageId: string) => {
+    setCurrentPage('home');
     if (pageId === 'home' || pageId === 'diretor-dashboard' || pageId === 'admin-dashboard') {
       setCurrentView('home');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -576,28 +578,24 @@ export default function App() {
 
   const isSessionStarted = Boolean(currentUser);
 
-  // If user navigated to Login or Register, render the dedicated full page!
-  if (currentPage === 'login' || currentPage === 'register') {
-    return (
-      <div className="min-h-screen bg-[#f7f3f3] text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
-        {toastMessage && (
-          <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-[#4f67ff] animate-ping" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
+  // Render view router based on currentView and currentPage
+  const renderCurrentView = () => {
+    // 0. Dedicated Login and Registration Pages (shares the global Navbar)
+    if (currentPage === 'login' || currentPage === 'register') {
+      return (
         <AuthPage
           initialMode={currentPage}
           onLoginSuccess={handleLoginSuccess}
-          onBackToHome={() => setCurrentPage('home')}
+          onBackToHome={() => {
+            setCurrentPage('home');
+            setCurrentView('home');
+          }}
+          hideHeader={true}
         />
-      </div>
-    );
-  }
+      );
+    }
 
-  // Render view router based on currentView
-  const renderCurrentView = () => {
-    // 0. Admin Pages
+    // 1. Admin Pages
     if (currentView === 'admin-estatisticas') {
       return (
         <AdminStatisticsPage
@@ -901,11 +899,14 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 w-full bg-white relative">
-          {/* Dynamic Blue Stat Cards Grid matching images 4.png (director), 8.png (admin), 6.png (teacher) */}
+        <main className="flex-1 w-full bg-[#f7f3f3] relative">
+          {/* Dynamic Stat Cards Grid with distinct clickable vs non-clickable designs */}
           <StatCards
             session={activeSession}
             onSelectCard={(card) => {
+              if (card.isClickable === false) {
+                return;
+              }
               if (activeRole === 'admin') {
                 if (card.id.includes('escola') || card.title.toLowerCase().includes('escola')) {
                   if (card.title.toLowerCase().includes('desempenho')) {
@@ -999,11 +1000,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f3f3] text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
+    <div className="min-h-screen bg-[#f7f3f3] text-[#002133] flex flex-col font-sans selection:bg-[#f75142] selection:text-white relative">
       {/* Toast Alert Notification */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-[#4f67ff] animate-ping" />
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-[#002133]/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
+          <span className="w-2 h-2 rounded-full bg-[#f75142] animate-ping" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -1013,8 +1014,14 @@ export default function App() {
         onOpenGetStarted={() => handleOpenAuth('login')}
         onNavigateToLogin={() => handleOpenAuth('login')}
         onNavigateToRegister={() => handleOpenAuth('register')}
+        onNavigateToHome={() => {
+          setCurrentPage('home');
+          setCurrentView('home');
+        }}
+        currentPage={currentPage}
         onOpenAbout={() => setInfoModalType('about')}
         onOpenProfile={() => {
+          setCurrentPage('home');
           if (activeRole === 'admin') {
             setCurrentView('admin-perfil');
             window.scrollTo({ top: 0, behavior: 'smooth' });

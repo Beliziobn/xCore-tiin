@@ -10,6 +10,7 @@ import {
 } from '../../../data/municipalitiesData';
 import type { AdminSchool } from '../../../types';
 import { SvgAiLogoModal } from './SvgAiLogoModal';
+import { StatCardItem } from '../../StatCardItem';
 
 interface AdminSchoolsPageProps {
   onOpenGetStarted: () => void;
@@ -358,148 +359,121 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
         </div>
 
-        {/* 4. First Metrics Row (6 Cards) matching Texto do seu parágrafo (1).png */}
+        {/* 4. First Metrics Row using StatCardItem logic */}
         <div className="mb-10">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-            {/* Card 1: Nº Classes */}
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
-                Nº Classes
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <span className="text-2xl sm:text-3xl font-black">
-                  {displayValues.classesCount}
-                </span>
-                <span className="text-[10px] text-blue-200 font-medium mt-1">
-                  Níveis de Ensino
-                </span>
-              </div>
-            </div>
-
-            {/* Card 2: Nº Professor */}
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
-                Nº Professor
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <span className="text-2xl sm:text-3xl font-black">
-                  {displayValues.teachersCount}
-                </span>
-                <span className="text-[10px] text-blue-200 font-medium mt-1">
-                  Corpo Docente
-                </span>
-              </div>
-            </div>
-
-            {/* Card 3: Nº Salas */}
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
-                Nº Salas
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <span className="text-2xl sm:text-3xl font-black">
-                  {displayValues.roomsCount}
-                </span>
-                <span className="text-[10px] text-blue-200 font-medium mt-1">
-                  Salas Físicas
-                </span>
-              </div>
-            </div>
-
-            {/* Card 4: Nº Turmas */}
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
-                Nº Turmas
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <span className="text-2xl sm:text-3xl font-black">
-                  {displayValues.turmasCount}
-                </span>
-                <span className="text-[10px] text-blue-200 font-medium mt-1">
-                  Turmas Ativas
-                </span>
-              </div>
-            </div>
-
-            {/* Card 5: Localização */}
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
-                Localização
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <MapPin className="w-4 h-4 text-[#4f67ff] mb-1" />
-                <span className="text-xs sm:text-sm font-bold leading-tight line-clamp-2 px-1">
-                  {displayValues.location}
-                </span>
-                <span className="text-[9px] text-blue-200 font-medium mt-1">
-                  Luanda, Angola
-                </span>
-              </div>
-            </div>
-
-            {/* Card 6: Desempenho das Escolas */}
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight mb-2 text-center">
-                Desempenho das Escolas
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <div className="flex items-center gap-1">
-                  <Award className="w-4 h-4 text-[#FBBF24]" />
-                  <span className="text-2xl sm:text-3xl font-black">
-                    {displayValues.performanceRate}
-                  </span>
-                </div>
-                <span className="text-[10px] text-blue-200 font-medium mt-1">
-                  Taxa Média ({displayValues.attendanceRate} presença)
-                </span>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 items-start">
+            <StatCardItem
+              id="as-card-classes"
+              size="sm"
+              card={{
+                id: 'classes',
+                title: 'Nº Classes',
+                value: String(displayValues.classesCount),
+                isClickable: false,
+                subtitle: 'Níveis de Ensino',
+              }}
+            />
+            <StatCardItem
+              id="as-card-professores"
+              size="sm"
+              card={{
+                id: 'professores',
+                title: 'Nº Professores',
+                value: String(displayValues.teachersCount),
+                isClickable: true,
+                actionText: 'Ver mais',
+                subtitle: 'Corpo Docente Ativo',
+              }}
+              onSelect={() => {
+                setCategoryFilter('professores');
+                document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+            <StatCardItem
+              id="as-card-salas"
+              size="sm"
+              card={{
+                id: 'salas',
+                title: 'Nº Salas',
+                value: String(displayValues.roomsCount),
+                isClickable: false,
+                subtitle: 'Espaços Pedagógicos',
+              }}
+            />
+            <StatCardItem
+              id="as-card-turmas"
+              size="sm"
+              card={{
+                id: 'turmas',
+                title: 'Nº Turmas',
+                value: String(displayValues.turmasCount),
+                isClickable: false,
+                subtitle: 'Turmas Formadas',
+              }}
+            />
+            <StatCardItem
+              id="as-card-localizacao"
+              size="sm"
+              card={{
+                id: 'localizacao',
+                title: displayValues.location.split(',')[0] || 'Quêssua',
+                value: '1',
+                isClickable: false,
+                subtitle: 'Região Municipal',
+              }}
+            />
+            <StatCardItem
+              id="as-card-desempenho"
+              size="sm"
+              card={{
+                id: 'desempenho',
+                title: 'Desempenho',
+                value: String(displayValues.performanceRate),
+                isClickable: false,
+                subtitle: `Taxa de Sucesso Geral`,
+              }}
+            />
           </div>
         </div>
 
-        {/* 5. Second Metrics Row (2 Documents Status Cards) matching Texto do seu parágrafo (1).png */}
+        {/* 5. Second Metrics Row (Documents Status Cards) featuring clickable and non-clickable design logic */}
         <div className="mb-14">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto sm:mx-0">
-            {/* Card 1: Nº alunos com Documentos */}
-            <div className="flex flex-col">
-              <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
-                Nº alunos com Documentos
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-6 min-h-[160px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <span className="text-4xl sm:text-5xl font-black tracking-tight">
-                  {displayValues.studentsWithDocs}
-                </span>
-                <span className="text-xs text-blue-100 font-semibold mt-2">
-                  Regularizados com BI e Cédula
-                </span>
-                <span className="text-[10px] text-emerald-300 font-black uppercase tracking-wider mt-1 bg-white/10 px-2.5 py-0.5 rounded-full">
-                  Documentação Homologada
-                </span>
-              </div>
-            </div>
-
-            {/* Card 2: Nº alunos sem Documentos */}
-            <div className="flex flex-col">
-              <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
-                Nº alunos sem Documentos
-              </span>
-              <div className="bg-[#4f67ff] text-white rounded-2xl p-6 min-h-[160px] flex flex-col items-center justify-center text-center shadow-md border border-white/10">
-                <span className="text-4xl sm:text-5xl font-black tracking-tight text-amber-200">
-                  {displayValues.studentsWithoutDocs}
-                </span>
-                <span className="text-xs text-blue-100 font-semibold mt-2">
-                  Pendentes de Registro Civil
-                </span>
-                <span className="text-[10px] text-amber-300 font-black uppercase tracking-wider mt-1 bg-white/10 px-2.5 py-0.5 rounded-full">
-                  Em Processo de Emissão
-                </span>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto sm:mx-0 items-start">
+            <StatCardItem
+              id="as-card-docs"
+              size="md"
+              card={{
+                id: 'docs',
+                title: 'Nº alunos com Documentos',
+                value: String(displayValues.studentsWithDocs),
+                isClickable: true,
+                actionText: 'Ver mais',
+                subtitle: 'Regularizados com BI e Cédula',
+              }}
+              onSelect={() => {
+                document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+            <StatCardItem
+              id="as-card-nodocs"
+              size="md"
+              card={{
+                id: 'nodocs',
+                title: 'Nº alunos sem Documentos',
+                value: String(displayValues.studentsWithoutDocs),
+                isClickable: true,
+                actionText: 'Ver mais',
+                subtitle: 'Pendentes de Registro Civil',
+              }}
+              onSelect={() => {
+                document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
           </div>
         </div>
 
         {/* 6. Schools Explorer in Selected Municipality */}
-        <div className="mt-8 pt-8 border-t border-slate-100">
+        <div id="admin-schools-explorer" className="mt-8 pt-8 border-t border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">

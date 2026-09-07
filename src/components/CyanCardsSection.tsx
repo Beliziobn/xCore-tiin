@@ -98,7 +98,7 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
     <section id="cyan-modules-section" className="w-full pt-16 pb-24 px-4 sm:px-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-10 pb-6 border-b border-slate-200">
-        <span className="text-xs font-semibold tracking-[0.14em] uppercase text-[#4f67ff]">
+        <span className="text-xs font-black tracking-[0.14em] uppercase text-[#f75142]">
           Módulos
         </span>
         <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance">
@@ -116,10 +116,10 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
             key={module.id}
             id={`cyan-card-${module.id}`}
             onClick={() => handleModuleClick(module)}
-            className="h-72 sm:h-80 bg-white hover:border-[#4f67ff]/40 rounded-2xl shadow-[0_1px_2px_rgba(11,16,32,0.04)] hover:shadow-[0_20px_40px_-16px_rgba(79,103,255,0.35)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between p-6 group border border-slate-200 relative"
+            className="h-72 sm:h-80 bg-white hover:border-[#f75142]/40 rounded-2xl shadow-[0_1px_2px_rgba(11,16,32,0.04)] hover:shadow-[0_20px_40px_-16px_rgba(247,81,66,0.25)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between p-6 group border border-slate-200 relative"
           >
             <div className="flex items-start justify-between">
-              <div className="w-11 h-11 rounded-xl bg-[#eef1ff] group-hover:bg-[#4f67ff] flex items-center justify-center text-[#4f67ff] group-hover:text-white font-display font-bold text-sm transition-colors duration-300">
+              <div className="w-11 h-11 rounded-xl bg-[#fef2f1] group-hover:bg-[#f75142] flex items-center justify-center text-[#f75142] group-hover:text-[#002133] font-display font-black text-sm transition-colors duration-300">
                 {String(idx + 1).padStart(2, '0')}
               </div>
               {!isLoggedIn && (

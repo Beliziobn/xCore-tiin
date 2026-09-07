@@ -1,7 +1,7 @@
 import React from 'react';
-import { Home, User, Users } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorStatsData } from '../../../data/directorData';
+import { StatCardItem } from '../../StatCardItem';
 
 interface DirectorStatisticsPageProps {
   onOpenGetStarted: () => void;
@@ -30,67 +30,54 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-        {/* Top 3 Metric Cards: Salas (11), Professores (23), Alunos (478) matching 5.png */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-4xl mx-auto mb-14">
-          {/* Card 1: Salas (11) */}
-          <div
-            id="dir-stat-card-salas"
-            onClick={onNavigateToRooms}
-            className="relative bg-[#5067fc] hover:bg-[#435bf7] text-white rounded-2xl pt-10 pb-8 px-6 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all duration-300 cursor-pointer hover:-translate-y-1 group"
-          >
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white group-hover:scale-110 transition-transform">
-              <Home className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />
-            </div>
-            <h4 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1">
-              Salas
-            </h4>
-            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              11
-            </div>
-            <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-              Ver Salas Ativas →
-            </span>
-          </div>
-
-          {/* Card 2: Professores (23) */}
-          <div
-            id="dir-stat-card-professores"
-            onClick={onNavigateToTeachers}
-            className="relative bg-[#5067fc] hover:bg-[#435bf7] text-white rounded-2xl pt-10 pb-8 px-6 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all duration-300 cursor-pointer hover:-translate-y-1 group"
-          >
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white group-hover:scale-110 transition-transform">
-              <User className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />
-            </div>
-            <h4 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1">
-              Professores
-            </h4>
-            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              23
-            </div>
-            <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-              Quadro Docente →
-            </span>
-          </div>
-
-          {/* Card 3: Alunos (478) */}
-          <div
+        {/* Metric Cards featuring clickable and non-clickable design logic */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-5xl mx-auto mb-14 items-start">
+          <StatCardItem
             id="dir-stat-card-alunos"
-            onClick={onNavigateToStudents}
-            className="relative bg-[#5067fc] hover:bg-[#435bf7] text-white rounded-2xl pt-10 pb-8 px-6 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all duration-300 cursor-pointer hover:-translate-y-1 group"
-          >
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white group-hover:scale-110 transition-transform">
-              <Users className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />
-            </div>
-            <h4 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1">
-              Alunos
-            </h4>
-            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              478
-            </div>
-            <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-              Alunos Matriculados →
-            </span>
-          </div>
+            card={{
+              id: 'alunos',
+              title: 'Nº Alunos',
+              value: '489',
+              icon: 'users',
+              isClickable: true,
+              actionText: 'Ver mais',
+            }}
+            onSelect={onNavigateToStudents}
+          />
+          <StatCardItem
+            id="dir-stat-card-turmas"
+            card={{
+              id: 'turmas',
+              title: 'Nº Turmas',
+              value: '14',
+              icon: 'home',
+              isClickable: false,
+            }}
+          />
+          <StatCardItem
+            id="dir-stat-card-salas"
+            card={{
+              id: 'salas',
+              title: 'Salas',
+              value: '11',
+              icon: 'home',
+              isClickable: true,
+              actionText: 'Ver mais',
+            }}
+            onSelect={onNavigateToRooms}
+          />
+          <StatCardItem
+            id="dir-stat-card-professores"
+            card={{
+              id: 'professores',
+              title: 'Professores',
+              value: '23',
+              icon: 'user',
+              isClickable: true,
+              actionText: 'Ver mais',
+            }}
+            onSelect={onNavigateToTeachers}
+          />
         </div>
 
         {/* Statistical Visualizers Grid reproducing exact layout in 5.png */}

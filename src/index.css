@@ -6,20 +6,21 @@
   --font-display: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
   --font-chau: 'Chau Philomene One', sans-serif;
 
-  /* Brand color system — one primary, one accent, disciplined neutrals */
-  --color-brand: #4f67ff;
-  --color-brand-600: #4056ea;
-  --color-brand-700: #3547cf;
-  --color-brand-50: #eef1ff;
-  --color-brand-100: #dfe4ff;
+  /* Brand color system — updated to #f75142 */
+  --color-brand: #f75142;
+  --color-brand-600: #e04436;
+  --color-brand-700: #c9372a;
+  --color-brand-50: #fef2f1;
+  --color-brand-100: #fee4e2;
 
-  /* Accent lives inside the brand hue — a lighter periwinkle, used sparingly for tonal depth only */
-  --color-accent: #6d84ff;
-  --color-accent-600: #4f67ff;
-  --color-accent-50: #eef1ff;
+  /* Accent lives inside the brand hue */
+  --color-accent: #f86f63;
+  --color-accent-600: #f75142;
+  --color-accent-50: #fef2f1;
 
-  --color-ink: #0b1020;
-  --color-ink-soft: #475569;
+  --color-ink: #002133;
+  --color-ink-soft: #334e68;
+  --color-black: #002133;
 
   /* Global page surface — soft off-white to avoid harsh pure white */
   --color-background: #f7f3f3;
@@ -32,7 +33,7 @@
   body,
   #root {
     font-family: var(--font-sans);
-    color: var(--color-ink);
+    color: #002133;
     background-color: var(--color-background);
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
@@ -44,12 +45,22 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
+    color: #002133;
   }
 
   /* Body copy and controls use the humanist sans for legibility */
   p, span, a, li, label, small, strong, em, td, th,
   input, select, textarea, button {
     font-family: var(--font-sans);
+  }
+
+  /* Ensure text with black or darkest slate uses #002133 instead of pure black */
+  .text-black,
+  .text-slate-950,
+  .text-slate-900,
+  .text-gray-950,
+  .text-gray-900 {
+    color: #002133 !important;
   }
 
   ::selection {

@@ -4,6 +4,7 @@ import { Hero } from '../../Hero';
 import { directorStudentsData as initialStudents } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorStudent, AdminStudent } from '../../../types';
+import { StatCardItem } from '../../StatCardItem';
 
 interface DirectorStudentsPageProps {
   onOpenGetStarted: () => void;
@@ -341,101 +342,62 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
           </div>
         </div>
 
-        {/* Second Row: 4 Cards with Cyan Badges matching 13.png */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Card 1: [Nº alunos com Documentos] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº alunos com Documentos
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <FileCheck className="w-7 h-7 text-emerald-300" />
-                <span className="text-xs bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold">
-                  90.4% Regularizados
-                </span>
-              </div>
-              <div className="mt-4">
-                <div className="text-4xl sm:text-5xl font-black">432</div>
-                <p className="text-xs text-white/80 mt-1">
-                  Alunos com BI ou Cédula de Nascimento válidos na secretaria
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: [Nº alunos sem Documentos] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº alunos sem Documentos
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <FileX className="w-7 h-7 text-rose-300" />
-                <span className="text-xs bg-rose-400/20 text-rose-200 border border-rose-400/30 px-2 py-0.5 rounded-full font-bold">
-                  9.6% Pendentes
-                </span>
-              </div>
-              <div className="mt-4">
-                <div className="text-4xl sm:text-5xl font-black">46</div>
-                <p className="text-xs text-white/80 mt-1">
-                  Em processo de registo civil com apoio do gabinete social
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: [Desempenho do aluno] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Desempenho do aluno
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">
-                  Nota do Aluno Selecionado
-                </span>
-                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                  Escala 0 a 10
-                </span>
-              </div>
-              <div className="mt-3">
-                <div className="text-4xl sm:text-5xl font-black flex items-baseline gap-1">
-                  <span>{currentStudent?.performanceScore || 8.9}</span>
-                  <span className="text-base text-white/70 font-semibold">/ 10</span>
-                </div>
-                <p className="text-xs text-white/80 mt-2">
-                  Aproveitamento Muito Bom • Acima da média geral escolar (7.8)
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: [Presença dos alunos] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Presença dos alunos
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">
-                  Frequência Trimestral
-                </span>
-                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                  {currentStudent?.presenceRate || 98.2}%
-                </span>
-              </div>
-              <div className="mt-3">
-                <div className="text-4xl sm:text-5xl font-black">96.2%</div>
-                <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden mt-3">
-                  <div className="bg-emerald-300 h-full rounded-full" style={{ width: '96.2%' }} />
-                </div>
-                <p className="text-[11px] text-white/80 mt-2">
-                  Assiduidade geral excelente em todos os turnos escolares
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Second Row: StatCardItem cards featuring clickable and non-clickable design logic */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+          <StatCardItem
+            id="ds-card-docs"
+            size="md"
+            card={{
+              id: 'docs',
+              title: 'Nº alunos com Documentos',
+              value: '432',
+              isClickable: true,
+              actionText: 'Ver mais',
+              subtitle: '90.4% Regularizados na rede',
+            }}
+            onSelect={() => {
+              setDocFilter('with-docs');
+              document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+          <StatCardItem
+            id="ds-card-nodocs"
+            size="md"
+            card={{
+              id: 'nodocs',
+              title: 'Nº alunos sem Documentos',
+              value: '46',
+              isClickable: true,
+              actionText: 'Ver mais',
+              subtitle: '9.6% Pendentes de registo',
+            }}
+            onSelect={() => {
+              setDocFilter('without-docs');
+              document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+          <StatCardItem
+            id="ds-card-desempenho"
+            size="md"
+            card={{
+              id: 'desempenho',
+              title: 'Desempenho Geral',
+              value: String(currentStudent?.performanceScore || '8.9'),
+              isClickable: false,
+              subtitle: 'Média escolar / 10',
+            }}
+          />
+          <StatCardItem
+            id="ds-card-presenca"
+            size="md"
+            card={{
+              id: 'presenca',
+              title: 'Presença dos alunos',
+              value: `${currentStudent?.presenceRate || 96}%`,
+              isClickable: false,
+              subtitle: 'Assiduidade geral coletiva',
+            }}
+          />
         </div>
       </div>
 

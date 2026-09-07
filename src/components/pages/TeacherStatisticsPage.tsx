@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Home, Flag, Users, ArrowRight, UserCheck, FileText, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react';
+import { ArrowRight, UserCheck, FileText, CheckCircle2, AlertTriangle, TrendingUp, Users } from 'lucide-react';
 import { StudentProfile, computeClassStats } from '../../data/teacherData';
+import { StatCardItem } from '../StatCardItem';
 
 interface TeacherStatisticsPageProps {
   onNavigateToClass: () => void;
@@ -69,64 +70,56 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
         </div>
       </div>
 
-      {/* Top 3 Interactive Blue Cards matching 7.png */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-14">
-        {/* Card 1: Minha Turma 1 */}
-        <div
-          onClick={onNavigateToClass}
-          className="relative bg-[#5067fc] text-white rounded-[24px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all cursor-pointer hover:-translate-y-1 group"
-        >
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#5067fc]/20 group-hover:scale-110 transition-transform">
-            <Home className="w-6 h-6 text-[#5067fc]" strokeWidth={2.4} />
-          </div>
-          <h4 className="text-xl sm:text-2xl font-black tracking-tight mb-1">
-            Minha Turma
-          </h4>
-          <div className="text-3xl sm:text-4xl font-black">
-            1
-          </div>
-          <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-            Aceder aos alunos →
-          </span>
-        </div>
-
-        {/* Card 2: Classe 4ª */}
-        <div
-          onClick={onNavigateToClass}
-          className="relative bg-[#5067fc] text-white rounded-[24px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all cursor-pointer hover:-translate-y-1 group"
-        >
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#5067fc]/20 group-hover:scale-110 transition-transform">
-            <Flag className="w-6 h-6 text-[#5067fc]" strokeWidth={2.4} />
-          </div>
-          <h4 className="text-xl sm:text-2xl font-black tracking-tight mb-1">
-            Classe
-          </h4>
-          <div className="text-3xl sm:text-4xl font-black">
-            4ª
-          </div>
-          <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-            Plano curricular →
-          </span>
-        </div>
-
-        {/* Card 3: Alunos 46 */}
-        <div
-          onClick={onNavigateToClass}
-          className="relative bg-[#5067fc] text-white rounded-[24px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all cursor-pointer hover:-translate-y-1 group"
-        >
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#5067fc]/20 group-hover:scale-110 transition-transform">
-            <Users className="w-6 h-6 text-[#5067fc]" strokeWidth={2.4} />
-          </div>
-          <h4 className="text-xl sm:text-2xl font-black tracking-tight mb-1">
-            Alunos
-          </h4>
-          <div className="text-3xl sm:text-4xl font-black">
-            {students.length || 46}
-          </div>
-          <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-            Lista e fichas →
-          </span>
-        </div>
+      {/* Metric Cards featuring clickable and non-clickable design logic */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-5xl mx-auto mb-14 items-start">
+        <StatCardItem
+          id="teacher-stat-card-alunos"
+          card={{
+            id: 'alunos',
+            title: 'Nº Alunos',
+            value: String(students.length || 46),
+            icon: 'users',
+            isClickable: true,
+            actionText: 'Ver mais',
+            subtitle: 'Alunos matriculados na turma',
+          }}
+          onSelect={onNavigateToClass}
+        />
+        <StatCardItem
+          id="teacher-stat-card-turmas"
+          card={{
+            id: 'turmas',
+            title: 'Nº Turmas',
+            value: '1',
+            icon: 'home',
+            isClickable: false,
+            subtitle: 'Turma atribuída ao docente',
+          }}
+        />
+        <StatCardItem
+          id="teacher-stat-card-minha-turma"
+          card={{
+            id: 'minha-turma',
+            title: 'Minha Turma',
+            value: '1',
+            icon: 'home',
+            isClickable: true,
+            actionText: 'Ver mais',
+            subtitle: 'Pauta e fichas da turma',
+          }}
+          onSelect={onNavigateToClass}
+        />
+        <StatCardItem
+          id="teacher-stat-card-classe"
+          card={{
+            id: 'classe',
+            title: 'Classe',
+            value: '4ª',
+            icon: 'flag',
+            isClickable: false,
+            subtitle: 'Ensino Primário Regular',
+          }}
+        />
       </div>
 
       {/* Analytics & Statistical Charts Grid matching 7.png */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Phone, ArrowLeft, ArrowRight, BookOpen, Clock, Award, CheckCircle, Mail, School, Calendar } from 'lucide-react';
 import { initialTeacherData, TeacherData, StudentProfile } from '../../data/teacherData';
+import { StatCardItem } from '../StatCardItem';
 
 interface TeacherProfilePageProps {
   onBackToStats: () => void;
@@ -121,38 +122,41 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
         </div>
       </div>
 
-      {/* Lower Section: Cyan Badge "Nº de alunos" over Blue Card matching 18.png */}
+      {/* Lower Section: StatCardItem with Clickable logic matching reference */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 items-start">
-        {/* Left Column: Cyan Badge "Nº de alunos" over Blue Card (matching 18.png) */}
-        <div className="lg:col-span-3 flex flex-col items-start">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Nº de alunos
-          </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[24px] p-6 shadow-[0_12px_32px_rgba(80,103,252,0.25)] flex flex-col items-center justify-center min-h-[200px] text-center">
-            <span className="text-5xl font-black mb-1">{totalAlunos}</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-white/80 mb-4">
-              Alunos Registados
-            </span>
-
-            <div className="w-full pt-4 border-t border-white/20 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-white/80">♀ Meninas:</span>
-                <span className="font-black">26 alunas</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white/80">♂ Meninos:</span>
-                <span className="font-black">20 alunos</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white/80">Assiduidade:</span>
-                <span className="font-black text-emerald-300">96.4%</span>
-              </div>
+        {/* Left Column: StatCardItem */}
+        <div className="lg:col-span-4 flex flex-col items-center">
+          <StatCardItem
+            id="teacher-profile-card-alunos"
+            size="md"
+            card={{
+              id: 'teacher-alunos',
+              title: 'Nº Alunos',
+              value: String(totalAlunos),
+              isClickable: true,
+              actionText: 'Ver mais',
+              subtitle: 'Alunos sob tutela docente',
+            }}
+            onSelect={onNavigateToClass}
+          />
+          <div className="w-full max-w-[310px] bg-white rounded-2xl border border-slate-200 p-4 mt-3 space-y-2 text-xs text-slate-700 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-medium">♀ Meninas:</span>
+              <span className="font-bold text-slate-900">26 alunas</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-medium">♂ Meninos:</span>
+              <span className="font-bold text-slate-900">20 alunos</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-medium">Assiduidade:</span>
+              <span className="font-bold text-emerald-600">96.4%</span>
             </div>
           </div>
         </div>
 
         {/* Right Column: Horário Semanal & Dados Institucionais */}
-        <div className="lg:col-span-9 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-sm">
+        <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
             <div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">

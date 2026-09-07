@@ -233,7 +233,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header matching uCore visual branding */}
-        <div className="bg-[#5067fc] p-5 sm:p-6 relative shrink-0 text-white shadow-sm">
+        <div className="bg-[#f75142] p-5 sm:p-6 relative shrink-0 text-white shadow-sm">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 text-white/80 hover:text-white rounded-full hover:bg-white/15 transition-colors cursor-pointer"
@@ -243,14 +243,14 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
           </button>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-white/20">
-            <GraduationCap className="w-3.5 h-3.5 text-[#4f67ff]" />
+            <GraduationCap className="w-3.5 h-3.5 text-white" />
             Secretaria & Matrículas • uCore
           </div>
 
           <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
             <span>Matrícula de Novo Aluno</span>
           </h3>
-          <p className="text-xs text-blue-100 font-medium mt-1">
+          <p className="text-xs text-white/85 font-medium mt-1">
             {schoolName} • Registro individual, documentação legal e perfil pedagógico
           </p>
 
@@ -261,7 +261,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
               onClick={() => setActiveTab('geral')}
               className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'geral'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
+                  ? 'bg-white text-[#002133] font-black shadow-xs'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
@@ -272,7 +272,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
               onClick={() => setActiveTab('documentos')}
               className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'documentos'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
+                  ? 'bg-white text-[#002133] font-black shadow-xs'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
@@ -283,7 +283,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
               onClick={() => setActiveTab('academico')}
               className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'academico'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
+                  ? 'bg-white text-[#002133] font-black shadow-xs'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
@@ -294,7 +294,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
               onClick={() => setActiveTab('familia')}
               className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'familia'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
+                  ? 'bg-white text-[#002133] font-black shadow-xs'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
@@ -357,7 +357,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
 
                     <div className="flex-1 space-y-2 text-center sm:text-left">
                       <div className="flex items-center gap-2 justify-center sm:justify-start">
-                        <Camera className="w-4 h-4 text-[#5067fc]" />
+                        <Camera className="w-4 h-4 text-[#f75142]" />
                         <span className="font-black text-slate-800 uppercase tracking-wider text-xs">
                           Fotografia do Aluno
                         </span>
@@ -368,9 +368,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       <div className="pt-1">
                         <label 
                           htmlFor={photoInputId}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer shadow-2xs transition-all hover:border-[#5067fc]"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer shadow-2xs transition-all hover:border-[#f75142]"
                         >
-                          <Upload className="w-3.5 h-3.5 text-[#5067fc]" />
+                          <Upload className="w-3.5 h-3.5 text-[#f75142]" />
                           <span>{foto ? 'Alterar Fotografia' : 'Carregar Foto do Aluno'}</span>
                         </label>
                         <input
@@ -396,7 +396,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc] transition-all"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142] transition-all"
                     />
                   </div>
 
@@ -423,21 +423,21 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         onClick={() => setGenero('M')}
                         className={`py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
                           genero === 'M'
-                            ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs'
+                            ? 'bg-[#fef2f1] border-[#f75142]/40 text-[#f75142] shadow-2xs'
                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                         }`}
                       >
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#5067fc]"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#f75142]"></span>
                         <span>Masculino (Menino)</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Data de Nascimento com CÁLCULO AUTOMÁTICO DA IDADE */}
-                  <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 space-y-3">
+                  <div className="p-4 rounded-2xl bg-[#fef2f1] border border-[#f75142]/20 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4 text-[#5067fc]" />
+                        <Calendar className="w-4 h-4 text-[#f75142]" />
                         <span>Data de Nascimento *</span>
                       </label>
                       
@@ -457,10 +457,10 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                           onChange={(e) => setDataNascimento(e.target.value)}
                           max={new Date().toISOString().split('T')[0]}
                           required
-                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                         />
                       </div>
-                      <div className="sm:col-span-4 text-xs font-bold text-slate-600 bg-white/80 p-2 rounded-xl border border-blue-100/80 text-center">
+                      <div className="sm:col-span-4 text-xs font-bold text-slate-600 bg-white/80 p-2 rounded-xl border border-[#f75142]/20 text-center">
                         {calculatedAge !== null ? (
                           <span className="text-emerald-700">
                             Cálculo automático: <strong>{calculatedAge} anos</strong>
@@ -494,7 +494,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                             onClick={() => setTipoDocumento(doc)}
                             className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                               isSelected
-                                ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-md scale-[1.02]'
+                                ? 'bg-[#f75142] text-[#002133] font-black border-[#f75142] shadow-md scale-[1.02]'
                                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
@@ -529,7 +529,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                           value={numeroDocumento}
                           onChange={(e) => setNumeroDocumento(e.target.value)}
                           required
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                         />
                       </div>
 
@@ -558,10 +558,10 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                           <div>
                             <label
                               htmlFor={docInputId}
-                              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 hover:border-[#5067fc] rounded-2xl bg-white text-center cursor-pointer transition-all group"
+                              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 hover:border-[#f75142] rounded-2xl bg-white text-center cursor-pointer transition-all group"
                             >
-                              <FileUp className="w-8 h-8 text-slate-400 group-hover:text-[#5067fc] mb-2 transition-colors" />
-                              <span className="text-xs font-bold text-slate-700 group-hover:text-[#5067fc]">
+                              <FileUp className="w-8 h-8 text-slate-400 group-hover:text-[#f75142] mb-2 transition-colors" />
+                              <span className="text-xs font-bold text-slate-700 group-hover:text-[#f75142]">
                                 Clique para anexar o documento do aluno
                               </span>
                               <span className="text-[10px] text-slate-400 mt-0.5">
@@ -609,11 +609,11 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         onClick={() => setCondicaoMatricula('primeira_vez')}
                         className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
                           condicaoMatricula === 'primeira_vez'
-                            ? 'bg-blue-50/80 border-[#5067fc] ring-2 ring-[#5067fc]/20 text-[#5067fc] shadow-sm'
+                            ? 'bg-[#fef2f1] border-[#f75142] ring-2 ring-[#f75142]/20 text-[#f75142] shadow-sm'
                             : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        <div className={`p-2 rounded-xl shrink-0 ${condicaoMatricula === 'primeira_vez' ? 'bg-[#5067fc] text-white' : 'bg-slate-200 text-slate-600'}`}>
+                        <div className={`p-2 rounded-xl shrink-0 ${condicaoMatricula === 'primeira_vez' ? 'bg-[#f75142] text-white' : 'bg-slate-200 text-slate-600'}`}>
                           <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
@@ -659,7 +659,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       <select
                         value={classe}
                         onChange={(e) => setClasse(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       >
                         <option value="Iniciação">Iniciação</option>
                         <option value="1ª Classe">1ª Classe</option>
@@ -681,7 +681,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       <select
                         value={turma}
                         onChange={(e) => setTurma(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       >
                         <option value="Turma A">Turma A</option>
                         <option value="Turma B">Turma B</option>
@@ -700,7 +700,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       <select
                         value={periodo}
                         onChange={(e) => setPeriodo(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       >
                         <option value="Manhã">Manhã (07h30 - 12h30)</option>
                         <option value="Tarde">Tarde (13h00 - 17h30)</option>
@@ -715,7 +715,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       <select
                         value={sala}
                         onChange={(e) => setSala(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       >
                         <option value="Sala 01">Sala 01</option>
                         <option value="Sala 02">Sala 02</option>
@@ -742,7 +742,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         placeholder="Ex: Manuel António"
                         value={nomePai}
                         onChange={(e) => setNomePai(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       />
                     </div>
 
@@ -755,7 +755,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         placeholder="Ex: Maria Domingos"
                         value={nomeMae}
                         onChange={(e) => setNomeMae(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       />
                     </div>
                   </div>
@@ -771,7 +771,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         value={encarregado}
                         onChange={(e) => setEncarregado(e.target.value)}
                         required
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       />
                     </div>
 
@@ -782,7 +782,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       <select
                         value={parentescoEncarregado}
                         onChange={(e) => setParentescoEncarregado(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       >
                         <option value="Mãe">Mãe</option>
                         <option value="Pai">Pai</option>
@@ -805,7 +805,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         value={telefone}
                         onChange={(e) => setTelefone(e.target.value)}
                         required
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       />
                     </div>
 
@@ -818,7 +818,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         placeholder="Ex: +244 912 345 678"
                         value={telefoneAlternativo}
                         onChange={(e) => setTelefoneAlternativo(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                       />
                     </div>
                   </div>
@@ -832,7 +832,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       placeholder="Ex: Bairro Palanca, Rua 12, Casa 45, Luanda"
                       value={endereco}
                       onChange={(e) => setEndereco(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                     />
                   </div>
 
@@ -845,7 +845,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       placeholder="Ex: Alergias, cuidados visuais, necessidades educativas especiais..."
                       value={observacoes}
                       onChange={(e) => setObservacoes(e.target.value)}
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
                     />
                   </div>
                 </div>
@@ -889,7 +889,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       else if (activeTab === 'documentos') setActiveTab('academico');
                       else if (activeTab === 'academico') setActiveTab('familia');
                     }}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-[#5067fc] hover:bg-[#4359eb] text-white font-black uppercase tracking-wider rounded-xl text-xs cursor-pointer shadow-sm transition-all"
+                    className="w-full sm:w-auto px-6 py-2.5 bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black uppercase tracking-wider rounded-xl text-xs cursor-pointer shadow-sm transition-all"
                   >
                     Avançar
                   </button>

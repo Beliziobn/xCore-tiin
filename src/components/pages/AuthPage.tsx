@@ -12,7 +12,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Building2,
-  GraduationCap
+  GraduationCap,
+  Box
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import type { UserAccount } from '../../types';
@@ -21,12 +22,14 @@ interface AuthPageProps {
   initialMode?: 'login' | 'register';
   onLoginSuccess: (user: UserAccount) => void;
   onBackToHome: () => void;
+  hideHeader?: boolean;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
   initialMode = 'login',
   onLoginSuccess,
   onBackToHome,
+  hideHeader = false,
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
@@ -188,65 +191,66 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   return (
     <div id="auth-full-page" className="min-h-screen w-full bg-[#f7f3f3] text-slate-900 flex flex-col justify-between selection:bg-[#5067fc] selection:text-white">
-      {/* Top Header Bar */}
-      <header className="w-full bg-[#4f67ff] border-b border-white/10 px-4 sm:px-8 py-3.5 shadow-sm sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          {/* Logo */}
-          <button
-            id="auth-header-logo-btn"
-            onClick={onBackToHome}
-            className="flex items-center gap-2.5 cursor-pointer group focus:outline-none"
-          >
-            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-              <svg
-                className="w-4 h-4 text-[#3B82F6]"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
-              </svg>
-            </div>
-            <span className="text-xl font-black tracking-tight text-white uppercase">
-              u<span className="text-[#4f67ff]">Core</span>
-            </span>
-          </button>
-
-          {/* Navigation controls */}
-          <div className="flex items-center gap-3">
-            {/* Mode switch pill */}
-            <div className="hidden sm:flex items-center bg-white/15 p-1 rounded-full text-[10px] uppercase tracking-[0.15em] font-bold text-white border border-white/20">
-              <button
-                id="tab-login-btn"
-                onClick={() => switchMode('login')}
-                className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${
-                  mode === 'login' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-white/80 hover:text-white'
-                }`}
-              >
-                Entrar
-              </button>
-              <button
-                id="tab-register-btn"
-                onClick={() => switchMode('register')}
-                className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${
-                  mode === 'register' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-white/80 hover:text-white'
-                }`}
-              >
-                Cadastrar
-              </button>
-            </div>
-
-            {/* Back to Home Button */}
+      {/* Top Header Bar (matches general navbar when rendered standalone) */}
+      {!hideHeader && (
+        <header className="w-full bg-white border-b border-slate-200/70 sticky top-0 z-30 shadow-[0_4px_20px_rgba(15,23,42,0.04)]">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[76px] flex items-center justify-between">
+            {/* Logo */}
             <button
-              id="auth-back-home-btn"
+              id="auth-header-logo-btn"
               onClick={onBackToHome}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-white/10 hover:bg-white/20 border border-white/25 px-4 py-2 rounded-full transition-all cursor-pointer active:scale-95"
+              className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Voltar ao Início</span>
+              <div className="w-10 h-10 rounded-xl bg-[#4f67ff] flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(79,103,255,0.6)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
+                <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
+              </div>
+              <span className="text-2xl font-black tracking-tight text-slate-950">
+                uCore
+              </span>
             </button>
+
+            {/* Navigation controls */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Back to Home Button */}
+              <button
+                id="auth-back-home-btn"
+                onClick={onBackToHome}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#4f67ff] transition-colors cursor-pointer mr-1"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Voltar ao Início</span>
+              </button>
+
+              {/* Mode switch buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  id="tab-login-btn"
+                  onClick={() => switchMode('login')}
+                  className={`text-sm font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
+                    mode === 'login'
+                      ? 'bg-slate-100 text-[#4f67ff] font-bold'
+                      : 'text-slate-700 hover:text-[#4f67ff]'
+                  }`}
+                >
+                  Entrar
+                </button>
+                <button
+                  id="tab-register-btn"
+                  onClick={() => switchMode('register')}
+                  className={`text-sm font-bold px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_8px_20px_-6px_rgba(79,103,255,0.8)] hover:shadow-[0_10px_26px_-6px_rgba(79,103,255,0.95)] active:scale-95 whitespace-nowrap ${
+                    mode === 'register'
+                      ? 'bg-[#3547cf] text-white ring-2 ring-[#4f67ff]/40'
+                      : 'bg-[#4f67ff] hover:bg-[#3547cf] text-white'
+                  }`}
+                >
+                  Inscreva - se
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </header>
+          <div className="w-full h-[2px] bg-[#4f67ff]" />
+        </header>
+      )}
 
       {/* Main Form Section */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex items-center justify-center">
@@ -742,9 +746,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </main>
 
       {/* Footer Note */}
-      <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
-        Central uCore • Plataforma de Gestão Educacional para Escolas, Professores e Alunos
-      </footer>
+      {!hideHeader && (
+        <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
+          Central uCore • Plataforma de Gestão Educacional para Escolas, Professores e Alunos
+        </footer>
+      )}
     </div>
   );
 };

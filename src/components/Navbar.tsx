@@ -6,6 +6,7 @@ interface NavbarProps {
   onOpenGetStarted: () => void;
   onNavigateToLogin?: () => void;
   onNavigateToRegister?: () => void;
+  onNavigateToHome?: () => void;
   onOpenAbout: () => void;
   onOpenProfile: () => void;
   onOpenSupport: () => void;
@@ -15,6 +16,7 @@ interface NavbarProps {
   currentUser?: UserAccount | null;
   onLogout?: () => void;
   activeRole?: string;
+  currentPage?: string;
 }
 
 const mockNotifications: NotificationItem[] = [
@@ -48,6 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGetStarted,
   onNavigateToLogin,
   onNavigateToRegister,
+  onNavigateToHome,
   onOpenAbout,
   onOpenProfile,
   onOpenSupport,
@@ -57,6 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onLogout,
   activeRole,
+  currentPage = 'home',
 }) => {
   const [showPagesDropdown, setShowPagesDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -92,8 +96,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       <header
         className={`w-full transition-all duration-300 ${
           isScrolled
-            ? 'fixed top-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-xl shadow-[0_8px_30px_rgba(15,23,42,0.08)] border-b border-slate-200/70'
-            : 'relative z-30 bg-white border-b border-slate-200/70'
+            ? 'fixed top-0 left-0 right-0 z-50 bg-[#f75142] shadow-[0_8px_30px_rgba(247,81,66,0.25)] border-b border-[#e54536]'
+            : 'relative z-30 bg-[#f75142] border-b border-[#e54536]'
         }`}
       >
         <nav
@@ -103,13 +107,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Logo */}
         <button
           id="logo-button"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onClick={() => {
+            if (onNavigateToHome) {
+              onNavigateToHome();
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#4f67ff] flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(79,103,255,0.6)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
+          <div className="w-10 h-10 rounded-xl bg-[#002133] flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(0,33,51,0.45)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
             <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-2xl font-black tracking-tight text-slate-950">
+          <span className="text-2xl font-black tracking-tight text-[#002133]">
             uCore
           </span>
         </button>
@@ -117,24 +126,24 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Dynamic Scroll Progress Bar */}
         <div
           id="navbar-scroll-progress"
-          className="absolute bottom-0 left-0 h-[2px] bg-[#4f67ff] transition-all duration-100 ease-out"
+          className="absolute bottom-0 left-0 h-[2.5px] bg-[#002133] transition-all duration-100 ease-out"
           style={{ width: `${scrollProgress}%` }}
         />
 
         {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 lg:gap-11 text-[15px] font-semibold text-slate-700">
+        <div className="hidden md:flex items-center gap-8 lg:gap-11 text-[15px] font-bold text-[#002133]">
           {/* Páginas dropdown */}
           <div className="relative">
             <button
               id="nav-paginas-dropdown"
               onClick={() => setShowPagesDropdown((prev) => !prev)}
               onBlur={() => setTimeout(() => setShowPagesDropdown(false), 200)}
-              className="flex items-center gap-1.5 hover:text-[#4f67ff] transition-colors cursor-pointer py-1"
+              className="flex items-center gap-1.5 text-[#002133] hover:text-white transition-colors cursor-pointer py-1"
             >
               <span>Paginas</span>
               <ChevronDown
-                className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                  showPagesDropdown ? 'rotate-180 text-[#4f67ff]' : ''
+                className={`w-4 h-4 text-[#002133]/80 transition-transform duration-200 ${
+                  showPagesDropdown ? 'rotate-180 text-white' : ''
                 }`}
               />
             </button>
@@ -389,7 +398,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onOpenProfile();
               }
             }}
-            className="hover:text-[#4f67ff] transition-colors cursor-pointer"
+            className="text-[#002133] hover:text-white font-bold transition-colors cursor-pointer"
           >
             Perfil
           </button>
@@ -398,12 +407,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="nav-chat-suporte"
               onClick={onOpenChat}
-              className="relative hover:text-[#4f67ff] transition-colors cursor-pointer"
+              className="relative text-[#002133] hover:text-white font-bold transition-colors cursor-pointer"
               title="Abrir Chat de Suporte e Ajuda"
             >
               <span>Chat</span>
               {unreadChatCount !== undefined && unreadChatCount > 0 && (
-                <span className="absolute -top-1 -right-2.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="absolute -top-1 -right-2.5 w-2.5 h-2.5 rounded-full bg-[#002133] ring-2 ring-[#f75142] animate-pulse" />
               )}
             </button>
           )}
@@ -416,23 +425,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="notification-bell-btn"
               onClick={() => setShowNotifications((prev) => !prev)}
-              className="relative p-2 rounded-full text-slate-600 hover:text-[#4f67ff] hover:bg-slate-100 transition-colors cursor-pointer focus:outline-none"
+              className="relative p-2 rounded-full text-[#002133] hover:text-white hover:bg-black/10 transition-colors cursor-pointer focus:outline-none"
               title="Notificações"
             >
-              <Bell className="w-6 h-6" strokeWidth={1.75} />
+              <Bell className="w-6 h-6" strokeWidth={2.2} />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#4f67ff] rounded-full ring-2 ring-white animate-pulse" />
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#002133] rounded-full ring-2 ring-[#f75142] animate-pulse" />
               )}
             </button>
 
             {/* Notifications Popover */}
             {showNotifications && (
-              <div className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-slate-900">
+              <div className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-[#002133]">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs uppercase tracking-[0.15em] text-slate-950">Notificações</span>
+                    <span className="font-bold text-xs uppercase tracking-[0.15em] text-[#002133]">Notificações</span>
                     {unreadCount > 0 && (
-                      <span className="text-[10px] bg-[#3B82F6]/10 text-[#3B82F6] border border-[#3B82F6]/30 px-2 py-0.5 rounded-full font-bold uppercase">
+                      <span className="text-[10px] bg-[#002133]/10 text-[#002133] border border-[#002133]/20 px-2 py-0.5 rounded-full font-bold uppercase">
                         {unreadCount} novas
                       </span>
                     )}
@@ -440,7 +449,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className="text-[10px] uppercase tracking-wider text-[#3B82F6] hover:underline font-bold cursor-pointer"
+                      className="text-[10px] uppercase tracking-wider text-[#f75142] hover:underline font-bold cursor-pointer"
                     >
                       Marcar lidas
                     </button>
@@ -456,7 +465,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }`}
                     >
                       <div className="flex justify-between items-start">
-                        <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
+                        <h4 className="text-xs font-bold text-[#002133]">{item.title}</h4>
                         <span className="text-[10px] text-slate-400 tracking-wider">{item.time}</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
@@ -473,13 +482,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="navbar-user-profile-btn"
                 onClick={onOpenProfile}
-                className="flex items-center gap-2 bg-indigo-50/80 hover:bg-indigo-100/80 border border-[#5067fc]/20 px-3 py-1.5 rounded-full transition-all cursor-pointer group"
+                className="flex items-center gap-2 bg-[#002133] text-white hover:bg-[#001726] px-3 py-1.5 rounded-full transition-all cursor-pointer group shadow-sm"
                 title="Meu Perfil"
               >
-                <div className="w-6 h-6 rounded-full bg-[#5067fc] text-white flex items-center justify-center text-[10px] font-black uppercase">
+                <div className="w-6 h-6 rounded-full bg-white text-[#002133] flex items-center justify-center text-[10px] font-black uppercase">
                   {currentUser.firstName.charAt(0)}
                 </div>
-                <span className="text-xs font-bold text-slate-800 hidden sm:inline">
+                <span className="text-xs font-bold text-white hidden sm:inline">
                   {currentUser.firstName}
                 </span>
               </button>
@@ -487,7 +496,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   id="navbar-logout-btn"
                   onClick={onLogout}
-                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors cursor-pointer"
+                  className="p-1.5 text-[#002133] hover:text-white hover:bg-black/10 rounded-full transition-colors cursor-pointer"
                   title="Encerrar sessão"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -499,14 +508,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="navbar-entrar-btn"
                 onClick={onNavigateToLogin || onOpenGetStarted}
-                className="hidden sm:inline-flex text-slate-700 hover:text-[#4f67ff] font-semibold text-sm px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer"
+                className={`hidden sm:inline-flex font-bold text-sm px-3.5 py-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                  currentPage === 'login'
+                    ? 'bg-white text-[#002133]'
+                    : 'text-[#002133] hover:text-white hover:bg-black/10'
+                }`}
               >
                 Entrar
               </button>
               <button
                 id="navbar-comecar-btn"
                 onClick={onNavigateToRegister || onOpenGetStarted}
-                className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-bold text-sm px-5 sm:px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-[0_8px_20px_-6px_rgba(79,103,255,0.8)] hover:shadow-[0_10px_26px_-6px_rgba(79,103,255,0.95)] active:scale-95 whitespace-nowrap"
+                className={`text-white font-black text-sm px-5 sm:px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-[0_8px_20px_-6px_rgba(0,33,51,0.5)] hover:shadow-[0_10px_26px_-6px_rgba(0,33,51,0.7)] active:scale-95 whitespace-nowrap bg-[#002133] hover:bg-[#001726] ${
+                  currentPage === 'register'
+                    ? 'ring-2 ring-white/60'
+                    : ''
+                }`}
               >
                 Inscreva - se
               </button>
@@ -517,7 +534,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="mobile-menu-toggle"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="md:hidden p-2 text-slate-700 hover:text-slate-950 rounded-lg focus:outline-none cursor-pointer"
+            className="md:hidden p-2 text-[#002133] hover:text-white rounded-lg focus:outline-none cursor-pointer"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>

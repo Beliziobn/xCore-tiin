@@ -4,6 +4,7 @@ import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorTeacher, AdminTeacher } from '../../../types';
+import { StatCardItem } from '../../StatCardItem';
 
 interface DirectorTeachersPageProps {
   onOpenGetStarted: () => void;
@@ -304,41 +305,19 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
         {/* Second Row: [Presença dos Professores] & [Horário das Aulas] matching 11.png */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Card: [Presença dos Professores] */}
-          <div className="lg:col-span-4 flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Presença dos Professores
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[260px]">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Assiduidade Geral</span>
-                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">23/23 Ativos</span>
-                </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-4xl sm:text-5xl font-black">98.5%</span>
-                  <span className="text-xs text-white/80 font-bold">no mês atual</span>
-                </div>
-              </div>
-
-              {/* Attendance breakdown for selected teacher */}
-              <div className="mt-6 pt-4 border-t border-white/20 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-white/90 font-medium">Presença de {currentTeacher?.name.split(' ')[0]}:</span>
-                  <span className="font-bold text-emerald-300">{currentTeacher?.presenceRate || 98.8}%</span>
-                </div>
-                <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-emerald-300 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${currentTeacher?.presenceRate || 98.8}%` }}
-                  />
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-white/80 pt-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-                  <span>Nenhuma falta injustificada registada neste trimestre</span>
-                </div>
-              </div>
-            </div>
+          {/* Card: [Presença dos Professores] with StatCardItem design logic */}
+          <div className="lg:col-span-4 flex flex-col items-center">
+            <StatCardItem
+              id="dt-card-presenca"
+              size="md"
+              card={{
+                id: 'presenca-professores',
+                title: 'Presença Professores',
+                value: '98.5%',
+                isClickable: false,
+                subtitle: `Assiduidade do Mês • ${currentTeacher?.name.split(' ')[0]}`,
+              }}
+            />
           </div>
 
           {/* Card: [Horário das Aulas] */}

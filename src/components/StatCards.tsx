@@ -1,6 +1,7 @@
-import React from 'react';
-import { Home, User, Users, Flag, Settings2, Sliders, ShieldCheck, Lock, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings2, ShieldCheck, Lock, ArrowRight, Layers, Sparkles } from 'lucide-react';
 import type { SessionCard, SessionProfile } from '../types';
+import { StatCardItem } from './StatCardItem';
 
 interface StatCardsProps {
   session: SessionProfile;
@@ -19,22 +20,10 @@ export const StatCards: React.FC<StatCardsProps> = ({
   onChangeRole,
   onRequireAuth,
 }) => {
-  const renderIcon = (icon: SessionCard['icon']) => {
-    switch (icon) {
-      case 'home':
-        return <Home className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />;
-      case 'user':
-        return <User className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />;
-      case 'users':
-        return <Users className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />;
-      case 'flag':
-        return <Flag className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />;
-      default:
-        return <Home className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />;
-    }
-  };
+  const [filter, setFilter] = useState<'all' | 'clickable' | 'stats'>('all');
 
   const handleCardClick = (card: SessionCard) => {
+    if (card.isClickable === false) return;
     onSelectCard(card);
   };
 
@@ -46,20 +35,29 @@ export const StatCards: React.FC<StatCardsProps> = ({
     onChangeRole?.(role);
   };
 
+  const filteredCards = session.cards.filter((card) => {
+    if (filter === 'clickable') return card.isClickable !== false;
+    if (filter === 'stats') return card.isClickable === false;
+    return true;
+  });
+
+  const clickableCount = session.cards.filter((c) => c.isClickable !== false).length;
+  const nonClickableCount = session.cards.filter((c) => c.isClickable === false).length;
+
   return (
-    <section id="stats-section" className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 pb-16">
+    <section id="stats-section" className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 pb-20">
       {/* Informative Banner when not logged in */}
       {!isLoggedIn && (
         <div 
           onClick={() => onRequireAuth?.('Autenticação no Sistema')}
-          className="mb-8 bg-blue-50/80 hover:bg-blue-100/80 border border-[#5067fc]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-800 transition-all cursor-pointer shadow-xs"
+          className="mb-8 bg-[#fef2f1] hover:bg-[#fee4e2] border border-[#f75142]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-800 transition-all cursor-pointer shadow-xs"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#5067fc] text-white flex items-center justify-center shrink-0">
-              <Lock className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-full bg-[#f75142] text-white flex items-center justify-center shrink-0">
+              <Lock className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#5067fc]">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#f75142]">
                 Sessão Não Iniciada
               </span>
               <p className="text-xs sm:text-sm font-semibold text-slate-800">
@@ -69,26 +67,26 @@ export const StatCards: React.FC<StatCardsProps> = ({
           </div>
           <button 
             type="button"
-            className="shrink-0 bg-[#5067fc] text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded-xl flex items-center gap-1.5 hover:bg-[#4056ea] transition-colors"
+            className="shrink-0 bg-[#f75142] text-[#002133] text-[11px] font-black uppercase tracking-wider px-4 py-2 rounded-xl flex items-center gap-1.5 hover:bg-[#e04436] transition-colors"
           >
             <span>Iniciar Sessão</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-3.5 h-3.5 text-[#002133]" />
           </button>
         </div>
       )}
 
       {/* Session Header Toolbar: shows verified session, role switchers, and settings */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-10 pb-4 border-b border-slate-100">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200/80">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#5067fc]/10 text-[#5067fc] flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5 text-[#5067fc]" />
+          <div className="w-9 h-9 rounded-full bg-[#f75142]/10 text-[#f75142] flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5 text-[#f75142]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                 {isLoggedIn ? 'Sessão Iniciada:' : 'Sessão Prévia:'}
               </span>
-              <span className="text-[10px] bg-blue-50 text-[#5067fc] border border-blue-200/80 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+              <span className="text-[10px] bg-[#fef2f1] text-[#f75142] border border-[#f75142]/30 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
                 {session.title}
               </span>
             </div>
@@ -101,13 +99,13 @@ export const StatCards: React.FC<StatCardsProps> = ({
         {/* Action Controls: Role Switcher Chips + Settings */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
           {onChangeRole && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/80 text-[11px] font-bold">
+            <div className="flex items-center bg-white p-1 rounded-full border border-slate-200 text-[11px] font-bold shadow-xs">
               <button
                 type="button"
                 onClick={() => handleRoleClick('diretor')}
                 className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                   session.role === 'diretor'
-                    ? 'bg-[#5067fc] text-white shadow-2xs'
+                    ? 'bg-[#f75142] text-white shadow-2xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -118,7 +116,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
                 onClick={() => handleRoleClick('professor')}
                 className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                   session.role === 'professor'
-                    ? 'bg-[#5067fc] text-white shadow-2xs'
+                    ? 'bg-[#f75142] text-white shadow-2xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -129,7 +127,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
                 onClick={() => handleRoleClick('admin')}
                 className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                   session.role === 'admin'
-                    ? 'bg-[#5067fc] text-white shadow-2xs'
+                    ? 'bg-[#f75142] text-white shadow-2xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -141,44 +139,67 @@ export const StatCards: React.FC<StatCardsProps> = ({
           {/* Configuration Button */}
           <button
             onClick={handleSettingsClick}
-            className="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer group shadow-2xs"
+            className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer group shadow-xs"
             title="Ver configurações específicas desta sessão"
           >
-            <Settings2 className="w-3.5 h-3.5 text-[#5067fc] group-hover:rotate-45 transition-transform" />
+            <Settings2 className="w-3.5 h-3.5 text-[#f75142] group-hover:rotate-45 transition-transform" />
             <span className="hidden sm:inline">Configurações</span>
           </button>
         </div>
       </div>
 
-      {/* Blue Cards Grid reproducing exact layout from 8.png, 4.png, 6.png */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 max-w-4xl mx-auto">
-        {session.cards.map((card) => (
-          <div
-            key={card.id}
-            id={`stat-card-${card.id}`}
-            onClick={() => handleCardClick(card)}
-            className="relative bg-[#5067fc] hover:bg-[#455df7] text-white rounded-2xl pt-10 pb-8 px-6 text-center shadow-[0_15px_35px_rgba(80,103,252,0.25)] hover:shadow-[0_20px_45px_rgba(80,103,252,0.35)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center min-h-[210px] group"
+      {/* Optional Card Classification Filter Chips */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
+        <div className="flex items-center gap-1.5 bg-slate-200/60 p-1 rounded-xl text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              filter === 'all'
+                ? 'bg-white text-slate-900 shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
-            {/* White Circular Icon Badge at Top Center */}
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white group-hover:scale-110 transition-transform duration-300">
-              {renderIcon(card.icon)}
-            </div>
+            Todos ({session.cards.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('clickable')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+              filter === 'clickable'
+                ? 'bg-white text-slate-900 shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>Módulos Clicáveis ({clickableCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('stats')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+              filter === 'stats'
+                ? 'bg-white text-slate-900 shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>Estatísticas ({nonClickableCount})</span>
+          </button>
+        </div>
 
-            {/* Card Title */}
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight">
-              {card.title}
-            </h3>
+        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-medium">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#f75142]" />
+          <span>Cards com botão navegam; cards sem botão são indicadores fixos</span>
+        </div>
+      </div>
 
-            {/* Card Value */}
-            <p className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              {card.value}
-            </p>
-
-            {/* Exploration hint */}
-            <span className="mt-3 text-[10px] uppercase font-bold tracking-wider text-white/80 group-hover:text-white transition-colors flex items-center gap-1">
-              <span>Aceder ao Módulo →</span>
-            </span>
-          </div>
+      {/* Refactored Cards Grid replicating the exact two styles from user reference */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto items-start">
+        {filteredCards.map((card) => (
+          <StatCardItem
+            key={card.id}
+            card={card}
+            onSelect={handleCardClick}
+          />
         ))}
       </div>
     </section>

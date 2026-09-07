@@ -8,6 +8,8 @@ export interface SessionCard {
   description?: string;
   details?: string[];
   actionText?: string;
+  isClickable?: boolean;
+  targetView?: string;
 }
 
 export interface SessionSettings {

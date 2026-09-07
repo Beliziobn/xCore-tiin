@@ -3,6 +3,7 @@ import { Search, ArrowLeft, GraduationCap, Phone, User, CheckCircle2, AlertCircl
 import { StudentProfile } from '../../data/teacherData';
 import { StudentRegistrationModal } from '../modals/StudentRegistrationModal';
 import type { StudentRegistrationData } from '../../types';
+import { StatCardItem } from '../StatCardItem';
 
 interface TeacherClassPageProps {
   onBackToStats: () => void;
@@ -67,61 +68,71 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         </div>
       </div>
 
-      {/* Row of 5 Blue Cards with Cyan Badges matching 16.png */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 mb-14">
-        {/* 1. Nº Turma */}
-        <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Nº Turma
-          </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
-            <span className="text-3xl sm:text-4xl font-black">1</span>
-          </div>
-        </div>
-
-        {/* 2. Periodo */}
-        <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Periodo
-          </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
-            <span className="text-xl sm:text-2xl font-black">Manhã</span>
-          </div>
-        </div>
-
-        {/* 3. Classe */}
-        <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Classe
-          </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
-            <span className="text-3xl sm:text-4xl font-black">4ª</span>
-          </div>
-        </div>
-
-        {/* 4. Sala */}
-        <div className="flex flex-col items-start group">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Sala
-          </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-3 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
-            <span className="text-lg sm:text-xl font-black text-center">Sala 04</span>
-          </div>
-        </div>
-
-        {/* 5. Nº Alunos */}
-        <div className="flex flex-col items-start group col-span-2 sm:col-span-1">
-          <span className="inline-block bg-[#4f67ff] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Nº Alunos
-          </span>
-          <div className="w-full bg-[#5067fc] text-white rounded-[22px] h-28 sm:h-32 flex items-center justify-center p-4 shadow-[0_8px_24px_rgba(80,103,252,0.25)] group-hover:scale-[1.02] transition-transform">
-            <span className="text-3xl sm:text-4xl font-black">{students.length || 46}</span>
-          </div>
-        </div>
+      {/* Row of Metric Cards featuring clickable and non-clickable design logic */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-14 items-start">
+        <StatCardItem
+          id="tc-card-turma"
+          size="sm"
+          card={{
+            id: 'turma',
+            title: 'Nº Turma',
+            value: '1',
+            isClickable: false,
+            subtitle: 'Turma Regular',
+          }}
+        />
+        <StatCardItem
+          id="tc-card-periodo"
+          size="sm"
+          card={{
+            id: 'periodo',
+            title: 'Periodo',
+            value: 'Manhã',
+            isClickable: false,
+            subtitle: 'Turno Matutino',
+          }}
+        />
+        <StatCardItem
+          id="tc-card-classe"
+          size="sm"
+          card={{
+            id: 'classe',
+            title: 'Classe',
+            value: '4ª',
+            isClickable: false,
+            subtitle: 'Ensino Primário',
+          }}
+        />
+        <StatCardItem
+          id="tc-card-sala"
+          size="sm"
+          card={{
+            id: 'sala',
+            title: 'Sala',
+            value: '04',
+            isClickable: false,
+            subtitle: 'Pavilhão A',
+          }}
+        />
+        <StatCardItem
+          id="tc-card-alunos"
+          size="sm"
+          card={{
+            id: 'alunos',
+            title: 'Nº Alunos',
+            value: String(students.length || 46),
+            isClickable: true,
+            actionText: 'Ver mais',
+            subtitle: 'Pauta matriculada',
+          }}
+          onSelect={() => {
+            document.getElementById('students-roster-section')?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
       </div>
 
       {/* Roster / Students Section */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
+      <div id="students-roster-section" className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 pb-5 border-b border-slate-100">
           <div>
             <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">

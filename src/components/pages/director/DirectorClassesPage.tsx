@@ -4,6 +4,7 @@ import { Hero } from '../../Hero';
 import { directorClassesData as initialClasses } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorClass } from '../../../types';
+import { StatCardItem } from '../../StatCardItem';
 
 interface DirectorClassesPageProps {
   onOpenGetStarted: () => void;
@@ -160,97 +161,71 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
           ))}
         </div>
 
-        {/* 5 Cards with Cyan Badges matching 20.png */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
-          {/* Card 1: [Nome] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nome
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Matriz Curricular</span>
-                <h4 className="text-2xl sm:text-3xl font-black mt-2">{currentClass?.name || '4ª Classe'}</h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>Plano Pedagógico Vigente</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: [Periodo] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Periodo
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Turno Oferecido</span>
-                <h4 className="text-xl sm:text-2xl font-black mt-2 leading-tight">
-                  {currentClass?.period || 'Manhã e Tarde'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-[11px] text-white/90">
-                <span>2 Turmas simultâneas ativas</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: [Sala] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Sala
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Sala de Aula</span>
-                <h4 className="text-2xl sm:text-3xl font-black mt-2">{currentClass?.room || 'Sala 03'}</h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>Pavilhão 1 - Bloco B</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: [Nº Alunos] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº Alunos
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Total de Alunos</span>
-                <h4 className="text-3xl sm:text-4xl font-black mt-2">
-                  {currentClass?.studentCount || 54}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>Taxa de ocupação: 96%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 5: [Nome dos Professores] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nome dos Professores
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Corpo Docente</span>
-                <h4 className="text-sm sm:text-base font-bold mt-2 leading-snug">
-                  {currentClass?.teachers.join(', ') || 'Prof. Santar Goes, Prof. Paulo André'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-[11px] text-white/90">
-                <span>Acompanhamento Pedagógico Ativo</span>
-              </div>
-            </div>
-          </div>
+        {/* Metric Cards featuring clickable and non-clickable design logic */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-8 items-start">
+          <StatCardItem
+            id="dc-card-nome"
+            size="sm"
+            card={{
+              id: 'nome',
+              title: currentClass?.name || '4ª Classe',
+              value: '1',
+              isClickable: false,
+              subtitle: 'Matriz Curricular',
+            }}
+          />
+          <StatCardItem
+            id="dc-card-periodo"
+            size="sm"
+            card={{
+              id: 'periodo',
+              title: 'Periodo',
+              value: currentClass?.period?.split(' ')[0] || 'Manhã',
+              isClickable: false,
+              subtitle: currentClass?.period || 'Manhã e Tarde',
+            }}
+          />
+          <StatCardItem
+            id="dc-card-sala"
+            size="sm"
+            card={{
+              id: 'sala',
+              title: currentClass?.room || 'Sala 03',
+              value: '3',
+              isClickable: false,
+              subtitle: 'Pavilhão 1 - Bloco B',
+            }}
+          />
+          <StatCardItem
+            id="dc-card-alunos"
+            size="sm"
+            card={{
+              id: 'alunos',
+              title: 'Nº Alunos',
+              value: String(currentClass?.studentCount || 54),
+              isClickable: true,
+              actionText: 'Ver mais',
+              subtitle: 'Taxa ocupação 96%',
+            }}
+            onSelect={() => {
+              document.getElementById('class-syllabus-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+          <StatCardItem
+            id="dc-card-professores"
+            size="sm"
+            card={{
+              id: 'professores',
+              title: 'Professores',
+              value: String(currentClass?.teachers.length || 2),
+              isClickable: false,
+              subtitle: currentClass?.teachers[0] || 'Corpo Docente',
+            }}
+          />
         </div>
 
         {/* Detailed Class Syllabus & Assessment Overview */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
+        <div id="class-syllabus-section" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
               <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#5067fc]">

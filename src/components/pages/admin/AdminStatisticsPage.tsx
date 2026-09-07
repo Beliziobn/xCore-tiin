@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Home, User, Users, Filter, BarChart3, TrendingUp, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Filter, BarChart3, TrendingUp, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminSchool, AdminTeacher, AdminStudent } from '../../../types';
 import { 
@@ -7,6 +7,7 @@ import {
   historicalSchoolPerformance, 
   historicalAttendanceTrends 
 } from '../../../data/adminData';
+import { StatCardItem } from '../../StatCardItem';
 
 interface AdminStatisticsPageProps {
   onOpenGetStarted: () => void;
@@ -98,67 +99,54 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
           </div>
         </div>
 
-        {/* Top 3 Metric Cards matching 9.png: Escolas (31), Professores (459), Alunos (5789) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-4xl mx-auto mb-14">
-          {/* Card 1: Escolas */}
-          <div
-            id="admin-stat-card-escolas"
-            onClick={onNavigateToSchools}
-            className="relative bg-[#5067fc] hover:bg-[#435bf7] text-white rounded-2xl pt-10 pb-8 px-6 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all duration-300 cursor-pointer hover:-translate-y-1 group"
-          >
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white group-hover:scale-110 transition-transform">
-              <Home className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />
-            </div>
-            <h4 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1">
-              Escolas
-            </h4>
-            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              {stats.totalSchools}
-            </div>
-            <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-              Ver Minhas Escolas &rarr;
-            </span>
-          </div>
-
-          {/* Card 2: Professores */}
-          <div
-            id="admin-stat-card-professores"
-            onClick={onNavigateToTeachers}
-            className="relative bg-[#5067fc] hover:bg-[#435bf7] text-white rounded-2xl pt-10 pb-8 px-6 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all duration-300 cursor-pointer hover:-translate-y-1 group"
-          >
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white group-hover:scale-110 transition-transform">
-              <User className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />
-            </div>
-            <h4 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1">
-              Professores
-            </h4>
-            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              {stats.totalTeachers}
-            </div>
-            <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-              Ver Quadro Docente &rarr;
-            </span>
-          </div>
-
-          {/* Card 3: Alunos */}
-          <div
+        {/* Metric Cards featuring clickable and non-clickable design logic */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-5xl mx-auto mb-14 items-start">
+          <StatCardItem
             id="admin-stat-card-alunos"
-            onClick={onNavigateToStudents}
-            className="relative bg-[#5067fc] hover:bg-[#435bf7] text-white rounded-2xl pt-10 pb-8 px-6 text-center shadow-[0_12px_32px_rgba(80,103,252,0.25)] hover:shadow-[0_16px_40px_rgba(80,103,252,0.35)] transition-all duration-300 cursor-pointer hover:-translate-y-1 group"
-          >
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white group-hover:scale-110 transition-transform">
-              <Users className="w-6 h-6 text-[#5067fc]" strokeWidth={2.2} />
-            </div>
-            <h4 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1">
-              Alunos
-            </h4>
-            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              {stats.totalStudents}
-            </div>
-            <span className="inline-block mt-3 text-[10px] uppercase font-bold tracking-[0.2em] text-white/80 group-hover:text-white underline decoration-white/40">
-              Ver Base de Alunos &rarr;
-            </span>
-          </div>
+            card={{
+              id: 'alunos',
+              title: 'Nº Alunos',
+              value: String(stats.totalStudents),
+              icon: 'users',
+              isClickable: true,
+              actionText: 'Ver mais',
+            }}
+            onSelect={onNavigateToStudents}
+          />
+          <StatCardItem
+            id="admin-stat-card-turmas"
+            card={{
+              id: 'turmas',
+              title: 'Nº Turmas',
+              value: '148',
+              icon: 'home',
+              isClickable: false,
+            }}
+          />
+          <StatCardItem
+            id="admin-stat-card-escolas"
+            card={{
+              id: 'escolas',
+              title: 'Escolas',
+              value: String(stats.totalSchools),
+              icon: 'home',
+              isClickable: true,
+              actionText: 'Ver mais',
+            }}
+            onSelect={onNavigateToSchools}
+          />
+          <StatCardItem
+            id="admin-stat-card-professores"
+            card={{
+              id: 'professores',
+              title: 'Professores',
+              value: String(stats.totalTeachers),
+              icon: 'user',
+              isClickable: true,
+              actionText: 'Ver mais',
+            }}
+            onSelect={onNavigateToTeachers}
+          />
         </div>
 
         {/* Dynamic Analytics Grid with Cyan Badges matching 9.png */}

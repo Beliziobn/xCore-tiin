@@ -29,8 +29,8 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({ card, onClose,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white text-slate-900 rounded-3xl max-w-lg w-full shadow-[0_20px_60px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden relative">
-        {/* Header with vibrant blue */}
-        <div className="bg-[#5067fc] p-6 relative text-white">
+        {/* Header with #f75142 */}
+        <div className="bg-[#f75142] p-6 relative text-white">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
@@ -70,13 +70,13 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({ card, onClose,
           {card.details && card.details.length > 0 && (
             <div>
               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-[#5067fc]" />
+                <Sparkles className="w-3 h-3 text-[#f75142]" />
                 Registros e Discriminação Detalhada
               </h4>
               <ul className="space-y-2.5">
                 {card.details.map((item, idx) => (
                   <li key={idx} className="text-xs text-slate-700 flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-[#5067fc] shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-[#f75142] shrink-0 mt-0.5" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -90,7 +90,7 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({ card, onClose,
             </span>
             <button
               onClick={onClose}
-              className="bg-[#5067fc] hover:bg-[#4359eb] text-white text-xs font-bold px-6 py-2.5 rounded-full transition-all cursor-pointer shadow-sm"
+              className="bg-[#f75142] hover:bg-[#e04436] text-[#002133] text-xs font-black px-6 py-2.5 rounded-full transition-all cursor-pointer shadow-sm"
             >
               {card.actionText || 'Entendido'}
             </button>

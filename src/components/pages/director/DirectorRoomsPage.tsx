@@ -4,6 +4,7 @@ import { Hero } from '../../Hero';
 import { directorRoomsData as initialRooms } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorRoom } from '../../../types';
+import { StatCardItem } from '../../StatCardItem';
 
 interface DirectorRoomsPageProps {
   onOpenGetStarted: () => void;
@@ -179,99 +180,71 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
           ))}
         </div>
 
-        {/* Main 5 Cards Grid with Cyan Badges matching 15.png */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
-          {/* Card 1: [Nº Salas] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº Salas
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Espaço Físico</span>
-                <h4 className="text-3xl sm:text-4xl font-black mt-2">{currentRoom?.roomNumber || 'Sala 03'}</h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>Total de {rooms.length} Salas Ativas na Escola</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: [Nº Turmas] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº Turmas
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Turmas na Sala</span>
-                <h4 className="text-3xl sm:text-4xl font-black mt-2">
-                  {currentRoom?.turmasCount || 2} Turmas
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>16 Turmas distribuídas no total</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: [Periodo] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Periodo
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Funcionamento</span>
-                <h4 className="text-xl sm:text-2xl font-black mt-2 leading-tight">
-                  {currentRoom?.period || 'Manhã / Tarde'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-[11px] text-white/90">
-                <span>07h30 às 12h00 e 12h30 às 17h30</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: [Classes] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Classes
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Níveis Atendidos</span>
-                <h4 className="text-xl sm:text-2xl font-black mt-2">
-                  {currentRoom?.classes.join(', ') || '4ª Classe'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>Capacidade: {currentRoom?.capacity || 46} alunos</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 5: [Nome dos Professores] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nome dos Professores
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Corpo Docente Alocado</span>
-                <h4 className="text-sm sm:text-base font-bold mt-2 leading-snug">
-                  {currentRoom?.teachers.join(', ') || 'Prof. Santar Goes'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-[11px] text-white/90">
-                <span>Supervisão do Diretor Fert Horlan</span>
-              </div>
-            </div>
-          </div>
+        {/* Metric Cards featuring clickable and non-clickable design logic */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-8 items-start">
+          <StatCardItem
+            id="dr-card-salas"
+            size="sm"
+            card={{
+              id: 'salas',
+              title: currentRoom?.roomNumber || 'Sala 03',
+              value: String(rooms.length),
+              isClickable: false,
+              subtitle: 'Total de Salas Ativas',
+            }}
+          />
+          <StatCardItem
+            id="dr-card-turmas"
+            size="sm"
+            card={{
+              id: 'turmas',
+              title: 'Nº Turmas',
+              value: String(currentRoom?.turmasCount || 2),
+              isClickable: false,
+              subtitle: '16 Turmas distribuídas',
+            }}
+          />
+          <StatCardItem
+            id="dr-card-capacidade"
+            size="sm"
+            card={{
+              id: 'capacidade',
+              title: 'Capacidade',
+              value: String(currentRoom?.capacity || 46),
+              isClickable: true,
+              actionText: 'Ver mais',
+              subtitle: 'Lotação máxima sala',
+            }}
+            onSelect={() => {
+              document.getElementById('room-specs-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+          <StatCardItem
+            id="dr-card-periodo"
+            size="sm"
+            card={{
+              id: 'periodo',
+              title: 'Periodo',
+              value: currentRoom?.period?.split(' ')[0] || 'Manhã',
+              isClickable: false,
+              subtitle: currentRoom?.period || 'Manhã / Tarde',
+            }}
+          />
+          <StatCardItem
+            id="dr-card-professores"
+            size="sm"
+            card={{
+              id: 'professores',
+              title: 'Professores',
+              value: String(currentRoom?.teachers.length || 1),
+              isClickable: false,
+              subtitle: currentRoom?.teachers[0] || 'Corpo Docente',
+            }}
+          />
         </div>
 
         {/* Detailed Room Specifications Panel */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
+        <div id="room-specs-section" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
               <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#5067fc]">
