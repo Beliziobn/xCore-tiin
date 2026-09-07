@@ -68,55 +68,81 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Row of 5 attribute cards matching 18.png */}
-        <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-5 gap-3.5 sm:gap-4">
-          {/* 1. Nº Turma */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Nº Turma
+        {/* Right Column: Informações organizadas de forma limpa, direta e legível sem cards pesados */}
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+          <div className="pb-3 mb-5 border-b border-slate-100 flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+              Informações Gerais do Docente
             </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-2xl sm:text-3xl font-black">{teacher.turma}</span>
-            </div>
+            <span className="text-[11px] font-bold text-[#f75142] bg-[#fef2f1] px-3 py-0.5 rounded-full border border-[#fee4e2]">
+              Ano Letivo Atual
+            </span>
           </div>
 
-          {/* 2. Periodo */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Periodo
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-base sm:text-lg font-black">{teacher.periodo}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+            {/* 1. Nº Turma */}
+            <div className="flex flex-col justify-center sm:pr-4">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Nº Turma
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {teacher.turma}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Turma Atribuída
+              </span>
             </div>
-          </div>
 
-          {/* 3. Classe */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Classe
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-2xl sm:text-3xl font-black">{teacher.classe}</span>
+            {/* 2. Periodo */}
+            <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Período
+              </span>
+              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {teacher.periodo}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Turno Regular
+              </span>
             </div>
-          </div>
 
-          {/* 4. Sala */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Sala
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-sm sm:text-base font-black text-center">{teacher.sala}</span>
+            {/* 3. Classe */}
+            <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Classe
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {teacher.classe}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Ensino Primário
+              </span>
             </div>
-          </div>
 
-          {/* 5. Telefone */}
-          <div className="flex flex-col items-start group col-span-2 sm:col-span-1">
-            <span className="inline-block bg-[#e04436] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Telefone
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-xs sm:text-sm font-mono font-bold text-center">{teacher.telefone}</span>
+            {/* 4. Sala */}
+            <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Sala
+              </span>
+              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {teacher.sala}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Bloco de Aulas
+              </span>
+            </div>
+
+            {/* 5. Telefone */}
+            <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:pl-4 col-span-2 sm:col-span-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Telefone
+              </span>
+              <span className="text-sm sm:text-base font-bold text-slate-900 font-mono tracking-tight">
+                {teacher.telefone}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Contacto Direto
+              </span>
             </div>
           </div>
         </div>

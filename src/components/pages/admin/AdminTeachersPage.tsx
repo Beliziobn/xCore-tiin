@@ -133,86 +133,104 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
         </div>
 
         {activeTeacher && (
-          <div className="space-y-6 mb-10">
-            {/* Top Row: 7 Blue Cards with Cyan Badges matching 12.png */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-              {/* Card 1: [Nome] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nome
-                </span>
-                <span className="text-xs sm:text-sm font-bold my-auto leading-snug px-1">
-                  {activeTeacher.name}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium truncate w-full px-1">
-                  {activeTeacher.subject}
-                </span>
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs mb-10">
+            {/* Header: Teacher Identity & School */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center shrink-0 shadow-2xs font-bold">
+                  <UserIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-slate-900 leading-tight">
+                      {activeTeacher.name}
+                    </h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Docente Efetivo
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-slate-700">{activeTeacher.subject}</span>
+                    <span>•</span>
+                    <span>{activeTeacher.schoolName}</span>
+                  </p>
+                </div>
               </div>
 
-              {/* Card 2: [Telefone] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Telefone
-                </span>
-                <span className="text-xs sm:text-sm font-bold my-auto leading-tight px-1 font-mono">
-                  {activeTeacher.phone}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Linha Direta</span>
-              </div>
-
-              {/* Card 3: [Classe] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Classe
-                </span>
-                <span className="text-base sm:text-lg font-black my-auto">
-                  {activeTeacher.gradeClass}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Nível Letivo</span>
-              </div>
-
-              {/* Card 4: [Sala] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Sala
-                </span>
-                <span className="text-base sm:text-lg font-black my-auto">
-                  {activeTeacher.room}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Espaço Físico</span>
-              </div>
-
-              {/* Card 5: [Turma] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Turma
-                </span>
-                <span className="text-base sm:text-lg font-black my-auto">
-                  {activeTeacher.turma}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Grupo Atribuído</span>
-              </div>
-
-              {/* Card 6: [Categoria] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Categoria
-                </span>
-                <span className="text-[11px] sm:text-xs font-bold my-auto leading-snug px-1">
-                  {activeTeacher.category}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Estatuto Carreira</span>
-              </div>
-
-              {/* Card 7: [Localização] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Localização
-                </span>
-                <span className="text-[11px] sm:text-xs font-semibold my-auto leading-tight px-1">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80 flex items-center gap-1.5 font-medium">
+                  <School className="w-3.5 h-3.5 text-[#f75142]" />
                   {activeTeacher.location}
                 </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">{activeTeacher.schoolName.split(' ')[0]}</span>
+              </div>
+            </div>
+
+            {/* Organized Content Layout for Optimal Reading - No cramped card boxes */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-5 gap-x-6 pt-5">
+              {/* 1. Disciplina / Especialidade */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Disciplina
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeTeacher.subject}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Área Pedagógica</span>
+              </div>
+
+              {/* 2. Telefone */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Contacto Direto
+                </span>
+                <span className="text-sm font-bold text-slate-900 font-mono leading-snug">
+                  {activeTeacher.phone}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Telefone Cadastrado</span>
+              </div>
+
+              {/* 3. Classe */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Classe Letiva
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeTeacher.gradeClass}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Nível de Ensino</span>
+              </div>
+
+              {/* 4. Sala & Espaço */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Sala
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeTeacher.room}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Espaço Físico</span>
+              </div>
+
+              {/* 5. Turma */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Turma Atribuída
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeTeacher.turma}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Grupo Letivo</span>
+              </div>
+
+              {/* 6. Categoria */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Categoria Funcional
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeTeacher.category}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Estatuto de Carreira</span>
               </div>
             </div>
           </div>

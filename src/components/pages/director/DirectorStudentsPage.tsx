@@ -375,62 +375,119 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
           </div>
         </div>
 
-        {/* Second Row: StatCardItem cards featuring clickable and non-clickable design logic */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-          <StatCardItem
-            id="ds-card-docs"
-            size="md"
-            card={{
-              id: 'docs',
-              title: 'Nº alunos com Documentos',
-              value: '432',
-              isClickable: true,
-              actionText: 'Ver mais',
-              subtitle: '90.4% Regularizados na rede',
-            }}
-            onSelect={() => {
-              setDocFilter('with-docs');
-              document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          />
-          <StatCardItem
-            id="ds-card-nodocs"
-            size="md"
-            card={{
-              id: 'nodocs',
-              title: 'Nº alunos sem Documentos',
-              value: '46',
-              isClickable: true,
-              actionText: 'Ver mais',
-              subtitle: '9.6% Pendentes de registo',
-            }}
-            onSelect={() => {
-              setDocFilter('without-docs');
-              document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          />
-          <StatCardItem
-            id="ds-card-desempenho"
-            size="md"
-            card={{
-              id: 'desempenho',
-              title: 'Desempenho Geral',
-              value: String(currentStudent?.performanceScore || '8.9'),
-              isClickable: false,
-              subtitle: 'Média escolar / 10',
-            }}
-          />
-          <StatCardItem
-            id="ds-card-presenca"
-            size="md"
-            card={{
-              id: 'presenca',
-              title: 'Presença dos alunos',
-              value: `${currentStudent?.presenceRate || 96}%`,
-              isClickable: false,
-              subtitle: 'Assiduidade geral coletiva',
-            }}
-          />
+        {/* Second Row: Métricas e Indicadores da Unidade - Layout Limpo e Organizado */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Métricas Consolidadas da Turma & Regularização
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                Situação documental, aproveitamento médio e frequência escolar dos discentes
+              </p>
+            </div>
+            <span className="text-[10px] font-semibold bg-slate-50 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200/70">
+              Ano Letivo 2024 / 2025
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
+            {/* 1. Alunos com Documentos */}
+            <div
+              className="flex flex-col justify-between cursor-pointer group"
+              onClick={() => {
+                setDocFilter('with-docs');
+                document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block group-hover:text-[#f75142] transition-colors">
+                  Alunos com Documentos
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight group-hover:text-[#f75142] transition-colors">
+                    432
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">90.4% da rede</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Regularizados com certidão ou B.I.</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Documentação Homologada
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Alunos sem Documentos */}
+            <div
+              className="flex flex-col justify-between cursor-pointer group"
+              onClick={() => {
+                setDocFilter('without-docs');
+                document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block group-hover:text-[#f75142] transition-colors">
+                  Alunos sem Documentos
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight group-hover:text-[#f75142] transition-colors">
+                    46
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">9.6% pendentes</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Pendentes de certidão ou registo civil</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  Processo em Apoio
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Desempenho Geral */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                  Desempenho Geral
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {String(currentStudent?.performanceScore || '8.9')}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">/ 10 valores</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Aproveitamento médio curricular</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Bom Rendimento
+                </span>
+              </div>
+            </div>
+
+            {/* 4. Presença dos Alunos */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                  Presença dos Alunos
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {currentStudent?.presenceRate || 96}%
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">assiduidade</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Frequência geral nas salas de aula</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Assiduidade Coletiva
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

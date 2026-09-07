@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle2, Clock, Calendar, ChevronDown, ShieldCheck, UserCheck } from 'lucide-react';
+import { Search, Plus, Filter, CheckCircle, CheckCircle2, Clock, Calendar, ChevronDown, ShieldCheck, UserCheck } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
@@ -324,19 +324,61 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
         {/* Second Row: [Presença dos Professores] & [Horário das Aulas] */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Card: [Presença dos Professores] with StatCardItem design logic */}
-          <div className="lg:col-span-4 flex flex-col items-center">
-            <StatCardItem
-              id="dt-card-presenca"
-              size="md"
-              card={{
-                id: 'presenca-professores',
-                title: 'Presença Professores',
-                value: '98.5%',
-                isClickable: false,
-                subtitle: `Assiduidade do Mês • ${currentTeacher?.name.split(' ')[0]}`,
-              }}
-            />
+          {/* Informações de Presença dos Professores - Layout Limpo e Sem Cards Pesados */}
+          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between min-h-[350px]">
+            <div>
+              <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-slate-100">
+                <div className="w-9 h-9 rounded-xl bg-[#fef2f1] text-[#f75142] border border-[#fee4e2] flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                    Presença Docente
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Acompanhamento de assiduidade
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                    Taxa Mensal de Presença
+                  </span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight font-display">
+                      98.5%
+                    </span>
+                    <span className="text-xs text-emerald-600 font-bold">Excelente</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Assiduidade do Mês • {currentTeacher?.name.split(' ')[0]}
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Aulas Previstas:</span>
+                    <span className="font-bold text-slate-800">40 aulas</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Aulas Ministradas:</span>
+                    <span className="font-bold text-emerald-700">39 aulas</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Faltas Justificadas:</span>
+                    <span className="font-bold text-slate-700">1 aula</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 w-full justify-center">
+                Cumprimento do Calendário Escolar
+              </span>
+            </div>
           </div>
 
           {/* Horário das Aulas - Sem card pesado, mantendo a organização para leitura clara */}

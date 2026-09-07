@@ -71,7 +71,13 @@ import type {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'login' | 'register'>('home');
-  const [currentView, setCurrentView] = useState<string>('home');
+  const [currentView, setCurrentView] = useState<string>(() => {
+    try {
+      return localStorage.getItem('ucore_current_view') || 'home';
+    } catch {
+      return 'home';
+    }
+  });
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SessionCard | null>(null);
   const [selectedModule, setSelectedModule] = useState<EducationalModule | null>(null);
@@ -177,11 +183,36 @@ export default function App() {
 
   // Active Role and session configuration state
   const [activeRole, setActiveRole] = useState<'admin' | 'diretor' | 'professor'>(() => {
+    try {
+      const savedRole = localStorage.getItem('ucore_active_role');
+      if (savedRole === 'admin' || savedRole === 'diretor' || savedRole === 'professor') {
+        return savedRole;
+      }
+    } catch {
+      // ignore
+    }
     if (currentUser?.role === 'admin' || currentUser?.role === 'diretor' || currentUser?.role === 'professor') {
       return currentUser.role;
     }
     return 'diretor'; // default to diretor as requested by user
   });
+
+  // Persist currentView and activeRole on changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_current_view', currentView);
+    } catch {
+      // ignore
+    }
+  }, [currentView]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_active_role', activeRole);
+    } catch {
+      // ignore
+    }
+  }, [activeRole]);
 
   // Chat System Dynamic State
   const [isChatOpen, setIsChatOpen] = useState(false);

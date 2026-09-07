@@ -161,8 +161,8 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
           ))}
         </div>
 
-        {/* Metric Cards featuring clickable and non-clickable design logic */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-8 items-start">
+        {/* Metric Cards featuring harmonious equal-height cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-8 items-stretch">
           <StatCardItem
             id="dc-card-nome"
             size="sm"

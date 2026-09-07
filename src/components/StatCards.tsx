@@ -23,7 +23,6 @@ export const StatCards: React.FC<StatCardsProps> = ({
   const [filter, setFilter] = useState<'all' | 'clickable' | 'stats'>('all');
 
   const handleCardClick = (card: SessionCard) => {
-    if (card.isClickable === false) return;
     onSelectCard(card);
   };
 
@@ -187,13 +186,13 @@ export const StatCards: React.FC<StatCardsProps> = ({
         </div>
 
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#f75142]" />
-          <span>Cards com botão navegam; cards sem botão são indicadores fixos</span>
+          <span className="inline-block w-2 h-2 rounded-full bg-[#f75142]" />
+          <span>Cards interativos navegam para páginas; indicadores fixos abrem detalhes</span>
         </div>
       </div>
 
-      {/* Refactored Cards Grid replicating the exact two styles from user reference */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto items-start">
+      {/* Harmonized Cards Grid with equal heights and uniform composition */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto items-stretch">
         {filteredCards.map((card) => (
           <StatCardItem
             key={card.id}

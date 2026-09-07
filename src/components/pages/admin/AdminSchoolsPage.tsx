@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Sparkles } from 'lucide-react';
+import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Sparkles, Layers, FileCheck, ArrowUpRight, BarChart3 } from 'lucide-react';
 import heroImg from '../../../assets/images/hero_teacher_students_1788685346634.jpg';
 import { QuessuaMunicipalitiesMap } from './QuessuaMunicipalitiesMap';
 import {
@@ -276,9 +276,9 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             />
           </div>
 
-          {/* Right Column (Toque no mapa + Nome, Nº Escolas, Nº Directores cards) */}
+          {/* Right Column: Informações diretas sem cards, mantendo organização e máxima legibilidade */}
           <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
-            {/* Title & Prompt text */}
+            {/* 1. Título & Orientação */}
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fef2f1] border border-[#fee4e2] text-xs font-bold text-[#f75142] mb-2.5">
                 <MapPin className="w-3.5 h-3.5" />
@@ -292,12 +292,12 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
               </p>
             </div>
 
-            {/* If user has drilled down to an individual school, provide a reset pill */}
+            {/* Reset button if individual school selected */}
             {activeSchool && (
-              <div className="flex items-center gap-2">
+              <div>
                 <button
                   onClick={() => setSelectedSchoolId(null)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all cursor-pointer shadow-xs"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
                   Voltar à Zona de {selectedMunicipality}
@@ -305,54 +305,45 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
               </div>
             )}
 
-            {/* Cards Grid matching layout: Row with [Nome] and [Nº Escolas], and wide [Nº Directores] */}
-            <div className="space-y-4">
-              {/* Row: Nome & Nº Escolas */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                {/* Card: Nome */}
-                <div className="sm:col-span-5 flex flex-col">
-                  <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
-                    Nome
-                  </span>
-                  <div className="bg-gradient-to-br from-[#f75142] to-[#e04436] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-[#f75142]/20 border border-white/15">
-                    <span className="text-base sm:text-lg font-black leading-tight line-clamp-2 px-1">
-                      {displayValues.name}
-                    </span>
-                    <span className="text-[11px] text-[#fee4e2] font-semibold mt-1">
-                      {displayValues.subtitle}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card: Nº Escolas */}
-                <div className="sm:col-span-7 flex flex-col">
-                  <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
-                    Nº Escolas
-                  </span>
-                  <div className="bg-gradient-to-br from-[#f75142] to-[#e04436] text-white rounded-2xl p-5 min-h-[115px] flex flex-col items-center justify-center text-center shadow-md shadow-[#f75142]/20 border border-white/15">
-                    <span className="text-3xl sm:text-4xl font-black font-display">
-                      {displayValues.schoolsCount}
-                    </span>
-                    <span className="text-[11px] text-[#fee4e2] font-semibold mt-1">
-                      Unidades de Ensino Ativas
-                    </span>
-                  </div>
-                </div>
+            {/* Informações: Sem card, apenas os dados organizados */}
+            <div className="border-t border-slate-200/80 pt-4 space-y-5">
+              {/* Nome */}
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                  Nome da Instituição / Território
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight block">
+                  {displayValues.name}
+                </span>
+                <span className="text-xs text-slate-500 font-medium block mt-1">
+                  {displayValues.subtitle} • {displayValues.location}
+                </span>
               </div>
 
-              {/* Wide Card: Nº Directores */}
-              <div className="flex flex-col">
-                <span className="text-sm font-black text-slate-900 tracking-tight mb-2 text-center sm:text-left">
-                  Nº Directores
-                </span>
-                <div className="bg-gradient-to-br from-[#f75142] to-[#e04436] text-white rounded-2xl p-5 min-h-[105px] flex flex-col items-center justify-center text-center shadow-md shadow-[#f75142]/20 border border-white/15">
-                  <div className="flex items-center gap-2.5">
-                    <UserCheck className="w-6 h-6 text-amber-300 shrink-0" />
-                    <span className="text-3xl sm:text-4xl font-black font-display">
-                      {displayValues.directorsCount}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-[#fee4e2] font-semibold mt-1">
+              {/* Métricas: Nº Escolas e Nº Directores */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-slate-200/80">
+                {/* Nº Escolas */}
+                <div>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                    Nº Escolas
+                  </span>
+                  <span className="text-4xl sm:text-5xl font-black text-slate-900 font-display block leading-none">
+                    {displayValues.schoolsCount}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-1.5 font-medium block">
+                    Unidades de Ensino Ativas
+                  </span>
+                </div>
+
+                {/* Nº Directores */}
+                <div>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                    Nº Directores
+                  </span>
+                  <span className="text-4xl sm:text-5xl font-black text-slate-900 font-display block leading-none">
+                    {displayValues.directorsCount}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-1.5 font-medium block">
                     {activeSchool ? 'Director(a) Titular da Instituição' : 'Directores Homologados em Exercício'}
                   </span>
                 </div>
@@ -361,116 +352,186 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
         </div>
 
-        {/* 4. First Metrics Row using StatCardItem logic */}
-        <div className="mb-10">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 items-start">
-            <StatCardItem
-              id="as-card-classes"
-              size="sm"
-              card={{
-                id: 'classes',
-                title: 'Nº Classes',
-                value: String(displayValues.classesCount),
-                isClickable: false,
-                subtitle: 'Níveis de Ensino',
-              }}
-            />
-            <StatCardItem
-              id="as-card-professores"
-              size="sm"
-              card={{
-                id: 'professores',
-                title: 'Nº Professores',
-                value: String(displayValues.teachersCount),
-                isClickable: true,
-                actionText: 'Ver mais',
-                subtitle: 'Corpo Docente Ativo',
-              }}
-              onSelect={() => {
+        {/* 4. Indicadores Estruturais e Pedagógicos da Rede - Sem caixa de card, integrado e legível */}
+        <div className="mb-10 pb-8 border-b border-slate-200/80">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-4 border-b border-slate-200/80">
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Indicadores de Infraestrutura & Capacidade da Rede
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Métricas consolidadas de salas, turmas e quadro docente em {displayValues.name}
+              </p>
+            </div>
+            <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200/70">
+              Dados em Tempo Real
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-5 gap-x-6 pt-1">
+            {/* 1. Classes */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Classes Letivas
+              </span>
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {displayValues.classesCount}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">Níveis de Ensino</span>
+            </div>
+
+            {/* 2. Professores */}
+            <div
+              className="flex flex-col cursor-pointer group"
+              onClick={() => {
                 setCategoryFilter('professores');
                 document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
               }}
-            />
-            <StatCardItem
-              id="as-card-salas"
-              size="sm"
-              card={{
-                id: 'salas',
-                title: 'Nº Salas',
-                value: String(displayValues.roomsCount),
-                isClickable: false,
-                subtitle: 'Espaços Pedagógicos',
-              }}
-            />
-            <StatCardItem
-              id="as-card-turmas"
-              size="sm"
-              card={{
-                id: 'turmas',
-                title: 'Nº Turmas',
-                value: String(displayValues.turmasCount),
-                isClickable: false,
-                subtitle: 'Turmas Formadas',
-              }}
-            />
-            <StatCardItem
-              id="as-card-localizacao"
-              size="sm"
-              card={{
-                id: 'localizacao',
-                title: displayValues.location.split(',')[0] || 'Quêssua',
-                value: '1',
-                isClickable: false,
-                subtitle: 'Região Municipal',
-              }}
-            />
-            <StatCardItem
-              id="as-card-desempenho"
-              size="sm"
-              card={{
-                id: 'desempenho',
-                title: 'Desempenho',
-                value: String(displayValues.performanceRate),
-                isClickable: false,
-                subtitle: `Taxa de Sucesso Geral`,
-              }}
-            />
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 group-hover:text-[#f75142] transition-colors">
+                  Corpo Docente
+                </span>
+                <ArrowUpRight className="w-3 h-3 text-slate-400 group-hover:text-[#f75142] mb-1 transition-colors" />
+              </div>
+              <span className="text-2xl font-black text-slate-900 tracking-tight group-hover:text-[#f75142] transition-colors">
+                {displayValues.teachersCount}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">Professores em Função</span>
+            </div>
+
+            {/* 3. Salas */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Salas de Aula
+              </span>
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {displayValues.roomsCount}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">Espaços Pedagógicos</span>
+            </div>
+
+            {/* 4. Turmas */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Turmas Formadas
+              </span>
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                {displayValues.turmasCount}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">Grupos Registados</span>
+            </div>
+
+            {/* 5. Localização */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Região
+              </span>
+              <span className="text-lg font-black text-slate-900 truncate tracking-tight" title={displayValues.location}>
+                {displayValues.location.split(',')[0] || 'Quêssua'}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">Área Municipal</span>
+            </div>
+
+            {/* 6. Desempenho */}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Desempenho Geral
+              </span>
+              <span className="text-2xl font-black text-emerald-700 tracking-tight">
+                {displayValues.performanceRate}
+              </span>
+              <span className="text-[11px] text-emerald-600 font-semibold mt-0.5">Aproveitamento Médio</span>
+            </div>
           </div>
         </div>
 
-        {/* 5. Second Metrics Row (Documents Status Cards) featuring clickable and non-clickable design logic */}
-        <div className="mb-14">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto sm:mx-0 items-start">
-            <StatCardItem
-              id="as-card-docs"
-              size="md"
-              card={{
-                id: 'docs',
-                title: 'Nº alunos com Documentos',
-                value: String(displayValues.studentsWithDocs),
-                isClickable: true,
-                actionText: 'Ver mais',
-                subtitle: 'Regularizados com BI e Cédula',
-              }}
-              onSelect={() => {
+        {/* 5. Situação Documental dos Alunos - Sem caixa de card, integrado e legível */}
+        <div className="mb-12 pb-8 border-b border-slate-200/80">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-4 border-b border-slate-200/80">
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Censo Documental & Regularização Discente
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Acompanhamento de registro civil, certidões e cédulas dos alunos na rede
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setCategoryFilter('all');
                 document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
               }}
-            />
-            <StatCardItem
-              id="as-card-nodocs"
-              size="md"
-              card={{
-                id: 'nodocs',
-                title: 'Nº alunos sem Documentos',
-                value: String(displayValues.studentsWithoutDocs),
-                isClickable: true,
-                actionText: 'Ver mais',
-                subtitle: 'Pendentes de Registro Civil',
-              }}
-              onSelect={() => {
-                document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            />
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#f75142] hover:text-[#e04436] bg-[#fef2f1] hover:bg-[#fee4e2] px-3.5 py-1.5 rounded-xl border border-[#fee4e2] transition-colors cursor-pointer"
+            >
+              <span>Ver no Explorador de Escolas</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-1">
+            {/* 1. Alunos com Documentos */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                  Alunos com Documentos
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {displayValues.studentsWithDocs}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">regularizados</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Estudantes com Certidão de Nascimento ou B.I. homologado</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Certidão / B.I. Válido
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Alunos sem Documentos */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                  Alunos sem Documentos
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {displayValues.studentsWithoutDocs}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">pendentes</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Estudantes sem registo civil oficial encaminhados para apoio</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  Pendente de Registro Civil
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Assiduidade / Regularização Geral */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                  Taxa de Frequência Escolar
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {displayValues.attendanceRate}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">assiduidade</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Frequência média dos alunos na unidade territorial</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Presença Coletiva
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 

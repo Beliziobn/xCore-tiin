@@ -176,77 +176,102 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           </div>
         </div>
 
-        {/* Right Column: 6 Badged Cards */}
-        <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4">
-          {/* 1. Nº Turma */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Nº Turma
+        {/* Right Column: Informações organizadas de forma limpa, direta e legível sem cards pesados */}
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+          <div className="pb-3 mb-5 border-b border-slate-100 flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+              Dados de Matrícula & Contactos
             </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-2xl sm:text-3xl font-black">{currentStudent.turma}</span>
-            </div>
+            <span className="text-[11px] font-bold text-[#002133] bg-slate-100 px-3 py-0.5 rounded-full">
+              Ficha Escolar
+            </span>
           </div>
 
-          {/* 2. Periodo */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Periodo
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-base sm:text-lg font-black">{currentStudent.periodo}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+            {/* 1. Nº Turma */}
+            <div className="flex flex-col">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Nº Turma
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {currentStudent.turma}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Turma Atribuída
+              </span>
             </div>
-          </div>
 
-          {/* 3. Classe */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Classe
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-3 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-2xl sm:text-3xl font-black">{currentStudent.classe}</span>
+            {/* 2. Periodo */}
+            <div className="flex flex-col">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Período
+              </span>
+              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {currentStudent.periodo}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Turno Regular
+              </span>
             </div>
-          </div>
 
-          {/* 4. Sala */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Sala
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
-              <span className="text-sm sm:text-base font-black text-center">{currentStudent.sala}</span>
+            {/* 3. Classe */}
+            <div className="flex flex-col">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Classe
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {currentStudent.classe}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Grau de Ensino
+              </span>
             </div>
-          </div>
 
-          {/* 5. Nome do Encarregado */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Nome do Encarregado
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex flex-col items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
+            {/* 4. Sala */}
+            <div className="flex flex-col pt-3 sm:pt-0">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Sala
+              </span>
+              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {currentStudent.sala}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Pavilhão Principal
+              </span>
+            </div>
+
+            {/* 5. Nome do Encarregado */}
+            <div className="flex flex-col pt-3 sm:pt-0">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Encarregado de Educação
+              </span>
               <input
                 type="text"
                 value={encarregado}
                 onChange={(e) => setEncarregado(e.target.value)}
-                className="w-full text-center bg-transparent border-b border-white/40 focus:border-white text-xs sm:text-sm font-black text-white focus:outline-none px-1"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#f75142] transition-colors"
                 placeholder="Nome do encarregado"
               />
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Responsável Legal
+              </span>
             </div>
-          </div>
 
-          {/* 6. Telefone */}
-          <div className="flex flex-col items-start group">
-            <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 shadow-2xs">
-              Telefone
-            </span>
-            <div className="w-full bg-[#f75142] text-white rounded-[20px] h-24 flex flex-col items-center justify-center p-2 shadow-[0_6px_20px_rgba(247,81,66,0.2)] group-hover:scale-[1.02] transition-transform">
+            {/* 6. Telefone */}
+            <div className="flex flex-col pt-3 sm:pt-0 col-span-2 sm:col-span-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                Telefone de Contacto
+              </span>
               <input
                 type="text"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
-                className="w-full text-center bg-transparent border-b border-white/40 focus:border-white text-xs sm:text-sm font-mono font-bold text-white focus:outline-none px-1"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#f75142] transition-colors"
                 placeholder="+244..."
               />
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                Linha de Emergência
+              </span>
             </div>
           </div>
         </div>

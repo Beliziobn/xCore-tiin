@@ -114,59 +114,119 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
           </button>
         </div>
 
-        {/* Selected Director Card Grid */}
+        {/* Selected Director Details - Formatted without heavy cards for optimal readability */}
         {activeDirector && (
-          <div className="mb-10 bg-gradient-to-r from-[#f75142] to-[#e04436] rounded-2xl p-6 sm:p-8 text-white shadow-lg">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-white/20">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center border border-white/30 text-white font-black text-2xl shadow-inner">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs mb-10">
+            {/* Header: Director Identity, Status & School */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center shrink-0 border border-[#fee4e2] font-black text-lg shadow-2xs">
                   {activeDirector.name.charAt(0)}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-xl sm:text-2xl font-black">{activeDirector.name}</h3>
-                    <span className="bg-[#c9372a] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded shadow-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                      {activeDirector.name}
+                    </h3>
+                    <span
+                      className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                        activeDirector.status === 'Ativo'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}
+                    >
                       {activeDirector.status}
                     </span>
                   </div>
-                  <p className="text-xs text-[#fee4e2] flex items-center gap-2">
-                    <School className="w-3.5 h-3.5" />
-                    <span>{activeDirector.schoolName}</span>
+                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                      <School className="w-3.5 h-3.5 text-[#f75142]" />
+                      {activeDirector.schoolName}
+                    </span>
                     <span>•</span>
-                    <span>Desde {activeDirector.appointmentYear}</span>
+                    <span>Mandato desde {activeDirector.appointmentYear}</span>
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-2 rounded-xl border border-white/15">
-                  <Phone className="w-4 h-4 text-[#fee4e2]" />
+              <div className="flex items-center gap-2.5 flex-wrap text-xs text-slate-600">
+                <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80 font-mono">
+                  <Phone className="w-3.5 h-3.5 text-[#f75142]" />
                   <span>{activeDirector.phone}</span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-2 rounded-xl border border-white/15">
-                  <Mail className="w-4 h-4 text-[#fee4e2]" />
+                <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80">
+                  <Mail className="w-3.5 h-3.5 text-[#f75142]" />
                   <span>{activeDirector.email}</span>
                 </div>
               </div>
             </div>
 
-            {/* Quick Director Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6">
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Docentes sob Gestão</span>
-                <div className="text-2xl font-black mt-0.5">{activeDirector.teachersCount} Professores</div>
+            {/* Organized Content Layout for Optimal Reading - Clean Typographical Rows without box cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-5 gap-x-6 pt-5">
+              {/* 1. Docentes sob Gestão */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Docentes sob Gestão
+                </span>
+                <span className="text-base font-bold text-slate-900 leading-snug">
+                  {activeDirector.teachersCount} Professores
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Quadro Docente</span>
               </div>
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Alunos Matriculados</span>
-                <div className="text-2xl font-black mt-0.5">{activeDirector.studentsCount} Alunos</div>
+
+              {/* 2. Alunos Matriculados */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Alunos Matriculados
+                </span>
+                <span className="text-base font-bold text-slate-900 leading-snug">
+                  {activeDirector.studentsCount} Alunos
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">População Discente</span>
               </div>
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Avaliação Institucional</span>
-                <div className="text-2xl font-black mt-0.5">{activeDirector.performanceRating}%</div>
+
+              {/* 3. Avaliação Institucional */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Avaliação Institucional
+                </span>
+                <span className="text-base font-bold text-emerald-700 leading-snug">
+                  {activeDirector.performanceRating}%
+                </span>
+                <span className="text-[11px] text-emerald-600 font-semibold mt-0.5">Desempenho da Gestão</span>
               </div>
-              <div className="bg-white/10 rounded-xl p-3 border border-white/15 text-center">
-                <span className="text-[10px] uppercase font-bold text-[#fee4e2]">Sede da Unidade</span>
-                <div className="text-xs font-semibold mt-1 truncate">{activeDirector.location}</div>
+
+              {/* 4. Linha Telefónica */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Linha Telefónica
+                </span>
+                <span className="text-sm font-bold text-slate-900 font-mono leading-snug">
+                  {activeDirector.phone}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Contacto Direto</span>
+              </div>
+
+              {/* 5. Correio Eletrónico */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Correio Eletrónico
+                </span>
+                <span className="text-sm font-bold text-slate-900 truncate leading-snug" title={activeDirector.email}>
+                  {activeDirector.email}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Email uCore</span>
+              </div>
+
+              {/* 6. Sede / Localização */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Localização da Sede
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeDirector.location}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Província de Malanje</span>
               </div>
             </div>
           </div>

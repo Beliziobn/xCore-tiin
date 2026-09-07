@@ -68,8 +68,8 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         </div>
       </div>
 
-      {/* Row of Metric Cards featuring clickable and non-clickable design logic */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-14 items-start">
+      {/* Row of Harmonious Metric Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-14 items-stretch">
         <StatCardItem
           id="tc-card-turma"
           size="sm"

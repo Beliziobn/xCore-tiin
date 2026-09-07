@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Users as UsersIcon, School, CheckCircle, AlertCircle, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Search, Plus, Users as UsersIcon, UserCheck, School, CheckCircle, AlertCircle, ChevronRight, ShieldCheck } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminStudent, AdminSchool } from '../../../types';
 
@@ -182,152 +182,217 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
         {activeStudent && (
           <div className="space-y-6 mb-10">
-            {/* Top Row: 7 Blue Cards with Cyan Badges matching 14.png */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-              {/* Card 1: [Nome] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nome
-                </span>
-                <span className="text-xs sm:text-sm font-bold my-auto leading-snug px-1">
-                  {activeStudent.name}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">
-                  {activeStudent.gender === 'F' ? 'Feminino 👩' : 'Masculino 👨'}
-                </span>
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs">
+            {/* Header: Student Identity & School */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center shrink-0 shadow-2xs font-bold">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-slate-900 leading-tight">
+                      {activeStudent.name}
+                    </h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Matrícula Regular
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-slate-700">{activeStudent.gradeClass} • {activeStudent.turma}</span>
+                    <span>•</span>
+                    <span>{activeStudent.schoolName}</span>
+                  </p>
+                </div>
               </div>
 
-              {/* Card 2: [Classe] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Classe
-                </span>
-                <span className="text-base sm:text-lg font-black my-auto">
-                  {activeStudent.gradeClass}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Grau de Ensino</span>
-              </div>
-
-              {/* Card 3: [Sala] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Sala
-                </span>
-                <span className="text-base sm:text-lg font-black my-auto">
-                  {activeStudent.room}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Espaço de Aula</span>
-              </div>
-
-              {/* Card 4: [Turma] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Turma
-                </span>
-                <span className="text-base sm:text-lg font-black my-auto">
-                  {activeStudent.turma}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Período Letivo</span>
-              </div>
-
-              {/* Card 5: [Nome dos Encarregados] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Nome dos Encarregados
-                </span>
-                <span className="text-[11px] sm:text-xs font-bold my-auto leading-tight px-1">
-                  {activeStudent.guardianName}
-                </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Família Cadastrada</span>
-              </div>
-
-              {/* Card 6: [Localização] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Localização
-                </span>
-                <span className="text-[11px] sm:text-xs font-semibold my-auto leading-tight px-1">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80 flex items-center gap-1.5 font-medium">
+                  <School className="w-3.5 h-3.5 text-[#f75142]" />
                   {activeStudent.location}
                 </span>
-                <span className="text-[9px] text-[#fee4e2] font-medium">Residência</span>
-              </div>
-
-              {/* Card 7: [Presença] */}
-              <div className="bg-[#f75142] text-white rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] text-center shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
-                <span className="bg-[#e04436] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs">
-                  Presença
+                <span className="bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-200/70 font-bold">
+                  Presença: {activeStudent.presenceRate}%
                 </span>
-                <span className="text-2xl sm:text-3xl font-black my-auto">
-                  {activeStudent.presenceRate}%
-                </span>
-                <span className="text-[9px] text-emerald-200 font-semibold">Assiduidade Individual</span>
               </div>
             </div>
 
-            {/* Bottom Row: 4 Large Blue Cards with Cyan Badges matching 14.png */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-              {/* Bottom Card 1: [Nº alunos com Documentos] */}
-              <div className="bg-[#f75142] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#e04436] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
-                  Nº alunos com Documentos
+            {/* Organized Content Layout for Optimal Reading - No cramped card boxes */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-5 gap-x-6 pt-5">
+              {/* 1. Género */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Género
                 </span>
-                <div className="my-auto py-2">
-                  <span className="text-3xl sm:text-4xl font-black tracking-tight">
-                    {totalWithDocsInScope.toLocaleString()}
-                  </span>
-                  <p className="text-[11px] text-[#fee4e2] mt-1">Regularizados na Rede</p>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeStudent.gender === 'F' ? 'Feminino 👩' : 'Masculino 👨'}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Identificação</span>
+              </div>
+
+              {/* 2. Sala & Espaço */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Sala de Aula
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeStudent.room}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Espaço Físico</span>
+              </div>
+
+              {/* 3. Turma */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Turma
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeStudent.turma}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Período Letivo</span>
+              </div>
+
+              {/* 4. Encarregados */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Encarregado(a)
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeStudent.guardianName}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">{activeStudent.guardianPhone}</span>
+              </div>
+
+              {/* 5. Documentação */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Documentação
+                </span>
+                <span className={`text-sm font-bold leading-snug ${activeStudent.hasDocuments ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  {activeStudent.hasDocuments ? 'Completa (B.I./Cédula)' : 'Pendente de Entrega'}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-0.5">Registo Civil</span>
+              </div>
+
+              {/* 6. Assiduidade */}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Taxa de Presença
+                </span>
+                <span className="text-sm font-bold text-slate-900 leading-snug">
+                  {activeStudent.presenceRate}%
+                </span>
+                <span className="text-[11px] text-emerald-600 font-semibold mt-0.5">Assíduo às Aulas</span>
+              </div>
+            </div>
+          </div>
+
+            {/* Bottom Section: Indicadores da Unidade e Rendimento - Layout limpo e organizado sem cards pesados */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-4 mb-5 border-b border-slate-100">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Métricas de Documentação & Desempenho na Unidade
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Dados consolidados da escola {activeStudent.schoolName}
+                  </p>
                 </div>
-                <span className="text-[9px] text-[#fee4e2] uppercase font-semibold">
-                  Certidão ou B.I. Válido
+                <span className="text-[10px] font-semibold bg-slate-50 text-slate-500 px-2.5 py-1 rounded-lg border border-slate-200/70">
+                  Visão Consolidada
                 </span>
               </div>
 
-              {/* Bottom Card 2: [Nº alunos sem Documentos] */}
-              <div className="bg-[#f75142] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#e04436] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
-                  Nº alunos sem Documentos
-                </span>
-                <div className="my-auto py-2">
-                  <span className="text-3xl sm:text-4xl font-black tracking-tight">
-                    {totalWithoutDocsInScope.toLocaleString()}
-                  </span>
-                  <p className="text-[11px] text-[#fee4e2] mt-1">Pendentes de Registo</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* 1. Alunos com Documentos */}
+                <div className="flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                      Alunos com Documentos
+                    </span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                        {totalWithDocsInScope.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">alunos</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">Regularizados no sistema</p>
+                  </div>
+                  <div className="mt-3">
+                    <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                      Certidão / B.I. Válido
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[9px] text-rose-200 uppercase font-semibold">
-                  Ação Social Prioritária
-                </span>
-              </div>
 
-              {/* Bottom Card 3: [Desempenho do aluno] */}
-              <div className="bg-[#f75142] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#e04436] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
-                  Desempenho do aluno
-                </span>
-                <div className="my-auto py-2">
-                  <span className="text-3xl sm:text-4xl font-black tracking-tight">
-                    {activeStudent.performanceScore.toFixed(1)} <span className="text-xl text-[#fee4e2] font-semibold">/ 10</span>
-                  </span>
-                  <p className="text-[11px] text-[#fee4e2] mt-1">Média Ponderada</p>
+                {/* 2. Alunos sem Documentos */}
+                <div className="flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                      Alunos sem Documentos
+                    </span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                        {totalWithoutDocsInScope.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">pendentes</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">Pendentes de registo civil</p>
+                  </div>
+                  <div className="mt-3">
+                    <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80">
+                      Ação Social Prioritária
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[9px] text-emerald-200 uppercase font-semibold">
-                  {activeStudent.performanceScore >= 7 ? 'Excelente Aproveitamento' : 'Necessita Apoio'}
-                </span>
-              </div>
 
-              {/* Bottom Card 4: [Presença dos alunos] */}
-              <div className="bg-[#f75142] text-white rounded-2xl p-5 flex flex-col items-center justify-between min-h-[150px] text-center shadow-md">
-                <span className="bg-[#e04436] text-white text-[10px] font-black uppercase px-3 py-1 rounded-md shadow-2xs">
-                  Presença dos alunos
-                </span>
-                <div className="my-auto py-2">
-                  <span className="text-3xl sm:text-4xl font-black tracking-tight">
-                    {avgPresenceInScope}%
-                  </span>
-                  <p className="text-[11px] text-[#fee4e2] mt-1">Média Global da Unidade</p>
+                {/* 3. Desempenho do Aluno */}
+                <div className="flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                      Desempenho do Aluno
+                    </span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                        {activeStudent.performanceScore.toFixed(1)}
+                      </span>
+                      <span className="text-xs text-slate-400 font-bold">/ 10</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">Média ponderada do período</p>
+                  </div>
+                  <div className="mt-3">
+                    <span
+                      className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        activeStudent.performanceScore >= 7
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                          : 'bg-rose-50 text-rose-700 border-rose-200/80'
+                      }`}
+                    >
+                      {activeStudent.performanceScore >= 7 ? 'Bom Aproveitamento' : 'Apoio Pedagógico'}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[9px] text-[#fee4e2] uppercase font-semibold">
-                  Assiduidade Coletiva
-                </span>
+
+                {/* 4. Presença Média Global */}
+                <div className="flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                      Presença Média na Unidade
+                    </span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                        {avgPresenceInScope}%
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">global</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">Média de frequência escolar</p>
+                  </div>
+                  <div className="mt-3">
+                    <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80">
+                      Assiduidade Coletiva
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
