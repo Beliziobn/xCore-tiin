@@ -49,6 +49,8 @@ import {
   incrementTurmaOccupancy,
   MAX_TURMA_CAPACITY,
 } from '../../data/classesConfig';
+import { SmartAutofillBar } from '../common/SmartAutofillBar';
+import type { AutofillProfile } from '../../utils/smartAutofill';
 
 interface StudentRegistrationModalProps {
   isOpen: boolean;
@@ -349,76 +351,85 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     onClose();
   };
 
+  const handleSmartAutofill = (profile: AutofillProfile) => {
+    if (profile.address) setEndereco(profile.address);
+    if (profile.province) setProvincia(profile.province);
+    if (profile.municipality) setMunicipio(profile.municipality);
+    if (profile.phone) setTelefone(profile.phone);
+    if (profile.phoneAlternative) setTelefoneAlternativo(profile.phoneAlternative);
+    if (profile.guardianName) setEncarregado(profile.guardianName);
+    if (profile.guardianRelationship) setParentescoEncarregado(profile.guardianRelationship);
+    if (profile.documentNumber) setNumeroDocumento(profile.documentNumber);
+    if (profile.documentType) {
+      if (profile.documentType === 'BI') setTipoDocumento('BI');
+      else if (profile.documentType === 'Cédula Pessoal') setTipoDocumento('Cedula pessoal');
+      else if (profile.documentType === 'Certidão de Nascimento') setTipoDocumento('Assento');
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        className="bg-white w-full max-w-4xl rounded-[28px] shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-[#002133] px-6 py-4.5 flex items-center justify-between text-white shrink-0 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#f75142] text-white flex items-center justify-center shadow-xs">
-              <GraduationCap className="w-5 h-5" />
+        {/* Modal Header: Clean, Light, Friendly (Matches Reference Image) */}
+        <div className="px-6 sm:px-8 pt-7 pb-5 bg-white border-b border-slate-100 flex items-start justify-between gap-4 shrink-0">
+          <div className="flex items-start gap-4">
+            {/* Dark Rounded Squircle Icon */}
+            <div className="w-12 h-12 rounded-2xl bg-zinc-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <GraduationCap className="w-6 h-6" />
             </div>
+
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-black tracking-tight">
-                  {initialData ? 'Editar Cadastro de Aluno' : 'Novo Cadastro de Aluno'}
-                </h2>
-                <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  Modelo Oficial uCore
-                </span>
-              </div>
-              <p className="text-xs text-slate-300">
-                15 Modalidades Oficiais (A a O) • Validação de Faixa Etária • Ensino Especial
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                {initialData ? 'Atualizar Matrícula do Aluno' : 'Candidatura & Matrícula de Aluno'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed max-w-xl">
+                Preencha a ficha do aluno de forma simples e assistida — o uCore calcula automaticamente a idade, faixa etária e sugere a turma ideal.
               </p>
             </div>
           </div>
+
+          {/* Minimal Close Button */}
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            title="Fechar formulário"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Wizard Step Navigation */}
-        <div className="bg-slate-50 border-b border-slate-200 px-6 py-2.5 flex items-center justify-between overflow-x-auto gap-2">
-          {[
-            { step: 1, label: '1. Identificação do Aluno', icon: User },
-            { step: 2, label: '2. Natureza & Modalidade', icon: Building },
-            { step: 3, label: '3. Classe, Etapa & Idade', icon: Layers },
-            { step: 4, label: '4. Dados Complementares & Foto', icon: HeartHandshake },
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.step;
-            const isDone = activeTab > item.step;
-            return (
-              <button
-                key={item.step}
-                type="button"
-                onClick={() => setActiveTab(item.step as any)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  isActive
-                    ? 'bg-[#002133] text-white shadow-xs'
-                    : isDone
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${
-                    isActive ? 'bg-[#f75142] text-white' : isDone ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
+        {/* Segmented Pill Tabs Bar (Matches Reference Image) */}
+        <div className="px-6 sm:px-8 py-3 bg-white border-b border-slate-100 shrink-0">
+          <div className="bg-[#f4f4f5] p-1.5 rounded-2xl flex items-center gap-1 border border-slate-200/60 overflow-x-auto scrollbar-none">
+            {[
+              { step: 1, label: 'Identificação', icon: User },
+              { step: 2, label: 'Natureza & Modalidade', icon: Building },
+              { step: 3, label: 'Classe & Faixa Etária', icon: Layers },
+              { step: 4, label: 'Família & Documentos', icon: HeartHandshake },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.step;
+              return (
+                <button
+                  key={item.step}
+                  type="button"
+                  onClick={() => setActiveTab(item.step as any)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'bg-white text-zinc-900 shadow-xs border border-slate-200/80 font-black'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
                   }`}
                 >
-                  {isDone ? <Check className="w-2.5 h-2.5" /> : item.step}
-                </div>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#f75142]' : 'text-slate-400'}`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Error Banner */}
@@ -434,6 +445,12 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
           {/* STEP 1: IDENTIFICAÇÃO DO ALUNO */}
           {activeTab === 1 && (
             <div className="space-y-5 animate-in fade-in duration-150">
+              {/* Smart Autofill Bar */}
+              <SmartAutofillBar
+                context="student"
+                onApplyProfile={handleSmartAutofill}
+              />
+
               <div className="border-b border-slate-100 pb-3">
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
                   <User className="w-4 h-4 text-[#f75142]" />
@@ -696,7 +713,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                               {mod.label}
                             </span>
                             {mod.isSpecialEducation && (
-                              <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded shrink-0">
+                              <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-1.5 py-0.5 rounded shrink-0">
                                 Ensino Especial
                               </span>
                             )}
@@ -725,8 +742,8 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
                   <span>Natureza da Escola *</span>
                   {selectedModalityConfig.isSpecialEducation && (
-                    <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-amber-700" />
+                    <span className="text-[10px] text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-slate-600" />
                       Fixa em "Pública" para Ensino Especial
                     </span>
                   )}
@@ -835,13 +852,13 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                           isSelected
                             ? 'bg-[#f75142] text-white border-[#f75142] shadow-xs'
                             : isCalculatedMatch
-                            ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                            ? 'bg-slate-100 text-[#002133] border-slate-300 ring-1 ring-[#002133]/20'
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
                         <span>{opt}</span>
                         {isCalculatedMatch && !isSelected && (
-                          <span className="block text-[9px] font-bold text-emerald-700">
+                          <span className="block text-[9px] font-bold text-slate-500">
                             (Sugerida)
                           </span>
                         )}
@@ -853,18 +870,18 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
 
               {/* TIPO DE DEFICIÊNCIA (SE ENSINO ESPECIAL OU NECESSIDADES INCLUSIVAS) */}
               {(selectedModalityConfig.supportsDisabilities || temNecessidadesEspeciais) && (
-                <div className="p-4 bg-purple-50/60 border border-purple-200 rounded-2xl space-y-3">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-black text-purple-950 flex items-center gap-1.5">
-                        <HeartHandshake className="w-4 h-4 text-purple-700" />
+                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <HeartHandshake className="w-4 h-4 text-[#002133]" />
                         Tipo de Deficiência / Necessidades Especiais (Pode marcar mais de uma) *
                       </h4>
-                      <p className="text-[11px] text-purple-800">
+                      <p className="text-[11px] text-slate-500">
                         Classificação conforme as diretrizes do Ensino Especial do MED.
                       </p>
                     </div>
-                    <span className="text-xs font-bold bg-purple-200/80 text-purple-900 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full">
                       {selectedDisabilities.length} Selecionada(s)
                     </span>
                   </div>
@@ -879,14 +896,14 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                           onClick={() => handleToggleDisability(dis)}
                           className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-between ${
                             isChecked
-                              ? 'bg-purple-700 text-white border-purple-700 shadow-xs'
-                              : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100/60'
+                              ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
                           <span>{dis}</span>
                           <div
                             className={`w-4 h-4 rounded flex items-center justify-center border ${
-                              isChecked ? 'bg-white text-purple-700 border-white' : 'border-slate-300'
+                              isChecked ? 'bg-white text-[#002133] border-white' : 'border-slate-300'
                             }`}
                           >
                             {isChecked && <Check className="w-3 h-3" />}
@@ -936,7 +953,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       onClick={() => setAlunoRepetente(true)}
                       className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
                         alunoRepetente
-                          ? 'bg-amber-600 text-white border-amber-600'
+                          ? 'bg-[#002133] text-white border-[#002133]'
                           : 'bg-white text-slate-700 border-slate-200'
                       }`}
                     >
@@ -967,7 +984,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       onClick={() => setTemNecessidadesEspeciais(true)}
                       className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
                         temNecessidadesEspeciais
-                          ? 'bg-purple-700 text-white border-purple-700'
+                          ? 'bg-[#002133] text-white border-[#002133]'
                           : 'bg-white text-slate-700 border-slate-200'
                       }`}
                     >
@@ -1108,7 +1125,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       <span>{anexoDocumentoNome ? 'Substituir Documento' : 'Anexar Ficheiro'}</span>
                     </button>
                     {anexoDocumentoNome && (
-                      <span className="text-[11px] font-mono text-emerald-700 font-bold truncate max-w-xs">
+                      <span className="text-[11px] font-mono text-slate-700 font-bold truncate max-w-xs">
                         {anexoDocumentoNome}
                       </span>
                     )}

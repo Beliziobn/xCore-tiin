@@ -21,7 +21,6 @@ import { StudentAnalyticalMatrixModal } from '../../modals/StudentAnalyticalMatr
 import { StudentDetailModal } from '../../modals/StudentDetailModal';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
 import { getStoredStudents, saveStudent } from '../../../utils/studentStorage';
-import { exportStudentsExcel } from '../../../utils/excelExport';
 
 interface AdminStudentsPageProps {
   onOpenGetStarted: () => void;
@@ -237,23 +236,6 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
           {/* Right: Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => exportStudentsExcel(students)}
-              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap"
-              title="Exportar planilha de alunos matriculados em Excel (.xlsx)"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Exportar Excel (.xlsx)</span>
-            </button>
-
-            <button
-              onClick={() => setIsMatrixModalOpen(true)}
-              className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              <span>Matriz Analítica (A a O)</span>
-            </button>
-
-            <button
               id="admin-btn-cadastrar-aluno"
               onClick={onOpenRegisterModal}
               className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
@@ -341,7 +323,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
                   Género
                 </span>
                 <span className="text-sm font-bold text-slate-900 leading-snug">
-                  {activeStudent.gender === 'F' ? 'Feminino 👩' : 'Masculino 👨'}
+                  {activeStudent.gender === 'F' ? 'Feminino' : 'Masculino'}
                 </span>
                 <span className="text-[11px] text-slate-500 mt-0.5">Identificação</span>
               </div>
@@ -557,7 +539,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
                         {st.name}
                       </td>
                       <td className="p-3.5 text-slate-600 font-medium">
-                        {st.gender === 'F' ? 'Feminino 👩' : 'Masculino 👨'}
+                        {st.gender === 'F' ? 'Feminino' : 'Masculino'}
                       </td>
                       <td className="p-3.5 text-slate-700 font-medium">{st.schoolName}</td>
                       <td className="p-3.5 font-semibold text-slate-800">{st.gradeClass}</td>

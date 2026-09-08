@@ -201,7 +201,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5">
               {(settings.allowedActions || []).map((action, idx) => (
                 <div key={idx} className="flex items-center gap-2.5 text-xs text-slate-700">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <ShieldCheck className="w-4 h-4 text-[#002133] shrink-0" />
                   <span>{action}</span>
                 </div>
               ))}
@@ -213,8 +213,8 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-slate-500 font-medium">
             {savedSuccess ? (
-              <span className="text-emerald-600 font-bold flex items-center gap-1.5">
-                <Check className="w-4 h-4" /> Configurações salvas!
+              <span className="text-slate-900 font-bold flex items-center gap-1.5">
+                <Check className="w-4 h-4 text-[#002133]" /> Configurações salvas!
               </span>
             ) : (
               'As alterações são aplicadas instantaneamente à sessão.'

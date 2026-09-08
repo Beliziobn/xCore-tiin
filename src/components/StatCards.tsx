@@ -108,27 +108,27 @@ export const StatCards: React.FC<StatCardsProps> = ({
           {session.settings?.autoSync && (
             <span
               title="Sincronização em tempo real ativa nas configurações"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[#002133]" />
               <span>Sincronização Ativa</span>
             </span>
           )}
           {session.settings?.showPercentages && (
             <span
               title="Exibição de percentuais ativa nas configurações"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold"
             >
-              <Percent className="w-3.5 h-3.5" />
+              <Percent className="w-3.5 h-3.5 text-slate-600" />
               <span>Métricas em %</span>
             </span>
           )}
           {session.settings?.emailAlerts && (
             <span
               title="Alertas críticos ativos nas configurações"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold"
             >
-              <Bell className="w-3.5 h-3.5" />
+              <Bell className="w-3.5 h-3.5 text-slate-600" />
               <span>Alertas Ativos</span>
             </span>
           )}

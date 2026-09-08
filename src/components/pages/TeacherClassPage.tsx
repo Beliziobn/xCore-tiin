@@ -263,11 +263,11 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                 Composição por Género
               </span>
               <div className="flex items-center gap-2 text-xs font-bold">
-                <span className="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">
-                  ♀ {stats.meninas} {stats.total > 0 ? `(${Math.round((stats.meninas / stats.total) * 100)}%)` : ''}
+                <span className="text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                  Meninas: {stats.meninas} {stats.total > 0 ? `(${Math.round((stats.meninas / stats.total) * 100)}%)` : ''}
                 </span>
-                <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                  ♂ {stats.meninos} {stats.total > 0 ? `(${Math.round((stats.meninos / stats.total) * 100)}%)` : ''}
+                <span className="text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                  Meninos: {stats.meninos} {stats.total > 0 ? `(${Math.round((stats.meninos / stats.total) * 100)}%)` : ''}
                 </span>
               </div>
             </div>
@@ -444,21 +444,21 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                     onClick={() => setFilterGender('F')}
                     className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                       filterGender === 'F'
-                        ? 'bg-rose-600 text-white'
+                        ? 'bg-[#002133] text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    ♀ Meninas ({stats.meninas})
+                    Meninas ({stats.meninas})
                   </button>
                   <button
                     onClick={() => setFilterGender('M')}
                     className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                       filterGender === 'M'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-[#002133] text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    ♂ Meninos ({stats.meninos})
+                    Meninos ({stats.meninos})
                   </button>
                 </div>
               </div>
@@ -539,7 +539,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium mt-0.5">
                               <span>
-                                {student.genero === 'F' ? '♀ Feminino' : '♂ Masculino'}
+                                {student.genero === 'F' ? 'Feminino' : 'Masculino'}
                               </span>
                               {student.idade && (
                                 <>
@@ -693,7 +693,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                             {student.name}
                           </h4>
                           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-0.5">
-                            <span>{student.genero === 'F' ? '♀ Feminino' : '♂ Masculino'}</span>
+                            <span>{student.genero === 'F' ? 'Feminino' : 'Masculino'}</span>
                             {student.idade && (
                               <>
                                 <span>•</span>

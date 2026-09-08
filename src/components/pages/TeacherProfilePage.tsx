@@ -199,16 +199,16 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
           />
           <div className="w-full max-w-[310px] bg-white rounded-2xl border border-slate-200 p-4 mt-3 space-y-2 text-xs text-slate-700 shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">♀ Meninas:</span>
+              <span className="text-slate-500 font-medium">Meninas:</span>
               <span className="font-bold text-slate-900">26 alunas</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">♂ Meninos:</span>
+              <span className="text-slate-500 font-medium">Meninos:</span>
               <span className="font-bold text-slate-900">20 alunos</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500 font-medium">Assiduidade:</span>
-              <span className="font-bold text-emerald-600">96.4%</span>
+              <span className="font-bold text-slate-900">96.4%</span>
             </div>
           </div>
         </div>

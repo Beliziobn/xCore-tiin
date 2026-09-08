@@ -4,6 +4,8 @@ import type { AdminSchool, AdminTeacher, AdminStudent, AdminDirector } from '../
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
 import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
 import { SchoolRegistrationModal } from '../../modals/SchoolRegistrationModal';
+import { DirectorRegistrationModal } from '../../modals/DirectorRegistrationModal';
+import { initialAdminSchools } from '../../../data/adminData';
 import { QUESSUA_ZONES_LIST } from '../../../data/municipalitiesData';
 
 export type AdminModalType = 'school' | 'teacher' | 'student' | 'director' | null;
@@ -17,6 +19,7 @@ interface AdminRegistrationModalProps {
   onAddStudent?: (student: AdminStudent) => void;
   onAddDirector?: (director: AdminDirector) => void;
   availableSchools: string[];
+  schools?: AdminSchool[];
 }
 
 export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
@@ -28,6 +31,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
   onAddStudent,
   onAddDirector,
   availableSchools,
+  schools,
 }) => {
   // School Form State
   const [schoolName, setSchoolName] = useState('');
@@ -158,6 +162,36 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
             registrationData: teacherData,
           };
           onAddTeacher?.(newTeacher);
+          onClose();
+        }}
+      />
+    );
+  }
+
+  if (type === 'director') {
+    const schoolsList = (schools && schools.length > 0) ? schools : initialAdminSchools;
+    return (
+      <DirectorRegistrationModal
+        isOpen={isOpen}
+        onClose={onClose}
+        schools={schoolsList}
+        authorName="Administrador Municipal"
+        onSuccess={(dirData) => {
+          const newDirector: AdminDirector = {
+            id: dirData.id,
+            name: dirData.nomeCompleto,
+            schoolName: dirData.nomeEscola,
+            phone: dirData.telefone,
+            email: dirData.emailInstitucional || dirData.emailPessoal || `${dirData.nomeCompleto.toLowerCase().replace(/\s+/g, '.')}@ucore.edu.ao`,
+            appointmentYear: parseInt(dirData.dataNomeacao.split('-')[0], 10) || 2025,
+            status: dirData.situacaoMandato === 'Anterior / Histórico' ? 'Anterior' : 'Ativo',
+            performanceRating: 92,
+            teachersCount: dirData.professoresSobDirecao || 22,
+            studentsCount: dirData.alunosSobDirecao || 450,
+            location: `${dirData.municipioEscola} (${dirData.provinciaEscola})`,
+            registrationData: dirData,
+          };
+          onAddDirector?.(newDirector);
           onClose();
         }}
       />

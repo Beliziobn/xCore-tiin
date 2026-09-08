@@ -49,6 +49,8 @@ import {
   NIVEL_ACADEMICO_OPTIONS,
   saveDirector
 } from '../../utils/directorStorage';
+import { SmartAutofillBar } from '../common/SmartAutofillBar';
+import type { AutofillProfile } from '../../utils/smartAutofill';
 
 interface DirectorRegistrationModalProps {
   isOpen: boolean;
@@ -412,71 +414,94 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
     onClose();
   };
 
+  const handleSmartAutofill = (profile: AutofillProfile) => {
+    if (profile.fullName) setNomeCompleto(profile.fullName);
+    if (profile.documentNumber) setBiNif(profile.documentNumber);
+    if (profile.gender) setSexo(profile.gender === 'F' ? 'Feminino' : 'Masculino');
+    if (profile.birthDate) setDataNascimento(profile.birthDate);
+    if (profile.phone) setTelefone(profile.phone);
+    if (profile.email) {
+      setEmailPessoal(profile.email);
+      if (!emailInstitucional) {
+        setEmailInstitucional(profile.email.replace('@gmail.com', '@ucore.edu.ao'));
+      }
+    }
+    if (profile.address) setMorada(profile.address);
+    if (profile.province) setProvinciaResidencia(profile.province);
+    if (profile.municipality) setMunicipioResidencia(profile.municipality);
+    if (profile.jobTitle && (profile.jobTitle.toLowerCase().includes('director') || profile.jobTitle.toLowerCase().includes('adjunto'))) {
+      if (profile.jobTitle.toLowerCase().includes('adjunto')) setCargo('Director(a) Adjunto(a)');
+      else setCargo('Director(a)');
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        className="bg-white w-full max-w-4xl rounded-[28px] shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="bg-[#f75142] px-6 py-4 flex items-center justify-between text-white shrink-0 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs border border-white/20">
-              <UserCheck className="w-5 h-5 text-white" />
+        {/* Modal Header: Clean, Light, Friendly (Matches Reference Image) */}
+        <div className="px-6 sm:px-8 pt-7 pb-5 bg-white border-b border-slate-100 flex items-start justify-between gap-4 shrink-0">
+          <div className="flex items-start gap-4">
+            {/* Dark Rounded Squircle Icon */}
+            <div className="w-12 h-12 rounded-2xl bg-zinc-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <UserCheck className="w-6 h-6" />
             </div>
+
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold">
-                  {initialData ? 'Atualizar Ficha do Director(a)' : 'Novo Cadastro & Homologação de Director(a)'}
-                </h3>
-                <span className="text-[10px] bg-white/20 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Modelo Oficial
-                </span>
-              </div>
-              <p className="text-xs text-white/80">
-                Identificação, vínculo escolar, formação em gestão, classificação pedagógica e validação.
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                {initialData ? 'Atualizar Ficha do Director(a)' : 'Cadastrar e Homologar Director(a)'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed max-w-xl">
+                Preencha a ficha do director(a) de forma guiada — o uCore calcula automaticamente a faixa etária, perfil de gestão e vínculo com a escola.
               </p>
             </div>
           </div>
+
+          {/* Minimal Close Button */}
           <button
+            type="button"
             onClick={onClose}
-            className="text-white/80 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-            title="Fechar"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            title="Fechar formulário"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Tab Navigation (7 Sections + Histórico) */}
-        <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center gap-1.5 overflow-x-auto text-xs shrink-0 no-scrollbar">
-          {[
-            { id: 1, label: '1. Identificação', icon: UserCheck },
-            { id: 2, label: '2. Vínculo à Escola', icon: School },
-            { id: 3, label: '3. Situação Direcção', icon: Briefcase },
-            { id: 4, label: '4. Formação Pedagógica', icon: GraduationCap },
-            { id: 5, label: '5. Gestão Escolar', icon: Award },
-            { id: 6, label: '6. Experiência & Docs', icon: ShieldCheck },
-            { id: 7, label: '7. Dados Complementares', icon: Users },
-            { id: 8, label: 'Histórico & Anteriores', icon: History },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#f75142] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+        {/* Segmented Pill Tabs Bar (Matches Reference Image) */}
+        <div className="px-6 sm:px-8 py-3 bg-white border-b border-slate-100 shrink-0">
+          <div className="bg-[#f4f4f5] p-1.5 rounded-2xl flex items-center gap-1 border border-slate-200/60 overflow-x-auto scrollbar-none">
+            {[
+              { id: 1, label: 'Identificação', icon: UserCheck },
+              { id: 2, label: 'Vínculo Escolar', icon: School },
+              { id: 3, label: 'Situação Direcção', icon: Briefcase },
+              { id: 4, label: 'Formação Pedagógica', icon: GraduationCap },
+              { id: 5, label: 'Gestão Escolar', icon: Award },
+              { id: 6, label: 'Experiência & Docs', icon: ShieldCheck },
+              { id: 7, label: 'Complementares', icon: Users },
+              { id: 8, label: 'Histórico', icon: History },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'bg-white text-zinc-900 shadow-xs border border-slate-200/80 font-black'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#f75142]' : 'text-slate-400'}`} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Error Notification */}
@@ -494,6 +519,12 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
           {/* ========================================================= */}
           {activeTab === 1 && (
             <div className="space-y-5 animate-in fade-in duration-150">
+              {/* Smart Autofill Bar */}
+              <SmartAutofillBar
+                context="director"
+                onApplyProfile={handleSmartAutofill}
+              />
+
               <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -675,17 +706,17 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                     O Director deve estar sempre associado a uma escola já cadastrada na rede.
                   </p>
                 </div>
-                <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
+                <span className="text-[11px] bg-slate-100 text-slate-700 border border-slate-200 font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-[#002133]" />
                   Herança Automática Ativa
                 </span>
               </div>
 
-              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold">Regra de Vínculo Institucional:</p>
-                  <p className="mt-0.5 text-amber-700">
+                  <p className="font-bold text-slate-900">Regra de Vínculo Institucional:</p>
+                  <p className="mt-0.5 text-slate-600">
                     Ao selecionar a escola, a natureza (Pública/Privada), município, estimativa docente e código são herdados automaticamente, mas podem ser confirmados ou ajustados.
                   </p>
                 </div>
@@ -1034,7 +1065,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                           type="button"
                           onClick={() => setTemMagisterioCompleto(true)}
                           className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                            temMagisterioCompleto ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200'
+                            temMagisterioCompleto ? 'bg-[#002133] text-white border-[#002133]' : 'bg-white text-slate-600 border-slate-200'
                           }`}
                         >
                           Sim
@@ -1058,7 +1089,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                           type="button"
                           onClick={() => setTemImneCompleto(true)}
                           className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                            temImneCompleto ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200'
+                            temImneCompleto ? 'bg-[#002133] text-white border-[#002133]' : 'bg-white text-slate-600 border-slate-200'
                           }`}
                         >
                           Sim
@@ -1085,7 +1116,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                             type="button"
                             onClick={() => setTemOutraFormacaoPedagogica(true)}
                             className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                              temOutraFormacaoPedagogica ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200'
+                              temOutraFormacaoPedagogica ? 'bg-[#002133] text-white border-[#002133]' : 'bg-white text-slate-600 border-slate-200'
                             }`}
                           >
                             Sim
@@ -1334,7 +1365,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                       type="button"
                       onClick={() => setPossuiValidacaoHabilitacoesCargo(true)}
                       className={`px-3 py-1 text-xs font-bold rounded-lg border cursor-pointer ${
-                        possuiValidacaoHabilitacoesCargo ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'
+                        possuiValidacaoHabilitacoesCargo ? 'bg-[#002133] text-white border-[#002133]' : 'bg-white text-slate-700 border-slate-200'
                       }`}
                     >
                       Sim
@@ -1641,7 +1672,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                   <div className="flex justify-end pt-2">
                     <button
                       type="submit"
-                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+                      className="px-4 py-1.5 bg-[#002133] hover:bg-slate-900 text-white text-xs font-bold rounded-lg cursor-pointer"
                     >
                       Salvar Registo Anterior
                     </button>

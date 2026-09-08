@@ -811,6 +811,16 @@ export default function App() {
           directors={adminDirectors}
           schools={adminSchools}
           onOpenRegisterModal={() => setAdminModalType('director')}
+          onUpdateDirector={(updatedDir) => {
+            setAdminDirectors((prev) =>
+              prev.map((d) => (d.id === updatedDir.id ? updatedDir : d))
+            );
+            showToast(`Ficha do Director(a) "${updatedDir.name}" atualizada com sucesso!`);
+          }}
+          onAddDirector={(newDir) => {
+            setAdminDirectors((prev) => [newDir, ...prev]);
+            showToast(`Diretor(a) "${newDir.name}" homologado(a) com sucesso!`);
+          }}
           isLoggedIn={isSessionStarted}
         />
       );
@@ -1360,6 +1370,7 @@ export default function App() {
           showToast(`Diretor(a) "${newDirector.name}" homologado(a) com sucesso!`);
         }}
         availableSchools={adminSchools.map((s) => s.name)}
+        schools={adminSchools}
       />
 
       {/* Info Modal (About, Support, Terms, Profile) */}

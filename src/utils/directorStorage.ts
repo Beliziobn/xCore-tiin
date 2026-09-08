@@ -18,6 +18,7 @@ import {
   computeClassificacaoPedagogica,
   NIVEL_ACADEMICO_OPTIONS
 } from './teacherStorage';
+import { initialAdminSchools } from '../data/adminData';
 
 export const STORAGE_KEY_DIRECTORS = 'ucore_registered_directors_v2';
 
@@ -78,12 +79,27 @@ export {
 export function getStoredDirectors(): DirectorRegistrationData[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_DIRECTORS);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    // Auto-seed all 31 municipal schools with compliant Director dossiers
+    const seeded = initialAdminSchools.map((school, index) =>
+      buildInitialDirectorDossier(school, index)
+    );
+    try {
+      localStorage.setItem(STORAGE_KEY_DIRECTORS, JSON.stringify(seeded));
+    } catch {
+      // ignore storage quota errors in sandbox
+    }
+    return seeded;
   } catch (err) {
     console.warn('Erro ao carregar directores armazenados:', err);
-    return [];
+    return initialAdminSchools.map((school, index) =>
+      buildInitialDirectorDossier(school, index)
+    );
   }
 }
 

@@ -377,11 +377,11 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
 
                     <p className="text-[11px] text-slate-500 mt-2.5 leading-relaxed">
                       {isFull ? (
-                        <span className="text-rose-800 font-medium">
-                          ⚠️ Atingiu o teto de 45 alunos. O sistema bloqueia automaticamente novas matrículas nesta turma.
+                        <span className="text-slate-800 font-semibold">
+                          Atingiu o teto de 45 alunos. O sistema bloqueia automaticamente novas matrículas nesta turma.
                         </span>
                       ) : (
-                        <span className="text-emerald-800 font-medium">
+                        <span className="text-slate-600 font-medium">
                           Elegível para receber até {remaining} novo(s) estudante(s) via módulo de matrículas.
                         </span>
                       )}

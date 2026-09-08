@@ -472,12 +472,12 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
               currentStudent.temDocumentos 
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                ? 'bg-slate-100 text-slate-800 border border-slate-300' 
+                : 'bg-rose-50 text-rose-800 border border-rose-200'
             }`}>
-              {currentStudent.temDocumentos ? '✓ Documentação Válida' : '⚠ Registro Civil Pendente'}
+              {currentStudent.temDocumentos ? 'Documentação Válida' : 'Registro Civil Pendente'}
             </span>
           </div>
         </div>

@@ -14,11 +14,9 @@ import {
   Layers,
   GraduationCap,
   Building,
-  FileSpreadsheet,
   FileText,
   Edit3,
-  CheckCircle2,
-  Table
+  CheckCircle2
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminTeacher, TeacherRegistrationData } from '../../../types';
@@ -26,7 +24,6 @@ import { getStoredTeachers, saveTeacher } from '../../../utils/teacherStorage';
 import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
 import { TeacherDetailModal } from '../../modals/TeacherDetailModal';
 import { TeacherAnalyticalMatrixModal } from '../../modals/TeacherAnalyticalMatrixModal';
-import { exportTeachersExcel } from '../../../utils/excelExport';
 
 interface AdminTeachersPageProps {
   onOpenGetStarted: () => void;
@@ -124,31 +121,10 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                 <span className="font-black text-slate-900 text-xs sm:text-sm">
                   Novo Modelo Oficial de Cadastro de Professores
                 </span>
-                <span className="text-[10px] bg-[#002133] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  Conforme Diretrizes do MED
-                </span>
               </div>
-              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5">
-                Validação automática de faixa etária, cascata pedagógica (Magistério/IMNE), múltiplos níveis de ensino e auditoria cadastral.
-              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              onClick={() => exportTeachersExcel(teachers)}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
-              title="Exportar planilha de professores em formato Excel (.xlsx)"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Exportar Excel (.xlsx)</span>
-            </button>
-            <button
-              onClick={() => setIsMatrixModalOpen(true)}
-              className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
-            >
-              <Table className="w-3.5 h-3.5 text-[#f75142]" />
-              <span>Matriz Analítica & Exportação</span>
-            </button>
             <button
               onClick={() => {
                 setEditingTeacherData(null);
@@ -223,23 +199,10 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
         {/* Selected Teacher Quick Header */}
         <div className="mb-4 flex items-center justify-between">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <span>Docente Inspecionado:</span>
-            {activeTeacher && (
-              <span className="font-mono text-slate-700 bg-slate-200 px-2 py-0.5 rounded text-[11px]">
-                {activeTeacher.biNif}
-              </span>
-            )}
+            <span>Docente Inspecionado</span>
           </span>
           {activeTeacher && (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setDetailModalTeacher(activeTeacher)}
-                className="px-3 py-1 bg-white hover:bg-slate-100 text-[#002133] border border-slate-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-              >
-                <FileText className="w-3.5 h-3.5 text-[#f75142]" />
-                <span>Ver Ficha Completa dos 8 Módulos</span>
-              </button>
               <button
                 type="button"
                 onClick={() => {

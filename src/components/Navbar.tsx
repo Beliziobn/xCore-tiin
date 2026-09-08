@@ -486,23 +486,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="notification-bell-btn"
               onClick={() => setShowNotifications((prev) => !prev)}
-              className="relative p-2 rounded-full text-[#002133] hover:text-white hover:bg-black/10 transition-colors cursor-pointer focus:outline-none"
+              className="relative p-2 rounded-full text-white hover:bg-white/20 transition-colors cursor-pointer focus:outline-none"
               title="Notificações"
+              aria-label="Notificações"
             >
-              <Bell className="w-6 h-6" strokeWidth={2.2} />
+              <Bell className="w-6 h-6 text-white" strokeWidth={2.2} />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#002133] rounded-full ring-2 ring-[#f75142] animate-pulse" />
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-white rounded-full ring-2 ring-[#f75142]" />
               )}
             </button>
 
             {/* Notifications Popover */}
             {showNotifications && (
-              <div className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-[#002133]">
+              <div className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-slate-900">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-xs uppercase tracking-[0.15em] text-[#002133]">Notificações</span>
                     {unreadCount > 0 && (
-                      <span className="text-[10px] bg-[#002133]/10 text-[#002133] border border-[#002133]/20 px-2 py-0.5 rounded-full font-bold uppercase">
+                      <span className="text-[10px] bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-full font-bold uppercase">
                         {unreadCount} novas
                       </span>
                     )}
@@ -510,7 +511,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className="text-[10px] uppercase tracking-wider text-[#f75142] hover:underline font-bold cursor-pointer"
+                      className="text-[10px] uppercase tracking-wider text-slate-600 hover:text-slate-900 font-bold cursor-pointer underline"
                     >
                       Marcar lidas
                     </button>
@@ -526,7 +527,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }`}
                     >
                       <div className="flex justify-between items-start">
-                        <h4 className="text-xs font-bold text-[#002133]">{item.title}</h4>
+                        <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
                         <span className="text-[10px] text-slate-400 tracking-wider">{item.time}</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
@@ -543,11 +544,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="navbar-settings-btn"
               type="button"
               onClick={onOpenSettings}
-              className="p-2 text-[#002133] hover:text-white hover:bg-black/10 rounded-full transition-colors cursor-pointer"
+              className="p-2 text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer"
               title="Configurações da Sessão"
               aria-label="Configurações da Sessão"
             >
-              <Settings className="w-5 h-5" strokeWidth={2.2} />
+              <Settings className="w-5 h-5 text-white" strokeWidth={2.2} />
             </button>
           )}
 
