@@ -1,12 +1,30 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle, AlertCircle, FileCheck, FileX, ChevronDown, ShieldCheck, GraduationCap } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Filter,
+  CheckCircle,
+  AlertCircle,
+  FileCheck,
+  FileX,
+  ChevronDown,
+  ShieldCheck,
+  GraduationCap,
+  FileSpreadsheet,
+  FileText,
+  Edit3
+} from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorStudentsData as initialStudents } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
-import type { DirectorStudent, AdminStudent } from '../../../types';
+import type { DirectorStudent, AdminStudent, StudentRegistrationData } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { SchoolAnnouncementsBanner } from '../../announcements/SchoolAnnouncementsBanner';
 import { getDemandStatus } from '../../../utils/announcementStorage';
+import { StudentAnalyticalMatrixModal } from '../../modals/StudentAnalyticalMatrixModal';
+import { StudentDetailModal } from '../../modals/StudentDetailModal';
+import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import { getStoredStudents } from '../../../utils/studentStorage';
 
 interface DirectorStudentsPageProps {
   onOpenGetStarted: () => void;
@@ -25,6 +43,60 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   const [docFilter, setDocFilter] = useState<'all' | 'with-docs' | 'without-docs'>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // New detailed modals state
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<StudentRegistrationData | null>(null);
+
+  const detailedStudents = useMemo(() => getStoredStudents(), [isModalOpen, isEditModalOpen]);
+
+  const getRegistrationDataFromDirectorStudent = (st: DirectorStudent): StudentRegistrationData => {
+    const matching = detailedStudents.find((d) => d.id === st.id || d.name === st.name);
+    if (matching) return matching;
+
+    return {
+      id: st.id,
+      name: st.name,
+      nomeCompleto: st.name,
+      genero: 'F',
+      dataNascimento: st.dataNascimento || '2016-05-10',
+      idade: st.idade || 9,
+      faixaEtariaCalculada: `${st.idade || 9} anos`,
+      tipoDocumento: (st.documentType as any) || (st.hasDocuments ? 'BI' : 'sem Documento'),
+      numeroDocumento: st.numeroDocumento,
+      naturezaEscola: 'Pública',
+      tipoEscolaModalidade: 'primario_regular',
+      tipoEscolaNome: 'D. Ensino Primário Regular',
+      classeEtapaModulo: st.gradeClass || '4.ª Classe',
+      classe: st.gradeClass || '4ª Classe',
+      turma: st.turma || 'Turma A',
+      periodo: 'Manhã',
+      turno: 'Manhã',
+      sala: st.room || 'Sala 03',
+      escola: 'Escola Modelo Central de Quêssua',
+      condicaoMatricula: st.condicaoMatricula || 'primeira_vez',
+      alunoRepetente: st.condicaoMatricula === 'repetente',
+      encarregado: st.guardianName || 'Encarregado Institucional',
+      telefone: '+244 923 000 000',
+      endereco: st.location || 'Zona Escolar de Quêssua',
+      provincia: 'Malanje',
+      municipio: 'Quêssua',
+    };
+  };
+
+  const consolidatedStudentsForMatrix = useMemo(() => {
+    const map = new Map<string, StudentRegistrationData>();
+    detailedStudents.forEach((ds) => map.set(ds.id || ds.name, ds));
+    students.forEach((st) => {
+      const reg = getRegistrationDataFromDirectorStudent(st);
+      if (!map.has(st.id) && !map.has(st.name)) {
+        map.set(st.id, reg);
+      }
+    });
+    return Array.from(map.values());
+  }, [detailedStudents, students]);
 
   // Check demand status for matriculas
   const demandStatus = useMemo(() => getDemandStatus('matriculas'), []);
@@ -205,15 +277,25 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
             />
           </div>
 
-          {/* Right: Cadastrar Button */}
-          <button
-            id="btn-cadastrar-aluno"
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Cadastrar</span>
-          </button>
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMatrixModalOpen(true)}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Matriz Analítica (A a O)</span>
+            </button>
+
+            <button
+              id="btn-cadastrar-aluno"
+              onClick={() => setIsModalOpen(true)}
+              className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cadastrar</span>
+            </button>
+          </div>
         </div>
 
         {/* Informações do Aluno - Sem cards pesados, mantendo organização e máxima legibilidade */}
@@ -235,6 +317,25 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setIsDetailModalOpen(true)}
+                className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+              >
+                <FileText className="w-3.5 h-3.5 text-[#f75142]" />
+                <span>Ficha Individual (4 Seções)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingStudent(getRegistrationDataFromDirectorStudent(currentStudent));
+                  setIsEditModalOpen(true);
+                }}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-200 cursor-pointer transition-colors"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Editar</span>
+              </button>
               <span
                 className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
                   currentStudent?.hasDocuments
@@ -505,6 +606,39 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
         onClose={() => setIsModalOpen(false)}
         entityType="alunos"
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* Analytical Matrix Modal */}
+      <StudentAnalyticalMatrixModal
+        isOpen={isMatrixModalOpen}
+        onClose={() => setIsMatrixModalOpen(false)}
+        students={consolidatedStudentsForMatrix}
+      />
+
+      {/* Student Detail Modal */}
+      <StudentDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        student={currentStudent ? getRegistrationDataFromDirectorStudent(currentStudent) : null}
+        onEdit={(st) => {
+          setEditingStudent(st);
+          setIsEditModalOpen(true);
+        }}
+      />
+
+      {/* Student Edit Modal */}
+      <StudentRegistrationModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+        }}
+        initialData={editingStudent}
+        onSuccess={(updated) => {
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+        }}
+        schoolName="Escola Modelo Central de Quêssua"
       />
     </div>
   );

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, School, User, Users, CheckCircle2, ShieldCheck, ShieldAlert, MapPin } from 'lucide-react';
 import type { AdminSchool, AdminTeacher, AdminStudent, AdminDirector } from '../../../types';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
+import { SchoolRegistrationModal } from '../../modals/SchoolRegistrationModal';
 import { QUESSUA_ZONES_LIST } from '../../../data/municipalitiesData';
 
 export type AdminModalType = 'school' | 'teacher' | 'student' | 'director' | null;
@@ -76,6 +78,21 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
 
   if (!isOpen || !type) return null;
 
+  if (type === 'school') {
+    return (
+      <SchoolRegistrationModal
+        isOpen={isOpen}
+        onClose={onClose}
+        defaultMunicipality="Quêssua"
+        defaultProvince="Malanje"
+        onSuccess={(newSchool) => {
+          onAddSchool?.(newSchool);
+          onClose();
+        }}
+      />
+    );
+  }
+
   if (type === 'student') {
     return (
       <StudentRegistrationModal
@@ -102,6 +119,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
             anexoDocumentoNome: regData.anexoDocumentoNome,
             performanceScore: 8.5,
             schoolName: sSchool || availableSchools[0] || 'Escola Modelo Central',
+            registrationData: regData,
           };
           onAddStudent?.(newStudent);
           onClose();
@@ -111,6 +129,37 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
         defaultRoom="Sala 03"
         defaultPeriod="Manhã"
         schoolName={sSchool || availableSchools[0] || 'Escola Modelo Central'}
+      />
+    );
+  }
+
+  if (type === 'teacher') {
+    return (
+      <TeacherRegistrationModal
+        isOpen={isOpen}
+        onClose={onClose}
+        defaultSchoolName={availableSchools[0] || 'Escola Modelo Central de Quêssua'}
+        defaultMunicipality="Quêssua"
+        defaultProvince="Malanje"
+        authorName="Administrador Municipal"
+        onSuccess={(teacherData) => {
+          const newTeacher: AdminTeacher = {
+            id: teacherData.id,
+            name: teacherData.nomeCompleto,
+            phone: teacherData.telefone,
+            gradeClass: teacherData.niveisLecciona[0]?.nome || 'Ensino Primário',
+            room: 'Sala 01',
+            turma: 'Turma A',
+            category: teacherData.funcaoCategoria,
+            location: `${teacherData.municipioEscola} (${teacherData.provinciaEscola})`,
+            schoolName: teacherData.nomeEscola,
+            presenceRate: 99.0,
+            subject: teacherData.disciplinas || 'Língua Portuguesa & Matemática',
+            registrationData: teacherData,
+          };
+          onAddTeacher?.(newTeacher);
+          onClose();
+        }}
       />
     );
   }

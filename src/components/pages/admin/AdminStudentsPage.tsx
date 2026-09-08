@@ -1,7 +1,26 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Plus, Users as UsersIcon, UserCheck, School, CheckCircle, AlertCircle, ChevronRight, ShieldCheck } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Search,
+  Plus,
+  Users as UsersIcon,
+  UserCheck,
+  School,
+  CheckCircle,
+  AlertCircle,
+  ChevronRight,
+  ShieldCheck,
+  FileSpreadsheet,
+  FileText,
+  Edit3,
+  Download,
+  GraduationCap
+} from 'lucide-react';
 import { Hero } from '../../Hero';
-import type { AdminStudent, AdminSchool } from '../../../types';
+import type { AdminStudent, AdminSchool, StudentRegistrationData } from '../../../types';
+import { StudentAnalyticalMatrixModal } from '../../modals/StudentAnalyticalMatrixModal';
+import { StudentDetailModal } from '../../modals/StudentDetailModal';
+import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import { getStoredStudents, saveStudent } from '../../../utils/studentStorage';
 
 interface AdminStudentsPageProps {
   onOpenGetStarted: () => void;
@@ -23,7 +42,65 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || '');
 
+  // Modals state
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<StudentRegistrationData | null>(null);
+
+  // Stored detailed students
+  const [detailedStudents, setDetailedStudents] = useState<StudentRegistrationData[]>(() => {
+    return getStoredStudents();
+  });
+
   const availableSchools = Array.from(new Set(schools.map((s) => s.name)));
+
+  const getRegistrationDataFromAdminStudent = (st: AdminStudent): StudentRegistrationData => {
+    if (st.registrationData) return st.registrationData;
+    const matchingDetailed = detailedStudents.find((d) => d.id === st.id || d.name === st.name);
+    if (matchingDetailed) return matchingDetailed;
+
+    return {
+      id: st.id,
+      name: st.name,
+      nomeCompleto: st.name,
+      genero: st.gender || 'F',
+      dataNascimento: st.dataNascimento || '2016-05-10',
+      idade: st.idade || 9,
+      faixaEtariaCalculada: `${st.idade || 9} anos`,
+      tipoDocumento: (st.documentType as any) || (st.hasDocuments ? 'BI' : 'sem Documento'),
+      numeroDocumento: st.numeroDocumento,
+      naturezaEscola: 'Pública',
+      tipoEscolaModalidade: 'primario_regular',
+      tipoEscolaNome: 'D. Ensino Primário Regular',
+      classeEtapaModulo: st.gradeClass || '4.ª Classe',
+      classe: st.gradeClass || '4ª Classe',
+      turma: st.turma || 'Turma A',
+      periodo: 'Manhã',
+      turno: 'Manhã',
+      sala: st.room || 'Sala 03',
+      escola: st.schoolName || 'Escola Modelo Central de Quêssua',
+      condicaoMatricula: st.condicaoMatricula || 'primeira_vez',
+      alunoRepetente: st.condicaoMatricula === 'repetente',
+      encarregado: st.guardianName || 'Encarregado Institucional',
+      telefone: '+244 923 000 000',
+      endereco: st.location || 'Quêssua, Malanje',
+      provincia: 'Malanje',
+      municipio: 'Quêssua',
+    };
+  };
+
+  const consolidatedStudentsForMatrix = useMemo(() => {
+    const map = new Map<string, StudentRegistrationData>();
+    detailedStudents.forEach((ds) => map.set(ds.id || ds.name, ds));
+    students.forEach((st) => {
+      const reg = getRegistrationDataFromAdminStudent(st);
+      if (!map.has(st.id) && !map.has(st.name)) {
+        map.set(st.id, reg);
+      }
+    });
+    return Array.from(map.values());
+  }, [detailedStudents, students]);
 
   // Filtered students list
   const filteredStudents = useMemo(() => {
@@ -156,15 +233,25 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
             />
           </div>
 
-          {/* Right: Cyan "Cadastrar" Button matching 14.png */}
-          <button
-            id="admin-btn-cadastrar-aluno"
-            onClick={onOpenRegisterModal}
-            className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            Cadastrar
-          </button>
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMatrixModalOpen(true)}
+              className="flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Matriz Analítica (A a O)</span>
+            </button>
+
+            <button
+              id="admin-btn-cadastrar-aluno"
+              onClick={onOpenRegisterModal}
+              className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              Cadastrar
+            </button>
+          </div>
         </div>
 
         {/* Selected Student Quick Bar */}
@@ -206,7 +293,26 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsDetailModalOpen(true)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#f75142]" />
+                  <span>Ficha Oficial</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingStudent(getRegistrationDataFromAdminStudent(activeStudent));
+                    setIsEditModalOpen(true);
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 border border-slate-200 cursor-pointer transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Editar</span>
+                </button>
                 <span className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80 flex items-center gap-1.5 font-medium">
                   <School className="w-3.5 h-3.5 text-[#f75142]" />
                   {activeStudent.location}
@@ -469,15 +575,29 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
                         {st.presenceRate}%
                       </td>
                       <td className="p-3.5 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedStudentId(st.id);
-                          }}
-                          className="text-[#f75142] font-bold hover:underline inline-flex items-center gap-1"
-                        >
-                          Ver <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedStudentId(st.id);
+                              setIsDetailModalOpen(true);
+                            }}
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-[11px] cursor-pointer transition-colors"
+                          >
+                            Ficha
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedStudentId(st.id);
+                            }}
+                            className="text-[#f75142] font-bold hover:underline inline-flex items-center gap-0.5"
+                          >
+                            Ver <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -487,6 +607,40 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Student Analytical Matrix Modal */}
+      <StudentAnalyticalMatrixModal
+        isOpen={isMatrixModalOpen}
+        onClose={() => setIsMatrixModalOpen(false)}
+        students={consolidatedStudentsForMatrix}
+      />
+
+      {/* Student Detail Modal */}
+      <StudentDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        student={activeStudent ? getRegistrationDataFromAdminStudent(activeStudent) : null}
+        onEdit={(st) => {
+          setEditingStudent(st);
+          setIsEditModalOpen(true);
+        }}
+      />
+
+      {/* Student Registration / Edit Modal */}
+      <StudentRegistrationModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+        }}
+        initialData={editingStudent}
+        onSuccess={(updated) => {
+          setDetailedStudents(getStoredStudents());
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+        }}
+        schoolName={activeStudent?.schoolName || 'Escola Modelo Central de Quêssua'}
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Layers, FileCheck, ArrowUpRight, BarChart3 } from 'lucide-react';
+import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Layers, FileCheck, ArrowUpRight, BarChart3, FileText, Edit3, ShieldCheck, Sparkles } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { QuessuaMunicipalitiesMap } from './QuessuaMunicipalitiesMap';
 import {
@@ -8,9 +8,12 @@ import {
   getZoneFromSchoolLocation,
   MunicipalitySummary,
 } from '../../../data/municipalitiesData';
-import type { AdminSchool } from '../../../types';
+import type { AdminSchool, SchoolNatureza } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { SectionShader } from '../../SectionShader';
+import { SchoolDetailModal } from '../../modals/SchoolDetailModal';
+import { SchoolRegistrationModal } from '../../modals/SchoolRegistrationModal';
+import { getSchoolRegistrationData } from '../../../utils/schoolStorage';
 
 interface AdminSchoolsPageProps {
   onOpenGetStarted: () => void;
@@ -29,8 +32,11 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [naturezaFilter, setNaturezaFilter] = useState<'all' | SchoolNatureza | 'especial'>('all');
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>('Quêssua');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
+  const [detailSchool, setDetailSchool] = useState<AdminSchool | null>(null);
+  const [editingSchool, setEditingSchool] = useState<AdminSchool | null>(null);
 
   // Compute aggregated summaries for all Quêssua zones
   const summaries = useMemo(() => computeMunicipalitySummaries(schools), [schools]);
@@ -89,6 +95,16 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
         school.location.toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!matchesSearch) return false;
+
+      // Natureza and special education filter
+      if (naturezaFilter !== 'all') {
+        const regData = getSchoolRegistrationData(school);
+        if (naturezaFilter === 'especial') {
+          if (!regData.oferta?.ensinoEspecial?.activo) return false;
+        } else {
+          if (regData.natureza !== naturezaFilter) return false;
+        }
+      }
 
       if (categoryFilter === 'all') return true;
       if (categoryFilter === 'professores') return school.teachersCount > 0;
@@ -178,7 +194,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
               >
-                <option value="all">Todas as Escolas</option>
+                <option value="all">Todas as Categorias</option>
                 <option value="professores">Professores</option>
                 <option value="directores">Directores</option>
                 <option value="Ensino Primário">Ensino Primário</option>
@@ -187,6 +203,24 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 <option value="Polivalente">Polivalente</option>
                 <option value="high-performance">Alto Desempenho (≥ 85%)</option>
                 <option value="low-performance">Baixo Desempenho (&lt; 70%)</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-600 text-[10px]">
+                ▼
+              </div>
+            </div>
+
+            {/* Natureza Filter */}
+            <div className="relative">
+              <select
+                value={naturezaFilter}
+                onChange={(e) => setNaturezaFilter(e.target.value as any)}
+                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
+              >
+                <option value="all">Todas as Naturezas</option>
+                <option value="Pública">Pública</option>
+                <option value="Público-Privada">Público-Privada (Comparticipada)</option>
+                <option value="Privada">Privada</option>
+                <option value="especial">Ensino Especial</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-600 text-[10px]">
                 ▼
@@ -221,8 +255,8 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
 
         {/* 3. Interactive Map & Municipality Summary Section */}
         <div className="reveal-up grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch mb-12">
-          {/* Left Column (Map Card Container) */}
-          <div className="lg:col-span-6 flex flex-col items-center justify-between p-5 sm:p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all">
+          {/* Left Column (Pure Map Display - No background box, purely the map) */}
+          <div className="lg:col-span-6 flex flex-col items-center justify-center p-0 bg-transparent border-0 shadow-none">
             <QuessuaMunicipalitiesMap
               selectedMunicipality={selectedMunicipality}
               onSelectMunicipality={(zone) => {
@@ -654,6 +688,23 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {schoolsToDisplay.map((school) => {
                 const isSelected = school.id === selectedSchoolId;
+                const regData = getSchoolRegistrationData(school);
+                const isEspecial = regData.oferta?.ensinoEspecial?.activo;
+                const isComplexo = regData.situacao?.regimeComplexoEscolar;
+
+                const getNatureColor = (nat: string) => {
+                  switch (nat) {
+                    case 'Pública':
+                      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                    case 'Público-Privada':
+                      return 'bg-blue-50 text-blue-700 border-blue-200';
+                    case 'Privada':
+                      return 'bg-purple-50 text-purple-700 border-purple-200';
+                    default:
+                      return 'bg-slate-50 text-slate-700 border-slate-200';
+                  }
+                };
+
                 return (
                   <div
                     key={school.id}
@@ -668,10 +719,22 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                     }`}
                   >
                     <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-black text-[#f75142] uppercase tracking-wider bg-[#fef2f1] px-2 py-0.5 rounded-md">
-                          {school.category}
-                        </span>
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${getNatureColor(regData.natureza)}`}>
+                            {regData.natureza}
+                          </span>
+                          {isEspecial && (
+                            <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded-md">
+                              Especial
+                            </span>
+                          )}
+                          {isComplexo && (
+                            <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                              Complexo
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
                             {school.performanceRate}% Desempenho
@@ -690,9 +753,16 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                             <SchoolIcon className="w-5 h-5 text-slate-400" />
                           </div>
                         )}
-                        <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                          {school.name}
-                        </h4>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                            {school.name}
+                          </h4>
+                          {regData.codigoSIGE && (
+                            <span className="text-[10px] font-mono text-slate-400 font-semibold">
+                              SIGE: {regData.codigoSIGE}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mt-2.5 space-y-1 text-xs text-slate-600">
@@ -707,20 +777,41 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-3 text-slate-500 font-semibold text-[11px]">
-                        <span>{school.teachersCount} Profs</span>
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between text-slate-500 font-semibold text-[11px]">
+                        <span>{school.teachersCount} Docentes</span>
                         <span>•</span>
                         <span>{school.turmasCount} Turmas</span>
                         <span>•</span>
                         <span>{school.studentsWithDocs + school.studentsWithoutDocs} Alunos</span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-[#f75142] font-bold">
-                          <span>{isSelected ? 'Ativa' : 'Ver'}</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </div>
+                      {/* Action buttons on card */}
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailSchool(school);
+                          }}
+                          className="flex-1 py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Ficha SIGE</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSchool(school);
+                          }}
+                          className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-[#fef2f1] hover:text-[#f75142] text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          title="Editar Cadastro da Escola"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Editar</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -730,6 +821,32 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           )}
         </div>
       </div>
+
+      {/* School Detail Modal (Ficha Institucional SIGE) */}
+      <SchoolDetailModal
+        isOpen={!!detailSchool}
+        onClose={() => setDetailSchool(null)}
+        school={detailSchool}
+        onEdit={(sch) => {
+          setDetailSchool(null);
+          setEditingSchool(sch);
+        }}
+      />
+
+      {/* School Registration & Edit Modal */}
+      {editingSchool && (
+        <SchoolRegistrationModal
+          isOpen={!!editingSchool}
+          onClose={() => setEditingSchool(null)}
+          existingSchool={editingSchool}
+          defaultMunicipality="Quêssua"
+          defaultProvince="Malanje"
+          onSuccess={(updated) => {
+            onUpdateSchool?.(updated);
+            setEditingSchool(null);
+          }}
+        />
+      )}
     </div>
   );
 };

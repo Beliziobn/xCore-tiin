@@ -204,7 +204,9 @@ export const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({
   const handleBatchLockAll = () => {
     const newRecordsToSave: StudentAttendanceRecord[] = [];
 
-    Object.entries(pendingMarks).forEach(([studentId, mark]) => {
+    Object.entries(pendingMarks).forEach(([studentId, markVal]) => {
+      const mark = markVal as { status: 'presente' | 'falta'; observacao?: string };
+      if (!mark) return;
       if (lockedRecordsMap.has(studentId)) return;
       const student = students.find((s) => s.id === studentId);
       if (!student) return;

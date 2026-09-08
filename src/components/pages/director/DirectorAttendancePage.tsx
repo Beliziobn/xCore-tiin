@@ -212,7 +212,9 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
   const handleBatchLockAll = () => {
     const newRecordsToSave: TeacherAttendanceRecord[] = [];
 
-    Object.entries(pendingMarks).forEach(([teacherId, mark]) => {
+    Object.entries(pendingMarks).forEach(([teacherId, markVal]) => {
+      const mark = markVal as { status: 'presente' | 'falta'; observacao?: string };
+      if (!mark) return;
       if (lockedRecordsMap.has(teacherId)) return;
       const teacher = teachers.find((t) => t.id === teacherId);
       if (!teacher) return;

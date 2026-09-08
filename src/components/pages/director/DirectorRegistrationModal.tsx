@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, Plus, ShieldCheck, User, Users, Home, BookOpen, AlertCircle } from 'lucide-react';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
 import { CLASS_GROUPS, MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
 
 interface DirectorRegistrationModalProps {
@@ -30,6 +31,37 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
         defaultRoom="Sala 03"
         defaultPeriod="Manhã"
         schoolName="Escola Modelo Central"
+      />
+    );
+  }
+
+  // If entity is 'professores', render the comprehensive Teacher Registration Modal
+  if (entityType === 'professores') {
+    return (
+      <TeacherRegistrationModal
+        isOpen={isOpen}
+        onClose={onClose}
+        defaultSchoolName="Escola Modelo Central"
+        defaultMunicipality="Quêssua"
+        defaultProvince="Malanje"
+        authorName="Diretor de Escola"
+        onSuccess={(teacherData) => {
+          const formattedTeacher = {
+            id: teacherData.id,
+            name: teacherData.nomeCompleto,
+            gradeClass: teacherData.niveisLecciona[0]?.nome || '4ª Classe',
+            room: 'Sala 03',
+            turma: 'Turma A',
+            shift: teacherData.turnos[0] || 'Manhã',
+            subject: teacherData.disciplinas || 'Educação Geral',
+            phone: teacherData.telefone,
+            status: 'ativo',
+            bi: teacherData.biNif,
+            registrationData: teacherData,
+          };
+          onSuccess(formattedTeacher);
+          onClose();
+        }}
       />
     );
   }

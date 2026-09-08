@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 
 interface NavbarProps {
@@ -409,51 +409,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Editais & Anúncios</span>
           </button>
 
-          {/* Quick Role Switcher Pills */}
-          <div className="flex items-center gap-1 bg-[#002133]/15 p-1 rounded-xl border border-[#002133]/10 text-xs font-bold">
-            <button
-              onClick={() => {
-                if (onSwitchRole) onSwitchRole('diretor');
-                onSelectPage('diretor-estatisticas');
-              }}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                activeRole === 'diretor'
-                  ? 'bg-white text-[#002133] shadow-xs font-black'
-                  : 'text-[#002133] hover:text-white'
-              }`}
-              title="Ir para o Painel do Diretor"
-            >
-              Diretor
-            </button>
-            <button
-              onClick={() => {
-                if (onSwitchRole) onSwitchRole('professor');
-                onSelectPage('professor-estatisticas');
-              }}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                activeRole === 'professor'
-                  ? 'bg-white text-[#002133] shadow-xs font-black'
-                  : 'text-[#002133] hover:text-white'
-              }`}
-              title="Ir para o Painel do Professor"
-            >
-              Professor
-            </button>
-            <button
-              onClick={() => {
-                if (onSwitchRole) onSwitchRole('admin');
-                onSelectPage('admin-estatisticas');
-              }}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                activeRole === 'admin'
-                  ? 'bg-white text-[#002133] shadow-xs font-black'
-                  : 'text-[#002133] hover:text-white'
-              }`}
-              title="Ir para o Painel do Administrador"
-            >
-              Admin
-            </button>
-          </div>
+          {/* Quick Access: Nossa Equipa */}
+          <button
+            id="nav-btn-nossa-equipa"
+            onClick={() => {
+              const el = document.getElementById('equipa');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+            className="flex items-center gap-1.5 text-[#002133] hover:text-white font-bold transition-colors cursor-pointer py-1 text-[13.5px] uppercase tracking-wide"
+            title="Conheça o Corpo Docente e Gestores"
+          >
+            <GraduationCap className="w-4 h-4 text-[#002133]" />
+            <span>Equipa</span>
+          </button>
         </div>
 
         {/* Right CTA Actions */}
@@ -831,6 +801,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
           >
             Sobre a Central uCore
+          </button>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              const el = document.getElementById('equipa');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+            className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center gap-2"
+          >
+            <GraduationCap className="w-4 h-4 text-[#f75142]" />
+            <span>Nossa Equipa Escolar</span>
           </button>
           <button
             onClick={() => {
