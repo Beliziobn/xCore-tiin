@@ -301,13 +301,13 @@ export interface ChatMessage {
   isHelpRequest?: boolean;
 }
 
-export interface ChatChannelMember {
+export type ChatChannelMember = {
   id: string;
   name: string;
   role: string;
   avatar?: string;
   online?: boolean;
-}
+};
 
 export interface ChatChannel {
   id: string;
@@ -321,6 +321,28 @@ export interface ChatChannel {
   lastMessageSnippet?: string;
   lastMessageTime?: string;
   members?: ChatChannelMember[];
+}
+
+export type SchoolDemandType = 'notas' | 'matriculas' | 'geral';
+
+export interface SchoolAnnouncement {
+  id: string;
+  title: string;
+  demandType: SchoolDemandType;
+  headline: string;
+  description: string;
+  displayUrl: string;
+  targetSchools: string; // e.g. "Todas as Escolas" or specific school names
+  coverImage?: string;
+  coverImageName?: string;
+  createdAt: string;
+  createdBy: string;
+  expirationDate: string; // ISO date-time string e.g. "2026-09-15T23:59"
+  ctaText?: string;
+  badgeText?: string;
+  priority?: 'urgente' | 'alta' | 'normal';
+  viewsCount?: number;
+  clicksCount?: number;
 }
 
 

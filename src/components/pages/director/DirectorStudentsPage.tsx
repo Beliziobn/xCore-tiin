@@ -5,6 +5,8 @@ import { directorStudentsData as initialStudents } from '../../../data/directorD
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorStudent, AdminStudent } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
+import { SchoolAnnouncementsBanner } from '../../announcements/SchoolAnnouncementsBanner';
+import { getDemandStatus } from '../../../utils/announcementStorage';
 
 interface DirectorStudentsPageProps {
   onOpenGetStarted: () => void;
@@ -23,6 +25,9 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   const [docFilter, setDocFilter] = useState<'all' | 'with-docs' | 'without-docs'>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Check demand status for matriculas
+  const demandStatus = useMemo(() => getDemandStatus('matriculas'), []);
 
   // Filtered list
   const filteredStudents = useMemo(() => {
@@ -112,6 +117,9 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Google-style Demand Announcement Banner for Matriculas */}
+        <SchoolAnnouncementsBanner filterType="matriculas" className="mb-6" />
+
         {/* Institutional Authority Card */}
         <div className="mb-6 p-4 bg-gradient-to-r from-[#fef2f1] to-[#fef2f1] border border-[#fee4e2] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">

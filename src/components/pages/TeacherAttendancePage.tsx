@@ -294,28 +294,6 @@ export const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({
         </div>
       </div>
 
-      {/* STRICT INSTITUTIONAL RULE BANNER */}
-      <div className="mb-6 p-4 rounded-2xl bg-amber-50/80 border border-amber-200/90 shadow-2xs">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
-            <Lock className="w-4 h-4 text-amber-700" />
-          </div>
-          <div>
-            <h2 className="text-xs sm:text-sm font-black text-amber-900 flex items-center gap-1.5">
-              <span>Diretriz Institucional: Registro Irrevogável de Assiduidade</span>
-              <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-black tracking-wider uppercase">
-                Segurança Ativa
-              </span>
-            </h2>
-            <p className="text-xs text-amber-800/90 mt-1 leading-relaxed">
-              <strong>Atenção:</strong> Uma vez preenchida e gravada a presença ou a falta de qualquer aluno para esta data, 
-              o campo é <strong>trancado permanentemente</strong> e <strong>não poderá mais ser alterado</strong>. 
-              Essa trava assegura conformidade oficial com as atas escolares e auditoria do Ministério da Educação.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Metric Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">

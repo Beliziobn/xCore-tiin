@@ -1,6 +1,65 @@
-import React, { useState, useEffect } from 'react';
-import { User, ArrowLeft, CheckCircle, Save, Award, BookOpen, ChevronLeft, ChevronRight, Phone, FileText, Calendar, Sparkles, RefreshCw, FileCheck, MapPin, HeartPulse } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User, ArrowLeft, CheckCircle, Save, Award, BookOpen, ChevronLeft, ChevronRight, Phone, FileText, Calendar, Sparkles, RefreshCw, FileCheck, MapPin, HeartPulse, Lock, AlertTriangle, ShieldAlert, Check } from 'lucide-react';
 import { StudentProfile, StudentGrade, defaultDisciplinasList } from '../../data/teacherData';
+import { getDemandStatus } from '../../utils/announcementStorage';
+import { SchoolAnnouncementsBanner } from '../announcements/SchoolAnnouncementsBanner';
+
+export type EducationalRegime = 'iniciacao' | 'primario_1_6' | 'secundario_7_9';
+
+export type QualitativeGrade = 'Muito Bom' | 'Bom' | 'Suficiente' | 'Mau' | 'Péssimo';
+
+export const QUALITATIVE_RATINGS: {
+  label: QualitativeGrade;
+  sigla: string;
+  score: number;
+  badgeClass: string;
+}[] = [
+  { label: 'Muito Bom', sigla: 'MB', score: 5, badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  { label: 'Bom', sigla: 'B', score: 4, badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { label: 'Suficiente', sigla: 'S', score: 3, badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { label: 'Mau', sigla: 'M', score: 2, badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { label: 'Péssimo', sigla: 'P', score: 1, badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' },
+];
+
+export function getRegimeForClass(classeStr: string = ''): EducationalRegime {
+  const norm = classeStr.toLowerCase().trim();
+  if (norm.includes('iniciação') || norm.includes('iniciacao') || norm.includes('pre-escolar')) {
+    return 'iniciacao';
+  }
+  if (norm.includes('7ª') || norm.includes('8ª') || norm.includes('9ª') || norm.startsWith('7') || norm.startsWith('8') || norm.startsWith('9')) {
+    return 'secundario_7_9';
+  }
+  // Default: 1ª a 6ª classe, PRAEER (Etapa 1, 2, 3), Módulo 1, 2, 3
+  return 'primario_1_6';
+}
+
+export function scoreToQualitativeRating(score: number): QualitativeGrade {
+  if (score >= 4.4) return 'Muito Bom';
+  if (score >= 3.4) return 'Bom';
+  if (score >= 2.4) return 'Suficiente';
+  if (score >= 1.4) return 'Mau';
+  return 'Péssimo';
+}
+
+export function numberToQualitativeGrade(val: number, maxScale: 10 | 20 = 10): QualitativeGrade {
+  const pct = val / maxScale;
+  if (pct >= 0.85) return 'Muito Bom';
+  if (pct >= 0.70) return 'Bom';
+  if (pct >= 0.50) return 'Suficiente';
+  if (pct >= 0.30) return 'Mau';
+  return 'Péssimo';
+}
+
+export function qualitativeGradeToNumber(val: QualitativeGrade, maxScale: 10 | 20 = 10): number {
+  switch (val) {
+    case 'Muito Bom': return maxScale === 10 ? 9.5 : 19;
+    case 'Bom': return maxScale === 10 ? 7.5 : 15;
+    case 'Suficiente': return maxScale === 10 ? 5.5 : 11;
+    case 'Mau': return maxScale === 10 ? 3.5 : 7;
+    case 'Péssimo': return maxScale === 10 ? 1.5 : 3;
+    default: return maxScale === 10 ? 5 : 10;
+  }
+}
 
 interface StudentProfilePageProps {
   student?: StudentProfile;
@@ -45,33 +104,135 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
     ],
   };
 
+  const detectedRegime = useMemo(() => getRegimeForClass(currentStudent.classe), [currentStudent.classe]);
+  const [activeRegime, setActiveRegime] = useState<EducationalRegime>(detectedRegime);
   const [grades, setGrades] = useState<StudentGrade[]>(currentStudent.grades);
   const [encarregado, setEncarregado] = useState(currentStudent.encarregado);
   const [telefone, setTelefone] = useState(currentStudent.telefone);
   const [selectedSubject, setSelectedSubject] = useState<string>(currentStudent.disciplinas[0] || 'Língua Portuguesa');
+  const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [isSavedRecently, setIsSavedRecently] = useState(false);
+
+  // Check official demand expiration status for Grade Submission
+  const demandStatus = useMemo(() => getDemandStatus('notas'), []);
+  const isGradeEntryLocked = !demandStatus.isAllowed;
 
   // Sync state if student prop changes
   useEffect(() => {
-    setGrades(currentStudent.grades);
+    const nextRegime = getRegimeForClass(currentStudent.classe);
+    setActiveRegime(nextRegime);
     setEncarregado(currentStudent.encarregado);
     setTelefone(currentStudent.telefone);
-  }, [currentStudent.id]);
 
-  const handleGradeChange = (index: number, field: 'p1' | 'p2' | 'trabalho', value: number) => {
-    const clampedVal = Math.min(20, Math.max(0, isNaN(value) ? 0 : value));
+    // If 1ª a 6ª classe / PRAEER / Módulos, ensure initial grades do not exceed 10
+    if (nextRegime === 'primario_1_6') {
+      const normalized = currentStudent.grades.map((g) => {
+        const p1 = g.p1 > 10 ? Number((g.p1 / 2).toFixed(1)) : g.p1;
+        const p2 = g.p2 > 10 ? Number((g.p2 / 2).toFixed(1)) : g.p2;
+        const trabalho = g.trabalho > 10 ? Number((g.trabalho / 2).toFixed(1)) : g.trabalho;
+        const media = Number(((p1 * 0.4) + (p2 * 0.4) + (trabalho * 0.2)).toFixed(1));
+        return {
+          ...g,
+          p1,
+          p2,
+          trabalho,
+          media,
+          status: (media >= 5.0 ? 'Aprovado' : 'Recuperação') as 'Aprovado' | 'Recuperação',
+        };
+      });
+      setGrades(normalized);
+    } else {
+      setGrades(currentStudent.grades);
+    }
+  }, [currentStudent.id, currentStudent.classe]);
+
+  // When teacher toggles the regime selector, adapt grades values appropriately
+  const handleRegimeChange = (newRegime: EducationalRegime) => {
+    setActiveRegime(newRegime);
+    setGrades((prev) => {
+      if (newRegime === 'primario_1_6') {
+        return prev.map((g) => {
+          const p1 = g.p1 > 10 ? Number((g.p1 / 2).toFixed(1)) : g.p1;
+          const p2 = g.p2 > 10 ? Number((g.p2 / 2).toFixed(1)) : g.p2;
+          const trabalho = g.trabalho > 10 ? Number((g.trabalho / 2).toFixed(1)) : g.trabalho;
+          const media = Number(((p1 * 0.4) + (p2 * 0.4) + (trabalho * 0.2)).toFixed(1));
+          return {
+            ...g,
+            p1,
+            p2,
+            trabalho,
+            media,
+            status: media >= 5.0 ? 'Aprovado' : 'Recuperação',
+          };
+        });
+      } else if (newRegime === 'secundario_7_9') {
+        return prev.map((g) => {
+          // If values were in 0-10, expand to 0-20 proportionally
+          const p1 = g.p1 <= 10 && g.p1 > 0 ? Number((g.p1 * 2).toFixed(1)) : g.p1;
+          const p2 = g.p2 <= 10 && g.p2 > 0 ? Number((g.p2 * 2).toFixed(1)) : g.p2;
+          const trabalho = g.trabalho <= 10 && g.trabalho > 0 ? Number((g.trabalho * 2).toFixed(1)) : g.trabalho;
+          const media = Number(((p1 * 0.4) + (p2 * 0.4) + (trabalho * 0.2)).toFixed(1));
+          return {
+            ...g,
+            p1,
+            p2,
+            trabalho,
+            media,
+            status: media >= 10.0 ? 'Aprovado' : 'Recuperação',
+          };
+        });
+      }
+      return prev;
+    });
+  };
+
+  const handleNumericGradeChange = (index: number, field: 'p1' | 'p2' | 'trabalho', rawValue: number) => {
+    if (isGradeEntryLocked) return;
+
+    const maxLimit = activeRegime === 'primario_1_6' ? 10 : 20;
+    const passingThreshold = activeRegime === 'primario_1_6' ? 5.0 : 10.0;
+    const clampedVal = Math.min(maxLimit, Math.max(0, isNaN(rawValue) ? 0 : rawValue));
+
     setGrades((prev) => {
       const copy = [...prev];
       const current = { ...copy[index], [field]: clampedVal };
       const media = Number(((current.p1 * 0.4) + (current.p2 * 0.4) + (current.trabalho * 0.2)).toFixed(1));
       current.media = media;
-      current.status = media >= 10 ? 'Aprovado' : 'Recuperação';
+      current.status = media >= passingThreshold ? 'Aprovado' : 'Recuperação';
+      copy[index] = current;
+      return copy;
+    });
+  };
+
+  const handleQualitativeGradeChange = (index: number, field: 'p1' | 'p2' | 'trabalho', qualVal: QualitativeGrade) => {
+    if (isGradeEntryLocked) return;
+
+    const numScore = qualitativeGradeToNumber(qualVal, 10);
+
+    setGrades((prev) => {
+      const copy = [...prev];
+      const current = { ...copy[index], [field]: numScore };
+      
+      const p1Rating = numberToQualitativeGrade(current.p1, 10);
+      const p2Rating = numberToQualitativeGrade(current.p2, 10);
+      const trabRating = numberToQualitativeGrade(current.trabalho, 10);
+
+      const s1 = QUALITATIVE_RATINGS.find((r) => r.label === p1Rating)?.score ?? 3;
+      const s2 = QUALITATIVE_RATINGS.find((r) => r.label === p2Rating)?.score ?? 3;
+      const sTrab = QUALITATIVE_RATINGS.find((r) => r.label === trabRating)?.score ?? 3;
+      const finalScore = (s1 * 0.4) + (s2 * 0.4) + (sTrab * 0.2);
+      const calculatedRating = scoreToQualitativeRating(finalScore);
+
+      current.media = Number(((current.p1 * 0.4) + (current.p2 * 0.4) + (current.trabalho * 0.2)).toFixed(1));
+      current.status = (calculatedRating === 'Muito Bom' || calculatedRating === 'Bom' || calculatedRating === 'Suficiente') ? 'Aprovado' : 'Recuperação';
       copy[index] = current;
       return copy;
     });
   };
 
   const handleSave = () => {
+    if (isGradeEntryLocked) return;
+
     const updated: StudentProfile = {
       ...currentStudent,
       encarregado,
@@ -278,15 +439,15 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
       </div>
 
       {/* Biographical Data & Document Verification Section */}
-      <div className="mb-10 bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-7">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
-          <div className="flex items-center gap-2">
+      <div className="mb-10 bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-6 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
             <span className="inline-block bg-[#002133] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-2xs">
               Registro Escolar
             </span>
             <h3 className="text-base sm:text-lg font-black text-[#002133] tracking-tight flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#f75142]" />
-              <span>Ficha Biográfica & Documentação Legal do Aluno</span>
+              <span>Ficha Biográfica & Documentação do Aluno</span>
             </h3>
           </div>
 
@@ -301,20 +462,22 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        {/* Information Grid without cards: pure typographical hierarchy and subtle dividers */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
           {/* 1. Documento */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          <div className="space-y-1.5 sm:pr-4">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
               Documento de Identificação
             </span>
-            <div className="font-black text-slate-800 text-sm">
+            <div className="font-black text-slate-900 text-sm">
               {currentStudent.tipoDocumento === 'Cedula pessoal' 
                 ? 'Cédula Pessoal' 
                 : currentStudent.tipoDocumento || (currentStudent.temDocumentos ? 'Bilhete de Identidade (BI)' : 'Sem Documento')}
             </div>
             {currentStudent.numeroDocumento ? (
-              <div className="font-mono text-slate-600 font-bold text-xs bg-white px-2.5 py-1 rounded-lg border border-slate-200/80 inline-block">
-                Nº {currentStudent.numeroDocumento}
+              <div className="text-slate-700 font-mono font-bold text-xs flex items-center gap-1.5 pt-0.5">
+                <span className="text-slate-400 font-sans font-medium">Nº</span>
+                <span>{currentStudent.numeroDocumento}</span>
               </div>
             ) : (
               <div className="text-[11px] text-slate-400 italic">
@@ -322,7 +485,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
               </div>
             )}
             {currentStudent.anexoDocumentoNome && (
-              <div className="pt-1 flex items-center gap-1.5 text-[11px] text-emerald-700 font-bold truncate">
+              <div className="pt-1 flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold truncate">
                 <FileCheck className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
                 <span className="truncate" title={currentStudent.anexoDocumentoNome}>
                   {currentStudent.anexoDocumentoNome}
@@ -332,11 +495,11 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           </div>
 
           {/* 2. Nascimento & Idade */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          <div className="space-y-1.5 sm:px-4 sm:border-l sm:border-slate-100">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
               Nascimento & Idade
             </span>
-            <div className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+            <div className="font-black text-slate-900 text-sm flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-[#f75142]" />
               <span>
                 {currentStudent.dataNascimento 
@@ -344,38 +507,40 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                   : '14/05/2016'}
               </span>
             </div>
-            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#fef2f1] text-[#f75142] font-black text-xs border border-[#f75142]/20">
-              Idade Calculada: {currentStudent.idade ?? 10} Anos
+            <div className="text-xs font-semibold text-slate-700 pt-0.5">
+              <span className="text-slate-400 font-normal">Idade:</span> {currentStudent.idade ?? 10} Anos
             </div>
             <div className="text-[11px] text-slate-500 font-medium">
-              Condição: <strong className="text-slate-800">{currentStudent.condicaoMatricula === 'repetente' ? 'Repetente' : 'Pela Primeira Vez'}</strong>
+              Condição: <strong className="text-slate-800 font-bold">{currentStudent.condicaoMatricula === 'repetente' ? 'Repetente' : 'Pela Primeira Vez'}</strong>
             </div>
           </div>
 
           {/* 3. Filiação */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          <div className="space-y-1.5 lg:px-4 lg:border-l lg:border-slate-100">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
               Filiação Paterna & Materna
             </span>
-            <div className="text-[11px] text-slate-600">
-              <span className="text-slate-400">Pai:</span>{' '}
-              <strong className="text-slate-800 font-bold">{currentStudent.nomePai || 'Manuel Golph'}</strong>
-            </div>
-            <div className="text-[11px] text-slate-600">
-              <span className="text-slate-400">Mãe:</span>{' '}
-              <strong className="text-slate-800 font-bold">{currentStudent.nomeMae || 'Francisca Golph'}</strong>
+            <div className="text-[11px] text-slate-600 space-y-1">
+              <div>
+                <span className="text-slate-400">Pai:</span>{' '}
+                <strong className="text-slate-900 font-bold">{currentStudent.nomePai || 'Manuel Golph'}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400">Mãe:</span>{' '}
+                <strong className="text-slate-900 font-bold">{currentStudent.nomeMae || 'Francisca Golph'}</strong>
+              </div>
             </div>
             <div className="text-[11px] text-slate-500 pt-0.5">
-              Parentesco Encarregado: <span className="font-bold text-slate-700">{currentStudent.parentescoEncarregado || 'Pai'}</span>
+              Parentesco: <span className="font-bold text-slate-800">{currentStudent.parentescoEncarregado || 'Pai'}</span>
             </div>
           </div>
 
-          {/* 4. Residência & Saúde */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          {/* 4. Residência & Observações */}
+          <div className="space-y-1.5 sm:px-4 sm:border-l sm:border-slate-100">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
               Residência & Observações
             </span>
-            <div className="flex items-start gap-1 text-[11px] text-slate-700 font-medium">
+            <div className="flex items-start gap-1.5 text-[11px] text-slate-700 font-medium">
               <MapPin className="w-3.5 h-3.5 text-[#f75142] shrink-0 mt-0.5" />
               <span className="truncate" title={currentStudent.endereco || 'Bairro Palanca, Luanda'}>
                 {currentStudent.endereco || 'Bairro Palanca, Luanda'}
@@ -386,147 +551,390 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                 Alt: <span className="font-mono font-bold text-slate-700">{currentStudent.telefoneAlternativo}</span>
               </div>
             )}
-            <div className="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200/70 truncate">
-              Obs: {currentStudent.observacoes || 'Apto para atividades letivas e físicas.'}
+            <div className="text-[11px] text-slate-500 line-clamp-2 pt-0.5">
+              <span className="text-slate-400">Obs:</span> {currentStudent.observacoes || 'Apto para atividades letivas e físicas.'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Lower Section: Disciplinas (Left) & Notas (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 items-start">
-        {/* Left Column: Badge "Disciplinas" over Container */}
-        <div className="lg:col-span-3 flex flex-col items-start">
-          <span className="inline-block bg-[#002133] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Disciplinas
-          </span>
-          <div className="w-full bg-[#f75142] text-white rounded-[24px] p-5 shadow-[0_12px_32px_rgba(247,81,66,0.25)] space-y-2">
-            {currentStudent.disciplinas.map((disc, idx) => {
-              const isSelected = disc === selectedSubject;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedSubject(disc)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-between ${
-                    isSelected
-                      ? 'bg-white text-[#002133] font-black shadow-sm'
-                      : 'bg-white/10 hover:bg-white/20 text-white'
-                  }`}
-                >
-                  <span className="truncate">{disc}</span>
-                  {isSelected && <Award className="w-3.5 h-3.5 text-[#002133] shrink-0" />}
-                </button>
-              );
-            })}
+      {/* Active Demand Announcement Banner for Notas - framed cleanly above both columns */}
+      <SchoolAnnouncementsBanner filterType="notas" className="mb-6" />
+
+      {/* Expiration Alert Notice if locked - placed cleanly above columns to avoid breaking column symmetry */}
+      {isGradeEntryLocked && (
+        <div className="mb-6 p-4 rounded-2xl bg-white border border-rose-200/90 shadow-2xs flex items-start gap-3 text-xs text-slate-700">
+          <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
+            <Lock className="w-4 h-4 text-rose-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-slate-900 text-sm">
+              Prazo Oficial de Lançamento de Notas Encerrado
+            </p>
+            <p className="mt-0.5 text-slate-600 leading-relaxed">
+              {demandStatus.message || `O período para inserção e edição de notas encerrou em ${demandStatus.formattedExpirationDate}. O sistema bloqueou a gravação de novas notas nas pautas em conformidade com o edital regimental.`}
+            </p>
+            {demandStatus.expiredAnnouncement && (
+              <p className="mt-1 text-[11px] font-mono text-slate-400">
+                Edital: {demandStatus.expiredAnnouncement.title}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Lower Section: Disciplinas (Left Div) & Notas (Right Div) - Perfectly Aligned Line-by-Line */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8 items-start">
+        {/* Left Column: Div 1 - Disciplinas */}
+        <div className="lg:col-span-4 flex flex-col items-start w-full">
+          <div className="flex items-center justify-between w-full mb-3.5 min-h-[44px] px-3.5 py-2 bg-slate-50/80 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <span className="inline-block bg-[#002133] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
+              Disciplinas Curriculares
+            </span>
+            <span className="text-[11px] font-bold text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200/80 shadow-2xs">
+              {grades.length} Matérias
+            </span>
+          </div>
+
+          <div className="w-full bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+            {/* Header row with fixed h-12 matching right column */}
+            <div className="h-12 px-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-slate-600">
+              <span className="flex items-center gap-2">
+                <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
+                <span>Componente Curricular</span>
+              </span>
+              <span className="text-slate-400 font-medium">Nº</span>
+            </div>
+
+            {/* Disciplines rows with exact h-[62px] matching each grade row */}
+            <div className="divide-y divide-slate-100 flex flex-col">
+              {grades.map((grade, idx) => {
+                const isSelected = grade.subject === selectedSubject;
+                const isHovered = grade.subject === hoveredSubject;
+                return (
+                  <div
+                    key={grade.subject}
+                    onClick={() => setSelectedSubject(grade.subject)}
+                    onMouseEnter={() => setHoveredSubject(grade.subject)}
+                    onMouseLeave={() => setHoveredSubject(null)}
+                    className={`h-[62px] px-4 flex items-center justify-between transition-colors cursor-pointer select-none ${
+                      isSelected
+                        ? 'bg-slate-100/95 text-slate-950 font-black border-l-4 border-l-[#f75142]'
+                        : isHovered
+                        ? 'bg-slate-50/90 text-slate-900 border-l-4 border-l-slate-400'
+                        : 'text-slate-700 hover:bg-slate-50/70 border-l-4 border-l-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <span
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-mono font-bold shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-[#002133] text-white'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {String(idx + 1).padStart(2, '0')}
+                      </span>
+                      <span className="text-xs font-bold truncate text-slate-900" title={grade.subject}>
+                        {grade.subject}
+                      </span>
+                    </div>
+
+                    {isSelected ? (
+                      <span className="shrink-0 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[#f75142] bg-[#fef2f1] px-2 py-0.5 rounded-md border border-[#fee4e2]">
+                        <Award className="w-3 h-3" />
+                        <span>Ativa</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        #{idx + 1}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer row with fixed h-12 matching right column */}
+            <div className="h-12 px-4 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+              <span>{grades.length} Disciplinas Avaliadas</span>
+              <span className="font-bold text-slate-700">Ano Letivo Regular</span>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Badge "Notas" over Container */}
-        <div className="lg:col-span-9 flex flex-col items-start">
-          <span className="inline-block bg-[#002133] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
-            Notas
-          </span>
-          <div className="w-full bg-[#f75142] text-white rounded-[24px] p-5 sm:p-7 shadow-[0_12px_32px_rgba(247,81,66,0.25)] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-white/20 text-white/90 text-[11px] uppercase tracking-wider font-bold">
-                    <th className="pb-3 pr-4 font-black">Disciplina</th>
-                    <th className="pb-3 px-2 text-center font-black">P1 (40%)</th>
-                    <th className="pb-3 px-2 text-center font-black">P2 (40%)</th>
-                    <th className="pb-3 px-2 text-center font-black">Trab. (20%)</th>
-                    <th className="pb-3 px-3 text-center font-black">Média</th>
-                    <th className="pb-3 pl-3 text-center font-black">Situação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/15">
-                  {grades.map((grade, idx) => {
-                    const isSelected = grade.subject === selectedSubject;
-                    return (
-                      <tr
-                        key={idx}
-                        className={`transition-colors ${
-                          isSelected ? 'bg-white/15 font-bold' : 'hover:bg-white/5'
-                        }`}
-                      >
-                        <td className="py-3 pr-4 font-bold text-white">
-                          <button
-                            onClick={() => setSelectedSubject(grade.subject)}
-                            className="text-left hover:underline cursor-pointer"
-                          >
-                            {grade.subject}
-                          </button>
-                        </td>
-
-                        {/* P1 Input */}
-                        <td className="py-2 px-2 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="20"
-                            step="0.5"
-                            value={grade.p1}
-                            onChange={(e) => handleGradeChange(idx, 'p1', parseFloat(e.target.value))}
-                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#002133] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
-                          />
-                        </td>
-
-                        {/* P2 Input */}
-                        <td className="py-2 px-2 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="20"
-                            step="0.5"
-                            value={grade.p2}
-                            onChange={(e) => handleGradeChange(idx, 'p2', parseFloat(e.target.value))}
-                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#002133] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
-                          />
-                        </td>
-
-                        {/* Trabalho Input */}
-                        <td className="py-2 px-2 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="20"
-                            step="0.5"
-                            value={grade.trabalho}
-                            onChange={(e) => handleGradeChange(idx, 'trabalho', parseFloat(e.target.value))}
-                            className="w-14 text-center bg-white/20 hover:bg-white/30 focus:bg-white focus:text-[#002133] text-white font-bold py-1 rounded-lg border border-white/30 focus:outline-none transition-all"
-                          />
-                        </td>
-
-                        {/* Média */}
-                        <td className="py-2 px-3 text-center font-black text-sm text-yellow-300">
-                          {grade.media.toFixed(1)}
-                        </td>
-
-                        {/* Situação */}
-                        <td className="py-2 pl-3 text-center">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              grade.status === 'Aprovado'
-                                ? 'bg-emerald-400 text-emerald-950'
-                                : 'bg-rose-400 text-rose-950'
-                            }`}
-                          >
-                            {grade.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        {/* Right Column: Div 2 - Notas */}
+        <div className="lg:col-span-8 flex flex-col items-start w-full">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 w-full mb-3.5 min-h-[44px] px-3.5 py-2 bg-slate-50/80 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="inline-block bg-[#002133] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-2xs">
+                Pauta de Notas
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-white text-slate-700 border border-slate-200/80 shadow-2xs">
+                {activeRegime === 'iniciacao' && 'Iniciação • Avaliação Qualitativa'}
+                {activeRegime === 'primario_1_6' && '1ª a 6ª / PRAEER • 0 a 10 val'}
+                {activeRegime === 'secundario_7_9' && '7ª a 9ª Classe • 0 a 20 val'}
+              </span>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-white/20 flex flex-wrap items-center justify-between text-xs text-white/80">
-              <span>* Escala de avaliação de 0 a 20 valores (Média de aprovação ≥ 10.0 valores).</span>
-              <span className="font-bold text-white">
-                Média Geral do Aluno:{' '}
-                {(grades.reduce((acc, g) => acc + g.media, 0) / grades.length).toFixed(1)} val
+            <div className="flex items-center gap-2">
+              {isGradeEntryLocked && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                  <Lock className="w-3 h-3 text-rose-600" />
+                  <span>Bloqueado</span>
+                </span>
+              )}
+
+              {/* Regime Selector */}
+              <div className="flex items-center gap-1.5 text-xs bg-white border border-slate-200/90 rounded-xl px-2.5 py-1 shadow-2xs">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Escala:</span>
+                <select
+                  value={activeRegime}
+                  onChange={(e) => handleRegimeChange(e.target.value as EducationalRegime)}
+                  className="text-xs font-bold text-slate-800 bg-transparent border-none focus:outline-none cursor-pointer py-0.5 pr-1"
+                  title="Alterar regime avaliativo para testes ou turmas específicas"
+                >
+                  <option value="primario_1_6">1ª a 6ª / PRAEER / Módulos (0 a 10)</option>
+                  <option value="iniciacao">Iniciação (Qualitativa)</option>
+                  <option value="secundario_7_9">7ª a 9ª Classe (0 a 20)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+            {/* Header row with fixed h-12 matching left column */}
+            <div className="h-12 px-4 bg-slate-50/90 border-b border-slate-200 grid grid-cols-12 items-center text-[11px] font-black uppercase tracking-wider text-slate-600 text-center">
+              {activeRegime === 'iniciacao' ? (
+                <>
+                  <span className="col-span-3 text-center font-black">1º Trimestre</span>
+                  <span className="col-span-3 text-center font-black">2º Trimestre</span>
+                  <span className="col-span-3 text-center font-black">Atividades (Trab.)</span>
+                  <span className="col-span-3 text-center font-black text-slate-900">Aproveitamento</span>
+                </>
+              ) : (
+                <>
+                  <span className="col-span-2 text-center font-black">P1 (40%)</span>
+                  <span className="col-span-2 text-center font-black">P2 (40%)</span>
+                  <span className="col-span-2 text-center font-black">Trab. (20%)</span>
+                  <span className="col-span-3 text-center font-black text-slate-900">
+                    Média ({activeRegime === 'primario_1_6' ? '0 - 10' : '0 - 20'})
+                  </span>
+                  <span className="col-span-3 text-center font-black">Situação</span>
+                </>
+              )}
+            </div>
+
+            {/* Grades rows with exact h-[62px] matching each discipline row */}
+            <div className="divide-y divide-slate-100 flex flex-col">
+              {grades.map((grade, idx) => {
+                const isSelected = grade.subject === selectedSubject;
+                const isHovered = grade.subject === hoveredSubject;
+
+                if (activeRegime === 'iniciacao') {
+                  const qP1 = numberToQualitativeGrade(grade.p1, 10);
+                  const qP2 = numberToQualitativeGrade(grade.p2, 10);
+                  const qTrab = numberToQualitativeGrade(grade.trabalho, 10);
+
+                  const s1 = QUALITATIVE_RATINGS.find((r) => r.label === qP1)?.score ?? 3;
+                  const s2 = QUALITATIVE_RATINGS.find((r) => r.label === qP2)?.score ?? 3;
+                  const sTrab = QUALITATIVE_RATINGS.find((r) => r.label === qTrab)?.score ?? 3;
+                  const weighted = (s1 * 0.4) + (s2 * 0.4) + (sTrab * 0.2);
+                  const qFinal = scoreToQualitativeRating(weighted);
+                  const isApproved = qFinal === 'Muito Bom' || qFinal === 'Bom' || qFinal === 'Suficiente';
+                  const ratingConfig = QUALITATIVE_RATINGS.find((r) => r.label === qFinal);
+
+                  return (
+                    <div
+                      key={grade.subject}
+                      onMouseEnter={() => setHoveredSubject(grade.subject)}
+                      onMouseLeave={() => setHoveredSubject(null)}
+                      className={`h-[62px] px-4 grid grid-cols-12 items-center transition-colors ${
+                        isSelected
+                          ? 'bg-slate-100/95 border-l-4 border-l-[#f75142]'
+                          : isHovered
+                          ? 'bg-slate-50/90 border-l-4 border-l-slate-400'
+                          : 'hover:bg-slate-50/60 border-l-4 border-l-transparent'
+                      }`}
+                    >
+                      {/* P1 Qualitativo */}
+                      <div className="col-span-3 px-1 flex justify-center">
+                        <select
+                          value={qP1}
+                          disabled={isGradeEntryLocked}
+                          onChange={(e) => handleQualitativeGradeChange(idx, 'p1', e.target.value as QualitativeGrade)}
+                          className="w-full max-w-[130px] text-center text-xs font-bold py-1.5 px-2 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer shadow-2xs"
+                        >
+                          {QUALITATIVE_RATINGS.map((item) => (
+                            <option key={item.label} value={item.label}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* P2 Qualitativo */}
+                      <div className="col-span-3 px-1 flex justify-center">
+                        <select
+                          value={qP2}
+                          disabled={isGradeEntryLocked}
+                          onChange={(e) => handleQualitativeGradeChange(idx, 'p2', e.target.value as QualitativeGrade)}
+                          className="w-full max-w-[130px] text-center text-xs font-bold py-1.5 px-2 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer shadow-2xs"
+                        >
+                          {QUALITATIVE_RATINGS.map((item) => (
+                            <option key={item.label} value={item.label}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Trabalho Qualitativo */}
+                      <div className="col-span-3 px-1 flex justify-center">
+                        <select
+                          value={qTrab}
+                          disabled={isGradeEntryLocked}
+                          onChange={(e) => handleQualitativeGradeChange(idx, 'trabalho', e.target.value as QualitativeGrade)}
+                          className="w-full max-w-[130px] text-center text-xs font-bold py-1.5 px-2 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer shadow-2xs"
+                        >
+                          {QUALITATIVE_RATINGS.map((item) => (
+                            <option key={item.label} value={item.label}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Aproveitamento & Situação */}
+                      <div className="col-span-3 px-1 flex flex-col items-center justify-center">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                            ratingConfig?.badgeClass || 'bg-slate-100 text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          {qFinal}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                          {isApproved ? 'Aprovado' : 'Apoio Pedagógico'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Numeric Evaluation (0-10 for 1ª-6ª / PRAEER / Módulos, or 0-20 for 7ª-9ª)
+                const maxVal = activeRegime === 'primario_1_6' ? 10 : 20;
+                const passingThreshold = activeRegime === 'primario_1_6' ? 5.0 : 10.0;
+                const isApproved = grade.media >= passingThreshold;
+
+                return (
+                  <div
+                    key={grade.subject}
+                    onMouseEnter={() => setHoveredSubject(grade.subject)}
+                    onMouseLeave={() => setHoveredSubject(null)}
+                    className={`h-[62px] px-4 grid grid-cols-12 items-center transition-colors ${
+                      isSelected
+                        ? 'bg-slate-100/95 border-l-4 border-l-[#f75142]'
+                        : isHovered
+                        ? 'bg-slate-50/90 border-l-4 border-l-slate-400'
+                        : 'hover:bg-slate-50/60 border-l-4 border-l-transparent'
+                    }`}
+                  >
+                    {/* P1 Input */}
+                    <div className="col-span-2 flex justify-center">
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxVal}
+                        step="0.1"
+                        value={grade.p1}
+                        disabled={isGradeEntryLocked}
+                        onChange={(e) => handleNumericGradeChange(idx, 'p1', parseFloat(e.target.value))}
+                        className={`w-14 text-center font-bold py-1.5 rounded-lg border text-xs transition-all ${
+                          isGradeEntryLocked
+                            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                            : 'bg-white hover:border-slate-400 focus:border-slate-900 text-slate-900 border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-900'
+                        }`}
+                        title={`Inserir nota de P1 (0 a ${maxVal})`}
+                      />
+                    </div>
+
+                    {/* P2 Input */}
+                    <div className="col-span-2 flex justify-center">
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxVal}
+                        step="0.1"
+                        value={grade.p2}
+                        disabled={isGradeEntryLocked}
+                        onChange={(e) => handleNumericGradeChange(idx, 'p2', parseFloat(e.target.value))}
+                        className={`w-14 text-center font-bold py-1.5 rounded-lg border text-xs transition-all ${
+                          isGradeEntryLocked
+                            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                            : 'bg-white hover:border-slate-400 focus:border-slate-900 text-slate-900 border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-900'
+                        }`}
+                        title={`Inserir nota de P2 (0 a ${maxVal})`}
+                      />
+                    </div>
+
+                    {/* Trabalho Input */}
+                    <div className="col-span-2 flex justify-center">
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxVal}
+                        step="0.1"
+                        value={grade.trabalho}
+                        disabled={isGradeEntryLocked}
+                        onChange={(e) => handleNumericGradeChange(idx, 'trabalho', parseFloat(e.target.value))}
+                        className={`w-14 text-center font-bold py-1.5 rounded-lg border text-xs transition-all ${
+                          isGradeEntryLocked
+                            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                            : 'bg-white hover:border-slate-400 focus:border-slate-900 text-slate-900 border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-900'
+                        }`}
+                        title={`Inserir nota de Trabalho (0 a ${maxVal})`}
+                      />
+                    </div>
+
+                    {/* Média */}
+                    <div className="col-span-3 flex justify-center">
+                      <span className="font-black text-sm text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200/80">
+                        {grade.media.toFixed(1)} val
+                      </span>
+                    </div>
+
+                    {/* Situação */}
+                    <div className="col-span-3 flex justify-center">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          isApproved
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}
+                      >
+                        {isApproved ? 'Aprovado' : 'Recuperação'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer row with fixed h-12 matching left column */}
+            <div className="h-12 px-4 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+              <span className="text-[11px] text-slate-500 truncate mr-2">
+                {activeRegime === 'iniciacao' && '* Iniciação: notas qualitativas (Muito Bom, Bom, Suficiente, Mau, Péssimo).'}
+                {activeRegime === 'primario_1_6' && '* 1ª a 6ª classe, PRAEER Etapas 1-3, Módulos 1-3: escala 0 a 10 (Aprovação ≥ 5.0).'}
+                {activeRegime === 'secundario_7_9' && '* 7ª a 9ª classe: escala de avaliação 0 a 20 valores (Aprovação ≥ 10.0).'}
               </span>
+
+              <div className="flex items-center gap-2 font-bold text-slate-800 shrink-0">
+                <span>Média Geral:</span>
+                <span className="text-[#f75142] font-black text-sm">
+                  {(grades.reduce((acc, g) => acc + g.media, 0) / (grades.length || 1)).toFixed(1)} val
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -539,6 +947,11 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
             <CheckCircle className="w-4 h-4" />
             <span>Dados e notas do aluno salvos com sucesso!</span>
           </div>
+        ) : isGradeEntryLocked ? (
+          <div className="flex items-center gap-2 text-rose-700 bg-rose-50 px-4 py-2 rounded-full border border-rose-200 text-xs font-bold">
+            <Lock className="w-4 h-4" />
+            <span>Inserção de notas suspensa: o prazo determinado pelo anúncio oficial expirou.</span>
+          </div>
         ) : (
           <div className="text-xs text-slate-400 font-medium">
             Clique no botão Guarda para registrar alterações no diário de classe.
@@ -548,12 +961,27 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
         {/* The "Guarda" button */}
         <button
           onClick={handleSave}
-          className="bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black text-xs sm:text-sm uppercase tracking-wider px-8 py-2.5 rounded-full shadow-[0_4px_16px_rgba(247,81,66,0.35)] hover:shadow-[0_6px_20px_rgba(247,81,66,0.45)] transition-all cursor-pointer active:scale-95 flex items-center gap-2"
+          disabled={isGradeEntryLocked}
+          className={`font-black text-xs sm:text-sm uppercase tracking-wider px-8 py-2.5 rounded-full shadow-md transition-all flex items-center gap-2 ${
+            isGradeEntryLocked
+              ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
+              : 'bg-[#f75142] hover:bg-[#e04436] text-[#002133] shadow-[0_4px_16px_rgba(247,81,66,0.35)] hover:shadow-[0_6px_20px_rgba(247,81,66,0.45)] cursor-pointer active:scale-95'
+          }`}
         >
-          <Save className="w-4 h-4" />
-          <span>Guarda</span>
+          {isGradeEntryLocked ? (
+            <>
+              <Lock className="w-4 h-4" />
+              <span>Lançamento Bloqueado</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Guarda</span>
+            </>
+          )}
         </button>
       </div>
+
     </div>
   );
 };

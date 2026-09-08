@@ -27,6 +27,7 @@ import { AdminTeachersPage } from './components/pages/admin/AdminTeachersPage';
 import { AdminStudentsPage } from './components/pages/admin/AdminStudentsPage';
 import { AdminDirectorsPage } from './components/pages/admin/AdminDirectorsPage';
 import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
+import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
 import { AdminRegistrationModal, AdminModalType } from './components/pages/admin/AdminRegistrationModal';
 import { 
   initialAdminSchools, 
@@ -514,6 +515,7 @@ export default function App() {
       pageId === 'admin-directores' ||
       pageId === 'admin-professores' ||
       pageId === 'admin-alunos' ||
+      pageId === 'admin-anuncios' ||
       pageId === 'admin-perfil'
     ) {
       setCurrentView(pageId);
@@ -522,6 +524,11 @@ export default function App() {
     }
 
     if (activeRole === 'admin') {
+      if (pageId === 'anuncios' || pageId === 'editais' || pageId === 'demandas') {
+        setCurrentView('admin-anuncios');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       if (pageId === 'escolas') {
         setCurrentView('admin-escolas');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -737,6 +744,24 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           isLoggedIn={isSessionStarted}
+        />
+      );
+    }
+    if (currentView === 'admin-anuncios') {
+      return (
+        <AdminAnnouncementsPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          onNavigateToGrades={() => {
+            setActiveRole('professor');
+            setCurrentView('aluno-perfil');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToMatriculas={() => {
+            setActiveRole('diretor');
+            setCurrentView('diretor-alunos');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       );
     }

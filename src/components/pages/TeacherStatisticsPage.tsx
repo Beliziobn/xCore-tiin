@@ -6,6 +6,7 @@ import { GenderDonutChart } from '../charts/GenderDonutChart';
 import { PerformanceBarChart } from '../charts/PerformanceBarChart';
 import { AttendanceAreaChart } from '../charts/AttendanceAreaChart';
 import { DocumentStatusChart } from '../charts/DocumentStatusChart';
+import { SchoolAnnouncementsBanner } from '../announcements/SchoolAnnouncementsBanner';
 
 interface TeacherStatisticsPageProps {
   onNavigateToClass: () => void;
@@ -73,6 +74,16 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Pedagogical Announcements Banner for Teachers */}
+      <SchoolAnnouncementsBanner
+        filterType="notas"
+        title="Editais, Prazos & Demandas Pedagógicas em Vigor"
+        className="mb-8 shadow-xs"
+        onActionClick={() => {
+          onNavigateToClass();
+        }}
+      />
 
       {/* Metric Cards featuring harmonious equal-height cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-5xl mx-auto mb-14 items-stretch">

@@ -24,7 +24,6 @@ import {
   FileText, 
   FileSpreadsheet, 
   File as FileGeneric, 
-  ArrowLeftRight, 
   Volume2, 
   VolumeX,
   Eye,
@@ -451,60 +450,14 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
             : 'w-full h-full sm:w-[92vw] sm:max-w-5xl sm:h-[86vh] sm:max-h-[800px] sm:rounded-[24px]'
         }`}
       >
-        {/* TOP MESSENGER BAR WITH SCHOOL LOCK */}
+        {/* TOP MESSENGER BAR */}
         <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xs select-none">
-          {/* Brand + School Security Indicator */}
-          <div className="flex items-center gap-3">
+          {/* Brand */}
+          <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#f75142] via-[#f86f63] to-[#f86f63] flex items-center justify-center shadow-xs text-white">
               <MessageSquare className="w-4 h-4 fill-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-900 tracking-tight">uCore Messenger</span>
-                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  <Lock className="w-3 h-3 text-emerald-600" />
-                  Isolamento: {userSchoolName}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Tempo Real Ativo
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-slate-600">Apenas membros da tua escola têm acesso</span>
-              </p>
-            </div>
-          </div>
-
-          {/* SENDER SWITCHER (Allows testing real-time interaction between real users of this school) */}
-          <div className="hidden lg:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-2.5 py-1 rounded-full text-xs">
-            <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-              <ArrowLeftRight className="w-3 h-3 text-[#f75142]" />
-              Remetente:
-            </span>
-            <select
-              value={currentSenderName}
-              onChange={(e) => {
-                const selectedName = e.target.value;
-                setCurrentSenderName(selectedName);
-                const member = schoolMembers.find((m) => m.name === selectedName);
-                if ((member?.role || '').toLowerCase().includes('diretor')) {
-                  setCurrentSenderRole('diretor');
-                } else {
-                  setCurrentSenderRole('professor');
-                }
-                // When switching sender, unlock waiting state so the new sender can answer!
-                setIsWaitingForReply(false);
-              }}
-              className="bg-white border border-slate-300 rounded-md px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#f75142]"
-            >
-              {schoolMembers.map((m) => (
-                <option key={m.id} value={m.name}>
-                  {m.name} ({m.role})
-                </option>
-              ))}
-            </select>
+            <span className="text-sm font-bold text-slate-900">Mensagens</span>
           </div>
 
           {/* Window Actions */}
@@ -652,12 +605,6 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                   </button>
                 );
               })}
-            </div>
-
-            {/* Strict Isolation Notice */}
-            <div className="p-3 border-t border-slate-100 bg-[#F9FAFB] text-[11px] text-slate-500 flex items-center gap-2">
-              <Lock className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Rede Fechada: É impossível interagir com usuários de outras escolas.</span>
             </div>
           </div>
 
@@ -1080,18 +1027,6 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                   </button>
                 )}
               </form>
-
-              {/* Status Hint */}
-              <div className="flex items-center justify-between mt-1.5 px-2 text-[10px] text-slate-400">
-                <span>
-                  {isWaitingForReply ? (
-                    <strong className="text-[#f75142]">Envio bloqueado temporariamente até a resposta chegar.</strong>
-                  ) : (
-                    <>Envio direto em tempo real (Arraste arquivos ou clique no clipe para importar).</>
-                  )}
-                </span>
-                <span>{userSchoolName}</span>
-              </div>
             </div>
           </div>
 

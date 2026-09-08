@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 
 interface NavbarProps {
@@ -17,6 +17,7 @@ interface NavbarProps {
   onLogout?: () => void;
   activeRole?: string;
   currentPage?: string;
+  onSwitchRole?: (role: 'admin' | 'diretor' | 'professor') => void;
 }
 
 const mockNotifications: NotificationItem[] = [
@@ -61,6 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   activeRole,
   currentPage = 'home',
+  onSwitchRole,
 }) => {
   const [showPagesDropdown, setShowPagesDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -209,10 +211,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                     <button
                       onClick={() => {
+                        onSelectPage('admin-anuncios');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
+                    >
+                      <span>Demandas & Editais</span>
+                      <span className="text-[9px] bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded">Oficial</span>
+                    </button>
+                    <button
+                      onClick={() => {
                         onSelectPage('admin-perfil');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
                     >
                       Perfil do Administrador
                     </button>
@@ -386,35 +398,62 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
+          {/* Quick Access: Mural de Editais & Anúncios */}
           <button
-            id="nav-meu-perfil"
-            onClick={() => {
-              if (activeRole === 'admin') {
-                onSelectPage('admin-perfil');
-              } else if (activeRole === 'diretor') {
-                onSelectPage('diretor-perfil');
-              } else {
-                onOpenProfile();
-              }
-            }}
-            className="text-[#002133] hover:text-white font-bold transition-colors cursor-pointer"
+            id="nav-btn-mural-editais"
+            onClick={() => onSelectPage('admin-anuncios')}
+            className="flex items-center gap-1.5 text-[#002133] hover:text-white font-bold transition-colors cursor-pointer py-1 text-[13.5px] uppercase tracking-wide"
+            title="Acessar Mural Oficial de Editais e Anúncios"
           >
-            Perfil
+            <Megaphone className="w-4 h-4 text-[#002133]" />
+            <span>Editais & Anúncios</span>
           </button>
 
-          {onOpenChat && (
+          {/* Quick Role Switcher Pills */}
+          <div className="flex items-center gap-1 bg-[#002133]/15 p-1 rounded-xl border border-[#002133]/10 text-xs font-bold">
             <button
-              id="nav-chat-suporte"
-              onClick={onOpenChat}
-              className="relative text-[#002133] hover:text-white font-bold transition-colors cursor-pointer"
-              title="Abrir Chat de Suporte e Ajuda"
+              onClick={() => {
+                if (onSwitchRole) onSwitchRole('diretor');
+                onSelectPage('diretor-estatisticas');
+              }}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                activeRole === 'diretor'
+                  ? 'bg-white text-[#002133] shadow-xs font-black'
+                  : 'text-[#002133] hover:text-white'
+              }`}
+              title="Ir para o Painel do Diretor"
             >
-              <span>Chat</span>
-              {unreadChatCount !== undefined && unreadChatCount > 0 && (
-                <span className="absolute -top-1 -right-2.5 w-2.5 h-2.5 rounded-full bg-[#002133] ring-2 ring-[#f75142] animate-pulse" />
-              )}
+              Diretor
             </button>
-          )}
+            <button
+              onClick={() => {
+                if (onSwitchRole) onSwitchRole('professor');
+                onSelectPage('professor-estatisticas');
+              }}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                activeRole === 'professor'
+                  ? 'bg-white text-[#002133] shadow-xs font-black'
+                  : 'text-[#002133] hover:text-white'
+              }`}
+              title="Ir para o Painel do Professor"
+            >
+              Professor
+            </button>
+            <button
+              onClick={() => {
+                if (onSwitchRole) onSwitchRole('admin');
+                onSelectPage('admin-estatisticas');
+              }}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                activeRole === 'admin'
+                  ? 'bg-white text-[#002133] shadow-xs font-black'
+                  : 'text-[#002133] hover:text-white'
+              }`}
+              title="Ir para o Painel do Administrador"
+            >
+              Admin
+            </button>
+          </div>
         </div>
 
         {/* Right CTA Actions */}
@@ -607,6 +646,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
               >
                 Meus Alunos
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('admin-anuncios');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+              >
+                <span>Demandas & Editais</span>
+                <span className="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded">Oficial</span>
               </button>
               <button
                 onClick={() => {

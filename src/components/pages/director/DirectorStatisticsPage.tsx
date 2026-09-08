@@ -6,6 +6,7 @@ import { GenderDonutChart } from '../../charts/GenderDonutChart';
 import { PerformanceBarChart } from '../../charts/PerformanceBarChart';
 import { AttendanceAreaChart } from '../../charts/AttendanceAreaChart';
 import { DocumentStatusChart } from '../../charts/DocumentStatusChart';
+import { SchoolAnnouncementsBanner } from '../../announcements/SchoolAnnouncementsBanner';
 
 interface DirectorStatisticsPageProps {
   onOpenGetStarted: () => void;
@@ -34,6 +35,19 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        {/* Institutional Announcements Banner for Directors */}
+        <SchoolAnnouncementsBanner
+          title="Editais, Prazos & Circulares Oficiais da Rede"
+          className="mb-10 shadow-xs"
+          onActionClick={(ad) => {
+            if (ad.demandType === 'matriculas') {
+              onNavigateToStudents();
+            } else if (ad.demandType === 'notas') {
+              onNavigateToStudents();
+            }
+          }}
+        />
+
         {/* Metric Cards featuring harmonious equal-height cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-5xl mx-auto mb-14 items-stretch">
           <StatCardItem
