@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 
 interface NavbarProps {
@@ -18,6 +18,9 @@ interface NavbarProps {
   activeRole?: string;
   currentPage?: string;
   onSwitchRole?: (role: 'admin' | 'diretor' | 'professor') => void;
+  isAuthLoading?: boolean;
+  authLoadingAction?: 'login' | 'register' | null;
+  onOpenSettings?: () => void;
 }
 
 const mockNotifications: NotificationItem[] = [
@@ -63,6 +66,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeRole,
   currentPage = 'home',
   onSwitchRole,
+  isAuthLoading = false,
+  authLoadingAction = null,
+  onOpenSettings,
 }) => {
   const [showPagesDropdown, setShowPagesDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -70,6 +76,36 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [notifications, setNotifications] = useState<NotificationItem[]>(mockNotifications);
   const [isScrolled, setIsScrolled] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [navLoadingAction, setNavLoadingAction] = useState<'login' | 'register' | null>(null);
+
+  const isLoginLoading = (isAuthLoading && authLoadingAction === 'login') || navLoadingAction === 'login';
+  const isRegisterLoading = (isAuthLoading && authLoadingAction === 'register') || navLoadingAction === 'register';
+
+  const handleLoginClick = () => {
+    if (isLoginLoading || isRegisterLoading) return;
+    setNavLoadingAction('login');
+    if (onNavigateToLogin) {
+      onNavigateToLogin();
+    } else {
+      onOpenGetStarted();
+    }
+    setTimeout(() => {
+      setNavLoadingAction(null);
+    }, 450);
+  };
+
+  const handleRegisterClick = () => {
+    if (isLoginLoading || isRegisterLoading) return;
+    setNavLoadingAction('register');
+    if (onNavigateToRegister) {
+      onNavigateToRegister();
+    } else {
+      onOpenGetStarted();
+    }
+    setTimeout(() => {
+      setNavLoadingAction(null);
+    }, 450);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -394,6 +430,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   </>
                 )}
+
+                {/* Session Settings Trigger in Pages Dropdown */}
+                {onOpenSettings && (
+                  <button
+                    onClick={() => {
+                      onOpenSettings();
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-slate-800 hover:bg-slate-50 hover:text-[#f75142] transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Settings className="w-3.5 h-3.5 text-[#f75142]" />
+                      <span>Configurações da Sessão</span>
+                    </span>
+                    <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">Sistema</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -484,6 +537,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
+          {/* Direct Settings Trigger Icon */}
+          {onOpenSettings && (
+            <button
+              id="navbar-settings-btn"
+              type="button"
+              onClick={onOpenSettings}
+              className="p-2 text-[#002133] hover:text-white hover:bg-black/10 rounded-full transition-colors cursor-pointer"
+              title="Configurações da Sessão"
+              aria-label="Configurações da Sessão"
+            >
+              <Settings className="w-5 h-5" strokeWidth={2.2} />
+            </button>
+          )}
+
           {/* Começar or Logged-in User Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -515,25 +582,49 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center gap-2">
               <button
                 id="navbar-entrar-btn"
-                onClick={onNavigateToLogin || onOpenGetStarted}
-                className={`hidden sm:inline-flex font-bold text-sm px-3.5 py-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                type="button"
+                onClick={handleLoginClick}
+                disabled={isLoginLoading || isRegisterLoading}
+                aria-busy={isLoginLoading}
+                className={`hidden sm:inline-flex items-center justify-center gap-2 font-bold text-sm px-3.5 py-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                  isLoginLoading || isRegisterLoading ? 'opacity-75 cursor-wait' : ''
+                } ${
                   currentPage === 'login'
-                    ? 'bg-white text-[#002133]'
+                    ? 'bg-white text-[#002133] shadow-xs'
                     : 'text-[#002133] hover:text-white hover:bg-black/10'
                 }`}
               >
-                Entrar
+                {isLoginLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-current shrink-0" />
+                    <span>Entrando...</span>
+                  </>
+                ) : (
+                  <span>Entrar</span>
+                )}
               </button>
               <button
                 id="navbar-comecar-btn"
-                onClick={onNavigateToRegister || onOpenGetStarted}
-                className={`text-white font-black text-sm px-5 sm:px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-[0_8px_20px_-6px_rgba(0,33,51,0.5)] hover:shadow-[0_10px_26px_-6px_rgba(0,33,51,0.7)] active:scale-95 whitespace-nowrap bg-[#002133] hover:bg-[#001726] ${
+                type="button"
+                onClick={handleRegisterClick}
+                disabled={isLoginLoading || isRegisterLoading}
+                aria-busy={isRegisterLoading}
+                className={`inline-flex items-center justify-center gap-2 text-white font-black text-sm px-5 sm:px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-[0_8px_20px_-6px_rgba(0,33,51,0.5)] hover:shadow-[0_10px_26px_-6px_rgba(0,33,51,0.7)] active:scale-95 whitespace-nowrap bg-[#002133] hover:bg-[#001726] ${
+                  isLoginLoading || isRegisterLoading ? 'opacity-75 cursor-wait' : ''
+                } ${
                   currentPage === 'register'
                     ? 'ring-2 ring-white/60'
                     : ''
                 }`}
               >
-                Inscreva - se
+                {isRegisterLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white shrink-0" />
+                    <span>A carregar...</span>
+                  </>
+                ) : (
+                  <span>Inscreva - se</span>
+                )}
               </button>
             </div>
           )}
@@ -824,6 +915,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Meu Perfil
           </button>
+          {onOpenSettings && (
+            <button
+              onClick={() => {
+                onOpenSettings();
+                setMobileMenuOpen(false);
+              }}
+              className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4 text-[#f75142]" />
+              <span>Configurações da Sessão</span>
+            </button>
+          )}
           {onOpenChat && (
             <button
               onClick={() => {
@@ -864,23 +967,47 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   id="mobile-entrar-btn"
+                  type="button"
                   onClick={() => {
-                    (onNavigateToLogin || onOpenGetStarted)();
+                    handleLoginClick();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer border border-slate-200"
+                  disabled={isLoginLoading || isRegisterLoading}
+                  aria-busy={isLoginLoading}
+                  className={`w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer border border-slate-200 flex items-center justify-center gap-2 ${
+                    isLoginLoading || isRegisterLoading ? 'opacity-75 cursor-wait' : ''
+                  }`}
                 >
-                  Entrar
+                  {isLoginLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-900 shrink-0" />
+                      <span>Entrando...</span>
+                    </>
+                  ) : (
+                    <span>Entrar</span>
+                  )}
                 </button>
                 <button
                   id="mobile-comecar-btn"
+                  type="button"
                   onClick={() => {
-                    (onNavigateToRegister || onOpenGetStarted)();
+                    handleRegisterClick();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full bg-[#f75142] hover:bg-[#e04436] text-white font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer shadow-sm"
+                  disabled={isLoginLoading || isRegisterLoading}
+                  aria-busy={isRegisterLoading}
+                  className={`w-full bg-[#f75142] hover:bg-[#e04436] text-white font-bold uppercase tracking-[0.15em] text-xs py-3 rounded-full text-center transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2 ${
+                    isLoginLoading || isRegisterLoading ? 'opacity-75 cursor-wait' : ''
+                  }`}
                 >
-                  Começar
+                  {isRegisterLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-white shrink-0" />
+                      <span>A carregar...</span>
+                    </>
+                  ) : (
+                    <span>Começar</span>
+                  )}
                 </button>
               </div>
             )}

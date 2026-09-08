@@ -15,12 +15,47 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
   session,
   onSaveSettings,
 }) => {
-  const [settings, setSettings] = useState<SessionSettings>(session.settings);
+  const getInitialSettings = (sess: SessionProfile): SessionSettings => {
+    const defaultActions = sess.role === 'admin'
+      ? [
+          'Supervisão e auditoria geral da rede escolar',
+          'Criação e homologação de unidades e turmas',
+          'Controle de orçamentos e matrículas gerais',
+          'Emissão de relatórios oficiais para o MEC e Censo',
+        ]
+      : sess.role === 'diretor'
+      ? [
+          'Gestão e atribuição de professores às turmas',
+          'Aprovação de pautas e atas de conselho',
+          'Acompanhamento do ponto diário dos docentes',
+          'Supervisão pedagógica de salas e turmas',
+        ]
+      : [
+          'Lançamento de notas bimestrais e avaliações',
+          'Registro de presença e chamada em tempo real',
+          'Elaboração de relatórios diagnósticos de alunos',
+          'Comunicação com a coordenação pedagógica',
+        ];
+
+    return {
+      autoSync: sess.settings?.autoSync ?? true,
+      emailAlerts: sess.settings?.emailAlerts ?? true,
+      dailyReports: sess.settings?.dailyReports ?? true,
+      showPercentages: sess.settings?.showPercentages ?? true,
+      privacyLevel: sess.settings?.privacyLevel ?? 'institucional',
+      accessScope: sess.settings?.accessScope ?? (sess.unit || 'Instituição'),
+      allowedActions: sess.settings?.allowedActions && sess.settings.allowedActions.length > 0
+        ? sess.settings.allowedActions
+        : defaultActions,
+    };
+  };
+
+  const [settings, setSettings] = useState<SessionSettings>(() => getInitialSettings(session));
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   // Sync if session changes
   React.useEffect(() => {
-    setSettings(session.settings);
+    setSettings(getInitialSettings(session));
   }, [session]);
 
   if (!isOpen) return null;
@@ -164,7 +199,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
               Ações e Permissões Autorizadas nesta Sessão
             </h4>
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5">
-              {settings.allowedActions.map((action, idx) => (
+              {(settings.allowedActions || []).map((action, idx) => (
                 <div key={idx} className="flex items-center gap-2.5 text-xs text-slate-700">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>{action}</span>

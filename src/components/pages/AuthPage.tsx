@@ -13,7 +13,8 @@ import {
   ShieldCheck,
   Building2,
   GraduationCap,
-  Box
+  Box,
+  Loader2
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import type { UserAccount } from '../../types';
@@ -23,6 +24,7 @@ interface AuthPageProps {
   onLoginSuccess: (user: UserAccount) => void;
   onBackToHome: () => void;
   hideHeader?: boolean;
+  onAuthLoadingChange?: (loading: boolean, action?: 'login' | 'register') => void;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
@@ -30,6 +32,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   onLoginSuccess,
   onBackToHome,
   hideHeader = false,
+  onAuthLoadingChange,
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
@@ -99,6 +102,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         return;
       }
       setLoading(true);
+      onAuthLoadingChange?.(true, 'login');
 
       setTimeout(() => {
         setLoading(false);
@@ -130,6 +134,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para a Central uCore...`);
         setTimeout(() => {
+          onAuthLoadingChange?.(false);
           onLoginSuccess(loggedUser);
         }, 900);
       }, 650);
@@ -157,6 +162,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }
 
       setLoading(true);
+      onAuthLoadingChange?.(true, 'register');
       setTimeout(() => {
         setLoading(false);
         const userFirst = firstName.trim();
@@ -173,6 +179,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${prefix} ${userFirst}...`);
         setTimeout(() => {
+          onAuthLoadingChange?.(false);
           onLoginSuccess(newUser);
         }, 900);
       }, 700);
@@ -489,8 +496,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     disabled={loading}
                     className="w-full py-3.5 rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-[0.2em] shadow-[0_6px_20px_rgba(247,81,66,0.35)] hover:shadow-[0_8px_25px_rgba(247,81,66,0.45)] transition-all duration-200 cursor-pointer active:scale-98 disabled:opacity-70 mt-2 flex items-center justify-center gap-2"
                   >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
                     <span>{loading ? 'Validando credenciais...' : 'Entrar na Central'}</span>
-                    <ChevronRight className="w-4 h-4" />
+                    {!loading && <ChevronRight className="w-4 h-4" />}
                   </button>
 
                   {/* Bottom Switch Link */}
@@ -722,8 +730,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     disabled={loading}
                     className="w-full py-3.5 rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-[0.2em] shadow-[0_6px_20px_rgba(247,81,66,0.35)] hover:shadow-[0_8px_25px_rgba(247,81,66,0.45)] transition-all duration-200 cursor-pointer active:scale-98 disabled:opacity-70 mt-2 flex items-center justify-center gap-2"
                   >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
                     <span>{loading ? 'Cadastrando usuário...' : 'Criar Minha Conta'}</span>
-                    <ChevronRight className="w-4 h-4" />
+                    {!loading && <ChevronRight className="w-4 h-4" />}
                   </button>
 
                   {/* Bottom Switch Link */}

@@ -270,6 +270,7 @@ export interface DirectorProfileInfo {
   teachersCount: string; // "23 Professores"
   email: string;
   status: string;
+  avatar?: string;
 }
 
 export type SchoolNatureza = 'Pública' | 'Público-Privada' | 'Privada';
@@ -490,11 +491,132 @@ export interface AdminDirector {
   phone: string;
   email: string;
   appointmentYear: number;
-  status: 'Ativo' | 'Em Avaliação';
+  status: 'Ativo' | 'Em Avaliação' | 'Anterior';
   performanceRating: number;
   teachersCount: number;
   studentsCount: number;
   location: string;
+  registrationData?: DirectorRegistrationData;
+}
+
+// ==========================================
+// NOVO MODELO DE CADASTRO DE DIRECTORES
+// ==========================================
+
+export type DirectorCargo = 
+  | 'Director(a)'
+  | 'Director(a) Adjunto(a)'
+  | 'Coordenador(a) Pedagógico(a)'
+  | 'Outro';
+
+export type DirectorRegime = 
+  | 'Efectivo'
+  | 'Contratado'
+  | 'Em comissão de serviço'
+  | 'Outro';
+
+export type DirectorDedicacao = 'Tempo Inteiro' | 'Acumula com leccionação';
+
+export interface DirectorAttachedDoc {
+  id: string;
+  nome: string;
+  tamanho?: string;
+  tipo: 'nomeacao' | 'diploma' | 'certificado' | 'outro';
+  data: string;
+  url?: string;
+}
+
+export interface DirectorAuditLog {
+  id: string;
+  data: string;
+  autor: string;
+  acao: 'Criação' | 'Atualização' | 'Validação' | 'Homologação' | 'Transição de Mandato';
+  detalhes: string;
+}
+
+export interface PreviousDirectorRecord {
+  id: string;
+  nomeCompleto: string;
+  cargo: DirectorCargo;
+  periodoInicio: string; // e.g. "2018"
+  periodoFim: string; // e.g. "2023"
+  motivoSaida?: string;
+  observacoes?: string;
+}
+
+export interface DirectorRegistrationData {
+  id: string;
+  
+  // 1. Identificação do Director(a)
+  nomeCompleto: string;
+  biNif: string;
+  sexo: 'Masculino' | 'Feminino' | 'Outro';
+  dataNascimento: string; // YYYY-MM-DD
+  idade: number; // Calculada automaticamente
+  faixaEtaria: TeacherFaixaEtaria; // Calculada automaticamente (18-19, 20-24, etc.)
+  telefone: string;
+  emailPessoal: string;
+  emailInstitucional?: string;
+  morada: string;
+  provinciaResidencia: string;
+  municipioResidencia: string;
+
+  // 2. Ligação à Escola
+  escolaId?: string;
+  nomeEscola: string;
+  codigoEscola?: string;
+  naturezaEscola: TeacherNaturezaEscola; // Herdada da escola e confirmável
+  provinciaEscola: string;
+  municipioEscola: string;
+  niveisEscolaOferece: string[]; // Lista de níveis
+  niveisEscolaOutro?: string;
+
+  // 3. Situação na Direcção
+  cargo: DirectorCargo;
+  cargoOutro?: string;
+  dataNomeacao: string; // YYYY-MM-DD
+  regime: DirectorRegime;
+  regimeOutro?: string;
+  dedicacao: DirectorDedicacao; // Tempo Inteiro ou Acumula com leccionação
+  anosExperienciaDirector: number;
+  anosServicoEducacao: number;
+  situacaoMandato: 'Atual / Em Exercício' | 'Anterior / Histórico';
+
+  // 4. Formação Pedagógica e Académica (igual ao dos professores)
+  temFormacaoPedagogica: boolean;
+  temMagisterioCompleto: boolean;
+  temImneCompleto: boolean;
+  temOutraFormacaoPedagogica: boolean;
+  outraFormacaoPedagogicaDesc?: string;
+  classificacaoPedagogica: TeacherClassificacaoPedagogica;
+  nivelAcademico: TeacherNivelAcademico;
+  nivelAcademicoOutro?: string;
+
+  // 5. Formação Específica em Gestão Escolar
+  temFormacaoAdministracaoGestao: boolean;
+  temFormacaoLiderancaSupervisao: boolean;
+  outrasFormacoesGestao?: string;
+  anoUltimaFormacaoGestao?: number | string;
+
+  // 6. Experiência e Validação
+  foiDirectorOutrasEscolas: boolean;
+  experienciaOutrasEscolasDetalhe?: string;
+  possuiValidacaoHabilitacoesCargo: boolean;
+  documentosAnexos?: DirectorAttachedDoc[];
+  observacoes?: string;
+
+  // 7. Dados Complementares Úteis
+  professoresSobDirecao: number;
+  alunosSobDirecao: number;
+  desafiosGestao: string[];
+  desafiosGestaoOutro?: string;
+  disponibilidadeFormacaoContinua: 'Total' | 'Parcial' | 'Não Disponível';
+
+  // Histórico e Auditoria
+  directoresAnteriores?: PreviousDirectorRecord[];
+  historicoAlteracoes: DirectorAuditLog[];
+  criadoEm: string;
+  atualizadoEm: string;
 }
 
 export type ChatRole = 'admin' | 'diretor' | 'professor' | 'suporte';

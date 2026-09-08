@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Search, Plus, UserCheck, School, Phone, Mail, Award, CheckCircle2, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Search, Plus, UserCheck, School, Phone, Mail, Award, CheckCircle2, ChevronRight, ShieldCheck, FileSpreadsheet } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminDirector, AdminSchool } from '../../../types';
+import { exportDirectorsExcel } from '../../../utils/excelExport';
 
 interface AdminDirectorsPageProps {
   onOpenGetStarted: () => void;
@@ -62,12 +63,22 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onOpenRegisterModal}
-            className="whitespace-nowrap px-4 py-2 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
-          >
-            Homologar Novo Diretor
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => exportDirectorsExcel(directors)}
+              className="whitespace-nowrap px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+              title="Exportar planilha de diretores homologados em Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Exportar Excel (.xlsx)</span>
+            </button>
+            <button
+              onClick={onOpenRegisterModal}
+              className="whitespace-nowrap px-4 py-2 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+            >
+              Homologar Novo Diretor
+            </button>
+          </div>
         </div>
 
         {/* Filter and Action Bar */}

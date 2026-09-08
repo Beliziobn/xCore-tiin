@@ -51,6 +51,7 @@ export interface TeacherData {
   totalAlunos: number;
   disciplinas: string[];
   bio: string;
+  avatar?: string;
   horario: {
     dia: string;
     tempo1: string;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ArrowRight } from 'lucide-react';
+import { Lock, ArrowRight, Settings, Percent, Bell, RefreshCw } from 'lucide-react';
 import type { SessionCard, SessionProfile } from '../types';
 import { StatCardItem } from './StatCardItem';
 
@@ -15,6 +15,7 @@ interface StatCardsProps {
 export const StatCards: React.FC<StatCardsProps> = ({
   session,
   onSelectCard,
+  onOpenSettings,
   isLoggedIn,
   onRequireAuth,
 }) => {
@@ -64,7 +65,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
         </div>
       )}
 
-      {/* Card Classification Filter Chips */}
+      {/* Card Classification Filter Chips & Settings Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
         <div className="flex items-center gap-1.5 bg-slate-200/60 p-1 rounded-xl text-xs font-bold">
           <button
@@ -101,6 +102,49 @@ export const StatCards: React.FC<StatCardsProps> = ({
             <span>Estatísticas ({nonClickableCount})</span>
           </button>
         </div>
+
+        {/* Applied Settings Indicators & Direct Settings Trigger Button */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {session.settings?.autoSync && (
+            <span
+              title="Sincronização em tempo real ativa nas configurações"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Sincronização Ativa</span>
+            </span>
+          )}
+          {session.settings?.showPercentages && (
+            <span
+              title="Exibição de percentuais ativa nas configurações"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold"
+            >
+              <Percent className="w-3.5 h-3.5" />
+              <span>Métricas em %</span>
+            </span>
+          )}
+          {session.settings?.emailAlerts && (
+            <span
+              title="Alertas críticos ativos nas configurações"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>Alertas Ativos</span>
+            </span>
+          )}
+          {onOpenSettings && (
+            <button
+              id="statcards-open-settings-btn"
+              type="button"
+              onClick={onOpenSettings}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#002133] hover:bg-[#001726] text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 border border-white/10"
+              title="Abrir Configurações da Sessão"
+            >
+              <Settings className="w-3.5 h-3.5 text-[#f75142]" />
+              <span>Configurações</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Harmonized Cards Grid with equal heights and uniform composition */}
@@ -110,6 +154,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
             key={card.id}
             card={card}
             onSelect={handleCardClick}
+            showPercentages={session.settings?.showPercentages !== false}
           />
         ))}
       </div>

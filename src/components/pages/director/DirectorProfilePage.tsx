@@ -1,19 +1,32 @@
 import React, { useState } from 'react';
-import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2, School, GraduationCap } from 'lucide-react';
+import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2, School, GraduationCap, Settings } from 'lucide-react';
 import { Hero } from '../../Hero';
+import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
 import { directorProfileData as initialProfile } from '../../../data/directorData';
 import type { DirectorProfileInfo } from '../../../types';
 
 interface DirectorProfilePageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
+  onOpenSettings?: () => void;
 }
+
+const STORAGE_KEY_DIRECTOR = 'ucore_director_profile';
 
 export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
+  onOpenSettings,
 }) => {
-  const [profile, setProfile] = useState<DirectorProfileInfo>(initialProfile);
+  const [profile, setProfile] = useState<DirectorProfileInfo>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DIRECTOR);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return initialProfile;
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(profile.name);
   const [editPhone, setEditPhone] = useState(profile.phone);
@@ -21,13 +34,32 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    setProfile((prev) => ({
-      ...prev,
-      name: editName.trim() || prev.name,
-      phone: editPhone.trim() || prev.phone,
-      email: editEmail.trim() || prev.email,
-    }));
+    const updated = {
+      ...profile,
+      name: editName.trim() || profile.name,
+      phone: editPhone.trim() || profile.phone,
+      email: editEmail.trim() || profile.email,
+    };
+    setProfile(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_DIRECTOR, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
     setIsEditing(false);
+  };
+
+  const handlePhotoChange = (newPhoto: string | null) => {
+    const updated = {
+      ...profile,
+      avatar: newPhoto || undefined,
+    };
+    setProfile(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_DIRECTOR, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -46,9 +78,17 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
           {/* Left Column: Profile Card with circular User badge matching 19.png */}
           <div className="lg:col-span-4 flex flex-col">
             <div className="relative bg-[#f75142] text-white rounded-3xl pt-14 pb-10 px-6 text-center shadow-[0_15px_35px_rgba(247,81,66,0.25)] flex flex-col items-center justify-center flex-1">
-              {/* White Circular Badge with User Icon */}
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white">
-                <Users className="w-8 h-8 text-[#f75142]" strokeWidth={2.2} />
+              {/* White Circular Badge with User Icon & Photo Upload (Click / Drag-and-Drop) */}
+              <div className="absolute -top-7 left-1/2 -translate-x-1/2">
+                <ProfilePhotoUploader
+                  id="director-photo-uploader"
+                  photo={profile.avatar}
+                  onPhotoChange={handlePhotoChange}
+                  fallbackIcon={<Users className="w-8 h-8 text-[#f75142]" strokeWidth={2.2} />}
+                  shape="circle"
+                  badgePosition="bottom-right"
+                  className="w-16 h-16 bg-white text-[#f75142] rounded-full shadow-md border-2 border-white flex items-center justify-center"
+                />
               </div>
 
               {/* Title & Director Name */}
@@ -75,14 +115,25 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                 </div>
               </div>
 
-              {/* Edit button */}
-              <button
-                onClick={() => setIsEditing(true)}
-                className="mt-6 inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer border border-white/20"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Atualizar Dados</span>
-              </button>
+              {/* Action buttons */}
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer border border-white/20"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Atualizar Dados</span>
+                </button>
+                {onOpenSettings && (
+                  <button
+                    onClick={onOpenSettings}
+                    className="inline-flex items-center gap-1.5 bg-white text-[#002133] hover:bg-slate-100 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-[#f75142]" />
+                    <span>Configurações</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

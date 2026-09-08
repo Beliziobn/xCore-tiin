@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, ShieldCheck, Mail, MapPin, Phone, Info, User, CheckCircle, LogOut, MessageSquare } from 'lucide-react';
 import type { UserAccount } from '../types';
+import { ProfilePhotoUploader } from './ProfilePhotoUploader';
 
 export type InfoModalType = 'about' | 'terms' | 'support' | 'profile' | null;
 
@@ -21,6 +22,14 @@ export const InfoModal: React.FC<InfoModalProps> = ({
   onOpenGetStarted,
   onOpenChat,
 }) => {
+  const [userAvatar, setUserAvatar] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('ucore_user_avatar');
+    } catch {
+      return null;
+    }
+  });
+
   if (!type) return null;
 
   return (
@@ -161,9 +170,23 @@ export const InfoModal: React.FC<InfoModalProps> = ({
               {currentUser ? (
                 <>
                   <div className="flex items-center gap-3.5 p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
-                    <div className="w-12 h-12 rounded-full bg-[#002133] text-white flex items-center justify-center font-black text-base tracking-wider uppercase shadow-sm">
-                      {currentUser.firstName.charAt(0)}
-                    </div>
+                    <ProfilePhotoUploader
+                      id="user-modal-photo-uploader"
+                      photo={userAvatar}
+                      onPhotoChange={(newPhoto) => {
+                        setUserAvatar(newPhoto);
+                        try {
+                          if (newPhoto) localStorage.setItem('ucore_user_avatar', newPhoto);
+                          else localStorage.removeItem('ucore_user_avatar');
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      fallbackInitials={currentUser.firstName.charAt(0)}
+                      shape="circle"
+                      badgePosition="bottom-right"
+                      className="w-12 h-12 rounded-full bg-[#002133] text-white flex items-center justify-center font-black text-base tracking-wider uppercase shadow-sm"
+                    />
                     <div className="flex-1">
                       <h4 className="font-bold text-[#002133] text-sm tracking-wide">
                         {currentUser.firstName} {currentUser.lastName}

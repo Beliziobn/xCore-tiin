@@ -29,6 +29,7 @@ import { AdminDirectorsPage } from './components/pages/admin/AdminDirectorsPage'
 import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
 import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
 import { AdminRegistrationModal, AdminModalType } from './components/pages/admin/AdminRegistrationModal';
+import { ExcelExportModal } from './components/modals/ExcelExportModal';
 import { 
   initialAdminSchools, 
   initialAdminTeachers, 
@@ -77,6 +78,8 @@ import type {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'login' | 'register'>('home');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authLoadingAction, setAuthLoadingAction] = useState<'login' | 'register' | null>(null);
   const [currentView, setCurrentView] = useState<string>(() => {
     try {
       return localStorage.getItem('ucore_current_view') || 'home';
@@ -128,8 +131,9 @@ export default function App() {
   });
 
   const [adminModalType, setAdminModalType] = useState<AdminModalType>(null);
+  const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
 
-  // Persist admin schools on change
+  // Persist admin entities on change
   useEffect(() => {
     try {
       localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
@@ -137,6 +141,30 @@ export default function App() {
       // ignore
     }
   }, [adminSchools]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
+    } catch {
+      // ignore
+    }
+  }, [adminTeachers]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
+    } catch {
+      // ignore
+    }
+  }, [adminDirectors]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
+    } catch {
+      // ignore
+    }
+  }, [adminStudents]);
 
   // Teacher dynamic state
   const [teacherStudents, setTeacherStudents] = useState<StudentProfile[]>(() => {
@@ -417,9 +445,21 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
-          admin: { ...sessionsData.admin, ...parsed.admin },
-          diretor: { ...sessionsData.diretor, ...parsed.diretor },
-          professor: { ...sessionsData.professor, ...parsed.professor },
+          admin: {
+            ...sessionsData.admin,
+            ...parsed.admin,
+            settings: { ...sessionsData.admin.settings, ...(parsed.admin?.settings || {}) },
+          },
+          diretor: {
+            ...sessionsData.diretor,
+            ...parsed.diretor,
+            settings: { ...sessionsData.diretor.settings, ...(parsed.diretor?.settings || {}) },
+          },
+          professor: {
+            ...sessionsData.professor,
+            ...parsed.professor,
+            settings: { ...sessionsData.professor.settings, ...(parsed.professor?.settings || {}) },
+          },
         };
       }
     } catch {
@@ -508,6 +548,8 @@ export default function App() {
   };
 
   const handleLoginSuccess = (user: UserAccount) => {
+    setIsAuthLoading(false);
+    setAuthLoadingAction(null);
     setCurrentUser(user);
     if (user.role === 'admin' || user.role === 'diretor' || user.role === 'professor') {
       setActiveRole(user.role);
@@ -713,6 +755,10 @@ export default function App() {
             setCurrentView('home');
           }}
           hideHeader={true}
+          onAuthLoadingChange={(loading, action) => {
+            setIsAuthLoading(loading);
+            setAuthLoadingAction(loading ? (action || null) : null);
+          }}
         />
       );
     }
@@ -725,6 +771,8 @@ export default function App() {
           schools={adminSchools}
           teachers={adminTeachers}
           students={adminStudents}
+          directors={adminDirectors}
+          onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
           onOpenRegisterModal={() => setAdminModalType('school')}
           onNavigateToSchools={() => {
             setCurrentView('admin-escolas');
@@ -799,6 +847,8 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           isLoggedIn={isSessionStarted}
+          onOpenSettings={() => setSettingsModalOpen(true)}
+          onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
         />
       );
     }
@@ -879,6 +929,7 @@ export default function App() {
         <DirectorProfilePage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          onOpenSettings={() => setSettingsModalOpen(true)}
         />
       );
     }
@@ -1216,6 +1267,8 @@ export default function App() {
           setCurrentView('home');
         }}
         currentPage={currentPage}
+        isAuthLoading={isAuthLoading}
+        authLoadingAction={authLoadingAction}
         onOpenAbout={() => setInfoModalType('about')}
         onOpenProfile={() => {
           setCurrentPage('home');
@@ -1236,6 +1289,7 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         activeRole={activeRole}
+        onOpenSettings={() => setSettingsModalOpen(true)}
       />
 
       {/* Main Routed View */}
@@ -1319,6 +1373,16 @@ export default function App() {
           setInfoModalType(null);
           setIsChatOpen(true);
         }}
+      />
+
+      {/* Excel Export Modal for Admin */}
+      <ExcelExportModal
+        isOpen={isExcelExportModalOpen}
+        onClose={() => setIsExcelExportModalOpen(false)}
+        schools={adminSchools}
+        teachers={adminTeachers}
+        directors={adminDirectors}
+        students={adminStudents}
       />
 
       {/* Live Support & Assistance Chat Modal */}

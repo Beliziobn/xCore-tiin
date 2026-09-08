@@ -266,14 +266,19 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
               {type === 'director' && <User className="w-5 h-5 text-white" />}
             </div>
             <div>
-              <h3 className="text-lg font-bold">
-                {type === 'school' && 'Cadastrar Nova Escola na Rede'}
-                {type === 'teacher' && 'Cadastrar Novo Professor'}
-                {type === 'student' && 'Matricular / Cadastrar Novo Aluno'}
-                {type === 'director' && 'Homologar Novo Diretor Escolar'}
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <span>
+                  {type === 'school' && 'Cadastrar Nova Escola na Rede'}
+                  {type === 'teacher' && 'Cadastrar Novo Professor'}
+                  {type === 'student' && 'Matricular / Cadastrar Novo Aluno'}
+                  {type === 'director' && 'Homologar Novo Diretor Escolar'}
+                </span>
+                <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
+                  Sincronizado c/ Excel
+                </span>
               </h3>
               <p className="text-xs text-white/80">
-                Os dados inseridos atualizarão os relatórios e estatísticas da Central uCore em tempo real.
+                Os dados inseridos são organizados em planilhas Excel (.xlsx) separadas e consolidadas para exportação do Administrador.
               </p>
             </div>
           </div>

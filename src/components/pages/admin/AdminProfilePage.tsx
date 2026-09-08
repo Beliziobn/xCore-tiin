@@ -1,6 +1,7 @@
-import React from 'react';
-import { ShieldCheck, Mail, Phone, MapPin, Building, Award, Calendar, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, Mail, Phone, MapPin, Building, Award, Calendar, CheckCircle2, Settings, FileSpreadsheet } from 'lucide-react';
 import { Hero } from '../../Hero';
+import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
 import type { AdminSchool } from '../../../types';
 
 interface AdminProfilePageProps {
@@ -8,14 +9,41 @@ interface AdminProfilePageProps {
   schools: AdminSchool[];
   onNavigateToStatistics: () => void;
   isLoggedIn?: boolean;
+  onOpenSettings?: () => void;
+  onOpenExcelExport?: () => void;
 }
+
+const STORAGE_KEY_ADMIN_AVATAR = 'ucore_admin_avatar';
 
 export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   onOpenGetStarted,
   schools,
   onNavigateToStatistics,
   isLoggedIn,
+  onOpenSettings,
+  onOpenExcelExport,
 }) => {
+  const [adminPhoto, setAdminPhoto] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_ADMIN_AVATAR);
+    } catch {
+      return null;
+    }
+  });
+
+  const handlePhotoChange = (newPhoto: string | null) => {
+    setAdminPhoto(newPhoto);
+    try {
+      if (newPhoto) {
+        localStorage.setItem(STORAGE_KEY_ADMIN_AVATAR, newPhoto);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_ADMIN_AVATAR);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const totalStudents = schools.reduce((acc, s) => acc + s.studentsWithDocs + s.studentsWithoutDocs, 0);
   const totalTeachers = schools.reduce((acc, s) => acc + s.teachersCount, 0);
 
@@ -33,8 +61,20 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
         {/* Profile Card */}
         <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-md">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 pb-8 border-b border-slate-100">
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-[#f75142] to-[#e04436] text-white font-black text-3xl flex items-center justify-center shadow-lg">
-              AF
+            {/* Campo Interativo para Anexar / Alterar Foto de Perfil (Suporta clique e Drag-and-Drop) */}
+            <div className="flex flex-col items-center">
+              <ProfilePhotoUploader
+                id="admin-photo-uploader"
+                photo={adminPhoto}
+                onPhotoChange={handlePhotoChange}
+                fallbackInitials="AF"
+                shape="square"
+                badgePosition="bottom-right"
+                className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-[#f75142] to-[#e04436] text-white font-black text-3xl flex items-center justify-center shadow-lg"
+              />
+              <span className="text-[10px] text-slate-400 mt-1.5 font-medium hidden sm:inline">
+                {adminPhoto ? 'Alterar foto' : 'Anexar foto'}
+              </span>
             </div>
             <div className="text-center sm:text-left flex-1">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -59,6 +99,15 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" /> Luanda Central, Angola
                 </span>
+                {onOpenSettings && (
+                  <button
+                    onClick={onOpenSettings}
+                    className="inline-flex items-center gap-1.5 bg-[#002133] hover:bg-[#001726] text-white px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ml-auto"
+                  >
+                    <Settings className="w-3 h-3 text-[#f75142]" />
+                    <span>Configurações da Sessão</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -110,7 +159,17 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
             </div>
           </div>
 
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+            {onOpenExcelExport && (
+              <button
+                onClick={onOpenExcelExport}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2"
+                title="Exportar dados de professores, diretores e alunos em Excel"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Exportar Planilhas Excel (.xlsx)</span>
+              </button>
+            )}
             <button
               onClick={onNavigateToStatistics}
               className="px-6 py-2.5 bg-[#f75142] hover:bg-[#c9372a] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md cursor-pointer transition-all"

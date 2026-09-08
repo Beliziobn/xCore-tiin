@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Users, Phone, ArrowLeft, ArrowRight, BookOpen, Clock, Award, CheckCircle, Mail, School, Calendar } from 'lucide-react';
 import { initialTeacherData, TeacherData, StudentProfile } from '../../data/teacherData';
 import { StatCardItem } from '../StatCardItem';
+import { ProfilePhotoUploader } from '../ProfilePhotoUploader';
 
 interface TeacherProfilePageProps {
   onBackToStats: () => void;
@@ -10,6 +11,8 @@ interface TeacherProfilePageProps {
   students?: StudentProfile[];
 }
 
+const STORAGE_KEY_TEACHER_AVATAR = 'ucore_teacher_avatar';
+
 export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   onBackToStats,
   onNavigateToClass,
@@ -17,6 +20,27 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   students = [],
 }) => {
   const [selectedDay, setSelectedDay] = useState('Segunda-feira');
+  const [teacherAvatar, setTeacherAvatar] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_TEACHER_AVATAR) || teacher.avatar || null;
+    } catch {
+      return teacher.avatar || null;
+    }
+  });
+
+  const handlePhotoChange = (newPhoto: string | null) => {
+    setTeacherAvatar(newPhoto);
+    try {
+      if (newPhoto) {
+        localStorage.setItem(STORAGE_KEY_TEACHER_AVATAR, newPhoto);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_TEACHER_AVATAR);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const totalAlunos = students.length || teacher.totalAlunos;
 
   return (
@@ -50,9 +74,17 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
         {/* Left Column: Big Blue Teacher Card (matching 18.png) */}
         <div className="lg:col-span-4 flex flex-col items-center">
           <div className="relative w-full bg-[#f75142] text-white rounded-[26px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(247,81,66,0.25)]">
-            {/* Circular badge on top matching 18.png with Users icon */}
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#f75142]/20">
-              <Users className="w-7 h-7 text-[#f75142]" strokeWidth={2.4} />
+            {/* Circular badge on top with Photo Upload (Click & Drag-and-Drop) */}
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2">
+              <ProfilePhotoUploader
+                id="teacher-photo-uploader"
+                photo={teacherAvatar}
+                onPhotoChange={handlePhotoChange}
+                fallbackIcon={<Users className="w-7 h-7 text-[#f75142]" strokeWidth={2.4} />}
+                shape="circle"
+                badgePosition="bottom-right"
+                className="w-14 h-14 bg-white text-[#f75142] rounded-full shadow-md border-2 border-[#f75142]/20 flex items-center justify-center"
+              />
             </div>
 
             <div className="text-xs uppercase tracking-[0.2em] text-white/80 font-bold mb-1">

@@ -26,6 +26,7 @@ import { getStoredTeachers, saveTeacher } from '../../../utils/teacherStorage';
 import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
 import { TeacherDetailModal } from '../../modals/TeacherDetailModal';
 import { TeacherAnalyticalMatrixModal } from '../../modals/TeacherAnalyticalMatrixModal';
+import { exportTeachersExcel } from '../../../utils/excelExport';
 
 interface AdminTeachersPageProps {
   onOpenGetStarted: () => void;
@@ -132,7 +133,15 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => exportTeachersExcel(teachers)}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+              title="Exportar planilha de professores em formato Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Exportar Excel (.xlsx)</span>
+            </button>
             <button
               onClick={() => setIsMatrixModalOpen(true)}
               className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"

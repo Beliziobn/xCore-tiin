@@ -17,6 +17,7 @@ export interface StatCardItemProps {
   id?: string;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  showPercentages?: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
   id,
   className = '',
   size = 'md',
+  showPercentages = true,
 }) => {
   const isClickable = card.isClickable !== false;
   const elementId = id || `stat-card-${card.id}`;
@@ -92,6 +94,16 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
             : 'h-36 sm:h-40 rounded-2xl'
         }`}
       >
+        {showPercentages && String(card.value).includes('%') && (
+          <span className="absolute top-2.5 right-2.5 bg-white/90 text-[#002133] text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
+            Taxa %
+          </span>
+        )}
+        {showPercentages && !String(card.value).includes('%') && (
+          <span className="absolute top-2.5 right-2.5 bg-black/15 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
+            Total
+          </span>
+        )}
         <span
           className={`font-black text-[#002133] tracking-tight leading-none text-center select-none font-sans px-2 ${getValueFontSize(
             card.value

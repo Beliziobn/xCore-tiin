@@ -3,6 +3,7 @@ import { User, ArrowLeft, CheckCircle, Save, Award, BookOpen, ChevronLeft, Chevr
 import { StudentProfile, StudentGrade, defaultDisciplinasList } from '../../data/teacherData';
 import { getDemandStatus } from '../../utils/announcementStorage';
 import { SchoolAnnouncementsBanner } from '../announcements/SchoolAnnouncementsBanner';
+import { ProfilePhotoUploader } from '../ProfilePhotoUploader';
 
 export type EducationalRegime = 'iniciacao' | 'primario_1_6' | 'secundario_7_9';
 
@@ -109,6 +110,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
   const [grades, setGrades] = useState<StudentGrade[]>(currentStudent.grades);
   const [encarregado, setEncarregado] = useState(currentStudent.encarregado);
   const [telefone, setTelefone] = useState(currentStudent.telefone);
+  const [studentPhoto, setStudentPhoto] = useState<string | null>(currentStudent.foto || null);
   const [selectedSubject, setSelectedSubject] = useState<string>(currentStudent.disciplinas[0] || 'Língua Portuguesa');
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [isSavedRecently, setIsSavedRecently] = useState(false);
@@ -123,6 +125,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
     setActiveRegime(nextRegime);
     setEncarregado(currentStudent.encarregado);
     setTelefone(currentStudent.telefone);
+    setStudentPhoto(currentStudent.foto || null);
 
     // If 1ª a 6ª classe / PRAEER / Módulos, ensure initial grades do not exceed 10
     if (nextRegime === 'primario_1_6') {
@@ -238,10 +241,23 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
       encarregado,
       telefone,
       grades,
+      foto: studentPhoto || undefined,
     };
     onSaveStudent(updated);
     setIsSavedRecently(true);
     setTimeout(() => setIsSavedRecently(false), 3000);
+  };
+
+  const handlePhotoChange = (newPhoto: string | null) => {
+    setStudentPhoto(newPhoto);
+    const updated: StudentProfile = {
+      ...currentStudent,
+      foto: newPhoto || undefined,
+      encarregado,
+      telefone,
+      grades,
+    };
+    onSaveStudent(updated);
   };
 
   const handleBack = onBackToClass || onBack || (() => {});
@@ -295,13 +311,17 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
         {/* Left Column: Big Student Card */}
         <div className="lg:col-span-4 flex flex-col items-center">
           <div className="relative w-full bg-[#f75142] text-white rounded-[26px] p-6 pt-12 text-center shadow-[0_12px_32px_rgba(247,81,66,0.25)]">
-            {/* Circular badge on top with user photo or icon */}
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-[#f75142]/20 overflow-hidden">
-              {currentStudent.foto ? (
-                <img src={currentStudent.foto} alt={currentStudent.name} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-7 h-7 text-[#f75142]" strokeWidth={2.4} />
-              )}
+            {/* Circular badge on top with Photo Upload (Click & Drag-and-Drop) */}
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2">
+              <ProfilePhotoUploader
+                id="student-photo-uploader"
+                photo={studentPhoto}
+                onPhotoChange={handlePhotoChange}
+                fallbackIcon={<User className="w-7 h-7 text-[#f75142]" strokeWidth={2.4} />}
+                shape="circle"
+                badgePosition="bottom-right"
+                className="w-14 h-14 bg-white text-[#f75142] rounded-full shadow-md border-2 border-[#f75142]/20 flex items-center justify-center"
+              />
             </div>
 
             <div className="text-xs uppercase tracking-[0.2em] text-white/80 font-bold mb-1">
