@@ -1001,7 +1001,6 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           )}
         </button>
       </div>
-
     </div>
   );
 };

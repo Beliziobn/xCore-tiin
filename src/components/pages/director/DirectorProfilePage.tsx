@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2, School, GraduationCap, Settings } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
+import { ProfileOptionsSection, UserProfileData } from '../../profile/ProfileOptionsSection';
 import { directorProfileData as initialProfile } from '../../../data/directorData';
 import type { DirectorProfileInfo } from '../../../types';
 
@@ -57,6 +58,23 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
     setProfile(updated);
     try {
       localStorage.setItem(STORAGE_KEY_DIRECTOR, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdateDirectorUser = (updated: Partial<UserProfileData>) => {
+    const next = {
+      ...profile,
+      name: updated.name || profile.name,
+      email: updated.email || profile.email,
+      phone: updated.phone || profile.phone,
+      avatar: updated.avatar !== undefined ? (updated.avatar || undefined) : profile.avatar,
+      schoolName: updated.schoolName || profile.schoolName,
+    };
+    setProfile(next);
+    try {
+      localStorage.setItem(STORAGE_KEY_DIRECTOR, JSON.stringify(next));
     } catch {
       // ignore
     }
@@ -306,6 +324,23 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Profile Options and Settings matching screenshot (Account, Preferences, Security) */}
+        <div className="my-8">
+          <ProfileOptionsSection
+            user={{
+              name: profile.name,
+              email: profile.email,
+              phone: profile.phone,
+              roleTitle: 'Diretor Geral • Gestão Escolar',
+              avatar: profile.avatar,
+              schoolName: profile.schoolName,
+              biNumber: '007294102LA048',
+              address: 'Complexo Escolar Central, Maianga, Luanda',
+            }}
+            onUpdateUser={handleUpdateDirectorUser}
+          />
         </div>
 
         {/* Institutional Mission & Governance Note */}

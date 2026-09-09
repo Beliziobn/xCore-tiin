@@ -18,6 +18,7 @@ import {
 import { SchoolAnnouncement, SchoolDemandType } from '../../types';
 import { PRESET_COVER_IMAGES } from '../../utils/announcementStorage';
 import { GoogleAnnouncementCard } from './GoogleAnnouncementCard';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CreateAnnouncementModalProps {
   isOpen: boolean;
@@ -353,12 +354,12 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Descrição do Snippet Google *
                 </label>
-                <textarea
+                <Textarea
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Descreva as instruções obrigatórias que as escolas e docentes devem seguir antes do encerramento..."
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20"
+                  className="w-full"
                 />
               </div>
 

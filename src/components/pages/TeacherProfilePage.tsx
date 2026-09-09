@@ -3,6 +3,7 @@ import { Users, Phone, ArrowLeft, ArrowRight, BookOpen, Clock, Award, CheckCircl
 import { initialTeacherData, TeacherData, StudentProfile } from '../../data/teacherData';
 import { StatCardItem } from '../StatCardItem';
 import { ProfilePhotoUploader } from '../ProfilePhotoUploader';
+import { ProfileOptionsSection, UserProfileData } from '../profile/ProfileOptionsSection';
 
 interface TeacherProfilePageProps {
   onBackToStats: () => void;
@@ -27,6 +28,25 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
       return teacher.avatar || null;
     }
   });
+
+  const [teacherProfileData, setTeacherProfileData] = useState<UserProfileData>(() => {
+    return {
+      name: teacher.name,
+      email: teacher.email || 'teresa.silva@escola.ao',
+      phone: teacher.telefone || '+244 923 888 999',
+      roleTitle: `Professor(a) • Turma ${teacher.turma} (${teacher.classe})`,
+      schoolName: teacher.escola,
+      biNumber: '006849102LA089',
+      address: 'Bairro Palanca, Kilamba Kiaxi, Luanda',
+    };
+  });
+
+  const handleUpdateTeacherUser = (updated: Partial<UserProfileData>) => {
+    setTeacherProfileData((prev) => ({ ...prev, ...updated }));
+    if (updated.avatar !== undefined) {
+      handlePhotoChange(updated.avatar);
+    }
+  };
 
   const handlePhotoChange = (newPhoto: string | null) => {
     setTeacherAvatar(newPhoto);
@@ -282,6 +302,23 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Profile Options and Settings matching screenshot (Account, Preferences, Security) */}
+      <div className="my-8">
+        <ProfileOptionsSection
+          user={{
+            name: teacherProfileData.name,
+            email: teacherProfileData.email,
+            phone: teacherProfileData.phone,
+            roleTitle: teacherProfileData.roleTitle,
+            avatar: teacherAvatar,
+            schoolName: teacherProfileData.schoolName,
+            biNumber: teacherProfileData.biNumber,
+            address: teacherProfileData.address,
+          }}
+          onUpdateUser={handleUpdateTeacherUser}
+        />
       </div>
     </div>
   );

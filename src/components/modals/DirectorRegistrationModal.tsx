@@ -22,7 +22,9 @@ import {
   Plus,
   History,
   Users,
-  Check
+  Check,
+  Sparkles,
+  Info
 } from 'lucide-react';
 import type {
   DirectorRegistrationData,
@@ -169,6 +171,64 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
       temOutraFormacaoPedagogica
     );
   }, [temFormacaoPedagogica, temMagisterioCompleto, temImneCompleto, temOutraFormacaoPedagogica]);
+
+  // Handlers for Pedagogical Cascade consistency with teacher model
+  const handleToggleFormacaoPedagogica = (val: boolean) => {
+    setTemFormacaoPedagogica(val);
+    if (!val) {
+      setTemMagisterioCompleto(false);
+      setTemImneCompleto(false);
+      setTemOutraFormacaoPedagogica(false);
+      setOutraFormacaoPedagogicaDesc('');
+    } else {
+      if (!temMagisterioCompleto && !temImneCompleto && !temOutraFormacaoPedagogica) {
+        setTemMagisterioCompleto(true);
+      }
+    }
+  };
+
+  const handleToggleMagisterio = (val: boolean) => {
+    setTemMagisterioCompleto(val);
+    if (val) setTemFormacaoPedagogica(true);
+  };
+
+  const handleToggleImne = (val: boolean) => {
+    setTemImneCompleto(val);
+    if (val) setTemFormacaoPedagogica(true);
+  };
+
+  const handleToggleOutra = (val: boolean) => {
+    setTemOutraFormacaoPedagogica(val);
+    if (val) {
+      setTemFormacaoPedagogica(true);
+    } else {
+      setOutraFormacaoPedagogicaDesc('');
+    }
+  };
+
+  const handleApplyPedagogicalPreset = (tipo: 'magisterio_imne' | 'outra' | 'sem_formacao') => {
+    if (tipo === 'magisterio_imne') {
+      setTemFormacaoPedagogica(true);
+      setTemMagisterioCompleto(true);
+      setTemImneCompleto(false);
+      setTemOutraFormacaoPedagogica(false);
+      setOutraFormacaoPedagogicaDesc('');
+    } else if (tipo === 'outra') {
+      setTemFormacaoPedagogica(true);
+      setTemMagisterioCompleto(false);
+      setTemImneCompleto(false);
+      setTemOutraFormacaoPedagogica(true);
+      if (!outraFormacaoPedagogicaDesc) {
+        setOutraFormacaoPedagogicaDesc('Agregação Pedagógica / Curso de Formação de Professores');
+      }
+    } else {
+      setTemFormacaoPedagogica(false);
+      setTemMagisterioCompleto(false);
+      setTemImneCompleto(false);
+      setTemOutraFormacaoPedagogica(false);
+      setOutraFormacaoPedagogicaDesc('');
+    }
+  };
 
   // Handle school selection to auto-inherit attributes
   const handleSchoolChange = (schoolId: string) => {
@@ -432,6 +492,11 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
     if (profile.jobTitle && (profile.jobTitle.toLowerCase().includes('director') || profile.jobTitle.toLowerCase().includes('adjunto'))) {
       if (profile.jobTitle.toLowerCase().includes('adjunto')) setCargo('Director(a) Adjunto(a)');
       else setCargo('Director(a)');
+    }
+    if (profile.source === 'director' || profile.source === 'teacher' || profile.source === 'active_session') {
+      setTemFormacaoPedagogica(true);
+      setTemMagisterioCompleto(true);
+      setNivelAcademico('Licenciado');
     }
   };
 
@@ -1003,129 +1068,222 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
           )}
 
           {/* ========================================================= */}
-          {/* TAB 4: FORMAÇÃO PEDAGÓGICA E ACADÉMICA (IGUAL PROFESSORES) */}
+          {/* TAB 4: FORMAÇÃO PEDAGÓGICA E ACADÉMICA (MODELO OFICIAL)   */}
           {/* ========================================================= */}
           {activeTab === 4 && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <div className="space-y-6 animate-in fade-in duration-150">
+              {/* Header with Title and Live Status Badge */}
+              <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                   <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-red-100 text-[#f75142] flex items-center justify-center text-xs font-black">4</span>
-                    Formação Pedagógica e Académica
+                    <span className="w-6 h-6 rounded-lg bg-[#002133] text-white flex items-center justify-center text-xs font-black">4</span>
+                    Formação Pedagógica e Académica (Modelo Oficial)
                   </h4>
                   <p className="text-xs text-slate-500">
-                    Segue exatamente a mesma lógica oficial dos professores para permitir análises comparativas da rede.
+                    Cálculo automático da classificação pedagógica baseado nas entradas do formulário, idêntico ao modelo dos professores.
                   </p>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-[#002133] border border-slate-200 self-start sm:self-auto">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#002133]" />
+                  <span className="truncate max-w-[200px]">{calculatedPedagogicalClass}</span>
                 </div>
               </div>
 
-              {/* Cascade Pedagogical Section */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800">
-                    Tem formação pedagógica? <span className="text-red-500">*</span>
+              {/* Quick Scenario Presets */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-[#002133]" />
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Atalhos de Preenchimento Rápido:
                   </span>
-                  <div className="flex items-center gap-2">
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPedagogicalPreset('magisterio_imne')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      calculatedPedagogicalClass === 'Com magistério e com IMNE completo'
+                        ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Com Magistério / IMNE Completo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPedagogicalPreset('outra')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      calculatedPedagogicalClass === 'Sem Magistério e com formação Pedagógica'
+                        ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Sem Magistério e com Formação Pedagógica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPedagogicalPreset('sem_formacao')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      calculatedPedagogicalClass === 'Sem Magistério e sem Formação pedagógica'
+                        ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Sem Formação Pedagógica
+                  </button>
+                </div>
+              </div>
+
+              {/* Cascading Questionnaire */}
+              <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-5 shadow-xs">
+                {/* 1. Main Question */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 mb-2">
+                    1. O Director(a) possui Formação Pedagógica? <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
-                      onClick={() => setTemFormacaoPedagogica(true)}
-                      className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                      onClick={() => handleToggleFormacaoPedagogica(true)}
+                      className={`p-3 text-xs font-bold rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                         temFormacaoPedagogica
-                          ? 'bg-[#f75142] text-white border-[#f75142]'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      Sim
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className={`w-4 h-4 ${temFormacaoPedagogica ? 'text-white' : 'text-slate-500'}`} />
+                        <span>Sim, possui formação pedagógica</span>
+                      </div>
+                      {temFormacaoPedagogica && <Check className="w-4 h-4 text-white" />}
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setTemFormacaoPedagogica(false);
-                        setTemMagisterioCompleto(false);
-                        setTemImneCompleto(false);
-                        setTemOutraFormacaoPedagogica(false);
-                      }}
-                      className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                      onClick={() => handleToggleFormacaoPedagogica(false)}
+                      className={`p-3 text-xs font-bold rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                         !temFormacaoPedagogica
-                          ? 'bg-slate-800 text-white border-slate-800'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      Não
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className={`w-4 h-4 ${!temFormacaoPedagogica ? 'text-white' : 'text-slate-400'}`} />
+                        <span>Não possui formação pedagógica</span>
+                      </div>
+                      {!temFormacaoPedagogica && <Check className="w-4 h-4 text-white" />}
                     </button>
                   </div>
                 </div>
 
-                {temFormacaoPedagogica && (
-                  <div className="pt-3 border-t border-slate-200/80 space-y-3 pl-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-700">Tem Magistério completo?</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setTemMagisterioCompleto(true)}
-                          className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                            temMagisterioCompleto ? 'bg-[#002133] text-white border-[#002133]' : 'bg-white text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          Sim
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTemMagisterioCompleto(false)}
-                          className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                            !temMagisterioCompleto ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          Não
-                        </button>
-                      </div>
+                {/* Cascaded specific questions when temFormacaoPedagogica is true */}
+                {temFormacaoPedagogica ? (
+                  <div className="pt-4 border-t border-slate-100 space-y-4 pl-1 sm:pl-3 border-l-2 border-l-[#002133]">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Perguntas em cascata para determinação da categoria ministerial:
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-700">Tem IMNE completo?</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setTemImneCompleto(true)}
-                          className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                            temImneCompleto ? 'bg-[#002133] text-white border-[#002133]' : 'bg-white text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          Sim
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTemImneCompleto(false)}
-                          className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                            !temImneCompleto ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          Não
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-slate-700">
-                          Tem formação pedagógica de outra natureza (CFL, agregação, etc.)?
+                    {/* Question A: Magistério */}
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">
+                          Tem Magistério completo?
                         </span>
-                        <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-500">
+                          Curso Médio Pedagógico / Magistério Primário (10.ª a 12.ª ou 13.ª classe pedagógica)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMagisterio(true)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                            temMagisterioCompleto
+                              ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Sim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMagisterio(false)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                            !temMagisterioCompleto
+                              ? 'bg-slate-700 text-white border-slate-700'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Não
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Question B: IMNE */}
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">
+                          Tem IMNE completo?
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          Instituto Médio Normal de Educação
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleImne(true)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                            temImneCompleto
+                              ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Sim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleImne(false)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                            !temImneCompleto
+                              ? 'bg-slate-700 text-white border-slate-700'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Não
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Question C: Outra Natureza */}
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 block">
+                            Tem formação pedagógica de outra natureza?
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            CFL, agregação pedagógica, cursos intensivos ou modulares homologados
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
-                            onClick={() => setTemOutraFormacaoPedagogica(true)}
-                            className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                              temOutraFormacaoPedagogica ? 'bg-[#002133] text-white border-[#002133]' : 'bg-white text-slate-600 border-slate-200'
+                            onClick={() => handleToggleOutra(true)}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                              temOutraFormacaoPedagogica
+                                ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
                             Sim
                           </button>
                           <button
                             type="button"
-                            onClick={() => setTemOutraFormacaoPedagogica(false)}
-                            className={`px-2.5 py-0.5 text-xs font-bold rounded border cursor-pointer ${
-                              !temOutraFormacaoPedagogica ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'
+                            onClick={() => handleToggleOutra(false)}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                              !temOutraFormacaoPedagogica
+                                ? 'bg-slate-700 text-white border-slate-700'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
                             Não
@@ -1133,36 +1291,94 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                         </div>
                       </div>
                       {temOutraFormacaoPedagogica && (
-                        <input
-                          type="text"
-                          value={outraFormacaoPedagogicaDesc}
-                          onChange={(e) => setOutraFormacaoPedagogicaDesc(e.target.value)}
-                          placeholder="Especifique a formação pedagógica de outra natureza..."
-                          className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white"
-                        />
+                        <div className="pt-2 border-t border-slate-200/60">
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Especificação da formação pedagógica complementar
+                          </label>
+                          <input
+                            type="text"
+                            value={outraFormacaoPedagogicaDesc}
+                            onChange={(e) => setOutraFormacaoPedagogicaDesc(e.target.value)}
+                            placeholder="Ex.: Agregação Pedagógica no ISCED, Curso de Formadores CFL..."
+                            className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#002133]"
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
+                ) : (
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center gap-2.5">
+                    <Info className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span>
+                      Como o director(a) não possui formação pedagógica, as perguntas de Magistério e IMNE foram automaticamente dispensadas e ocultadas.
+                    </span>
+                  </div>
                 )}
+              </div>
 
-                {/* Resulting Classification Badge */}
-                <div className="mt-3 p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700">Classificação Resultante:</span>
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#fef2f1] text-[#f75142] border border-[#fee4e2]">
-                    {calculatedPedagogicalClass}
+              {/* Automatic Resulting Classification Card (Aligned with Teacher Model) */}
+              <div className="bg-[#002133] p-5 rounded-2xl text-white shadow-md space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                      Classificação Automática Resultante (Censo MED)
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-white border border-white/20">
+                    Calculado em Tempo Real
                   </span>
+                </div>
+
+                <div className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span>{calculatedPedagogicalClass}</span>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {calculatedPedagogicalClass === 'Com magistério e com IMNE completo' && (
+                    <>
+                      <strong>Classificação Plena:</strong> O director(a) possui Magistério e/ou IMNE concluído. Esta categoria preenche integralmente os requisitos para quadros de direção segundo o estatuto dos agentes da educação.
+                    </>
+                  )}
+                  {calculatedPedagogicalClass === 'Sem Magistério e com formação Pedagógica' && (
+                    <>
+                      <strong>Classificação Complementar:</strong> O director(a) possui agregação pedagógica ou formação específica de outra natureza, sem a conclusão formal de Magistério ou IMNE.
+                    </>
+                  )}
+                  {calculatedPedagogicalClass === 'Sem Magistério e sem Formação pedagógica' && (
+                    <>
+                      <strong>Classificação Geral:</strong> O director(a) não possui formação pedagógica registada. Enquadrado para fins estatísticos e elegível para programas de formação contínua do Ministério da Educação.
+                    </>
+                  )}
+                </p>
+
+                {/* Audit Breakdown Line */}
+                <div className="pt-3 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-slate-300 font-mono">
+                  <div>
+                    Formação: <span className="font-bold text-white">{temFormacaoPedagogica ? 'SIM' : 'NÃO'}</span>
+                  </div>
+                  <div>
+                    Magistério: <span className="font-bold text-white">{temMagisterioCompleto ? 'SIM' : 'NÃO'}</span>
+                  </div>
+                  <div>
+                    IMNE: <span className="font-bold text-white">{temImneCompleto ? 'SIM' : 'NÃO'}</span>
+                  </div>
+                  <div>
+                    Outra Natureza: <span className="font-bold text-white">{temOutraFormacaoPedagogica ? 'SIM' : 'NÃO'}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Nível Académico */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+              {/* Nível Académico / Habilitação Literária */}
+              <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
                   Nível Académico / Habilitação Literária <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={nivelAcademico}
                   onChange={(e) => setNivelAcademico(e.target.value as TeacherNivelAcademico)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white cursor-pointer font-bold"
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#002133] bg-white cursor-pointer font-bold text-slate-800"
                 >
                   {NIVEL_ACADEMICO_OPTIONS.map((n) => (
                     <option key={n} value={n}>
@@ -1176,7 +1392,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                     value={nivelAcademicoOutro}
                     onChange={(e) => setNivelAcademicoOutro(e.target.value)}
                     placeholder="Especifique a habilitação literária..."
-                    className="mt-2 w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white"
+                    className="mt-2.5 w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#002133] bg-white"
                   />
                 )}
               </div>

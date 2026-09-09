@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShieldCheck, Mail, Phone, MapPin, Building, Award, Calendar, CheckCircle2, Settings, FileSpreadsheet } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
+import { ProfileOptionsSection, UserProfileData } from '../../profile/ProfileOptionsSection';
 import type { AdminSchool } from '../../../types';
 
 interface AdminProfilePageProps {
@@ -14,6 +15,7 @@ interface AdminProfilePageProps {
 }
 
 const STORAGE_KEY_ADMIN_AVATAR = 'ucore_admin_avatar';
+const STORAGE_KEY_ADMIN_DATA = 'ucore_admin_profile_data';
 
 export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   onOpenGetStarted,
@@ -31,8 +33,50 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     }
   });
 
+  const [adminData, setAdminData] = useState<UserProfileData>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_ADMIN_DATA);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return {
+      name: 'Super Admin uCore',
+      email: 'admin.geral@ucore.ao',
+      phone: '+244 923 000 001',
+      roleTitle: 'Administrador Geral da Rede uCore',
+      schoolName: 'Ministério da Educação & Rede uCore Escolas',
+      biNumber: '005481920LA031',
+      address: 'Edifício Monumental, Ingombota, Luanda',
+    };
+  });
+
+  const handleUpdateAdminData = (updated: Partial<UserProfileData>) => {
+    const next = {
+      ...adminData,
+      ...updated,
+      avatar: updated.avatar !== undefined ? updated.avatar : adminPhoto,
+    };
+    setAdminData(next);
+    if (updated.avatar !== undefined) {
+      setAdminPhoto(updated.avatar);
+      try {
+        if (updated.avatar) localStorage.setItem(STORAGE_KEY_ADMIN_AVATAR, updated.avatar);
+        else localStorage.removeItem(STORAGE_KEY_ADMIN_AVATAR);
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY_ADMIN_DATA, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
+
   const handlePhotoChange = (newPhoto: string | null) => {
     setAdminPhoto(newPhoto);
+    setAdminData((prev) => ({ ...prev, avatar: newPhoto }));
     try {
       if (newPhoto) {
         localStorage.setItem(STORAGE_KEY_ADMIN_AVATAR, newPhoto);
@@ -157,6 +201,23 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 Auditoria Periódica
               </span>
             </div>
+          </div>
+
+          {/* Profile Options and Settings matching screenshot (Account, Preferences, Security) */}
+          <div className="my-8">
+            <ProfileOptionsSection
+              user={{
+                name: adminData.name,
+                email: adminData.email,
+                phone: adminData.phone,
+                roleTitle: adminData.roleTitle,
+                avatar: adminPhoto,
+                schoolName: adminData.schoolName,
+                biNumber: adminData.biNumber,
+                address: adminData.address,
+              }}
+              onUpdateUser={handleUpdateAdminData}
+            />
           </div>
 
           <div className="mt-8 flex flex-wrap items-center justify-end gap-3">

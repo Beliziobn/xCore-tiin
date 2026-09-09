@@ -462,20 +462,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Editais & Anúncios</span>
           </button>
 
-          {/* Quick Access: Nossa Equipa */}
+          {/* Quick Access: Livro de Ponto & Calendário */}
           <button
-            id="nav-btn-nossa-equipa"
+            id="nav-btn-livro-ponto"
             onClick={() => {
-              const el = document.getElementById('equipa');
-              if (el) {
-                el.scrollIntoView({ behavior: 'smooth' });
-              }
+              onSelectPage('diretor-presenca');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="flex items-center gap-1.5 text-[#002133] hover:text-white font-bold transition-colors cursor-pointer py-1 text-[13.5px] uppercase tracking-wide"
-            title="Conheça o Corpo Docente e Gestores"
+            className="flex items-center gap-1.5 bg-[#002133] hover:bg-[#002133]/90 text-white font-bold transition-all cursor-pointer py-1.5 px-3.5 rounded-xl text-xs uppercase tracking-wide shadow-xs active:scale-95"
+            title="Acessar Livro de Ponto e Calendário de Frequência"
           >
-            <GraduationCap className="w-4 h-4 text-[#002133]" />
-            <span>Equipa</span>
+            <Calendar className="w-3.5 h-3.5 text-[#f75142]" />
+            <span>Livro de Ponto</span>
           </button>
         </div>
 

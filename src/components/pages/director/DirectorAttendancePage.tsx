@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Calendar,
+  Calendar as CalendarIcon,
   Search,
   CheckCircle2,
   XCircle,
@@ -16,7 +16,14 @@ import {
   Briefcase,
   Building,
   FileCheck,
+  ChevronDown,
+  Sparkles,
 } from 'lucide-react';
+import { type DateRange } from 'react-day-picker';
+import { ptBR } from 'date-fns/locale';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar-range-select-utils/calendar';
+import { Textarea } from '@/components/ui/textarea';
+import { AIInputWithLoading } from '@/components/ui/ai-input-with-loading';
 import { DirectorTeacher } from '../../../types';
 import { directorTeachersData } from '../../../data/directorData';
 import {
@@ -43,6 +50,36 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
 }) => {
   // Default date: 2026-09-07 or today
   const [selectedDate, setSelectedDate] = useState<string>('2026-09-07');
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    return {
+      from: new Date(2026, 8, 7),
+      to: new Date(2026, 8, 11),
+    };
+  });
+
+  const formatYMD = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (calendarContainerRef.current && !calendarContainerRef.current.contains(event.target as Node)) {
+        setCalendarOpen(false);
+      }
+    }
+    if (calendarOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [calendarOpen]);
+
   const [records, setRecords] = useState<TeacherAttendanceRecord[]>(() => getStoredTeacherAttendance());
   const [pendingMarks, setPendingMarks] = useState<Record<string, { status: 'presente' | 'falta'; observacao?: string }>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,6 +98,28 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const [diaryNotes, setDiaryNotes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_attendance_diary_notes');
+      return saved ? JSON.parse(saved) : [
+        'Despacho: Turno matutino com 100% de regência cumprida em todas as turmas.',
+        'Nota Pedagógica: Reunião extraordinária de alinhamento curricular agendada para sexta-feira.'
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleAddDiaryNote = (text: string) => {
+    if (!text.trim()) return;
+    const updated = [text.trim(), ...diaryNotes];
+    setDiaryNotes(updated);
+    try {
+      localStorage.setItem('ucore_attendance_diary_notes', JSON.stringify(updated));
+    } catch {}
+    showToast('Anotação registrada com sucesso no Livro de Ponto!');
   };
 
   // Map of locked records for selected date
@@ -295,15 +354,122 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
         </div>
 
         {/* Date Selector */}
-        <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
-          <Calendar className="w-4 h-4 text-[#f75142]" />
-          <span className="text-xs font-bold text-slate-700">Data Letiva:</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="text-xs font-bold text-slate-900 bg-transparent outline-none cursor-pointer"
-          />
+        <div ref={calendarContainerRef} className="relative">
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setCalendarOpen((prev) => !prev)}
+              className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              <CalendarIcon className="w-4 h-4 text-blue-600" />
+              <span>Data Letiva:</span>
+              <span className="text-slate-900 bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 rounded-lg border border-slate-200/60 font-semibold transition-colors">
+                {dateRange?.from
+                  ? dateRange.from.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  : selectedDate}
+                {dateRange?.to && dateRange.to.getTime() !== dateRange.from?.getTime()
+                  ? ` – ${dateRange.to.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+                  : ''}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${calendarOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                const [y, m, d] = e.target.value.split('-').map(Number);
+                if (y && m && d) {
+                  const newD = new Date(y, m - 1, d);
+                  setDateRange({ from: newD, to: newD });
+                }
+              }}
+              className="sr-only"
+              aria-label="Data letiva nativa"
+            />
+          </div>
+
+          {/* Popover with Custom Range Select Calendar styled as reference */}
+          {calendarOpen && (
+            <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl border border-slate-200/90 shadow-2xl p-3.5 sm:p-4 w-[330px] sm:w-[350px] max-w-[calc(100vw-2rem)] select-none">
+              <div className="flex items-center justify-between pb-2.5 mb-1.5 border-b border-slate-100">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-xs font-bold text-slate-900">Período Letivo / Frequência</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date(2026, 8, 7);
+                    setDateRange({ from: d, to: d });
+                    setSelectedDate('2026-09-07');
+                  }}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-blue-50"
+                >
+                  7 Set 2026
+                </button>
+              </div>
+
+              <div className="w-full flex justify-center">
+                <CalendarPicker
+                  mode="range"
+                  locale={ptBR}
+                  defaultMonth={dateRange?.from || new Date(2026, 8, 1)}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    setDateRange(range);
+                    if (range?.from) {
+                      setSelectedDate(formatYMD(range.from));
+                    }
+                  }}
+                  className="w-full p-0"
+                  classNames={{
+                    range_start: "bg-blue-500/20 rounded-l-full",
+                    range_end: "bg-blue-500/20 rounded-r-full",
+                    day_button:
+                      "data-[range-end=true]:rounded-full! data-[range-start=true]:rounded-full! data-[range-start=true]:bg-blue-500! data-[range-start=true]:text-white! data-[range-start=true]:group-data-[focused=true]/day:ring-blue-500/20 data-[range-end=true]:bg-blue-500! data-[range-end=true]:text-white! data-[range-end=true]:group-data-[focused=true]/day:ring-blue-500/20 data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-blue-500/20 hover:rounded-full",
+                    today:
+                      "data-[selected=true]:rounded-l-none! rounded-full bg-accent! data-[selected=true]:bg-blue-500/20! [&_button[data-range-middle=true]]:bg-transparent!",
+                  }}
+                />
+              </div>
+
+              <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="text-[11px] text-slate-500 font-medium truncate">
+                  {dateRange?.from ? (
+                    <span>
+                      {dateRange.from.toLocaleDateString('pt-BR')}
+                      {dateRange?.to && dateRange.to.getTime() !== dateRange.from.getTime()
+                        ? ` – ${dateRange.to.toLocaleDateString('pt-BR')}`
+                        : ''}
+                    </span>
+                  ) : (
+                    <span>Selecione um intervalo</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date();
+                      setDateRange({ from: today, to: today });
+                      setSelectedDate(formatYMD(today));
+                    }}
+                    className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Hoje
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarOpen(false)}
+                    className="px-3 py-1 bg-[#002133] hover:bg-[#002133]/90 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -490,6 +656,48 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Caixa de Observação e Parecer Institucional com IA */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#002133] text-white flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-[#f75142]" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Parecer Institucional & Anotações do Livro de Ponto
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Registe despachos diários, ocorrências pedagógicas ou consulte a IA institucional:
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full flex justify-center">
+          <AIInputWithLoading
+            placeholder="Digite uma observação do livro de ponto ou peça à IA para gerar relatório..."
+            onSubmit={handleAddDiaryNote}
+          />
+        </div>
+
+        {diaryNotes.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Despachos & Ocorrências Registadas:
+            </span>
+            <div className="flex flex-col gap-1.5">
+              {diaryNotes.slice(0, 3).map((note, idx) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2 text-xs text-slate-700 flex items-start gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#f75142] shrink-0 mt-1" />
+                  <span className="font-medium">{note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Teacher Attendance List */}
@@ -707,12 +915,12 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
               Professor(a): <strong>{justificationModalTeacher.name}</strong>
             </p>
 
-            <textarea
+            <Textarea
               rows={3}
               value={tempObservation}
               onChange={(e) => setTempObservation(e.target.value)}
               placeholder="Ex: Atestado médico entregue na secretaria, comissão externa pelo MED, etc."
-              className="w-full p-3 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-[#f75142]"
+              className="w-full rounded-2xl bg-black/5 dark:bg-white/5 border-none text-xs p-3.5 focus-visible:ring-2 focus-visible:ring-black/20 resize-none"
             />
 
             <div className="flex justify-end gap-2 mt-4">

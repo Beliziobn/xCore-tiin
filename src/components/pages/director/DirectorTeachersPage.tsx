@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle, CheckCircle2, Clock, Calendar, ChevronDown, ShieldCheck, UserCheck, Lock } from 'lucide-react';
+import { Search, Plus, Filter, CheckCircle, CheckCircle2, Clock, Calendar, ChevronDown, UserCheck } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
@@ -95,29 +95,6 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Institutional Authority Card */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-[#fef2f1] to-[#fef2f1] border border-[#fee4e2] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#f75142] text-white flex items-center justify-center shrink-0 shadow-xs">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-black text-slate-900 block text-xs sm:text-sm">
-                Autonomia do Diretor: Cadastro Oficial de Professores
-              </span>
-              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5">
-                Por diretriz de segurança uCore, o cadastro e alocação de turmas dos docentes é realizado diretamente pela Direção Escolar com validação presencial.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="whitespace-nowrap px-4 py-2 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
-          >
-            Cadastrar Novo Docente
-          </button>
-        </div>
-
         {/* Filter Bar matching 11.png: Filtro: Professores v, Search, Cadastrar button */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
           {/* Left: Filtro Dropdown */}
@@ -180,17 +157,6 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            {onNavigateToAttendance && (
-              <button
-                id="btn-livro-ponto"
-                onClick={onNavigateToAttendance}
-                className="bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-2xs hover:shadow active:scale-95 flex items-center justify-center gap-2"
-                title="Abrir livro de ponto dos professores"
-              >
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Livro de Ponto</span>
-              </button>
-            )}
             <button
               id="btn-cadastrar-professor"
               onClick={() => setIsModalOpen(true)}

@@ -51,6 +51,7 @@ import {
 } from '../../data/classesConfig';
 import { SmartAutofillBar } from '../common/SmartAutofillBar';
 import type { AutofillProfile } from '../../utils/smartAutofill';
+import { Textarea } from '@/components/ui/textarea';
 
 interface StudentRegistrationModalProps {
   isOpen: boolean;
@@ -1137,12 +1138,12 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Observações Administrativas / Pedagógicas
                   </label>
-                  <textarea
+                  <Textarea
                     rows={2}
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}
                     placeholder="Informações adicionais relevantes sobre saúde, apoio pedagógico ou documentação..."
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                    className="w-full"
                   />
                 </div>
               </div>

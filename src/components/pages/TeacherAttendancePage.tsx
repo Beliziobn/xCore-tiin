@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { StudentProfile } from '../../data/teacherData';
+import { Textarea } from '@/components/ui/textarea';
 import {
   StudentAttendanceRecord,
   getStoredStudentAttendance,
@@ -690,12 +691,12 @@ export const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({
               Aluno: <strong>{justificationModalStudent.name}</strong>
             </p>
 
-            <textarea
+            <Textarea
               rows={3}
               value={tempObservation}
               onChange={(e) => setTempObservation(e.target.value)}
               placeholder="Ex: Apresentou atestado médico, dispensa do encarregado, etc."
-              className="w-full p-3 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-[#f75142]"
+              className="w-full"
             />
 
             <div className="flex justify-end gap-2 mt-4">

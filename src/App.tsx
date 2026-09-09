@@ -60,6 +60,7 @@ import { initSmoothScroll, scrollToTop, refreshScrollReveals } from './utils/scr
 
 // School Team Section (Professores, Gestores e Coordenadores)
 import SchoolTeamSection, { defaultSchoolMembers, SchoolMember } from './components/ui/school-team-section';
+import { AIInputWithLoading } from './components/ui/ai-input-with-loading';
 
 import type { 
   EducationalModule, 
@@ -132,6 +133,25 @@ export default function App() {
 
   const [adminModalType, setAdminModalType] = useState<AdminModalType>(null);
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
+  const [homeAIResponse, setHomeAIResponse] = useState<string | null>(null);
+
+  const handleHomeAICommand = (prompt: string) => {
+    if (!prompt.trim()) return;
+    const p = prompt.toLowerCase();
+    if (p.includes('ponto') || p.includes('presen') || p.includes('falta') || p.includes('docente') || p.includes('professor')) {
+      setHomeAIResponse(
+        `📊 Análise de Presenças (Livro de Ponto Docente):\n• Total de Professores: 23 docentes lotados na unidade.\n• Presentes: 22 docentes em regência de classe regular.\n• Falta Justificada: 1 docente (comprovativo médico homologado na secretaria).\n• Índice de Assiduidade: 95.7% no dia de hoje.`
+      );
+    } else if (p.includes('turma') || p.includes('aluno') || p.includes('sala')) {
+      setHomeAIResponse(
+        `🎓 Panorama Discente & Turmas:\n• 489 alunos distribuídos por 16 turmas nos turnos da manhã e tarde.\n• Frequência discente média da unidade: 96.2%.\n• 11 salas operacionais com iluminação e ventilação certificadas.`
+      );
+    } else {
+      setHomeAIResponse(
+        `✨ Parecer Institucional Inteligente uCore:\nRecebido: "${prompt}".\nOs dados da Direção e da Secretaria Escolar de Quêssua encontram-se homologados e em total conformidade para o ano letivo de 2026.`
+      );
+    }
+  };
 
   // Persist admin entities on change
   useEffect(() => {
@@ -1249,6 +1269,69 @@ export default function App() {
               showToast(`Alternado para sessão: ${role.toUpperCase()}`);
             }}
           />
+
+          {/* Seção Principal: Assistente Inteligente IA & Central com AIInputWithLoading */}
+          <section className="max-w-4xl mx-auto px-4 sm:px-6 mb-12">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-[0_10px_35px_rgba(0,0,0,0.04)] text-center relative overflow-hidden">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#002133] text-white text-xs font-bold mb-3 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-[#f75142] animate-pulse" />
+                <span>Assistente de Gestão Escolar Inteligente (IA)</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
+                Central de Pareceres & Análises Rápidas
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto mb-6">
+                Utilize o novo componente com suporte a auto-redimensionamento e digitação inteligente para consultar dados ou registar despachos:
+              </p>
+
+              <div className="w-full flex justify-center">
+                <AIInputWithLoading
+                  placeholder="Pergunte sobre presenças docentes, turmas ou digite uma ocorrência..."
+                  onSubmit={handleHomeAICommand}
+                />
+              </div>
+
+              {/* Sugestões de cliques rápidos */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView('diretor-presenca');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                >
+                  📅 Abrir Livro de Ponto (Calendário)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHomeAICommand('Resumo de presenças dos professores')}
+                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                >
+                  📊 Resumo de Presenças Docentes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHomeAICommand('Panorama de turmas e alunos')}
+                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                >
+                  🎓 Panorama Geral de Alunos
+                </button>
+              </div>
+
+              {homeAIResponse && (
+                <div className="mt-6 text-left p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>Resposta do Assistente uCore:</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                    {homeAIResponse}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* Optional Academic Modules Section */}
           <CyanCardsSection onSelectModule={(module) => setSelectedModule(module)} />
