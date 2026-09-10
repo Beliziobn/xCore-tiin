@@ -148,6 +148,20 @@ export function fillCapaSheet(ws, metaData) {
     ws.getCell('B16').value = String(metaData.municipio).toUpperCase();
     cellsModified++;
   }
+  if (metaData.escola || metaData.nome_escola) {
+    ws.getCell('A17').value = 'ESCOLA:';
+    ws.getCell('B17').value = String(metaData.escola || metaData.nome_escola).toUpperCase();
+    cellsModified += 2;
+  }
+  if (metaData.codigo_sige || metaData.comuna) {
+    const info = [
+      metaData.codigo_sige ? `CÓDIGO: ${metaData.codigo_sige}` : '',
+      metaData.comuna ? `COMUNA: ${metaData.comuna}` : ''
+    ].filter(Boolean).join(' | ');
+    ws.getCell('A18').value = 'CÓDIGO SIGE / COMUNA:';
+    ws.getCell('B18').value = info.toUpperCase();
+    cellsModified += 2;
+  }
   if (metaData.data_entrega) {
     ws.getCell('H33').value = String(metaData.data_entrega);
     cellsModified++;

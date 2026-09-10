@@ -317,24 +317,28 @@ export function exportConsolidatedExcel(
   const teachersData = buildTeachersSheetData(unified.teachers);
   const wsTeachers = XLSX.utils.json_to_sheet(teachersData);
   wsTeachers['!cols'] = calculateColumnWidths(teachersData);
+  if (wsTeachers['!ref']) wsTeachers['!autofilter'] = { ref: wsTeachers['!ref'] };
   XLSX.utils.book_append_sheet(wb, wsTeachers, 'Professores');
 
   // 3. Diretores
   const directorsData = buildDirectorsSheetData(unified.directors);
   const wsDirectors = XLSX.utils.json_to_sheet(directorsData);
   wsDirectors['!cols'] = calculateColumnWidths(directorsData);
+  if (wsDirectors['!ref']) wsDirectors['!autofilter'] = { ref: wsDirectors['!ref'] };
   XLSX.utils.book_append_sheet(wb, wsDirectors, 'Diretores');
 
   // 4. Alunos
   const studentsData = buildStudentsSheetData(unified.students);
   const wsStudents = XLSX.utils.json_to_sheet(studentsData);
   wsStudents['!cols'] = calculateColumnWidths(studentsData);
+  if (wsStudents['!ref']) wsStudents['!autofilter'] = { ref: wsStudents['!ref'] };
   XLSX.utils.book_append_sheet(wb, wsStudents, 'Alunos');
 
   // 5. Escolas da Rede
   const schoolsData = buildSchoolsSheetData(unified.schools);
   const wsSchools = XLSX.utils.json_to_sheet(schoolsData);
   wsSchools['!cols'] = calculateColumnWidths(schoolsData);
+  if (wsSchools['!ref']) wsSchools['!autofilter'] = { ref: wsSchools['!ref'] };
   XLSX.utils.book_append_sheet(wb, wsSchools, 'Escolas da Rede');
 
   // File name format
@@ -407,3 +411,13 @@ export function exportSchoolsExcel(schools?: AdminSchool[], customFileName?: str
   const filename = customFileName || `uCore_Planilha_Escolas_${dateTag}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
+
+// Re-export official ministerial SIGE statistical export functions
+export {
+  exportOfficialSigeExcel,
+  exportStandaloneSigeHtml,
+  aggregateSigeDataset,
+  buildOfficialSigeSheetDefinitions,
+  buildSigeJsonPayload,
+} from './sigeAggregation';
+export type { SigeAggregatedReport } from './sigeAggregation';

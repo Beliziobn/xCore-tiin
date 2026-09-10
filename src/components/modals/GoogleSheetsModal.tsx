@@ -37,6 +37,7 @@ import {
   buildFullSystemSheetDefinitions,
   buildStudentsSheetDefinition,
   buildTeachersSheetDefinition,
+  buildOfficialSigeSheetDefinitions,
   recordsToSheetDefinition,
   getSavedSpreadsheets,
   SavedSpreadsheetRecord,
@@ -73,9 +74,9 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Export options
-  const [exportScope, setExportScope] = useState<'all' | 'students' | 'teachers'>('all');
+  const [exportScope, setExportScope] = useState<'sige_official' | 'all' | 'students' | 'teachers'>('sige_official');
   const [spreadsheetTitle, setSpreadsheetTitle] = useState(
-    prefilledTitle || `uCore - Rede de Ensino de Quêssua (${new Date().toLocaleDateString('pt-PT')})`
+    prefilledTitle || `SIGE 2024/2025 - Estatística Oficial de Quêssua (${new Date().toLocaleDateString('pt-PT')})`
   );
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<GoogleSpreadsheetResult | null>(null);
@@ -182,7 +183,9 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
       setAuthError(null);
 
       let sheetDefs;
-      if (exportScope === 'students') {
+      if (exportScope === 'sige_official') {
+        sheetDefs = buildOfficialSigeSheetDefinitions(dataset);
+      } else if (exportScope === 'students') {
         sheetDefs = buildStudentsSheetDefinition(dataset.students);
       } else if (exportScope === 'teachers') {
         sheetDefs = buildTeachersSheetDefinition(dataset.teachers);
@@ -510,74 +513,121 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
                     {/* Scope Selector */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-2">
-                        Selecione o Conteúdo para Exportação
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold text-slate-700">
+                          Selecione o Modelo de Exportação
+                        </label>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Conforme finalidade estatística ou administrativa
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-3.5">
+                        {/* Option 1: SIGE OFICIAL (Agregado) */}
                         <div
-                          onClick={() => setExportScope('all')}
+                          onClick={() => {
+                            setExportScope('sige_official');
+                            setSpreadsheetTitle(`SIGE 2024/2025 - Estatística Oficial de Quêssua (${new Date().toLocaleDateString('pt-PT')})`);
+                          }}
+                          className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative ${
+                            exportScope === 'sige_official'
+                              ? 'border-[#1F4E79] bg-[#1F4E79]/5 text-[#1F4E79] ring-2 ring-[#1F4E79]/30 shadow-xs'
+                              : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                          }`}
+                        >
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <FileSpreadsheet className="w-4 h-4 text-[#1F4E79]" />
+                                <span className="text-sm font-bold text-[#1F4E79]">Instrumento Oficial SIGE</span>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                Oficial GEPE
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-relaxed">
+                              <strong>8 Abas Oficiais:</strong> CAPA, 1-Alunos, 2-Docentes, 3-Infra, 4-Aproveitamento, 5-Repetentes, 6-NEE, 7-Não Docentes.
+                            </p>
+                            <div className="p-2 bg-emerald-50/70 rounded-lg border border-emerald-200/60 text-[10px] text-emerald-800 font-medium">
+                              ✓ <strong>Zero Dados Nominais:</strong> 100% contagens por nível, classe, idade e gênero (MF/F).
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-[#1F4E79] mt-2.5 flex items-center gap-1">
+                            ● Recomendado para o Ministério da Educação
+                          </span>
+                        </div>
+
+                        {/* Option 2: LISTAGEM DE GESTÃO INTERNA (uCore) */}
+                        <div
+                          onClick={() => {
+                            setExportScope('all');
+                            setSpreadsheetTitle(`uCore - Gestão Operacional Interna (${new Date().toLocaleDateString('pt-PT')})`);
+                          }}
                           className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                             exportScope === 'all'
-                              ? 'border-[#002133] bg-[#002133]/5 text-[#002133] ring-1 ring-[#002133]'
+                              ? 'border-[#002133] bg-[#002133]/5 text-[#002133] ring-2 ring-[#002133]/20 shadow-xs'
                               : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
                           }`}
                         >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Layers className="w-4 h-4 text-emerald-600" />
-                              <span className="text-sm font-bold">Consolidada (Tudo)</span>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-slate-800" />
+                                <span className="text-sm font-bold text-slate-900">Listagem de Gestão Interna</span>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                                Secretaria
+                              </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 leading-relaxed">
-                              5 Abas: Resumo, Alunos, Professores, Diretores e Escolas
+                            <p className="text-[11px] text-slate-600 leading-relaxed">
+                              <strong>5 Abas Operacionais:</strong> Resumo, Alunos, Professores, Diretores e Escolas da Rede.
                             </p>
+                            <div className="p-2 bg-slate-50 rounded-lg border border-slate-200/70 text-[10px] text-slate-600">
+                              ℹ Contém pautas nominais completas (nomes, contactos, processos) para gestão escolar.
+                            </div>
                           </div>
-                          <span className="text-[10px] font-bold text-emerald-700 mt-2">
-                            {dataset.students.length + dataset.teachers.length + dataset.directors.length} registos
+                          <span className="text-[10px] font-bold text-slate-600 mt-2.5">
+                            {dataset.students.length + dataset.teachers.length + dataset.directors.length} registos administrativos
                           </span>
                         </div>
+                      </div>
 
+                      {/* Micro individual cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div
-                          onClick={() => setExportScope('students')}
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                          onClick={() => {
+                            setExportScope('students');
+                            setSpreadsheetTitle(`uCore - Registo de Alunos (${new Date().toLocaleDateString('pt-PT')})`);
+                          }}
+                          className={`px-3 py-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                             exportScope === 'students'
-                              ? 'border-[#002133] bg-[#002133]/5 text-[#002133] ring-1 ring-[#002133]'
-                              : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                              ? 'border-[#002133] bg-[#002133]/5 font-bold text-[#002133]'
+                              : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'
                           }`}
                         >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <GraduationCap className="w-4 h-4 text-sky-600" />
-                              <span className="text-sm font-bold">Apenas Alunos</span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 leading-relaxed">
-                              Matrículas, turmas, gênero, assiduidade e situação civil
-                            </p>
-                          </div>
-                          <span className="text-[10px] font-bold text-sky-700 mt-2">
-                            {dataset.students.length} estudantes
+                          <span className="flex items-center gap-1.5">
+                            <GraduationCap className="w-3.5 h-3.5 text-sky-600" />
+                            Apenas Registo de Alunos (Interno)
                           </span>
+                          <span className="text-[10px] text-slate-500 font-semibold">{dataset.students.length}</span>
                         </div>
 
                         <div
-                          onClick={() => setExportScope('teachers')}
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                          onClick={() => {
+                            setExportScope('teachers');
+                            setSpreadsheetTitle(`uCore - Quadro de Professores (${new Date().toLocaleDateString('pt-PT')})`);
+                          }}
+                          className={`px-3 py-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                             exportScope === 'teachers'
-                              ? 'border-[#002133] bg-[#002133]/5 text-[#002133] ring-1 ring-[#002133]'
-                              : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                              ? 'border-[#002133] bg-[#002133]/5 font-bold text-[#002133]'
+                              : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'
                           }`}
                         >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4 text-amber-600" />
-                              <span className="text-sm font-bold">Apenas Docentes</span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 leading-relaxed">
-                              Quadro pedagógico, disciplinas e salas alocadas
-                            </p>
-                          </div>
-                          <span className="text-[10px] font-bold text-amber-700 mt-2">
-                            {dataset.teachers.length} professores
+                          <span className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-amber-600" />
+                            Apenas Quadro Docente (Interno)
                           </span>
+                          <span className="text-[10px] text-slate-500 font-semibold">{dataset.teachers.length}</span>
                         </div>
                       </div>
                     </div>

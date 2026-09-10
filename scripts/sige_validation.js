@@ -1,16 +1,117 @@
 /**
  * SIGE 2024/2025 Data Validation Module
  * 
- * Cobertura Total do Instrumento:
- * 1. meta -> CAPA (Província, Município, Data)
- * 2. pre_escolar, iniciacao, primario_regular, praeer, eja_primario, sec1_*, sec2_* -> 1 - Alunos
- * 3. docentes -> 2 - Pessoal Docente (Pré, Primário, Secundário I e II)
- * 4. infraestruturas -> 3 - Infraestruturas (Escolas, Salas Definitivas/Provisórias)
- * 5. aproveitamento -> 4 - Aproveitamento (Matriculados = Aprovados + Reprovados + Desistidos, F <= MF)
- * 6. repetentes -> 5 - Repetentes (F <= MF)
- * 7. nee -> 6 - NEE (F <= MF)
- * 8. nao_docente -> 7 - Pessoal Não Docente (Pré-escolar e Administrativo/Auxiliar)
+ * Cobertura Total do Instrumento (18 Chaves de Topo):
+ * 1. meta -> CAPA (Província, Município, Data de Entrega)
+ * 2. pre_escolar -> 1 – Matriculados (Creche, Jardim 1 e 2)
+ * 3. iniciacao -> 1 – Matriculados (Iniciação)
+ * 4. primario_regular -> 1 – Matriculados (1ª à 6ª Classe)
+ * 5. praeer -> 1 – Matriculados (Etapas de Aceleração Escolar)
+ * 6. eja_primario -> 1 – Matriculados (Módulos de EJA Primário)
+ * 7. sec1_geral -> 1 – Matriculados (7ª à 9ª Classe I Ciclo Geral)
+ * 8. sec1_tecnico -> 1 – Matriculados (I Ciclo Técnico)
+ * 9. sec1_eja -> 1 – Matriculados (EJA I Ciclo por Anos)
+ * 10. sec2_geral -> 1 – Matriculados (10ª à 13ª Classe II Ciclo Geral)
+ * 11. sec2_tecnico -> 1 – Matriculados (II Ciclo Técnico)
+ * 12. sec2_formacao -> 1 – Matriculados (Formação de Professores)
+ * 13. repetentes -> 5 – Repetentes (F <= MF, idade >= 6a no primário)
+ * 14. nee -> 6 – NEE (Necessidades Educativas Especiais)
+ * 15. aproveitamento -> 4 – Aproveitamento (Matriculados = Aprovados + Reprovados + Desistidos, F <= MF)
+ * 16. docentes -> 2 – Pessoal Docente (Pré, Primário, Secundário I e II)
+ * 17. infraestruturas -> 3 – Infraestruturas (Escolas, Salas Definitivas/Provisórias)
+ * 18. nao_docente -> 7 – Pessoal Não Docente (Pré-escolar e Administrativo/Auxiliar)
  */
+
+export const SIGE_TOP_LEVEL_KEYS = [
+  'meta',
+  'pre_escolar',
+  'iniciacao',
+  'primario_regular',
+  'praeer',
+  'eja_primario',
+  'sec1_geral',
+  'sec1_tecnico',
+  'sec1_eja',
+  'sec2_geral',
+  'sec2_tecnico',
+  'sec2_formacao',
+  'repetentes',
+  'nee',
+  'aproveitamento',
+  'docentes',
+  'infraestruturas',
+  'nao_docente'
+];
+
+export const SIGE_OFFICIAL_SHEETS = [
+  { numero: 1, nome: 'CAPA', chave: 'meta' },
+  { numero: 2, nome: '1 – Matriculados', chaves: ['pre_escolar', 'iniciacao', 'primario_regular', 'praeer', 'eja_primario', 'sec1_geral', 'sec1_tecnico', 'sec1_eja', 'sec2_geral', 'sec2_tecnico', 'sec2_formacao'] },
+  { numero: 3, nome: '2 – Pessoal Docente', chave: 'docentes' },
+  { numero: 4, nome: '3 – Infraestruturas', chave: 'infraestruturas' },
+  { numero: 5, nome: '4 – Aproveitamento', chave: 'aproveitamento' },
+  { numero: 6, nome: '5 – Repetentes', chave: 'repetentes' },
+  { numero: 7, nome: '6 – NEE', chave: 'nee' },
+  { numero: 8, nome: '7 – Pessoal Não Docente', chave: 'nao_docente' },
+  { numero: 9, nome: 'Quadro Geral de Turmas', chave: 'infraestruturas.turmas' }
+];
+
+export const ALLOWED_INSTITUTIONAL_KEYS = /^(escola|nome_escola|designacao_escola|codigo_escola|numero_escola|codigo_sige|municipio|provincia|comuna|distrito|departamento|ministerio|gabinete)$/i;
+
+export const PROHIBITED_FIELD_TYPES = [
+  { tipo: 1, nome: 'nomes_pessoais', pattern: /(^|_)(nome_aluno|nome_estudante|nome_professor|nome_docente|nome_pai|nome_mae|nome_encarregado|primeiro_nome|ultimo_nome|nome_completo)($|_)|^nome$|^nomes$|^name$|^names$/i },
+  { tipo: 2, nome: 'emails', pattern: /(^|_)email(s)?($|_)|e_mail|correio_electronico/i },
+  { tipo: 3, nome: 'bi', pattern: /(^|_)bi($|_)|numero_bi|num_bi|n_bi|cedula|passaporte/i },
+  { tipo: 4, nome: 'nif', pattern: /(^|_)nif($|_)|numero_nif|num_nif/i },
+  { tipo: 5, nome: 'n_processo', pattern: /(^|_)processo(s)?($|_)|num_processo|n_processo|numero_processo|matricula_id/i },
+  { tipo: 6, nome: 'encarregados', pattern: /(^|_)encarregado(s)?($|_)|filiacao|nome_pai|nome_mae/i },
+  { tipo: 7, nome: 'directores', pattern: /(^|_)director(es)?($|_)|(^|_)diretor(es)?($|_)/i },
+  { tipo: 8, nome: 'moradas', pattern: /(^|_)morada(s)?($|_)|endereco|rua|bairro|residencia/i },
+  { tipo: 9, nome: 'telefones', pattern: /(^|_)telefone(s)?($|_)|telemovel|phone|contacto_pessoal/i },
+  { tipo: 10, nome: 'data_nascimento', pattern: /(^|_)data_nasc(imento)?($|_)|birth_date|dt_nasc/i },
+  { tipo: 11, nome: 'senhas', pattern: /(^|_)senha(s)?($|_)|password|credenciais|pin|token/i }
+];
+
+/**
+ * Validates that the payload contains ZERO prohibited personal / nominal fields.
+ * Institutional school data (school name, SIGE code, commune) is allowed and encouraged.
+ */
+export function validateProhibitedFields(payload) {
+  const errors = [];
+
+  function checkObject(obj, currentPath) {
+    if (!obj || typeof obj !== 'object') return;
+
+    for (const [key, value] of Object.entries(obj)) {
+      const fullPath = currentPath ? `${currentPath}.${key}` : key;
+
+      // Se for identificação institucional da escola, permitir
+      if (ALLOWED_INSTITUTIONAL_KEYS.test(key)) {
+        if (typeof value === 'object' && value !== null) {
+          checkObject(value, fullPath);
+        }
+        continue;
+      }
+
+      for (const prohibited of PROHIBITED_FIELD_TYPES) {
+        if (prohibited.pattern.test(key)) {
+          errors.push(
+            `Campo Proibido Detectado (${prohibited.nome}): '${key}' em '${fullPath}'. O SIGE proíbe dados nominais ou identificadores de pessoas físicas (BI, processo, contactos pessoais).`
+          );
+        }
+      }
+
+      if (typeof value === 'object' && value !== null) {
+        checkObject(value, fullPath);
+      }
+    }
+  }
+
+  checkObject(payload, '');
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
 
 /**
  * Normalizes strings for matching
@@ -544,6 +645,12 @@ export function validateSigePayload(payload, options = {}) {
   const results = {};
   const allErrors = [];
   const allWarnings = [];
+
+  // 0. Validação Anti-Identificação (Zero Dados Pessoais / Nominais) - 11 Tipos Proibidos
+  const prohibitedCheck = validateProhibitedFields(payload);
+  if (!prohibitedCheck.isValid) {
+    allErrors.push(...prohibitedCheck.errors);
+  }
 
   // 1. CAPA / Meta
   if (payload.meta) {

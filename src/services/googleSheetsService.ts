@@ -8,6 +8,9 @@ import {
   buildSchoolsSheetData,
   getUnifiedSystemDataset,
 } from '../utils/excelExport';
+import {
+  buildOfficialSigeSheetDefinitions as buildSigeOfficialSheets
+} from '../utils/sigeAggregation';
 import type { AdminTeacher, AdminStudent } from '../types';
 
 export interface SheetDataDefinition {
@@ -338,7 +341,20 @@ export async function fetchSheetValues(
 }
 
 /**
+ * Builds the official SIGE Ministério da Educação (GEPE) sheet definitions for Google Sheets.
+ * CONFORME AS EXIGÊNCIAS MINISTERIAIS:
+ * - 100% NÚMEROS AGREGADOS (contagens e somas por nível, classe, idade, gênero).
+ * - ZERO DADOS NOMINAIS (Sem nomes, sem BI, sem emails, sem nº de processo).
+ */
+export function buildOfficialSigeSheetDefinitions(dataset?: SystemDataset): SheetDataDefinition[] {
+  const unified = dataset || getUnifiedSystemDataset();
+  return buildSigeOfficialSheets(unified);
+}
+
+/**
  * Builds standard full system dataset definitions for Google Sheets export
+ * NOTA: Esta é uma LISTAGEM DE GESTÃO INTERNA (Secretaria Escolar / Direção).
+ * Para submissão estatística ao Ministério da Educação, utilize 'buildOfficialSigeSheetDefinitions'.
  */
 export function buildFullSystemSheetDefinitions(dataset?: SystemDataset): SheetDataDefinition[] {
   const unified = dataset || getUnifiedSystemDataset();
@@ -349,11 +365,11 @@ export function buildFullSystemSheetDefinitions(dataset?: SystemDataset): SheetD
   const schoolsRecords = buildSchoolsSheetData(unified.schools);
 
   return [
-    recordsToSheetDefinition('Resumo Executivo', summaryRecords),
-    recordsToSheetDefinition('Alunos da Rede', studentsRecords),
-    recordsToSheetDefinition('Quadro de Professores', teachersRecords),
-    recordsToSheetDefinition('Directores Escolares', directorsRecords),
-    recordsToSheetDefinition('Rede de Escolas', schoolsRecords),
+    recordsToSheetDefinition('Resumo Executivo (Interno)', summaryRecords),
+    recordsToSheetDefinition('Alunos (Registo Interno)', studentsRecords),
+    recordsToSheetDefinition('Professores (Registo Interno)', teachersRecords),
+    recordsToSheetDefinition('Directores (Registo Interno)', directorsRecords),
+    recordsToSheetDefinition('Rede de Escolas (Interno)', schoolsRecords),
   ];
 }
 

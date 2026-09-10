@@ -313,7 +313,7 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
       }
       setActiveTab(3);
     } else if (activeTab === 3) {
-      const hasAnyLevel = Object.values(selectedLevels).some((l) => l.selected);
+      const hasAnyLevel = Object.values(selectedLevels).some((l: any) => l?.selected);
       if (!hasAnyLevel) {
         setErrorMessage('Por favor seleccione pelo menos um Nível de Ensino.');
         return;

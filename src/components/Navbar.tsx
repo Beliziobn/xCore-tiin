@@ -211,6 +211,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onSelectPage('admin-estatisticas');
                         setShowPagesDropdown(false);
                       }}
+                      className="w-full text-left px-4 py-2 text-xs text-cyan-900 bg-cyan-50/70 hover:bg-cyan-100 hover:text-[#0b3d5c] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    >
+                      <span>SIGE Oficial 2024/2025</span>
+                      <span className="text-[10px] bg-[#0b3d5c] text-white px-1.5 py-0.5 rounded font-semibold">GEPE</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('admin-estatisticas');
+                        setShowPagesDropdown(false);
+                      }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
                       Estatísticas da Rede

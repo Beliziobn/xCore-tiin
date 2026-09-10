@@ -95,6 +95,40 @@ export function buildCapaSheet(workbook) {
   };
   b16.alignment = { vertical: 'middle', horizontal: 'left' };
 
+  ws.getCell('A17').value = 'ESCOLA:';
+  ws.getCell('A17').font = labelFont;
+  ws.getCell('A17').alignment = { vertical: 'middle', horizontal: 'left' };
+
+  ws.mergeCells('B17:I17');
+  const b17 = ws.getCell('B17');
+  b17.value = '';
+  b17.font = { name: FONT_FAMILY, size: 11, bold: true };
+  b17.fill = inputFill;
+  b17.border = {
+    bottom: { style: 'medium', color: { argb: '1F4E79' } },
+    top: { style: 'thin', color: { argb: 'D3D3D3' } },
+    left: { style: 'thin', color: { argb: 'D3D3D3' } },
+    right: { style: 'thin', color: { argb: 'D3D3D3' } }
+  };
+  b17.alignment = { vertical: 'middle', horizontal: 'left' };
+
+  ws.getCell('A18').value = 'CÓDIGO SIGE:';
+  ws.getCell('A18').font = labelFont;
+  ws.getCell('A18').alignment = { vertical: 'middle', horizontal: 'left' };
+
+  ws.mergeCells('B18:I18');
+  const b18 = ws.getCell('B18');
+  b18.value = '';
+  b18.font = { name: FONT_FAMILY, size: 11, bold: true };
+  b18.fill = inputFill;
+  b18.border = {
+    bottom: { style: 'medium', color: { argb: '1F4E79' } },
+    top: { style: 'thin', color: { argb: 'D3D3D3' } },
+    left: { style: 'thin', color: { argb: 'D3D3D3' } },
+    right: { style: 'thin', color: { argb: 'D3D3D3' } }
+  };
+  b18.alignment = { vertical: 'middle', horizontal: 'left' };
+
   // Section OBSERVAÇÕES GERAIS (A23:I23)
   ws.mergeCells('A23:I23');
   const a23 = ws.getCell('A23');
