@@ -19,7 +19,8 @@ import {
   Check,
   Download,
   Users,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeft
 } from 'lucide-react';
 import type { DirectorRegistrationData } from '../../types';
 
@@ -45,11 +46,27 @@ export const DirectorDetailModal: React.FC<DirectorDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200">
+      {/* Backdrop overlay */}
+      <div className="absolute inset-0 cursor-pointer" onClick={onClose} />
+
+      {/* Drawer Container: full screen on mobile, right-docked on desktop */}
       <div
-        className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        className="relative z-10 w-full sm:max-w-2xl lg:max-w-3xl h-full bg-white shadow-2xl border-l border-slate-200 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile top return bar */}
+        <div className="sm:hidden bg-[#001724] px-4 py-2.5 flex items-center justify-between border-b border-white/10 shrink-0">
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-2 text-xs font-bold text-white hover:text-[#f75142] transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Voltar à lista de diretores</span>
+          </button>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Ficha do Diretor</span>
+        </div>
+
         {/* Header */}
         <div className="bg-[#002133] px-6 py-4 flex items-center justify-between text-white shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">

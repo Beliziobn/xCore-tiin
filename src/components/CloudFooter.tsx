@@ -21,7 +21,7 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
   };
 
   return (
-    <footer id="ucore-cloud-footer" className="relative w-full mt-24 bg-white">
+    <footer id="ucore-cloud-footer" className="relative w-full mt-12 sm:mt-16 bg-white">
       {/* 
         Top curved transition matching Design sem nome (1).png:
         - CSS selector 1 targets: div:nth-of-type(1) > svg:nth-of-type(1)
@@ -35,10 +35,10 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
           onClick={scrollToTop}
           aria-label="Voltar ao início da página"
           title="Voltar ao topo"
-          className="absolute z-20 left-[76%] sm:left-[77%] md:left-[78%] top-1 sm:top-2 md:top-3 -translate-x-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 md:w-14 md:h-14 rounded-full bg-[#002133] hover:bg-[#001726] active:scale-90 transition-all duration-300 flex items-center justify-center shadow-[0_8px_20px_rgba(0,33,51,0.45)] hover:shadow-[0_12px_28px_rgba(0,33,51,0.6)] cursor-pointer group hover:-translate-y-2/3"
+          className="absolute z-20 left-[76%] sm:left-[77%] md:left-[78%] top-0 sm:top-1 md:top-2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 md:w-13 md:h-13 rounded-full bg-[#002133] hover:bg-[#001726] active:scale-90 transition-all duration-300 flex items-center justify-center shadow-[0_8px_20px_rgba(0,33,51,0.45)] hover:shadow-[0_12px_28px_rgba(0,33,51,0.6)] cursor-pointer group hover:-translate-y-2/3"
         >
           <ArrowUp
-            className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:-translate-y-0.5 transition-transform stroke-[2.6]"
+            className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-y-0.5 transition-transform stroke-[2.6]"
           />
         </button>
 
@@ -47,7 +47,7 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
           viewBox="0 0 1440 90"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-14 sm:h-20 md:h-24 block"
+          className="w-full h-9 sm:h-12 md:h-14 block"
           preserveAspectRatio="none"
           aria-hidden="true"
         >
@@ -60,9 +60,9 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
       </div>
 
       {/* Main Footer Container with #f75142 background */}
-      <div className="bg-[#f75142] text-[#002133] px-6 sm:px-12 pt-8 sm:pt-12 pb-14 border-t border-[#f75142]">
+      <div className="bg-[#f75142] text-[#002133] px-6 sm:px-12 pt-6 sm:pt-8 pb-8 border-t border-[#f75142]">
         <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-[#002133]/15">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 pb-6 border-b border-[#002133]/15">
             {/* Brand column */}
             <div className="md:col-span-5">
               <div className="flex items-center gap-3">
@@ -135,7 +135,7 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
           </div>
 
           {/* Bottom bar */}
-          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#002133]/85 font-medium">
+          <div className="pt-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#002133]/85 font-medium">
             <p className="tracking-wide text-center sm:text-left">
               © 2026 <strong className="text-[#002133] font-black">uCore</strong> — Todos os direitos reservados.
             </p>

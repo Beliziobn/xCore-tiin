@@ -522,8 +522,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onOpenSettings}
               className="p-2 text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-              title="Configurações da Sessão"
-              aria-label="Configurações da Sessão"
+              title="Configurações da Conta & Palavra-passe"
+              aria-label="Configurações da Conta & Palavra-passe"
             >
               <Settings className="w-5 h-5 text-white" strokeWidth={2.2} />
             </button>
@@ -902,7 +902,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center gap-2"
             >
               <Settings className="w-4 h-4 text-[#f75142]" />
-              <span>Configurações da Sessão</span>
+              <span>Configurações & Palavra-passe</span>
             </button>
           )}
           {onOpenChat && (

@@ -255,7 +255,7 @@ export const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({
   }, [selectedDate]);
 
   return (
-    <div id="teacher-attendance-page" className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-24 font-sans">
+    <div id="teacher-attendance-page" className="attendance-page w-full min-h-screen bg-[#f7f5f4] pb-20 font-sans">
       {/* Toast message */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
@@ -264,373 +264,426 @@ export const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({
         </div>
       )}
 
-      {/* Top Breadcrumb & Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200/80">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBackToClass}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#f75142] bg-white hover:bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Voltar à Turma</span>
-          </button>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <span>Chamada & Presença dos Alunos</span>
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              {turmaName} • Docente Responsável: <strong>Prof. {teacherName}</strong>
-            </p>
-          </div>
-        </div>
-
-        {/* Date Selector */}
-        <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
-          <Calendar className="w-4 h-4 text-[#f75142]" />
-          <span className="text-xs font-bold text-slate-700">Data Letiva:</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="text-xs font-bold text-slate-900 bg-transparent outline-none cursor-pointer"
-          />
-        </div>
-      </div>
-
-      {/* Metric Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total de Alunos</span>
-            <Users className="w-4 h-4 text-slate-400" />
-          </div>
-          <p className="text-2xl font-black text-slate-900">{metrics.total}</p>
-          <span className="text-[11px] text-slate-500 font-medium">Matriculados na turma</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-emerald-200/80 shadow-2xs bg-emerald-50/20">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Presentes Hoje</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-2xl font-black text-emerald-700">{metrics.presentes}</p>
-          <span className="text-[11px] text-emerald-600/90 font-bold">
-            {metrics.total > 0 ? Math.round((metrics.presentes / metrics.total) * 100) : 0}% da turma
-          </span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-rose-200/80 shadow-2xs bg-rose-50/20">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-rose-700">Faltas Registradas</span>
-            <XCircle className="w-4 h-4 text-rose-600" />
-          </div>
-          <p className="text-2xl font-black text-rose-700">{metrics.faltas}</p>
-          <span className="text-[11px] text-rose-600/90 font-bold">
-            {metrics.total > 0 ? Math.round((metrics.faltas / metrics.total) * 100) : 0}% ausências
-          </span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Pendentes</span>
-            <Clock className="w-4 h-4 text-amber-500" />
-          </div>
-          <p className={`text-2xl font-black ${metrics.pendentes > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
-            {metrics.pendentes}
-          </p>
-          <span className="text-[11px] text-slate-500 font-medium">
-            {metrics.pendentes === 0 ? 'Diário 100% selado' : 'Aguardando marcação'}
-          </span>
-        </div>
-      </div>
-
-      {/* Control Bar: Date Info, Quick Actions, Search & Status Filter */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-slate-900 capitalize">
-                {formattedDateFriendly}
-              </span>
-              {metrics.isDayFullyClosed ? (
-                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  <Lock className="w-3 h-3 text-emerald-700" />
-                  <span>Diário Selado</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                  <Clock className="w-3 h-3 text-amber-700" />
-                  <span>Em Preenchimento</span>
-                </span>
-              )}
+      <div className="attendance-content w-full max-w-[1180px] mx-auto px-4 sm:px-6 -mt-7 sm:-mt-8 relative z-10">
+        {/* Page Context Bar: Voltar à Turma, Título, Docente e Data alinhada */}
+        <div className="page-context flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-1">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBackToClass}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#f75142] bg-white hover:bg-slate-50 border border-slate-200/80 px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Voltar à Turma</span>
+            </button>
+            <div>
+              <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <span>Chamada & Presença dos Alunos</span>
+              </h1>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                {turmaName} · Docente: <strong className="text-slate-700">Prof. {teacherName}</strong>
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Assiduidade registrada hoje: <strong>{metrics.assiduidadeRate}%</strong>
-            </p>
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            {!metrics.isDayFullyClosed && (
-              <>
-                <button
-                  onClick={handleMarkAllPresent}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition-all cursor-pointer"
-                >
-                  <CheckCheck className="w-4 h-4 text-slate-600" />
-                  <span>Marcar Pendentes Presentes</span>
-                </button>
-                <button
-                  onClick={() => setConfirmModalOpen(true)}
-                  disabled={Object.keys(pendingMarks).length === 0}
-                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-2xs ${
-                    Object.keys(pendingMarks).length > 0
-                      ? 'bg-[#f75142] hover:bg-[#e04436] text-white cursor-pointer active:scale-95'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>Gravar Chamada Definitiva ({Object.keys(pendingMarks).length})</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Search & Filter Buttons */}
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          {/* Date Selector aligned to the right */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs self-start sm:self-auto">
+            <Calendar className="w-4 h-4 text-[#f75142]" />
+            <span className="text-xs font-bold text-slate-700">Data Letiva:</span>
             <input
-              type="text"
-              placeholder="Buscar por aluno, número ou encarregado..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9.5 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#f75142]"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="text-xs font-bold text-slate-900 bg-transparent outline-none cursor-pointer"
             />
           </div>
+        </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                statusFilter === 'all'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Todos ({students.length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('pending')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                statusFilter === 'pending'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Pendentes ({metrics.pendentes})
-            </button>
-            <button
-              onClick={() => setStatusFilter('presente')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                statusFilter === 'presente'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Presentes ({metrics.presentes})
-            </button>
-            <button
-              onClick={() => setStatusFilter('falta')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                statusFilter === 'falta'
-                  ? 'bg-rose-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Faltas ({metrics.faltas})
-            </button>
+        {/* 4 Summary Cards with reduced height (~112px) and progress bars */}
+        <div className="summary-grid grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5">
+          {/* Total Card */}
+          <div className="summary-card min-h-[112px] p-4 rounded-2xl bg-white border border-[#e3e8ef] shadow-[0_8px_24px_rgba(10,35,52,0.04)] flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total de Alunos</span>
+              <Users className="w-4 h-4 text-slate-400" />
+            </div>
+            <div className="my-0.5">
+              <p className="text-2xl sm:text-3xl font-black text-[#002133] leading-none">{metrics.total}</p>
+              <span className="text-[11px] text-slate-500 font-medium">Matriculados na turma</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-[#002133] h-1.5 rounded-full w-full" />
+            </div>
+          </div>
+
+          {/* Presentes Card */}
+          <div className="summary-card min-h-[112px] p-4 rounded-2xl bg-white border border-[#e3e8ef] shadow-[0_8px_24px_rgba(10,35,52,0.04)] flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Presentes</span>
+              <CheckCircle2 className="w-4 h-4 text-[#12b981]" />
+            </div>
+            <div className="my-0.5">
+              <p className="text-2xl sm:text-3xl font-black text-[#12b981] leading-none">{metrics.presentes}</p>
+              <span className="text-[11px] text-emerald-600 font-bold">
+                {metrics.total > 0 ? Math.round((metrics.presentes / metrics.total) * 100) : 0}% da turma
+              </span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-[#12b981] h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${metrics.total > 0 ? Math.round((metrics.presentes / metrics.total) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Faltas Card */}
+          <div className="summary-card min-h-[112px] p-4 rounded-2xl bg-white border border-[#e3e8ef] shadow-[0_8px_24px_rgba(10,35,52,0.04)] flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-700">Faltas</span>
+              <XCircle className="w-4 h-4 text-[#ef4444]" />
+            </div>
+            <div className="my-0.5">
+              <p className="text-2xl sm:text-3xl font-black text-[#ef4444] leading-none">{metrics.faltas}</p>
+              <span className="text-[11px] text-rose-600 font-bold">
+                {metrics.total > 0 ? Math.round((metrics.faltas / metrics.total) * 100) : 0}% ausências
+              </span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-[#ef4444] h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${metrics.total > 0 ? Math.round((metrics.faltas / metrics.total) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Pendentes Card */}
+          <div className="summary-card min-h-[112px] p-4 rounded-2xl bg-white border border-[#e3e8ef] shadow-[0_8px_24px_rgba(10,35,52,0.04)] flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Pendentes</span>
+              <Clock className="w-4 h-4 text-[#f59e0b]" />
+            </div>
+            <div className="my-0.5">
+              <p className="text-2xl sm:text-3xl font-black text-[#f59e0b] leading-none">{metrics.pendentes}</p>
+              <span className="text-[11px] text-slate-500 font-medium">
+                {metrics.pendentes === 0 ? 'Diário 100% selado' : 'Aguardando marcação'}
+              </span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-[#f59e0b] h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${metrics.total > 0 ? Math.round((metrics.pendentes / metrics.total) * 100) : 0}%` }}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Student Attendance List */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="divide-y divide-slate-100">
-          {filteredStudents.length === 0 ? (
-            <div className="p-12 text-center">
-              <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700">Nenhum aluno encontrado</p>
-              <p className="text-xs text-slate-400 mt-0.5">Tente ajustar a busca ou os filtros de status.</p>
+        {/* Attendance Panel */}
+        <div className="attendance-panel overflow-hidden border border-[#e0e6ed] rounded-[18px] bg-white shadow-[0_8px_24px_rgba(10,35,52,0.04)]">
+          {/* Attendance Toolbar: Status + Action Buttons + Search & Filters */}
+          <div className="attendance-toolbar p-4 sm:p-5 border-b border-[#e8edf2]">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-slate-900 capitalize">
+                    {formattedDateFriendly}
+                  </span>
+                  {metrics.isDayFullyClosed ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Lock className="w-3 h-3 text-emerald-700" />
+                      <span>Diário Selado</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                      <Clock className="w-3 h-3 text-amber-700" />
+                      <span>Em Preenchimento</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Assiduidade registrada hoje: <strong className="text-slate-700">{metrics.assiduidadeRate}%</strong>
+                </p>
+              </div>
+
+              {/* Quick Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {!metrics.isDayFullyClosed && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleMarkAllPresent}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200/90 border border-slate-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-98"
+                    >
+                      <CheckCheck className="w-4 h-4 text-slate-600" />
+                      <span>Marcar pendentes presentes</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmModalOpen(true)}
+                      disabled={Object.keys(pendingMarks).length === 0}
+                      className={`inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs ${
+                        Object.keys(pendingMarks).length > 0
+                          ? 'bg-[#f75142] hover:bg-[#e04436] text-white cursor-pointer active:scale-98 ring-2 ring-[#f75142]/20'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Gravar chamada definitiva ({Object.keys(pendingMarks).length})</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          ) : (
-            filteredStudents.map(({ student, currentStatus, isLocked, observacao, recordedAt, recordedBy }) => {
-              const isMarkedPresent = currentStatus === 'presente';
-              const isMarkedFalta = currentStatus === 'falta';
 
-              return (
-                <div
-                  key={student.id}
-                  className={`p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
-                    isLocked
-                      ? isMarkedPresent
-                        ? 'bg-emerald-50/20'
-                        : 'bg-rose-50/20'
-                      : 'hover:bg-slate-50/70'
+            {/* Search & Status Filters */}
+            <div className="mt-4 pt-4 border-t border-[#edf0f3] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por aluno, número ou encarregado..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9.5 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#f75142]"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                    statusFilter === 'all'
+                      ? 'bg-[#002133] text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {/* Student Identity */}
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <span className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                      {String(student.numeroChamada).padStart(2, '0')}
-                    </span>
+                  Todos ({students.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('pending')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                    statusFilter === 'pending'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Pendentes ({metrics.pendentes})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('presente')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                    statusFilter === 'presente'
+                      ? 'bg-[#12b981] text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Presentes ({metrics.presentes})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('falta')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                    statusFilter === 'falta'
+                      ? 'bg-[#ef4444] text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Faltas ({metrics.faltas})
+                </button>
+              </div>
+            </div>
+          </div>
 
-                    <div className="relative">
-                      {student.foto ? (
-                        <img
-                          src={student.foto}
-                          alt={student.name}
-                          className="w-11 h-11 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-full bg-[#002133] text-white flex items-center justify-center font-bold text-sm shrink-0">
-                          {student.name.charAt(0)}
-                        </div>
-                      )}
-                      {isLocked && (
-                        <div
-                          className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-xs"
-                          title="Registro trancado permanentemente"
-                        >
-                          <Lock className="w-2.5 h-2.5 text-amber-400" />
-                        </div>
-                      )}
-                    </div>
+          {/* Student List */}
+          <div className="divide-y divide-[#edf0f3]">
+            {filteredStudents.length === 0 ? (
+              <div className="p-12 text-center">
+                <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-bold text-slate-700">Nenhum aluno encontrado</p>
+                <p className="text-xs text-slate-400 mt-0.5">Tente ajustar a busca ou os filtros de status.</p>
+              </div>
+            ) : (
+              filteredStudents.map(({ student, currentStatus, isLocked, observacao, recordedAt, recordedBy }) => {
+                const isMarkedPresent = currentStatus === 'presente';
+                const isMarkedFalta = currentStatus === 'falta';
+                const isPending = !isLocked && !currentStatus;
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => onNavigateToStudent && onNavigateToStudent(student.id)}
-                          className="font-bold text-sm text-slate-900 hover:text-[#f75142] transition-colors truncate text-left cursor-pointer"
-                        >
-                          {student.name}
-                        </button>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                          {student.genero === 'F' ? 'Feminino' : 'Masculino'}
-                        </span>
-                        {student.temDocumentos ? (
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                            Doc OK
-                          </span>
+                const rowStateClass = isLocked
+                  ? isMarkedPresent
+                    ? 'bg-emerald-50/20 shadow-[inset_3px_0_0_#12b981]'
+                    : 'bg-rose-50/20 shadow-[inset_3px_0_0_#ef4444]'
+                  : isMarkedPresent
+                  ? 'bg-emerald-50/20 shadow-[inset_3px_0_0_#12b981]'
+                  : isMarkedFalta
+                  ? 'bg-rose-50/20 shadow-[inset_3px_0_0_#ef4444]'
+                  : 'student-row--pending shadow-[inset_3px_0_0_#f59e0b] bg-amber-50/10';
+
+                return (
+                  <div
+                    key={student.id}
+                    className={`student-row flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 min-h-[84px] px-4 sm:px-5 py-3.5 transition-colors ${rowStateClass} hover:bg-[#fbfcfd]`}
+                  >
+                    {/* Student Identity: Number, Avatar, Grouped Name & Status */}
+                    <div className="student-main flex items-center gap-3.5 min-w-0">
+                      {/* Discreet call number */}
+                      <span className="text-xs font-mono font-bold text-slate-400 w-5 text-center shrink-0">
+                        {String(student.numeroChamada).padStart(2, '0')}
+                      </span>
+
+                      {/* Slightly larger avatar (42px) */}
+                      <div className="student-avatar w-[42px] h-[42px] shrink-0 rounded-full flex items-center justify-center font-bold text-sm bg-[#002133] text-white relative overflow-hidden border border-slate-200">
+                        {student.foto ? (
+                          <img
+                            src={student.foto}
+                            alt={student.name}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                            Sem Doc
-                          </span>
+                          <span>{student.name.charAt(0)}</span>
+                        )}
+                        {isLocked && (
+                          <div
+                            className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-xs"
+                            title="Registro trancado permanentemente"
+                          >
+                            <Lock className="w-2.5 h-2.5 text-amber-400" />
+                          </div>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
-                        Encarregado: {student.encarregado} • Tel: {student.telefone}
-                      </p>
-                      {observacao && (
-                        <p className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1 inline-block">
-                          Obs: {observacao}
-                        </p>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Attendance Controls & Permanent Lock Status */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 self-end md:self-center">
-                    {isLocked ? (
-                      /* LOCKED STATE: READ-ONLY & UNALTERABLE */
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-2">
-                          {isMarkedPresent ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                              <span>PRESENÇA CONFIRMADA</span>
+                      {/* Info lines */}
+                      <div className="student-info min-w-0">
+                        <div className="student-name-line flex items-center flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onNavigateToStudent && onNavigateToStudent(student.id)}
+                            className="font-bold text-sm text-slate-900 hover:text-[#f75142] transition-colors truncate text-left cursor-pointer"
+                          >
+                            {student.name}
+                          </button>
+                          <span className="tag tag--gender text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                            {student.genero === 'F' ? 'Feminino' : 'Masculino'}
+                          </span>
+                          {student.temDocumentos ? (
+                            <span className="tag tag--document-ok text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                              Doc OK
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1.5 rounded-xl bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                              <XCircle className="w-4 h-4 text-rose-700" />
-                              <span>FALTA REGISTRADA</span>
+                            <span className="tag text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              Sem Doc
                             </span>
                           )}
-
-                          <div
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 cursor-not-allowed select-none"
-                            title="Campo selado no diário de classe. Não pode ser alterado."
-                          >
-                            <Lock className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Trancado</span>
-                          </div>
                         </div>
 
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {recordedAt
-                            ? `Selado às ${new Date(recordedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • ${recordedBy || 'Docente'}`
-                            : 'Registro definitivo'}
-                        </span>
-                      </div>
-                    ) : (
-                      /* UNLOCKED STATE: PENDING SELECTION AND CONFIRMATION */
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleSelectStatus(student.id, 'presente')}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                            isMarkedPresent
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs scale-102'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-500 hover:text-emerald-700'
-                          }`}
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Presente</span>
-                        </button>
+                        <div className="student-meta text-xs text-slate-500 truncate mt-1">
+                          Encarregado: {student.encarregado} · Tel: {student.telefone}
+                        </div>
 
-                        <button
-                          onClick={() => handleSelectStatus(student.id, 'falta')}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                            isMarkedFalta
-                              ? 'bg-rose-600 text-white border-rose-600 shadow-2xs scale-102'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-rose-500 hover:text-rose-700'
-                          }`}
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>Falta</span>
-                        </button>
-
-                        {/* Justification note if Falta */}
-                        {isMarkedFalta && (
-                          <button
-                            onClick={() => {
-                              setJustificationModalStudent(student);
-                              setTempObservation(observacao || '');
-                            }}
-                            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 underline px-1 cursor-pointer"
-                          >
-                            {observacao ? 'Editar Nota' : '+ Justificativa'}
-                          </button>
-                        )}
-
-                        {/* Quick single-lock button */}
-                        {(isMarkedPresent || isMarkedFalta) && (
-                          <button
-                            onClick={() => handleLockSingleRecord(student)}
-                            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-2xs cursor-pointer flex items-center gap-1"
-                            title="Gravar este registro definitivamente e trancar"
-                          >
-                            <Lock className="w-3 h-3 text-amber-400" />
-                            <span>Gravar</span>
-                          </button>
+                        {observacao && (
+                          <p className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1 inline-block">
+                            Obs: {observacao}
+                          </p>
                         )}
                       </div>
-                    )}
+                    </div>
+
+                    {/* Attendance Controls & Confirmation */}
+                    <div className="attendance-actions flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      {isLocked ? (
+                        /* LOCKED STATE: READ-ONLY */
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center gap-2">
+                            {isMarkedPresent ? (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>PRESENÇA CONFIRMADA</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1.5 rounded-xl bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+                                <XCircle className="w-3.5 h-3.5 text-rose-700" />
+                                <span>FALTA REGISTRADA</span>
+                              </span>
+                            )}
+
+                            <div
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 cursor-not-allowed select-none"
+                              title="Campo selado no diário de classe. Não pode ser alterado."
+                            >
+                              <Lock className="w-3 h-3 text-slate-500" />
+                              <span>Trancado</span>
+                            </div>
+                          </div>
+
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {recordedAt
+                              ? `Selado às ${new Date(recordedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • ${recordedBy || 'Docente'}`
+                              : 'Registro definitivo'}
+                          </span>
+                        </div>
+                      ) : (
+                        /* UNLOCKED STATE */
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectStatus(student.id, 'presente')}
+                            className={`attendance-button min-w-[92px] h-[34px] px-3.5 rounded-[9px] text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                              isMarkedPresent
+                                ? 'attendance-button--present is-active bg-[#12b981] border-[#12b981] text-white shadow-2xs'
+                                : 'bg-white text-[#18344a] border-[#dce4ed] hover:border-[#12b981] hover:text-[#12b981]'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Presente</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSelectStatus(student.id, 'falta')}
+                            className={`attendance-button min-w-[92px] h-[34px] px-3.5 rounded-[9px] text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                              isMarkedFalta
+                                ? 'attendance-button--absent is-active bg-[#ef4444] border-[#ef4444] text-white shadow-2xs'
+                                : 'bg-white text-[#18344a] border-[#dce4ed] hover:border-[#ef4444] hover:text-[#ef4444]'
+                            }`}
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Falta</span>
+                          </button>
+
+                          {/* Justification note if Falta */}
+                          {isMarkedFalta && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setJustificationModalStudent(student);
+                                setTempObservation(observacao || '');
+                              }}
+                              className="text-[11px] font-bold text-slate-600 hover:text-slate-900 underline px-1 cursor-pointer"
+                            >
+                              {observacao ? 'Editar Nota' : '+ Justificativa'}
+                            </button>
+                          )}
+
+                          {/* Quick single-lock button */}
+                          {(isMarkedPresent || isMarkedFalta) && (
+                            <button
+                              type="button"
+                              onClick={() => handleLockSingleRecord(student)}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#002133] hover:bg-[#001726] text-white transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                              title="Gravar este registro definitivamente e trancar"
+                            >
+                              <Lock className="w-3 h-3 text-amber-400" />
+                              <span>Gravar</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 

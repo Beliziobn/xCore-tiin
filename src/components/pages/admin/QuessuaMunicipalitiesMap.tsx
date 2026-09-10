@@ -18,6 +18,8 @@ interface QuessuaMunicipalitiesMapProps {
   selectedMunicipality: string;
   onSelectMunicipality: (zone: string) => void;
   municipalitiesSummary?: Record<string, ZoneSummaryData>;
+  schoolsPerZone?: Record<string, number>;
+  highlightedZones?: Set<string> | string[];
 }
 
 // Harmonious cartographic palette for Quêssua districts
@@ -69,11 +71,26 @@ const ZONE_COLOR_PALETTES: Record<string, { baseFrom: string; baseTo: string; st
 export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> = ({
   selectedMunicipality,
   onSelectMunicipality,
+  schoolsPerZone,
+  highlightedZones,
 }) => {
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
 
   const zones = QUESSUA_ZONES_PATHS;
   const dashedDividingLines = QUESSUA_DASHED_LINES;
+
+  const isZoneHighlighted = (zoneName: string) => {
+    if (!highlightedZones) return true;
+    if (highlightedZones instanceof Set) {
+      if (highlightedZones.size === 0) return true;
+      return highlightedZones.has(zoneName);
+    }
+    if (Array.isArray(highlightedZones)) {
+      if (highlightedZones.length === 0) return true;
+      return highlightedZones.includes(zoneName);
+    }
+    return true;
+  };
 
   return (
     <div className="relative w-full flex items-center justify-center select-none bg-transparent">
@@ -149,6 +166,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
           {zones.map((zone) => {
             const isSelected = selectedMunicipality === zone.name;
             const isHovered = hoveredZone === zone.name;
+            const highlighted = isZoneHighlighted(zone.name);
 
             let fillColor = `url(#grad-zone-${zone.id})`;
             if (isSelected) {
@@ -164,6 +182,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                 onMouseEnter={() => setHoveredZone(zone.name)}
                 onMouseLeave={() => setHoveredZone(null)}
                 className="cursor-pointer transition-all duration-300 group"
+                opacity={highlighted ? 1 : 0.38}
                 filter={isSelected ? 'url(#quessuaSelectedGlow)' : isHovered ? 'url(#quessuaHoverElevation)' : undefined}
                 style={{
                   transformOrigin: `${zone.labelX}px ${zone.labelY}px`,
@@ -179,6 +198,65 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                   strokeLinecap="round"
                   className="transition-all duration-200"
                 />
+              </g>
+            );
+          })}
+
+          {/* Dynamic Pinpoints / Badges for Filtered Schools */}
+          {zones.map((zone) => {
+            const count = schoolsPerZone ? schoolsPerZone[zone.name] || 0 : undefined;
+            if (count === undefined || count === 0) return null;
+            const isSelected = selectedMunicipality === zone.name;
+
+            return (
+              <g
+                key={`pin-${zone.id}`}
+                onClick={() => onSelectMunicipality(zone.name)}
+                transform={`translate(${zone.labelX}, ${zone.labelY})`}
+                className="cursor-pointer transition-transform duration-300 hover:scale-110 select-none"
+              >
+                {/* Ambient pulse */}
+                <circle
+                  r={isSelected ? 18 : 14}
+                  fill="#f75142"
+                  fillOpacity={isSelected ? 0.35 : 0.22}
+                  className="animate-pulse"
+                />
+                {/* Solid pill badge */}
+                <rect
+                  x="-16"
+                  y="-11"
+                  width="32"
+                  height="22"
+                  rx="11"
+                  fill={isSelected ? '#f75142' : '#0f172a'}
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                  className="shadow-sm"
+                />
+                {/* Count */}
+                <text
+                  y="4"
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize="11"
+                  fontWeight="900"
+                  fontFamily="sans-serif"
+                >
+                  {count}
+                </text>
+                {/* Zone name */}
+                <text
+                  y="22"
+                  textAnchor="middle"
+                  fill="#0f172a"
+                  fontSize="9.5"
+                  fontWeight="800"
+                  fontFamily="sans-serif"
+                  filter="drop-shadow(0 1px 2px rgba(255,255,255,0.95))"
+                >
+                  {zone.name}
+                </text>
               </g>
             );
           })}

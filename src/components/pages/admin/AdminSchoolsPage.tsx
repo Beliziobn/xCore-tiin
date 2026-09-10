@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Layers, FileCheck, ArrowUpRight, BarChart3, FileText, Edit3, ShieldCheck, Sparkles } from 'lucide-react';
+import { Search, Plus, School as SchoolIcon, ChevronRight, Check, MapPin, Phone, Mail, UserCheck, Award, RotateCcw, Layers, FileCheck, ArrowUpRight, BarChart3, FileText, Edit3, ShieldCheck, Sparkles, SlidersHorizontal, X } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { QuessuaMunicipalitiesMap } from './QuessuaMunicipalitiesMap';
 import {
@@ -13,6 +13,10 @@ import { StatCardItem } from '../../StatCardItem';
 import { SectionShader } from '../../SectionShader';
 import { SchoolDetailModal } from '../../modals/SchoolDetailModal';
 import { SchoolRegistrationModal } from '../../modals/SchoolRegistrationModal';
+import { SchoolAdvancedFilterDrawer } from './SchoolAdvancedFilterDrawer';
+import type { AdvancedSchoolFilterCriteria } from '../../../types/schoolFilterTypes';
+import { defaultSchoolFilterCriteria } from '../../../types/schoolFilterTypes';
+import { filterSchoolsWithCriteria } from '../../../utils/schoolFilterHelper';
 import { getSchoolRegistrationData } from '../../../utils/schoolStorage';
 
 interface AdminSchoolsPageProps {
@@ -30,98 +34,55 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [naturezaFilter, setNaturezaFilter] = useState<'all' | SchoolNatureza | 'especial'>('all');
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedSchoolFilterCriteria>(defaultSchoolFilterCriteria);
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>('Quêssua');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const [detailSchool, setDetailSchool] = useState<AdminSchool | null>(null);
   const [editingSchool, setEditingSchool] = useState<AdminSchool | null>(null);
 
-  // Compute aggregated summaries for all Quêssua zones
+  // Compute aggregated summaries for all Quêssua zones for the map base reference
   const summaries = useMemo(() => computeMunicipalitySummaries(schools), [schools]);
 
-  // Network overall total summary for Quêssua
-  const networkSummary: MunicipalitySummary = useMemo(() => {
-    const totalTeachers = schools.reduce((acc, s) => acc + (s.teachersCount || 0), 0);
-    const totalClasses = schools.reduce((acc, s) => acc + (s.classesCount || 0), 0);
-    const totalRooms = schools.reduce((acc, s) => acc + (s.roomsCount || 0), 0);
-    const totalTurmas = schools.reduce((acc, s) => acc + (s.turmasCount || 0), 0);
-    const totalDocs = schools.reduce((acc, s) => acc + (s.studentsWithDocs || 0), 0);
-    const totalNoDocs = schools.reduce((acc, s) => acc + (s.studentsWithoutDocs || 0), 0);
-    const avgPerf = schools.length
-      ? Math.round(schools.reduce((acc, s) => acc + (s.performanceRate || 0), 0) / schools.length)
-      : 84;
-    const avgAtt = schools.length
-      ? Math.round((schools.reduce((acc, s) => acc + (s.attendanceRate || 0), 0) / schools.length) * 10) / 10
-      : 96.5;
+  // Compute filtered schools using the advanced operational criteria
+  const filterResult = useMemo(() => {
+    return filterSchoolsWithCriteria(schools, advancedFilters);
+  }, [schools, advancedFilters]);
 
-    return {
-      id: 'rede-total',
-      name: 'Município do Quêssua (Todas as Zonas)',
-      schoolsCount: schools.length,
-      directorsCount: schools.filter((s) => !!s.directorName).length,
-      teachersCount: totalTeachers,
-      classesCount: totalClasses,
-      roomsCount: totalRooms,
-      turmasCount: totalTurmas,
-      locationDescription: 'Município do Quêssua (7 Zonas)',
-      studentsWithDocs: totalDocs,
-      studentsWithoutDocs: totalNoDocs,
-      performanceRate: avgPerf,
-      attendanceRate: avgAtt,
-      schools: schools,
-    };
-  }, [schools]);
-
-  // Current municipality / zone data
-  const currentMunicipalityData =
-    selectedMunicipality === 'Todas as Escolas'
-      ? networkSummary
-      : summaries[selectedMunicipality] || summaries['Quêssua'] || networkSummary;
-
-  // Filter schools within municipality or across all based on search and category
+  // Determine schools to display in the grid and indicators:
+  // If user selected a zone in the filter, it drives the list.
+  // If user tapped a zone on the map, it restricts to that zone unless 'Todas as Escolas' is selected.
   const schoolsToDisplay = useMemo(() => {
-    const baseList =
-      selectedMunicipality === 'Todas as Escolas'
-        ? schools
-        : currentMunicipalityData.schools;
+    let list = filterResult.filteredSchools;
+    if (advancedFilters.zone === 'all' && selectedMunicipality !== 'Todas as Escolas') {
+      list = list.filter((s) => getZoneFromSchoolLocation(s.location) === selectedMunicipality);
+    }
+    return list;
+  }, [filterResult.filteredSchools, advancedFilters.zone, selectedMunicipality]);
 
-    return baseList.filter((school) => {
-      const matchesSearch =
-        searchTerm.trim() === '' ||
-        school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        school.directorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        school.location.toLowerCase().includes(searchTerm.toLowerCase());
-
-      if (!matchesSearch) return false;
-
-      // Natureza and special education filter
-      if (naturezaFilter !== 'all') {
-        const regData = getSchoolRegistrationData(school);
-        if (naturezaFilter === 'especial') {
-          if (!regData.oferta?.ensinoEspecial?.activo) return false;
-        } else {
-          if (regData.natureza !== naturezaFilter) return false;
-        }
-      }
-
-      if (categoryFilter === 'all') return true;
-      if (categoryFilter === 'professores') return school.teachersCount > 0;
-      if (categoryFilter === 'directores') return !!school.directorName;
-      if (categoryFilter === 'high-performance') return school.performanceRate >= 85;
-      if (categoryFilter === 'low-performance') return school.performanceRate < 70;
-      return school.category === categoryFilter;
-    });
-  }, [schools, currentMunicipalityData, selectedMunicipality, searchTerm, categoryFilter]);
-
-  // Active individual school if selected
+  // Active individual school if selected by click
   const activeSchool = useMemo(() => {
     if (!selectedSchoolId) return null;
     return schools.find((s) => s.id === selectedSchoolId) || null;
   }, [selectedSchoolId, schools]);
 
-  // Values to display in the cards (either specific school or active municipality)
+  const handleRemoveFilterChip = (key: keyof AdvancedSchoolFilterCriteria) => {
+    setAdvancedFilters((prev) => ({
+      ...prev,
+      [key]: defaultSchoolFilterCriteria[key],
+    }));
+    if (key === 'zone') {
+      setSelectedMunicipality('Todas as Escolas');
+    }
+  };
+
+  const handleClearAllFilters = () => {
+    setAdvancedFilters(defaultSchoolFilterCriteria);
+    setSelectedMunicipality('Todas as Escolas');
+    setSelectedSchoolId(null);
+  };
+
+  // Values to display in the cards (either specific school or active filtered schools)
   const displayValues = useMemo(() => {
     if (activeSchool) {
       return {
@@ -142,32 +103,68 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
       };
     }
 
+    const count = schoolsToDisplay.length;
+    const totalTeachers = schoolsToDisplay.reduce((acc, s) => acc + (s.teachersCount || 0), 0);
+    const totalClasses = schoolsToDisplay.reduce((acc, s) => acc + (s.classesCount || 0), 0);
+    const totalRooms = schoolsToDisplay.reduce((acc, s) => acc + (s.roomsCount || 0), 0);
+    const totalTurmas = schoolsToDisplay.reduce((acc, s) => acc + (s.turmasCount || 0), 0);
+    const totalDocs = schoolsToDisplay.reduce((acc, s) => acc + (s.studentsWithDocs || 0), 0);
+    const totalNoDocs = schoolsToDisplay.reduce((acc, s) => acc + (s.studentsWithoutDocs || 0), 0);
+    const avgPerf = count
+      ? Math.round(schoolsToDisplay.reduce((acc, s) => acc + (s.performanceRate || 0), 0) / count)
+      : 0;
+    const avgAtt = count
+      ? Math.round((schoolsToDisplay.reduce((acc, s) => acc + (s.attendanceRate || 0), 0) / count) * 10) / 10
+      : 0;
+    const directorsCount = schoolsToDisplay.filter((s) => !!s.directorName).length;
+
+    let locLabel = 'Município do Quêssua';
+    if (advancedFilters.zone !== 'all') {
+      locLabel = `Zona de ${advancedFilters.zone}`;
+    } else if (selectedMunicipality !== 'Todas as Escolas') {
+      locLabel = `Zona de ${selectedMunicipality}`;
+    } else {
+      locLabel = `Toda a Rede Central`;
+    }
+
+    let nameLabel = locLabel;
+    if (filterResult.activeChips.length > 0) {
+      nameLabel = `${count} ${count === 1 ? 'Escola Filtrada' : 'Escolas Filtradas'} (${locLabel})`;
+    }
+
     return {
-      name: currentMunicipalityData.name,
-      subtitle: `${currentMunicipalityData.schoolsCount} escolas cadastradas`,
-      schoolsCount: `${currentMunicipalityData.schoolsCount}`,
-      directorsCount: `${currentMunicipalityData.directorsCount}`,
-      classesCount: currentMunicipalityData.classesCount,
-      teachersCount: currentMunicipalityData.teachersCount,
-      roomsCount: currentMunicipalityData.roomsCount,
-      turmasCount: currentMunicipalityData.turmasCount,
-      location: currentMunicipalityData.locationDescription,
-      performanceRate: `${currentMunicipalityData.performanceRate}%`,
-      studentsWithDocs: currentMunicipalityData.studentsWithDocs.toLocaleString('pt-AO'),
-      studentsWithoutDocs: currentMunicipalityData.studentsWithoutDocs.toLocaleString('pt-AO'),
-      attendanceRate: `${currentMunicipalityData.attendanceRate}%`,
+      name: nameLabel,
+      subtitle: `${count} ${count === 1 ? 'escola correspondente' : 'escolas correspondentes'} aos filtros`,
+      schoolsCount: `${count}`,
+      directorsCount: `${directorsCount}`,
+      classesCount: totalClasses,
+      teachersCount: totalTeachers,
+      roomsCount: totalRooms,
+      turmasCount: totalTurmas,
+      location: locLabel,
+      performanceRate: `${avgPerf}%`,
+      studentsWithDocs: totalDocs.toLocaleString('pt-AO'),
+      studentsWithoutDocs: totalNoDocs.toLocaleString('pt-AO'),
+      attendanceRate: `${avgAtt}%`,
       isIndividualSchool: false,
     };
-  }, [activeSchool, currentMunicipalityData]);
+  }, [activeSchool, schoolsToDisplay, advancedFilters.zone, selectedMunicipality, filterResult.activeChips.length]);
 
   // Document regularization calculation for the census section
   const docsStats = useMemo(() => {
-    const withDocs = activeSchool ? activeSchool.studentsWithDocs : (currentMunicipalityData.studentsWithDocs || 0);
-    const withoutDocs = activeSchool ? activeSchool.studentsWithoutDocs : (currentMunicipalityData.studentsWithoutDocs || 0);
+    if (activeSchool) {
+      const withDocs = activeSchool.studentsWithDocs;
+      const withoutDocs = activeSchool.studentsWithoutDocs;
+      const total = withDocs + withoutDocs;
+      const rate = total > 0 ? Math.round((withDocs / total) * 100) : 0;
+      return { withDocs, withoutDocs, total, rate };
+    }
+    const withDocs = schoolsToDisplay.reduce((acc, s) => acc + (s.studentsWithDocs || 0), 0);
+    const withoutDocs = schoolsToDisplay.reduce((acc, s) => acc + (s.studentsWithoutDocs || 0), 0);
     const total = withDocs + withoutDocs;
     const rate = total > 0 ? Math.round((withDocs / total) * 100) : 0;
     return { withDocs, withoutDocs, total, rate };
-  }, [activeSchool, currentMunicipalityData]);
+  }, [activeSchool, schoolsToDisplay]);
 
   return (
     <div id="admin-schools-page" className="w-full min-h-screen bg-[#f7f3f3]">
@@ -181,89 +178,164 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
 
       {/* 2. Main Body Content matching Texto do seu parágrafo (1).png */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        {/* Filter and Search Bar matching Texto do seu parágrafo (1).png */}
-        <div className="reveal-up flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-10 pb-4 border-b border-slate-100">
-          {/* Left: Filter selector dropdown */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-slate-800 tracking-tight whitespace-nowrap">
-              Filtro:
-            </span>
-            <div className="relative">
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
+        {/* Filter and Search Bar with Advanced Filter Drawer trigger and Active Chips */}
+        <div className="reveal-up mb-10 space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Left: Advanced Filters Button */}
+            <div className="flex items-center gap-2">
+              <button
+                id="admin-btn-filtros-avancados"
+                onClick={() => setIsFilterDrawerOpen(true)}
+                className="flex items-center gap-2.5 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition-all cursor-pointer whitespace-nowrap group"
               >
-                <option value="all">Todas as Categorias</option>
-                <option value="professores">Professores</option>
-                <option value="directores">Directores</option>
-                <option value="Ensino Primário">Ensino Primário</option>
-                <option value="Iº Ciclo">Iº Ciclo</option>
-                <option value="IIº Ciclo">IIº Ciclo</option>
-                <option value="Polivalente">Polivalente</option>
-                <option value="high-performance">Alto Desempenho (≥ 85%)</option>
-                <option value="low-performance">Baixo Desempenho (&lt; 70%)</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-600 text-[10px]">
-                ▼
+                <SlidersHorizontal className="w-4 h-4 text-[#f75142] group-hover:rotate-12 transition-transform" />
+                <span>Filtros avançados</span>
+                {filterResult.activeFilterCount > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-[#f75142] text-white text-[10px] font-black flex items-center justify-center">
+                    {filterResult.activeFilterCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Fast dropdown for quick category selection */}
+              <div className="relative hidden md:block">
+                <select
+                  value={advancedFilters.institutionType}
+                  onChange={(e) => setAdvancedFilters((prev) => ({ ...prev, institutionType: e.target.value as any }))}
+                  className="appearance-none bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold py-2.5 pl-3 pr-8 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer shadow-xs"
+                >
+                  <option value="all">Todos os Tipos</option>
+                  <option value="regular">Escola Regular</option>
+                  <option value="complexo">Complexo Escolar</option>
+                  <option value="sede">Escola Sede</option>
+                  <option value="especial">Ensino Especial</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-600 text-[10px]">
+                  ▼
+                </div>
               </div>
             </div>
 
-            {/* Natureza Filter */}
-            <div className="relative">
-              <select
-                value={naturezaFilter}
-                onChange={(e) => setNaturezaFilter(e.target.value as any)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
+            {/* Center: Search input */}
+            <div className="relative flex-1 max-w-lg">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={advancedFilters.search}
+                onChange={(e) => setAdvancedFilters((prev) => ({ ...prev, search: e.target.value }))}
+                placeholder="Pesquisar escola, código ou director"
+                className="w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#f75142] shadow-xs"
+              />
+              {advancedFilters.search && (
+                <button
+                  onClick={() => setAdvancedFilters((prev) => ({ ...prev, search: '' }))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  title="Limpar pesquisa"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Right: Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                id="admin-btn-cadastrar-escola"
+                onClick={onOpenRegisterModal}
+                className="flex items-center justify-center gap-2 bg-[#e04436] hover:bg-[#c9372a] text-white text-xs font-bold tracking-wide px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
               >
-                <option value="all">Todas as Naturezas</option>
-                <option value="Pública">Pública</option>
-                <option value="Público-Privada">Público-Privada (Comparticipada)</option>
-                <option value="Privada">Privada</option>
-                <option value="especial">Ensino Especial</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-600 text-[10px]">
-                ▼
-              </div>
+                <Plus className="w-4 h-4" />
+                Cadastrar
+              </button>
             </div>
           </div>
 
-          {/* Center: Search input */}
-          <div className="relative flex-1 max-w-lg">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar"
-              className="w-full pl-10 pr-4 py-2 bg-slate-100/90 border border-slate-200 rounded-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-            />
-          </div>
+          {/* Active Filter Chips & Results Count Bar */}
+          {(filterResult.activeFilterCount > 0 || advancedFilters.search.trim() !== '' || selectedSchoolId) && (
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-xs space-y-3">
+              {/* Active tags line */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                  Filtros activos:
+                </span>
+                {advancedFilters.search.trim() !== '' && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                    Busca: "{advancedFilters.search}"
+                    <button
+                      onClick={() => setAdvancedFilters((prev) => ({ ...prev, search: '' }))}
+                      className="hover:text-red-600 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {filterResult.activeChips.map((chip) => (
+                  <span
+                    key={chip.key}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#fef2f1] text-[#f75142] border border-[#fee4e2]"
+                  >
+                    <span>{chip.displayValue}</span>
+                    <button
+                      onClick={() => handleRemoveFilterChip(chip.key)}
+                      className="hover:text-red-700 cursor-pointer p-0.5"
+                      title="Remover filtro"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                {selectedSchoolId && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                    <span>Escola Selecionada</span>
+                    <button
+                      onClick={() => setSelectedSchoolId(null)}
+                      className="hover:text-amber-900 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
 
-          {/* Right: Action Buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              id="admin-btn-cadastrar-escola"
-              onClick={onOpenRegisterModal}
-              className="flex items-center justify-center gap-2 bg-[#e04436] hover:bg-[#c9372a] text-white text-xs font-bold tracking-wide px-6 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              Cadastrar
-            </button>
-          </div>
+              {/* Results and Clear Button */}
+              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs font-bold text-slate-600">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-900 font-extrabold text-sm">
+                    {schoolsToDisplay.length} {schoolsToDisplay.length === 1 ? 'escola encontrada' : 'escolas encontradas'}
+                  </span>
+                  <span className="text-slate-400 font-normal">
+                    {filterResult.matchingZones.size > 0 && (
+                      <>em {filterResult.matchingZones.size} {filterResult.matchingZones.size === 1 ? 'zona' : 'zonas'} de Quêssua</>
+                    )}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleClearAllFilters}
+                  className="text-xs font-bold text-[#f75142] hover:text-[#c9372a] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Limpar filtros
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 3. Interactive Map & Municipality Summary Section */}
         <div className="reveal-up grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch mb-12">
-          {/* Left Column (Pure Map Display - No background box, purely the map) */}
+          {/* Left Column (Pure Map Display with Live School Pinpoints & Filter Highlights) */}
           <div className="lg:col-span-6 flex flex-col items-center justify-center p-0 bg-transparent border-0 shadow-none">
             <QuessuaMunicipalitiesMap
               selectedMunicipality={selectedMunicipality}
               onSelectMunicipality={(zone) => {
                 setSelectedMunicipality(zone);
                 setSelectedSchoolId(null);
+                setAdvancedFilters((prev) => ({ ...prev, zone }));
               }}
               municipalitiesSummary={summaries}
+              schoolsPerZone={filterResult.schoolsPerZone}
+              highlightedZones={filterResult.matchingZones}
             />
           </div>
 
@@ -394,7 +466,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             {/* 2. Professores */}
             <div
               onClick={() => {
-                setCategoryFilter('professores');
                 document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
               }}
               className="bg-slate-50/70 hover:bg-[#fef2f1]/60 border border-slate-200/70 hover:border-[#fee4e2] rounded-2xl p-4 flex flex-col justify-between transition-all cursor-pointer group"
@@ -514,7 +585,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
 
             <button
               onClick={() => {
-                setCategoryFilter('all');
                 document.getElementById('admin-schools-explorer')?.scrollIntoView({ behavior: 'smooth' });
               }}
               className="inline-flex items-center gap-2 text-xs font-bold text-[#f75142] hover:text-[#e04436] bg-[#fef2f1] hover:bg-[#fee4e2] px-3.5 py-2 rounded-xl border border-[#fee4e2] transition-colors cursor-pointer shrink-0"
@@ -672,16 +742,12 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             <div className="bg-slate-50 rounded-2xl p-8 text-center border border-dashed border-slate-200">
               <SchoolIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-700">Nenhuma escola encontrada para os filtros atuais.</p>
-              <p className="text-xs text-slate-500 mt-1">Experimente limpar a pesquisa ou selecionar outra zona.</p>
+              <p className="text-xs text-slate-500 mt-1">Experimente ajustar os critérios do filtro avançado ou selecionar outra zona.</p>
               <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setCategoryFilter('all');
-                  setSelectedMunicipality('Todas as Escolas');
-                }}
-                className="mt-4 px-4 py-2 bg-[#f75142] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs hover:bg-[#3f54de]"
+                onClick={handleClearAllFilters}
+                className="mt-4 px-4 py-2 bg-[#f75142] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs hover:bg-[#c9372a] transition-colors"
               >
-                Ver Todas as Escolas
+                Limpar Todos os Filtros
               </button>
             </div>
           ) : (
@@ -847,6 +913,15 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           }}
         />
       )}
+
+      {/* Advanced Filter Drawer */}
+      <SchoolAdvancedFilterDrawer
+        isOpen={isFilterDrawerOpen}
+        onClose={() => setIsFilterDrawerOpen(false)}
+        filters={advancedFilters}
+        onFilterChange={setAdvancedFilters}
+        schools={schools}
+      />
     </div>
   );
 };

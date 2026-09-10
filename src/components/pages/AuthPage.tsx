@@ -7,14 +7,14 @@ import {
   EyeOff, 
   CheckCircle2, 
   AlertCircle, 
-  Sparkles, 
   ArrowLeft,
   ChevronRight,
   ShieldCheck,
   Building2,
   GraduationCap,
   Box,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import type { UserAccount } from '../../types';
@@ -67,6 +67,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setMode(newMode);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setForgotPasswordOpen(false);
   };
 
   const handleFillPreset = (preset: 'admin' | 'diretor' | 'professor') => {
@@ -115,7 +116,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           resolvedRole = 'professor';
         }
 
-        const derivedName = email.split('@')[0].split('.')[0] || 'Usuário';
         const resolvedFirst = firstName.trim() || (resolvedRole === 'admin' ? 'Fred' : resolvedRole === 'diretor' ? 'Carl' : 'Santar');
         
         const loggedUser: UserAccount = {
@@ -141,7 +141,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     } else {
       // Register validation
       if (!firstName.trim()) {
-        setErrorMsg('Por favor, informe seu primeiro nome.');
+        setErrorMsg('Por favor, informe o seu primeiro nome.');
         return;
       }
       if (!email.trim()) {
@@ -157,7 +157,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         return;
       }
       if (!agreeTerms) {
-        setErrorMsg('Você precisa aceitar os Termos de Uso e Política de Privacidade.');
+        setErrorMsg('É necessário aceitar os Termos de Uso e a Política de Privacidade.');
         return;
       }
 
@@ -188,7 +188,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail) return;
+    if (!forgotEmail.trim()) return;
     setForgotSuccess(true);
     setTimeout(() => {
       setForgotSuccess(false);
@@ -197,46 +197,47 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div id="auth-full-page" className="min-h-screen w-full bg-[#f7f3f3] text-slate-900 flex flex-col justify-between selection:bg-[#f75142] selection:text-white">
-      {/* Top Header Bar (matches general navbar when rendered standalone) */}
+    <div 
+      id="auth-full-page" 
+      className="min-h-screen w-full bg-gradient-to-b from-[#f8f9fb] via-[#f3f5f8] to-[#edf1f5] text-slate-900 flex flex-col justify-between selection:bg-[#f75142] selection:text-white font-sans"
+    >
+      {/* Top Header Bar (when standalone) */}
       {!hideHeader && (
-        <header className="w-full bg-white border-b border-slate-200/70 sticky top-0 z-30 shadow-[0_4px_20px_rgba(15,23,42,0.04)]">
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[76px] flex items-center justify-between">
+        <header className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between">
             {/* Logo */}
             <button
               id="auth-header-logo-btn"
               onClick={onBackToHome}
               className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#f75142] flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(247,81,66,0.6)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
+              <div className="w-10 h-10 rounded-xl bg-[#f75142] flex items-center justify-center shadow-md group-hover:scale-105 group-hover:rotate-2 transition-transform duration-300">
                 <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
               </div>
-              <span className="text-2xl font-black tracking-tight text-slate-950">
+              <span className="text-2xl font-black tracking-tight text-[#002133]">
                 uCore
               </span>
             </button>
 
             {/* Navigation controls */}
             <div className="flex items-center gap-3 sm:gap-4">
-              {/* Back to Home Button */}
               <button
                 id="auth-back-home-btn"
                 onClick={onBackToHome}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#f75142] transition-colors cursor-pointer mr-1"
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-[#f75142] transition-colors cursor-pointer mr-1"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Voltar ao Início</span>
+                <span>Voltar ao Início</span>
               </button>
 
-              {/* Mode switch buttons */}
               <div className="flex items-center gap-2">
                 <button
                   id="tab-login-btn"
                   onClick={() => switchMode('login')}
-                  className={`text-sm font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
+                  className={`text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
                     mode === 'login'
-                      ? 'bg-slate-100 text-[#f75142] font-bold'
-                      : 'text-slate-700 hover:text-[#f75142]'
+                      ? 'bg-slate-100 text-[#002133] font-bold'
+                      : 'text-slate-600 hover:text-[#002133]'
                   }`}
                 >
                   Entrar
@@ -244,49 +245,70 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <button
                   id="tab-register-btn"
                   onClick={() => switchMode('register')}
-                  className={`text-sm font-bold px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_8px_20px_-6px_rgba(247,81,66,0.8)] hover:shadow-[0_10px_26px_-6px_rgba(247,81,66,0.95)] active:scale-95 whitespace-nowrap ${
+                  className={`text-xs sm:text-sm font-bold px-4 py-2 rounded-xl transition-all cursor-pointer shadow-xs ${
                     mode === 'register'
-                      ? 'bg-[#e04436] text-white ring-2 ring-[#f75142]/40'
+                      ? 'bg-[#002133] text-white'
                       : 'bg-[#f75142] hover:bg-[#e04436] text-white'
                   }`}
                 >
-                  Inscreva - se
+                  Inscreva-se
                 </button>
               </div>
             </div>
           </div>
-          <div className="w-full h-[2px] bg-[#f75142]" />
+          <div className="w-full h-[2px] bg-gradient-to-r from-[#f75142] via-[#f75142]/80 to-[#002133]" />
         </header>
       )}
 
-      {/* Main Form Section */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex items-center justify-center">
-        <div className="w-full bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.08)] border border-slate-200/90 overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+      {/* Main Content Area: Balanced 1120px Card */}
+      <main className="flex-1 w-full max-w-[1120px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 md:py-10 flex items-center justify-center">
+        <div 
+          id="auth-card-container"
+          className="w-full bg-white rounded-3xl shadow-[0_12px_40px_-8px_rgba(0,33,51,0.08),0_2px_6px_rgba(0,33,51,0.04)] border border-slate-200/90 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[560px] lg:min-h-[600px] transition-all"
+        >
           
-          {/* Left Hero Column: Completely visible photo without obscuring elements */}
-          <div className="hidden lg:block lg:col-span-5 relative overflow-hidden bg-slate-100 min-h-full">
+          {/* Left Column: Visual Photography with Navy Degradé & Context */}
+          <div className="hidden md:block md:col-span-5 lg:col-span-5 relative overflow-hidden bg-[#002133] select-none">
             <img
               src={teacherImg}
               alt="Professora e ambiente escolar uCore"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-center select-none"
+              className="w-full h-full object-cover object-top filter brightness-[0.98] contrast-[1.02] transition-transform duration-700 hover:scale-105"
             />
+            
+            {/* Navy Degradé on bottom third - doesn't cover face */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#002133] via-[#002133]/65 via-35% to-transparent pointer-events-none" />
+
+            {/* Context Message */}
+            <div className="absolute bottom-0 inset-x-0 p-6 lg:p-8 text-white z-10 space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-[11px] font-bold tracking-wide uppercase text-white/90">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#f75142]" />
+                Rede de Ensino Integrada
+              </div>
+              <h3 className="text-2xl lg:text-3xl font-bold tracking-tight text-white leading-tight">
+                A sua escola, mais conectada.
+              </h3>
+              <p className="text-xs text-white/80 leading-relaxed font-normal pt-0.5">
+                Organização eficiente de turmas, docentes e rendimento escolar com a tecnologia uCore.
+              </p>
+            </div>
           </div>
 
-          {/* Right Form Column */}
-          <div className="lg:col-span-7 p-6 sm:p-10 lg:p-12 flex flex-col justify-center bg-white">
+          {/* Right Column: High-Comfort Form */}
+          <div className="col-span-1 md:col-span-7 lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-center bg-white">
+            
+            {/* Forgot Password Sub-view */}
             {forgotPasswordOpen ? (
-              /* Forgot password sub-view */
-              <div className="space-y-6 max-w-md mx-auto w-full">
+              <div className="max-w-[420px] mx-auto w-full space-y-5">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-[#f75142] tracking-widest bg-[#fef2f1] px-2.5 py-1 rounded-full mb-3">
+                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#f75142] bg-[#fef2f1] px-3 py-1 rounded-full mb-2">
                     Recuperação de Acesso
                   </div>
-                  <h2 className="text-3xl font-black uppercase text-slate-900 tracking-tight">
-                    Recuperar Senha
+                  <h2 className="text-2xl sm:text-3xl font-bold text-[#002133] tracking-tight">
+                    Recuperar senha
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1.5 leading-relaxed">
-                    Informe o e-mail cadastrado na plataforma uCore para enviarmos as instruções de redefinição.
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
+                    Indique o seu e-mail institucional para receber o link de redefinição.
                   </p>
                 </div>
 
@@ -294,13 +316,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                     <p className="text-xs font-semibold">
-                      Link de recuperação enviado com sucesso para <span className="font-bold">{forgotEmail}</span>! Verifique sua caixa de entrada e spam.
+                      Link de recuperação enviado com sucesso para <span className="font-bold">{forgotEmail}</span>!
                     </p>
                   </div>
                 ) : (
                   <form onSubmit={handleForgotPassword} className="space-y-4">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         E-mail de cadastro
                       </label>
                       <div className="relative">
@@ -313,23 +335,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           value={forgotEmail}
                           onChange={(e) => setForgotEmail(e.target.value)}
                           placeholder="seu.email@ucore.edu.br"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-sm outline-none transition-all shadow-xs"
+                          className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm outline-none transition-all shadow-xs"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-3 px-4 rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-xs uppercase tracking-widest shadow-md transition-all cursor-pointer"
+                      className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
-                      Enviar link de recuperação
+                      <span>Enviar link de recuperação</span>
+                      <ChevronRight className="w-4 h-4" />
                     </button>
 
                     <div className="text-center pt-2">
                       <button
                         type="button"
                         onClick={() => setForgotPasswordOpen(false)}
-                        className="text-xs font-bold text-[#f75142] hover:underline cursor-pointer"
+                        className="text-xs font-semibold text-slate-600 hover:text-[#f75142] transition-colors cursor-pointer"
                       >
                         ← Voltar ao login
                       </button>
@@ -338,18 +361,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 )}
               </div>
             ) : mode === 'login' ? (
-              /* LOGIN / SIGN IN FORM (FULL PAGE VIEW) */
-              <div className="max-w-md mx-auto w-full space-y-6">
-                {/* Heading */}
+              /* LOGIN VIEW */
+              <div className="max-w-[420px] mx-auto w-full space-y-5">
+                
+                {/* Header with refined typography */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-[#f75142] tracking-widest bg-[#fef2f1] px-2.5 py-1 rounded-full mb-2">
-                    Acesso à Plataforma
+                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#f75142] bg-[#fef2f1] px-3 py-1 rounded-full mb-2">
+                    Acesso Institucional
                   </div>
-                  <h1 className="text-3xl sm:text-4xl font-black uppercase text-slate-900 tracking-tight">
-                    Entrar na Central
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#002133] tracking-tight">
+                    Bem-vindo à Central
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                    Bem-vindo de volta! Faça login com suas credenciais institucionais.
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
+                    Introduza as suas credenciais para aceder à gestão escolar da uCore.
                   </p>
                 </div>
 
@@ -367,61 +391,65 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
                 )}
 
-                {/* Quick Presets for Demo / Testing */}
-                <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-[#f75142]" />
-                      Preenchimento Rápido por Perfil:
+                {/* Subtle Profile Demo Selector - Low Visual Weight to not compete with primary CTA */}
+                <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                      Acesso rápido por perfil:
                     </span>
+                    <span className="text-[10px] text-slate-400">Clique para testar</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
                       id="preset-admin-btn"
                       onClick={() => handleFillPreset('admin')}
-                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`py-2 px-2 rounded-xl text-xs font-medium transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
                         selectedRole === 'admin'
-                          ? 'bg-[#f75142] text-white border-[#f75142] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70 hover:text-slate-900'
                       }`}
                     >
-                      <ShieldCheck className="w-4 h-4" />
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                       <span>Admin</span>
                     </button>
+
                     <button
                       type="button"
                       id="preset-diretor-btn"
                       onClick={() => handleFillPreset('diretor')}
-                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`py-2 px-2 rounded-xl text-xs font-medium transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
                         selectedRole === 'diretor'
-                          ? 'bg-[#f75142] text-white border-[#f75142] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70 hover:text-slate-900'
                       }`}
                     >
-                      <Building2 className="w-4 h-4" />
+                      <Building2 className="w-3.5 h-3.5 shrink-0" />
                       <span>Diretor</span>
                     </button>
+
                     <button
                       type="button"
                       id="preset-professor-btn"
                       onClick={() => handleFillPreset('professor')}
-                      className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`py-2 px-2 rounded-xl text-xs font-medium transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
                         selectedRole === 'professor'
-                          ? 'bg-[#f75142] text-white border-[#f75142] shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70 hover:text-slate-900'
                       }`}
                     >
-                      <GraduationCap className="w-4 h-4" />
+                      <GraduationCap className="w-3.5 h-3.5 shrink-0" />
                       <span>Professor</span>
                     </button>
                   </div>
                 </div>
 
+                {/* Login Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Email Input */}
+                  
+                  {/* Email Input: Comfortable 48-52px height */}
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       E-mail Institucional
                     </label>
                     <div className="relative">
@@ -434,17 +462,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="seu.email@ucore.edu.br"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                        placeholder="nome@ucore.edu.br"
+                        className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                       />
                     </div>
                   </div>
 
-                  {/* Password Input */}
+                  {/* Password Input: Comfortable 48-52px height */}
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      Senha de Acesso
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Senha de Acesso
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setForgotPasswordOpen(true)}
+                        className="text-xs font-semibold text-[#f75142] hover:underline cursor-pointer"
+                      >
+                        Esqueceu a senha?
+                      </button>
+                    </div>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <Lock className="w-4 h-4" />
@@ -456,78 +493,79 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-10 pr-11 py-3 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                        className="w-full h-[48px] sm:h-[50px] pl-10 pr-11 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
                         className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-400" />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Remember me & Forgot Password */}
-                  <div className="flex items-center justify-between pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 select-none">
+                  {/* Remember me Checkbox */}
+                  <div className="flex items-center pt-0.5">
+                    <label className="flex items-center gap-2.5 cursor-pointer text-xs text-slate-600 select-none">
                       <input
                         type="checkbox"
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
                         className="w-4 h-4 rounded text-[#f75142] focus:ring-[#f75142] border-slate-300 cursor-pointer"
                       />
-                      <span>Lembrar minhas credenciais</span>
+                      <span>Manter sessão iniciada neste dispositivo</span>
                     </label>
-
-                    <button
-                      type="button"
-                      onClick={() => setForgotPasswordOpen(true)}
-                      className="text-xs font-bold text-[#f75142] hover:underline cursor-pointer"
-                    >
-                      Esqueceu a senha?
-                    </button>
                   </div>
 
-                  {/* Submit Button */}
+                  {/* Primary Submit Button: High contrast, coral uCore, prominent focus */}
                   <button
                     id="submit-login-btn"
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-[0.2em] shadow-[0_6px_20px_rgba(247,81,66,0.35)] hover:shadow-[0_8px_25px_rgba(247,81,66,0.45)] transition-all duration-200 cursor-pointer active:scale-98 disabled:opacity-70 mt-2 flex items-center justify-center gap-2"
+                    className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-[0_6px_20px_rgba(247,81,66,0.25)] hover:shadow-[0_8px_24px_rgba(247,81,66,0.35)] transition-all duration-200 cursor-pointer active:scale-[0.99] disabled:opacity-70 mt-1 flex items-center justify-center gap-2"
                   >
-                    {loading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
-                    <span>{loading ? 'Validando credenciais...' : 'Entrar na Central'}</span>
-                    {!loading && <ChevronRight className="w-4 h-4" />}
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        <span>A autenticar credenciais...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Entrar na Central</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
 
-                  {/* Bottom Switch Link */}
-                  <div className="text-center pt-3 text-xs text-slate-600">
+                  {/* Switch to Register */}
+                  <div className="text-center pt-2 text-xs text-slate-600">
                     Ainda não possui uma conta?{' '}
                     <button
                       type="button"
                       id="switch-to-register-btn"
                       onClick={() => switchMode('register')}
-                      className="font-bold text-[#f75142] hover:underline cursor-pointer uppercase tracking-wider"
+                      className="font-bold text-[#f75142] hover:underline cursor-pointer"
                     >
-                      Criar Conta / Sign Up
+                      Crie a sua conta
                     </button>
                   </div>
                 </form>
               </div>
             ) : (
-              /* SIGN UP / REGISTER FORM (FULL PAGE VIEW) */
-              <div className="max-w-md mx-auto w-full space-y-5">
-                {/* Heading */}
+              /* REGISTER VIEW */
+              <div className="max-w-[440px] mx-auto w-full space-y-4">
+                
+                {/* Header */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-[#f75142] tracking-widest bg-[#fef2f1] px-2.5 py-1 rounded-full mb-2">
-                    Novo Cadastro Escolar
+                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#f75142] bg-[#fef2f1] px-3 py-1 rounded-full mb-2">
+                    Novo Cadastro
                   </div>
-                  <h1 className="text-3xl sm:text-4xl font-black uppercase text-slate-900 tracking-tight">
-                    Criar Conta
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#002133] tracking-tight">
+                    Crie a sua conta
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                    Cadastre-se na Central uCore para ingressar na gestão da sua escola.
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
+                    Junte-se à plataforma uCore para gerir turmas, notas e indicadores escolares.
                   </p>
                 </div>
 
@@ -546,19 +584,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-3.5">
-                  {/* Role Selector */}
+                  
+                  {/* Role Selector: Discreto e integrado, sem roubar atenção */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                      Seu Perfil / Cargo na Instituição:
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Perfil de Atuação na Escola
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setSelectedRole('admin')}
-                        className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        className={`py-2 px-1 text-center rounded-xl text-xs font-medium transition-all border cursor-pointer ${
                           selectedRole === 'admin'
-                            ? 'bg-[#f75142] text-white border-[#f75142] shadow-sm'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         Administrador
@@ -566,10 +605,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       <button
                         type="button"
                         onClick={() => setSelectedRole('diretor')}
-                        className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        className={`py-2 px-1 text-center rounded-xl text-xs font-medium transition-all border cursor-pointer ${
                           selectedRole === 'diretor'
-                            ? 'bg-[#f75142] text-white border-[#f75142] shadow-sm'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         Diretor
@@ -577,10 +616,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       <button
                         type="button"
                         onClick={() => setSelectedRole('professor')}
-                        className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        className={`py-2 px-1 text-center rounded-xl text-xs font-medium transition-all border cursor-pointer ${
                           selectedRole === 'professor'
-                            ? 'bg-[#f75142] text-white border-[#f75142] shadow-sm'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         Professor
@@ -588,10 +627,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     </div>
                   </div>
 
-                  {/* Name and Last Name */}
+                  {/* Nome e Sobrenome lado a lado no desktop */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Primeiro Nome
                       </label>
                       <div className="relative">
@@ -605,13 +644,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
                           placeholder="Ex: Carlos"
-                          className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                          className="w-full h-[48px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Sobrenome
                       </label>
                       <div className="relative">
@@ -624,15 +663,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           placeholder="Ex: Silva"
-                          className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                          className="w-full h-[48px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Email */}
+                  {/* E-mail Institucional */}
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       E-mail Institucional
                     </label>
                     <div className="relative">
@@ -646,15 +685,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="seu.nome@ucore.edu.br"
-                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                        className="w-full h-[48px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                       />
                     </div>
                   </div>
 
-                  {/* Password & Confirm */}
+                  {/* Senha e Confirmação lado a lado com orientação */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Senha
                       </label>
                       <div className="relative">
@@ -667,8 +706,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Mínimo 6 dígitos"
-                          className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                          placeholder="Mínimo 6 caracteres"
+                          className="w-full h-[48px] pl-10 pr-9 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                         />
                         <button
                           type="button"
@@ -681,7 +720,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Confirmar Senha
                       </label>
                       <div className="relative">
@@ -695,7 +734,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="Repita a senha"
-                          className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                          className="w-full h-[48px] pl-10 pr-9 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                         />
                         <button
                           type="button"
@@ -708,7 +747,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     </div>
                   </div>
 
-                  {/* Terms checkbox */}
+                  {/* Orientação de senha próxima ao campo */}
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>A senha deve possuir no mínimo 6 caracteres para assegurar o acesso.</span>
+                  </div>
+
+                  {/* Termos de uso */}
                   <div className="pt-1">
                     <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 select-none">
                       <input
@@ -718,7 +763,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         className="w-4 h-4 mt-0.5 rounded text-[#f75142] focus:ring-[#f75142] border-slate-300 cursor-pointer"
                       />
                       <span className="leading-tight">
-                        Concordo com os <span className="text-[#f75142] font-bold underline">Termos de Uso</span> e a <span className="text-[#f75142] font-bold underline">Política de Privacidade</span> da plataforma uCore.
+                        Concordo com os <span className="text-[#f75142] font-semibold underline">Termos de Uso</span> e a <span className="text-[#f75142] font-semibold underline">Política de Privacidade</span> da uCore.
                       </span>
                     </label>
                   </div>
@@ -728,23 +773,31 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     id="submit-register-btn"
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-[0.2em] shadow-[0_6px_20px_rgba(247,81,66,0.35)] hover:shadow-[0_8px_25px_rgba(247,81,66,0.45)] transition-all duration-200 cursor-pointer active:scale-98 disabled:opacity-70 mt-2 flex items-center justify-center gap-2"
+                    className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-[0_6px_20px_rgba(247,81,66,0.25)] hover:shadow-[0_8px_24px_rgba(247,81,66,0.35)] transition-all duration-200 cursor-pointer active:scale-[0.99] disabled:opacity-70 mt-1 flex items-center justify-center gap-2"
                   >
-                    {loading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
-                    <span>{loading ? 'Cadastrando usuário...' : 'Criar Minha Conta'}</span>
-                    {!loading && <ChevronRight className="w-4 h-4" />}
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        <span>A criar conta institucional...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Criar Minha Conta</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
 
-                  {/* Bottom Switch Link */}
+                  {/* Switch to Login */}
                   <div className="text-center pt-2 text-xs text-slate-600">
                     Já possui cadastro na plataforma?{' '}
                     <button
                       type="button"
                       id="switch-to-login-btn"
                       onClick={() => switchMode('login')}
-                      className="font-bold text-[#f75142] hover:underline cursor-pointer uppercase tracking-wider"
+                      className="font-bold text-[#f75142] hover:underline cursor-pointer"
                     >
-                      Fazer Login / Entrar
+                      Entrar na Central
                     </button>
                   </div>
                 </form>
@@ -754,9 +807,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </div>
       </main>
 
-      {/* Footer Note */}
+      {/* Footer Note (when standalone) */}
       {!hideHeader && (
-        <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
+        <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-200/80 bg-white">
           Central uCore • Plataforma de Gestão Educacional para Escolas, Professores e Alunos
         </footer>
       )}

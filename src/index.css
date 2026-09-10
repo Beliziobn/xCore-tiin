@@ -316,3 +316,214 @@ html.lenis.lenis-stopped {
   }
 }
 
+/* ==========================================================================
+   Student Profile Design System - uCore
+   ========================================================================== */
+
+:root {
+  --coral: #ff5148;
+  --coral-soft: #fff1ef;
+  --navy: #06283a;
+  --text: #18364a;
+  --muted: #7c8fa3;
+  --surface: #ffffff;
+  --background: #f8f6f5;
+  --border: #e1e8ef;
+  --success: #07966b;
+}
+
+.student-card {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  border: 1px solid #e3e9ef;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(10, 35, 51, 0.08);
+}
+
+.student-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: #ff5148;
+}
+
+.student-card .avatar {
+  width: 72px;
+  height: 72px;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background: #fff1ef;
+  box-shadow: 0 8px 18px rgba(255, 81, 72, 0.18);
+}
+
+.student-card .name {
+  margin-top: 14px;
+  color: #06283a;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.student-card .status-pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e6faf2;
+  color: #087a58;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.enrollment-card {
+  padding: 26px;
+  border: 1px solid #e1e8ef;
+  border-radius: 22px;
+  background: #ffffff;
+}
+
+.enrollment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px 32px;
+  margin-top: 22px;
+}
+
+.enrollment-item .label {
+  color: #7c8fa3;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.enrollment-item .value {
+  margin-top: 6px;
+  color: #06283a;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.enrollment-item .caption {
+  margin-top: 4px;
+  color: #5c7285;
+  font-size: 12px;
+}
+
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.metric-card {
+  padding: 18px 20px;
+  border: 1px solid #e6edf2;
+  border-radius: 18px;
+  background: #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card.highlight {
+  border-color: #ffd2cf;
+  background: #fff8f7;
+}
+
+.metric-card .label {
+  color: #7c8fa3;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metric-card .value {
+  margin-top: 8px;
+  color: #06283a;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.metric-card.highlight .value {
+  color: #ff5148;
+}
+
+.biographic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.biographic-item {
+  min-height: 120px;
+  padding: 20px 24px;
+  border-top: 1px solid #e6edf2;
+}
+
+.biographic-item:nth-child(odd) {
+  border-right: 1px solid #e6edf2;
+}
+
+.grades-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.grades-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5ecf2;
+  background: #f7fafc;
+  color: #51687d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.grades-table tbody tr {
+  border-top: 1px solid #edf2f6;
+  transition: background-color 0.18s ease;
+}
+
+.grades-table tbody tr.is-selected {
+  border-left: 4px solid #ff5148;
+  background: #fff8f7;
+}
+
+@media (max-width: 900px) {
+  .enrollment-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .summary-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .biographic-grid {
+    grid-template-columns: 1fr;
+  }
+  .biographic-item:nth-child(odd) {
+    border-right: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .enrollment-grid {
+    grid-template-columns: 1fr;
+  }
+  .summary-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+

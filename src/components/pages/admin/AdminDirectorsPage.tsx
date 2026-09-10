@@ -2,23 +2,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search,
   Plus,
-  UserCheck,
   School,
-  Phone,
-  Mail,
-  Award,
   CheckCircle2,
-  ChevronRight,
-  ShieldCheck,
-  FileSpreadsheet,
-  FileText,
-  Edit3,
+  AlertCircle,
+  Clock,
   Eye,
-  GraduationCap,
-  History,
+  Edit3,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
   Users,
   Briefcase,
-  MapPin
+  GraduationCap,
+  ShieldCheck,
+  X,
+  FileText
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminDirector, AdminSchool, DirectorRegistrationData } from '../../../types';
@@ -49,14 +47,17 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
   const [statusFilter, setStatusFilter] = useState('all');
   const [naturezaFilter, setNaturezaFilter] = useState('all');
   const [formacaoFilter, setFormacaoFilter] = useState('all');
-  const [selectedDirectorId, setSelectedDirectorId] = useState<string>(directors[0]?.id || '');
+
+  // Pagination state (default: 10 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Detailed stored director registration records (source of truth for rich dossiers)
   const [detailedDirectors, setDetailedDirectors] = useState<DirectorRegistrationData[]>(() => {
     return getStoredDirectors();
   });
 
-  // Modals state
+  // Modals / Drawer state
   const [detailModalDirector, setDetailModalDirector] = useState<DirectorRegistrationData | null>(null);
   const [editingDirectorData, setEditingDirectorData] = useState<DirectorRegistrationData | null>(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -67,6 +68,11 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
     setDetailedDirectors(list);
   }, []);
 
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, naturezaFilter, formacaoFilter, pageSize]);
+
   // Helper to resolve detailed registration dossier for any director
   const getDossierForDirector = (d: AdminDirector): DirectorRegistrationData => {
     if (d.registrationData) return d.registrationData;
@@ -75,20 +81,22 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
     );
     if (found) return found;
 
-    // Fallback on the fly if needed
     const matchedSchool = schools.find((s) => s.name === d.schoolName) || schools[0];
     return buildInitialDirectorDossier(matchedSchool, 0);
   };
 
+  // Filtered directors calculation
   const filteredDirectors = useMemo(() => {
     return directors.filter((dir) => {
       const dossier = getDossierForDirector(dir);
+      const query = searchTerm.trim().toLowerCase();
       const matchesSearch =
-        dir.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dir.schoolName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dir.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dir.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (dossier?.biNif && dossier.biNif.toLowerCase().includes(searchTerm.toLowerCase()));
+        query === '' ||
+        dir.name.toLowerCase().includes(query) ||
+        dir.schoolName.toLowerCase().includes(query) ||
+        dir.email.toLowerCase().includes(query) ||
+        dir.phone.toLowerCase().includes(query) ||
+        (dossier?.biNif && dossier.biNif.toLowerCase().includes(query));
 
       if (!matchesSearch) return false;
       if (statusFilter !== 'all' && dir.status !== statusFilter) return false;
@@ -98,9 +106,38 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
     });
   }, [directors, detailedDirectors, searchTerm, statusFilter, naturezaFilter, formacaoFilter]);
 
-  const activeDirector =
-    directors.find((d) => d.id === selectedDirectorId) || filteredDirectors[0] || directors[0];
-  const activeDossier = activeDirector ? getDossierForDirector(activeDirector) : null;
+  // Dynamic summary metrics calculated from actual data
+  const totalDirectors = directors.length;
+  const activeDirectorsCount = useMemo(() => {
+    return directors.filter((d) => d.status === 'Ativo').length;
+  }, [directors]);
+
+  const evaluatingDirectorsCount = useMemo(() => {
+    return directors.filter((d) => d.status === 'Em Avaliação').length;
+  }, [directors]);
+
+  // Check if any filter is active
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    statusFilter !== 'all' ||
+    naturezaFilter !== 'all' ||
+    formacaoFilter !== 'all';
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setNaturezaFilter('all');
+    setFormacaoFilter('all');
+    setCurrentPage(1);
+  };
+
+  // Pagination slice
+  const totalFiltered = filteredDirectors.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalFiltered);
+  const paginatedDirectors = filteredDirectors.slice(startIndex, endIndex);
 
   const handleDirectorSaved = (saved: DirectorRegistrationData) => {
     saveDirector(saved, 'Administrador Municipal');
@@ -131,8 +168,8 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
   };
 
   return (
-    <div id="admin-directors-page" className="w-full min-h-screen bg-[#f7f3f3]">
-      {/* Hero Header: "Meus Directores" */}
+    <div id="admin-directors-page" className="w-full min-h-screen bg-[#f8f9fb]">
+      {/* Hero Header */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
         isLoggedIn={isLoggedIn}
@@ -140,318 +177,499 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
         customSubtitle=""
       />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Filter and Action Bar */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mb-8 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Filtros:</span>
-            {/* Status */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 px-3 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
-            >
-              <option value="all">Status ({directors.length})</option>
-              <option value="Ativo">Em Exercício / Ativo</option>
-              <option value="Em Avaliação">Em Avaliação de Mandato</option>
-              <option value="Anterior">Anterior / Cessou Funções</option>
-            </select>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+        
+        {/* 1. Resumo compacto no início do body com botão Novo cadastro separado à direita */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
+            {/* Total de diretores */}
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-medium text-slate-500">Total de diretores:</span>
+              <span className="text-base sm:text-lg font-bold text-[#002133]">{totalDirectors}</span>
+            </div>
 
-            {/* Natureza da Escola */}
-            <select
-              value={naturezaFilter}
-              onChange={(e) => setNaturezaFilter(e.target.value)}
-              className="bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 px-3 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
-            >
-              <option value="all">Natureza da Escola</option>
-              <option value="Pública">Pública</option>
-              <option value="Público-Privada">Público-Privada</option>
-              <option value="Privada">Privada</option>
-            </select>
+            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 
-            {/* Formação Pedagógica */}
-            <select
-              value={formacaoFilter}
-              onChange={(e) => setFormacaoFilter(e.target.value)}
-              className="bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 px-3 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
-            >
-              <option value="all">Classificação Pedagógica</option>
-              <option value="Com magistério e com IMNE completo">Magistério / IMNE Completo</option>
-              <option value="Sem Magistério e com formação Pedagógica">Com Formação Pedagógica</option>
-              <option value="Sem Magistério e sem Formação pedagógica">Sem Formação Pedagógica</option>
-            </select>
+            {/* Ativos */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                {activeDirectorsCount} Ativos
+              </span>
+            </div>
+
+            {/* Em avaliação */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                {evaluatingDirectorsCount} Em avaliação
+              </span>
+            </div>
           </div>
 
-          {/* Center: Search input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar diretor, BI, escola ou contacto..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-            />
-          </div>
-
-          {/* Right: Quick Cadastrar Button */}
+          {/* Botão Novo cadastro à direita, separado dos filtros */}
           <button
             id="admin-btn-cadastrar-director"
             onClick={() => setIsRegisterModalOpen(true)}
-            className="flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            Novo Cadastro
+            <span>Novo cadastro</span>
           </button>
         </div>
 
-        {/* Selected Director Details - Quick Highlight Banner */}
-        {activeDirector && activeDossier && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs mb-10">
-            {/* Header: Director Identity, Status & School */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center shrink-0 border border-[#fee4e2] font-black text-lg shadow-2xs">
-                  {activeDirector.name.charAt(0)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-                      {activeDirector.name}
-                    </h3>
-                    <span
-                      className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                        activeDirector.status === 'Ativo'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}
-                    >
-                      {activeDirector.status}
-                    </span>
-                    <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
-                      BI: {activeDossier.biNif}
-                    </span>
-                    <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-100">
-                      {activeDossier.faixaEtaria}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                      <School className="w-3.5 h-3.5 text-[#f75142]" />
-                      {activeDirector.schoolName}
-                    </span>
-                    <span>•</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-100 font-bold text-slate-700 text-[10px]">
-                      {activeDossier.naturezaEscola}
-                    </span>
-                    <span>•</span>
-                    <span>Mandato desde {activeDirector.appointmentYear} ({activeDossier.cargo})</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Action buttons for selected Director */}
-              <div className="flex items-center gap-2 flex-wrap">
+        {/* 2. Pesquisa com mais espaço e filtros organizados */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-4">
+          {/* Campo amplo de pesquisa */}
+          <div>
+            <label
+              htmlFor="director-search-input"
+              className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2"
+            >
+              Pesquisar diretor
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                id="director-search-input"
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Nome, BI ou escola"
+                className="w-full h-11 sm:h-12 pl-10 pr-10 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 transition-all focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142]"
+              />
+              {searchTerm && (
                 <button
-                  onClick={() => setDetailModalDirector(activeDossier)}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  title="Limpar pesquisa"
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Ver Ficha Completa</span>
+                  <X className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => setEditingDirectorData(activeDossier)}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-200 flex items-center gap-1.5"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Editar Ficha</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Organized Content Layout for Optimal Reading */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-5 gap-x-6 pt-5">
-              {/* 1. Classificação Pedagógica */}
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Classificação Pedagógica
-                </span>
-                <span className="text-xs font-bold text-slate-900 leading-snug line-clamp-2">
-                  {activeDossier.classificacaoPedagogica}
-                </span>
-                <span className="text-[11px] text-slate-500 mt-0.5">{activeDossier.nivelAcademico}</span>
-              </div>
-
-              {/* 2. Docentes sob Gestão */}
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Docentes sob Gestão
-                </span>
-                <span className="text-base font-bold text-slate-900 leading-snug">
-                  {activeDirector.teachersCount} Professores
-                </span>
-                <span className="text-[11px] text-slate-500 mt-0.5">Quadro Docente</span>
-              </div>
-
-              {/* 3. Alunos Matriculados */}
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Alunos Matriculados
-                </span>
-                <span className="text-base font-bold text-slate-900 leading-snug">
-                  {activeDirector.studentsCount} Alunos
-                </span>
-                <span className="text-[11px] text-slate-500 mt-0.5">População Discente</span>
-              </div>
-
-              {/* 4. Formação em Gestão */}
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Formação em Gestão
-                </span>
-                <span className="text-xs font-bold text-emerald-700 leading-snug">
-                  {activeDossier.temFormacaoAdministracaoGestao ? 'Certificado em Gestão' : 'Em Formação'}
-                </span>
-                <span className="text-[11px] text-slate-500 mt-0.5">Ano: {activeDossier.anoUltimaFormacaoGestao || 2024}</span>
-              </div>
-
-              {/* 5. Contactos */}
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Telefone & E-mail
-                </span>
-                <span className="text-xs font-bold text-slate-900 font-mono leading-snug">
-                  {activeDirector.phone}
-                </span>
-                <span className="text-[11px] text-slate-500 truncate mt-0.5" title={activeDirector.email}>
-                  {activeDirector.email}
-                </span>
-              </div>
-
-              {/* 6. Validação de Despacho */}
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Validação Documental
-                </span>
-                <span className="text-xs font-bold text-emerald-700 leading-snug flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Homologado
-                </span>
-                <span className="text-[11px] text-slate-500 mt-0.5">
-                  {activeDossier.documentosAnexos?.length || 0} docs anexados
-                </span>
-              </div>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Directors Table */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+          {/* Filtros em linha abaixo da pesquisa */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Filtrar por:</span>
+
+              {/* Situação */}
+              <select
+                id="director-status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142] cursor-pointer"
+              >
+                <option value="all">Situação (Todas)</option>
+                <option value="Ativo">Ativo ({activeDirectorsCount})</option>
+                <option value="Em Avaliação">Em avaliação ({evaluatingDirectorsCount})</option>
+                <option value="Anterior">Anterior</option>
+              </select>
+
+              {/* Natureza da Escola */}
+              <select
+                id="director-natureza-filter"
+                value={naturezaFilter}
+                onChange={(e) => setNaturezaFilter(e.target.value)}
+                className="h-9 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142] cursor-pointer"
+              >
+                <option value="all">Natureza da escola (Todas)</option>
+                <option value="Pública">Pública</option>
+                <option value="Privada">Privada</option>
+                <option value="Público-Privada">Público-Privada</option>
+              </select>
+
+              {/* Classificação Pedagógica */}
+              <select
+                id="director-formacao-filter"
+                value={formacaoFilter}
+                onChange={(e) => setFormacaoFilter(e.target.value)}
+                className="h-9 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142] cursor-pointer"
+              >
+                <option value="all">Classificação pedagógica (Todas)</option>
+                <option value="Com magistério e com IMNE completo">Magistério / IMNE Completo</option>
+                <option value="Sem Magistério e com formação Pedagógica">Com Formação Pedagógica</option>
+                <option value="Sem Magistério e sem Formação pedagógica">Sem Formação Pedagógica</option>
+              </select>
+            </div>
+
+            {/* Limpar filtros visível quando houver filtros aplicados */}
+            {hasActiveFilters && (
+              <button
+                id="director-clear-filters-btn"
+                onClick={handleClearFilters}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#f75142] hover:bg-[#fef2f1] border border-[#fee4e2] transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Limpar filtros</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Tabela mais legível e menos carregada (sem cartão fixo superior) */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+          {/* Header da listagem com contador e seletor de registros */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
             <div>
-              <h4 className="text-sm font-bold text-slate-800">
-                Corpo Diretivo Homologado na Central uCore ({filteredDirectors.length})
-              </h4>
-              <p className="text-xs text-slate-500 font-medium">
-                Gestão direta das 31 unidades de ensino da rede municipal de Quêssua
+              <h2 className="text-base font-bold text-slate-900">
+                Listagem de Diretores
+              </h2>
+              <p className="text-xs text-slate-500 font-normal mt-0.5">
+                {totalFiltered === 0 ? (
+                  <span>Nenhum diretor encontrado com os filtros selecionados</span>
+                ) : (
+                  <span>
+                    A exibir {startIndex + 1}–{endIndex} de {totalFiltered} diretores
+                    {hasActiveFilters && ' (filtrados)'}
+                  </span>
+                )}
               </p>
             </div>
-            <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg text-slate-600">
-              Modelo Oficial de Cadastro 2025/2026
-            </span>
+
+            {/* Seletor de registros por página */}
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-xs text-slate-500 font-medium">Por página:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="h-8 bg-slate-50 text-slate-700 text-xs font-semibold px-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#f75142] cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={31}>Todos</option>
+              </select>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider">
-                <tr>
-                  <th className="p-3.5">Diretor(a) & BI</th>
-                  <th className="p-3.5">Escola sob Direção</th>
-                  <th className="p-3.5">Natureza</th>
-                  <th className="p-3.5">Mandato Desde</th>
-                  <th className="p-3.5 text-center">Docentes</th>
-                  <th className="p-3.5 text-center">Alunos</th>
-                  <th className="p-3.5">Formação Pedagógica</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5 text-right">Ações</th>
+          {/* Visualização Desktop: Tabela de alta legibilidade (~14px) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-4">Diretor</th>
+                  <th className="py-3.5 px-4">Escola</th>
+                  <th className="py-3.5 px-4">Mandato</th>
+                  <th className="py-3.5 px-4">Comunidade escolar</th>
+                  <th className="py-3.5 px-4">Formação</th>
+                  <th className="py-3.5 px-4">Situação</th>
+                  <th className="py-3.5 px-4 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredDirectors.map((d) => {
-                  const dossier = getDossierForDirector(d);
-                  const isSelected = d.id === activeDirector?.id;
-                  return (
-                    <tr
-                      key={d.id}
-                      onClick={() => setSelectedDirectorId(d.id)}
-                      className={`hover:bg-[#fef2f1]/50 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-[#fef2f1]/80 font-medium' : ''
-                      }`}
-                    >
-                      <td className="p-3.5">
-                        <div className="flex items-center gap-2">
-                          <UserCheck className={`w-4 h-4 shrink-0 ${isSelected ? 'text-[#f75142]' : 'text-slate-400'}`} />
-                          <div>
-                            <span className="font-bold text-slate-900 block">{d.name}</span>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {dossier?.biNif || '004819234LA042'} • {dossier?.faixaEtaria || '35-39'}
-                            </span>
+              <tbody className="divide-y divide-slate-100 text-sm text-slate-800">
+                {paginatedDirectors.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 px-4 text-center">
+                      <div className="max-w-md mx-auto text-center space-y-3">
+                        <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                          <Search className="w-6 h-6" />
+                        </div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          Nenhum diretor corresponde aos critérios de pesquisa
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Tente ajustar o termo digitado ou redefinir os filtros de situação e formação.
+                        </p>
+                        {hasActiveFilters && (
+                          <button
+                            onClick={handleClearFilters}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#f75142] text-white rounded-xl text-xs font-bold hover:bg-[#e04436] transition-colors"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Limpar todos os filtros</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedDirectors.map((d) => {
+                    const dossier = getDossierForDirector(d);
+                    const isAtivo = d.status === 'Ativo';
+                    const isEmAvaliacao = d.status === 'Em Avaliação';
+
+                    return (
+                      <tr
+                        key={d.id}
+                        className="hover:bg-slate-50/90 transition-colors group cursor-pointer"
+                        onClick={() => setDetailModalDirector(dossier)}
+                      >
+                        {/* 1. Diretor: Nome em destaque (14px) e BI como secundária */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900 text-sm group-hover:text-[#f75142] transition-colors">
+                            {d.name}
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-3.5">
-                        <span className="text-slate-800 font-medium block">{d.schoolName}</span>
-                        <span className="text-[10px] text-slate-500">{dossier?.municipioEscola}</span>
-                      </td>
-                      <td className="p-3.5">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                          {dossier?.naturezaEscola || 'Pública'}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-slate-600 font-mono">{d.appointmentYear}</td>
-                      <td className="p-3.5 text-center font-bold text-slate-800">{d.teachersCount}</td>
-                      <td className="p-3.5 text-center font-bold text-slate-800">{d.studentsCount}</td>
-                      <td className="p-3.5 text-slate-700">
-                        <span className="text-[11px] block font-semibold truncate max-w-[160px]" title={dossier?.classificacaoPedagogica}>
-                          {dossier?.classificacaoPedagogica}
-                        </span>
-                        <span className="text-[10px] text-slate-500 block">{dossier?.nivelAcademico}</span>
-                      </td>
-                      <td className="p-3.5">
-                        <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[10px]">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {d.status}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-right">
-                        <div className="inline-flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => setDetailModalDirector(dossier)}
-                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-                            title="Ver Ficha Cadastral e Histórico"
+                          <div className="text-xs text-slate-500 font-mono mt-0.5">
+                            BI: {dossier?.biNif || '004819234LA042'}
+                          </div>
+                        </td>
+
+                        {/* 2. Escola: Nome e natureza da instituição */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-800 text-sm">
+                            {d.schoolName}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                            <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                              {dossier?.naturezaEscola || 'Pública'}
+                            </span>
+                            <span>•</span>
+                            <span>{dossier?.municipioEscola || 'Quêssua'}</span>
+                          </div>
+                        </td>
+
+                        {/* 3. Mandato: Ano de início */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="text-sm font-medium text-slate-700">
+                            Desde {d.appointmentYear}
+                          </span>
+                        </td>
+
+                        {/* 4. Comunidade escolar: Docentes e alunos claramente identificados */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-slate-800">
+                            <span className="font-semibold text-slate-900">{d.teachersCount}</span> docentes
+                            <span className="text-slate-400 mx-1.5">•</span>
+                            <span className="font-semibold text-slate-900">{d.studentsCount}</span> alunos
+                          </div>
+                        </td>
+
+                        {/* 5. Formação: Resumo pedagógico */}
+                        <td className="py-3.5 px-4 max-w-[200px]">
+                          <div
+                            className="text-xs font-semibold text-slate-800 truncate"
+                            title={dossier?.classificacaoPedagogica}
                           >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setEditingDirectorData(dossier)}
-                            className="p-1.5 text-slate-600 hover:text-[#f75142] hover:bg-slate-100 rounded-lg transition-colors"
-                            title="Editar Ficha"
+                            {dossier?.classificacaoPedagogica || 'Magistério / IMNE Completo'}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                            {dossier?.nivelAcademico || 'Licenciatura'}
+                          </div>
+                        </td>
+
+                        {/* 6. Situação: Etiqueta verde (Ativo) e âmbar (Em avaliação) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {isAtivo && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Ativo
+                            </span>
+                          )}
+                          {isEmAvaliacao && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              Em avaliação
+                            </span>
+                          )}
+                          {!isAtivo && !isEmAvaliacao && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              {d.status}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 7. Ações: Ver ficha e Editar */}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <div
+                            className="inline-flex items-center gap-1.5 justify-end"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                            <button
+                              onClick={() => setDetailModalDirector(dossier)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-[#002133] hover:text-white text-slate-700 transition-colors cursor-pointer"
+                              title="Ver ficha completa no painel lateral"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Ver ficha</span>
+                            </button>
+                            <button
+                              onClick={() => setEditingDirectorData(dossier)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 hover:border-[#fee4e2] hover:bg-[#fef2f1] text-slate-600 hover:text-[#f75142] transition-colors cursor-pointer"
+                              title="Editar ficha"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Editar</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
+
+          {/* 6. Layout próprio para telemóvel: cartões compactos */}
+          <div className="md:hidden divide-y divide-slate-100">
+            {paginatedDirectors.length === 0 ? (
+              <div className="p-8 text-center space-y-3">
+                <Search className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-sm font-semibold text-slate-800">
+                  Nenhum diretor encontrado
+                </p>
+                {hasActiveFilters && (
+                  <button
+                    onClick={handleClearFilters}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#f75142] text-white rounded-xl text-xs font-bold"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Limpar filtros</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              paginatedDirectors.map((d) => {
+                const dossier = getDossierForDirector(d);
+                const isAtivo = d.status === 'Ativo';
+                const isEmAvaliacao = d.status === 'Em Avaliação';
+
+                return (
+                  <div
+                    key={d.id}
+                    className="p-4 space-y-3 hover:bg-slate-50 transition-colors"
+                  >
+                    {/* Linha superior: Nome e Situação */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                          {d.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">
+                          BI: {dossier?.biNif || '004819234LA042'}
+                        </p>
+                      </div>
+
+                      {/* Situação */}
+                      {isAtivo && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Ativo
+                        </span>
+                      )}
+                      {isEmAvaliacao && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Em avaliação
+                        </span>
+                      )}
+                      {!isAtivo && !isEmAvaliacao && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                          {d.status}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Escola e natureza */}
+                    <div className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
+                      <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                        <School className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
+                        <span className="truncate">{d.schoolName}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                        <span>{dossier?.naturezaEscola || 'Pública'}</span>
+                        <span>•</span>
+                        <span>Mandato desde {d.appointmentYear}</span>
+                      </div>
+                    </div>
+
+                    {/* Comunidade e formação */}
+                    <div className="flex items-center justify-between text-xs text-slate-600 pt-1">
+                      <div>
+                        <span className="font-semibold text-slate-900">{d.teachersCount}</span> docentes
+                        <span className="mx-1">•</span>
+                        <span className="font-semibold text-slate-900">{d.studentsCount}</span> alunos
+                      </div>
+                      <span className="text-[11px] text-slate-500 truncate max-w-[140px]">
+                        {dossier?.classificacaoPedagogica}
+                      </span>
+                    </div>
+
+                    {/* Ações no telemóvel */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => setDetailModalDirector(dossier)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#002133] hover:bg-[#00314d] text-white text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Ver ficha</span>
+                      </button>
+                      <button
+                        onClick={() => setEditingDirectorData(dossier)}
+                        className="inline-flex items-center justify-center gap-1 py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Editar</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* 5. Paginação e controles de rodapé */}
+          {totalFiltered > 0 && (
+            <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white">
+              <span className="text-xs text-slate-500 font-medium">
+                Página {safeCurrentPage} de {totalPages} ({totalFiltered} diretores no total)
+              </span>
+
+              <div className="flex items-center gap-1">
+                {/* Botão Anterior */}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    safeCurrentPage <= 1
+                      ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                      : 'border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                  }`}
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Anterior</span>
+                </button>
+
+                {/* Páginas numeradas */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        pageNum === safeCurrentPage
+                          ? 'bg-[#002133] text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Botão Seguinte */}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage >= totalPages}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    safeCurrentPage >= totalPages
+                      ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                      : 'border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                  }`}
+                >
+                  <span>Seguinte</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Modal: Ver Ficha Cadastral Completa / Histórico */}
+      {/* Drawer / Painel Lateral: Ver Ficha Cadastral Completa / Histórico */}
       {detailModalDirector && (
         <DirectorDetailModal
           isOpen={detailModalDirector !== null}
@@ -489,3 +707,4 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
     </div>
   );
 };
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Mail,
@@ -32,6 +32,8 @@ interface AdminProfilePageProps {
   isLoggedIn?: boolean;
   onOpenSettings?: () => void;
   onOpenExcelExport?: () => void;
+  focusZone?: boolean;
+  settingsTrigger?: number;
 }
 
 const STORAGE_KEY_ADMIN_AVATAR = 'ucore_admin_avatar';
@@ -44,7 +46,21 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   isLoggedIn,
   onOpenSettings,
   onOpenExcelExport,
+  focusZone,
+  settingsTrigger,
 }) => {
+  useEffect(() => {
+    if (focusZone || settingsTrigger) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('zona-dados-senha');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [focusZone, settingsTrigger]);
+
   const [adminPhoto, setAdminPhoto] = useState<string | null>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY_ADMIN_AVATAR);
@@ -410,7 +426,18 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
           </div>
 
           {/* Coluna 2: Definições da Conta, Preferências e Segurança (lg:col-span-5) */}
-          <div className="lg:col-span-5">
+          <div id="zona-dados-senha" className="lg:col-span-5 scroll-mt-24">
+            <div className="mb-4">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#f75142] block">
+                Definições da Conta & Segurança
+              </span>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
+                Zona de Alteração de Dados & Palavra-passe
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Edite os dados do superadministrador e redefina credenciais de acesso seguro.
+              </p>
+            </div>
             <ProfileOptionsSection
               className="w-full"
               hideProfileHeaderCard={true}

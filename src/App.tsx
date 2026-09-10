@@ -275,6 +275,11 @@ export default function App() {
     }
   }, [activeRole]);
 
+  // Profile view states for direct navigation to general vs settings/password zone
+  const [profileInitialTab, setProfileInitialTab] = useState<'visao-geral' | 'configuracoes'>('visao-geral');
+  const [profileFocusZone, setProfileFocusZone] = useState(false);
+  const [settingsTriggerCount, setSettingsTriggerCount] = useState(0);
+
   // Curated faculty portraits assigned consistently to registered teachers
   const TEACHER_PORTRAITS: string[] = [
     'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop',
@@ -936,8 +941,13 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           isLoggedIn={isSessionStarted}
-          onOpenSettings={() => setSettingsModalOpen(true)}
+          onOpenSettings={() => {
+            setProfileFocusZone(true);
+            setSettingsTriggerCount((c) => c + 1);
+          }}
           onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
+          focusZone={profileFocusZone}
+          settingsTrigger={settingsTriggerCount}
         />
       );
     }
@@ -1018,7 +1028,12 @@ export default function App() {
         <DirectorProfilePage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
-          onOpenSettings={() => setSettingsModalOpen(true)}
+          onOpenSettings={() => {
+            setProfileFocusZone(true);
+            setSettingsTriggerCount((c) => c + 1);
+          }}
+          focusZone={profileFocusZone}
+          settingsTrigger={settingsTriggerCount}
         />
       );
     }
@@ -1178,6 +1193,7 @@ export default function App() {
               { label: 'Chamada Diária' },
             ]}
             isLoggedIn={isSessionStarted}
+            compact={true}
           />
           <TeacherAttendancePage
             onBackToClass={() => {
@@ -1205,6 +1221,14 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Perfil do Professor"
+            customSubtitle="Identificação profissional, turma atribuída, horário letivo e definições de conta."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Estatísticas', onClick: () => { setCurrentView('professor-estatisticas'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Perfil do Professor' },
+            ]}
+            compact={true}
             isLoggedIn={isSessionStarted}
           />
           <TeacherProfilePage
@@ -1218,6 +1242,12 @@ export default function App() {
             }}
             teacher={teacherProfile}
             students={teacherStudents}
+            onUpdateTeacher={(updated) => {
+              setTeacherProfile((prev) => ({ ...prev, ...updated }));
+            }}
+            initialTab={profileInitialTab}
+            focusZone={profileFocusZone}
+            settingsTrigger={settingsTriggerCount}
           />
         </div>
       );
@@ -1228,6 +1258,14 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Perfil do Aluno"
+            customSubtitle="Identificação cadastral, indicadores acadêmicos e pauta curricular."
+            compact="ultra"
+            badge="Ficha do Aluno"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Minha Turma', onClick: () => { setCurrentView('professor-turma'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: selectedStudent?.name || 'Aluno' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <StudentProfilePage
@@ -1453,15 +1491,16 @@ export default function App() {
         onOpenAbout={() => setInfoModalType('about')}
         onOpenProfile={() => {
           setCurrentPage('home');
+          setProfileInitialTab('visao-geral');
+          setProfileFocusZone(false);
           if (activeRole === 'admin') {
             setCurrentView('admin-perfil');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
           } else if (activeRole === 'diretor') {
             setCurrentView('diretor-perfil');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
           } else {
-            setInfoModalType('profile');
+            setCurrentView('professor-perfil');
           }
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenSupport={() => setInfoModalType('support')}
         onOpenChat={() => setIsChatOpen(true)}
@@ -1485,7 +1524,27 @@ export default function App() {
           );
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenSettings={() => {
+          setCurrentPage('home');
+          setProfileInitialTab('configuracoes');
+          setProfileFocusZone(true);
+          setSettingsTriggerCount((c) => c + 1);
+          if (activeRole === 'admin') {
+            setCurrentView('admin-perfil');
+          } else if (activeRole === 'diretor') {
+            setCurrentView('diretor-perfil');
+          } else {
+            setCurrentView('professor-perfil');
+          }
+          setTimeout(() => {
+            const el = document.getElementById('zona-dados-senha');
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }, 150);
+        }}
         onOpenDemoModal={() => setIsDemoModalOpen(true)}
       />
 

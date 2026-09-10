@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2, School, GraduationCap, Settings } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
@@ -10,6 +10,8 @@ interface DirectorProfilePageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
   onOpenSettings?: () => void;
+  focusZone?: boolean;
+  settingsTrigger?: number;
 }
 
 const STORAGE_KEY_DIRECTOR = 'ucore_director_profile';
@@ -18,7 +20,21 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
   onOpenSettings,
+  focusZone,
+  settingsTrigger,
 }) => {
+  useEffect(() => {
+    if (focusZone || settingsTrigger) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('zona-dados-senha');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [focusZone, settingsTrigger]);
+
   const [profile, setProfile] = useState<DirectorProfileInfo>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_DIRECTOR);
@@ -327,7 +343,18 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
         </div>
 
         {/* Profile Options and Settings matching screenshot (Account, Preferences, Security) */}
-        <div className="my-8">
+        <div id="zona-dados-senha" className="my-8 scroll-mt-24">
+          <div className="mb-4">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#f75142] block">
+              Configurações da Conta & Segurança
+            </span>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
+              Zona de Alteração de Dados & Palavra-passe
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Atualize as informações cadastrais do diretor, contactos e credenciais de acesso seguro.
+            </p>
+          </div>
           <ProfileOptionsSection
             user={{
               name: profile.name,

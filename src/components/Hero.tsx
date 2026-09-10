@@ -16,6 +16,7 @@ interface HeroProps {
   customSubtitle?: string;
   breadcrumbs?: BreadcrumbItem[];
   badge?: string;
+  compact?: boolean | 'ultra';
 }
 
 const SERVICE_TAGS = [
@@ -31,6 +32,7 @@ export const Hero: React.FC<HeroProps> = ({
   customSubtitle,
   breadcrumbs,
   badge,
+  compact,
 }) => {
   const [scrollY, setScrollY] = useState(0);
 
@@ -56,11 +58,19 @@ export const Hero: React.FC<HeroProps> = ({
     return (
       <section
         id="ucore-hero-section"
-        className="relative w-full bg-gradient-to-br from-[#f75142] via-[#e54536] to-[#c9372a] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(247,81,66,0.45)] pt-8 sm:pt-12 pb-10 sm:pb-14 px-4 sm:px-8 lg:px-16 overflow-hidden"
+        className={`relative w-full bg-gradient-to-br from-[#f75142] via-[#e54536] to-[#c9372a] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(247,81,66,0.45)] px-4 sm:px-8 lg:px-16 overflow-hidden ${
+          compact === 'ultra'
+            ? 'pt-3.5 sm:pt-4 pb-4 sm:pb-5 min-h-[115px] sm:min-h-[125px]'
+            : compact
+            ? 'pt-5 sm:pt-6 pb-7 sm:pb-9 min-h-[155px]'
+            : 'pt-8 sm:pt-12 pb-10 sm:pb-14'
+        }`}
       >
         <SectionShader variant="coral" />
         <div
-          className="absolute inset-0 opacity-[0.07] pointer-events-none z-[1]"
+          className={`absolute inset-0 pointer-events-none z-[1] ${
+            compact === 'ultra' ? 'opacity-[0.02]' : compact ? 'opacity-[0.03]' : 'opacity-[0.07]'
+          }`}
           style={{
             backgroundImage:
               'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
@@ -69,7 +79,7 @@ export const Hero: React.FC<HeroProps> = ({
         />
         <div className="max-w-6xl mx-auto relative z-10 text-white">
           {/* Breadcrumb Trail & Optional Role Badge */}
-          <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className={`flex flex-wrap items-center gap-2.5 ${compact ? 'mb-2' : 'mb-3'}`}>
             {badge && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-white text-[11px] font-black uppercase tracking-wider">
                 {badge}
@@ -97,11 +107,15 @@ export const Hero: React.FC<HeroProps> = ({
             )}
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[1.1]">
+          <h1 className={`font-black tracking-tight leading-[1.1] ${
+            compact ? 'text-2xl sm:text-3xl lg:text-3xl' : 'text-3xl sm:text-4xl lg:text-5xl'
+          }`}>
             {customTitle}
           </h1>
           {customSubtitle && (
-            <p className="mt-3 text-sm sm:text-base font-medium text-white/90 leading-relaxed max-w-2xl">
+            <p className={`font-medium text-white/90 leading-relaxed max-w-2xl ${
+              compact ? 'mt-1.5 text-xs sm:text-sm' : 'mt-3 text-sm sm:text-base'
+            }`}>
               {customSubtitle}
             </p>
           )}

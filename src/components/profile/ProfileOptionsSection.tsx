@@ -379,13 +379,15 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       )}
 
       {/* SECTION 1: Conta */}
-      <div className="mb-5">
-        <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1">
-          Conta
+      <div id="secao-conta-dados" className="mb-5 scroll-mt-28">
+        <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
+          <span>Conta & Identificação</span>
+          <span className="text-[10px] text-slate-400 font-semibold">Dados Pessoais</span>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs divide-y divide-slate-100">
           {/* Gerir perfil */}
           <button
+            id="btn-gerir-perfil"
             onClick={() => setActiveModal('manage-profile')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
@@ -407,6 +409,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
 
           {/* Informações pessoais */}
           <button
+            id="btn-info-pessoais"
             onClick={() => setActiveModal('personal-info')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
@@ -515,13 +518,15 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       </div>
 
       {/* SECTION 3: Segurança */}
-      <div className="mb-5">
-        <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1">
-          Segurança
+      <div id="secao-seguranca-senha" className="mb-5 scroll-mt-28">
+        <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
+          <span>Segurança & Credenciais</span>
+          <span className="text-[10px] text-[#f75142] font-semibold">Palavra-passe</span>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs divide-y divide-slate-100">
           {/* Alterar palavra-passe */}
           <button
+            id="btn-alterar-senha"
             onClick={() => setActiveModal('change-password')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
@@ -538,7 +543,12 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 </span>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[#f75142] bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100">
+                Redefinir
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+            </div>
           </button>
         </div>
       </div>
