@@ -140,7 +140,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
   return (
     <main id="teacher-profile-page" className="teacher-profile w-full min-h-screen bg-[#f7f5f4] pb-24 font-sans">
-      <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 -mt-7 sm:-mt-8 relative z-10">
+      <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 relative">
         {/* Profile Toolbar */}
         <div className="profile-toolbar flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <button
@@ -430,7 +430,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
               {/* Side Column: Account Card */}
               <aside className="profile-side-column lg:col-span-4 min-w-0">
-                <section className="account-card p-6 rounded-2xl bg-white border border-[#e2e8ef] shadow-[0_8px_24px_rgba(3,31,48,0.04)] sticky top-6">
+                <section className="account-card p-6 rounded-2xl bg-white border border-[#e2e8ef] shadow-[0_8px_24px_rgba(3,31,48,0.04)] sticky top-24">
                   {/* Account Card Header */}
                   <div className="account-card-header flex items-center gap-3.5 pb-5 border-b border-[#e8edf2]">
                     <div className="profile-avatar profile-avatar-small w-14 h-14 rounded-full bg-[#002133] text-white flex items-center justify-center font-bold text-xl shrink-0 border border-slate-200 overflow-hidden">
@@ -590,25 +590,24 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
         )}
       </div>
 
-      {/* Hidden ProfileOptionsSection to handle modals when in Visão Geral */}
+      {/* ProfileOptionsSection to handle modals when in Visão Geral */}
       {activeTab === 'visao-geral' && (
-        <div className="hidden">
-          <ProfileOptionsSection
-            user={{
-              name: teacherProfileData.name,
-              email: teacherProfileData.email,
-              phone: teacherProfileData.phone,
-              roleTitle: teacherProfileData.roleTitle,
-              avatar: teacherAvatar,
-              schoolName: teacherProfileData.schoolName,
-              biNumber: teacherProfileData.biNumber,
-              address: teacherProfileData.address,
-            }}
-            onUpdateUser={handleUpdateTeacherUser}
-            externalActiveModal={activeModal}
-            onCloseExternalModal={() => setActiveModal(null)}
-          />
-        </div>
+        <ProfileOptionsSection
+          user={{
+            name: teacherProfileData.name,
+            email: teacherProfileData.email,
+            phone: teacherProfileData.phone,
+            roleTitle: teacherProfileData.roleTitle,
+            avatar: teacherAvatar,
+            schoolName: teacherProfileData.schoolName,
+            biNumber: teacherProfileData.biNumber,
+            address: teacherProfileData.address,
+          }}
+          onUpdateUser={handleUpdateTeacherUser}
+          externalActiveModal={activeModal}
+          onCloseExternalModal={() => setActiveModal(null)}
+          modalsOnly={true}
+        />
       )}
     </main>
   );

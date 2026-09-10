@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Hero } from '../../Hero';
 import { directorStatsData } from '../../../data/directorData';
+import { initialStudentsData } from '../../../data/teacherData';
 import { StatCardItem } from '../../StatCardItem';
 import { GenderDonutChart } from '../../charts/GenderDonutChart';
 import { PerformanceBarChart } from '../../charts/PerformanceBarChart';
 import { AttendanceAreaChart } from '../../charts/AttendanceAreaChart';
 import { DocumentStatusChart } from '../../charts/DocumentStatusChart';
+import { ChartDrillDownModal, DrillDownFilter } from '../../charts/ChartDrillDownModal';
 import { SchoolAnnouncementsBanner } from '../../announcements/SchoolAnnouncementsBanner';
 
 interface DirectorStatisticsPageProps {
@@ -23,8 +25,28 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
   onNavigateToStudents,
   isLoggedIn,
 }) => {
+  const [drillDownFilter, setDrillDownFilter] = useState<DrillDownFilter | null>(null);
+  const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
+
+  const openFilter = (filter: DrillDownFilter) => {
+    setDrillDownFilter(filter);
+    setIsDrillDownOpen(true);
+  };
+
   return (
     <div id="director-statistics-page" className="w-full min-h-screen bg-[#f7f3f3]">
+      {/* Interactive Drill Down Modal */}
+      <ChartDrillDownModal
+        isOpen={isDrillDownOpen}
+        onClose={() => setIsDrillDownOpen(false)}
+        filter={drillDownFilter}
+        students={initialStudentsData}
+        onSelectStudent={() => {
+          setIsDrillDownOpen(false);
+          onNavigateToStudents();
+        }}
+      />
+
       {/* Hero: "Analisa as suas estatísticas" matching 5.png */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -114,6 +136,14 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
               title="Gênero dos Alunos"
               badgeText="Alunos"
               subtitle="Distribuição de alunos da escola por gênero"
+              onSelectGender={(gender) => {
+                openFilter({
+                  type: 'gender',
+                  value: gender,
+                  title: `Estudantes do Gênero ${gender}`,
+                  subtitle: `Alunos da instituição cadastrados no sistema`,
+                });
+              }}
             />
 
             {/* Chart 2: [Desempenho dos alunos] (2017.1 to 2019.2) */}
@@ -122,27 +152,47 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
                 period: item.semester,
                 aprovacao: item.approval,
                 reprovacao: item.reproval,
+                distincao: Math.round(item.approval * 0.25),
+                regular: Math.round(item.approval * 0.75),
+                recuperacao: item.reproval,
+                totalAvaliados: 489,
               }))}
               title="Desempenho da Unidade"
               badgeText="Desempenho dos alunos"
               subtitle="Rendimento acadêmico por semestre avaliativo"
               targetRate={80}
+              onOpenDrillDown={(period) => {
+                openFilter({
+                  type: 'performance',
+                  value: 'aprovados',
+                  title: `Desempenho Acadêmico • ${period}`,
+                  subtitle: `Rendimento escolar verificado no período ${period}`,
+                });
+              }}
             />
 
             {/* Chart 3: [Presença] (EAD vs Presencial Trend lines / Area) */}
             <AttendanceAreaChart
               data={[
-                { year: '2009', presencial: 95, ead: 60 },
-                { year: '2013', presencial: 94, ead: 65 },
-                { year: '2016', presencial: 95, ead: 75 },
-                { year: '2019', presencial: 96, ead: 80 },
-                { year: '2023', presencial: 97, ead: 72 },
-                { year: '2026', presencial: 98, ead: 70 },
+                { year: '2009', presencial: 95, ead: 60, totalPresentes: 465, totalFaltas: 24, detalhe: '465 alunos presentes em média' },
+                { year: '2013', presencial: 94, ead: 65, totalPresentes: 460, totalFaltas: 29, detalhe: '460 alunos presentes em média' },
+                { year: '2016', presencial: 95, ead: 75, totalPresentes: 465, totalFaltas: 24, detalhe: '465 alunos presentes em média' },
+                { year: '2019', presencial: 96, ead: 80, totalPresentes: 470, totalFaltas: 19, detalhe: '470 alunos presentes em média' },
+                { year: '2023', presencial: 97, ead: 72, totalPresentes: 474, totalFaltas: 15, detalhe: '474 alunos presentes em média' },
+                { year: '2026', presencial: 98, ead: 70, totalPresentes: 479, totalFaltas: 10, detalhe: '479 alunos presentes em média' },
               ]}
               title="Presença & Assiduidade"
               badgeText="Presença"
               subtitle="Controle diário de assiduidade na escola"
               averageRate={97.2}
+              onOpenDrillDown={(period) => {
+                openFilter({
+                  type: 'attendance',
+                  value: 'alto',
+                  title: `Presença & Assiduidade • ${period}`,
+                  subtitle: `Registros de frequência dos alunos no ano de ${period}`,
+                });
+              }}
             />
           </div>
 
@@ -160,6 +210,14 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
               badgeText="Alunos sem documentos"
               subtitle="Alunos em processo de emissão de cédula ou BI"
               isFocusWithoutDocs={true}
+              onSelectDocStatus={(status) => {
+                openFilter({
+                  type: 'docs',
+                  value: status,
+                  title: status === 'sem_docs' ? 'Pendências de Documentos' : 'Documentos Regularizados',
+                  subtitle: `Alunos identificados no censo documental da escola`,
+                });
+              }}
             />
 
             {/* Chart 5: Alunos com documentos */}
@@ -174,6 +232,14 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
               badgeText="Alunos com documentos"
               subtitle="Documentação completa validada pela secretaria"
               isFocusWithoutDocs={false}
+              onSelectDocStatus={(status) => {
+                openFilter({
+                  type: 'docs',
+                  value: status,
+                  title: status === 'com_docs' ? 'Documentos Regularizados' : 'Pendências de Documentos',
+                  subtitle: `Alunos com documentação civil completa validada`,
+                });
+              }}
             />
           </div>
         </div>

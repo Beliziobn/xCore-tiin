@@ -9,12 +9,10 @@ import {
   Unlock, 
   School, 
   Layers, 
-  ArrowRight,
-  ShieldCheck,
-  Megaphone,
-  CheckCircle2,
+  ArrowUpDown,
   FileSpreadsheet,
-  UserCheck
+  UserCheck,
+  X
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { SchoolAnnouncement, SchoolDemandType } from '../../../types';
@@ -26,6 +24,7 @@ import {
 } from '../../../utils/announcementStorage';
 import { GoogleAnnouncementCard } from '../../announcements/GoogleAnnouncementCard';
 import { CreateAnnouncementModal } from '../../announcements/CreateAnnouncementModal';
+import { AnnouncementDetailModal } from '../../announcements/AnnouncementDetailModal';
 
 interface AdminAnnouncementsPageProps {
   onOpenGetStarted?: () => void;
@@ -44,26 +43,34 @@ export const AdminAnnouncementsPage: React.FC<AdminAnnouncementsPageProps> = ({
 }) => {
   const [announcements, setAnnouncements] = useState<SchoolAnnouncement[]>(getStoredAnnouncements());
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'expired' | 'notas' | 'matriculas'>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'deadline' | 'title'>('recent');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'notas' | 'matriculas' | 'geral'>('all');
+  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<SchoolAnnouncement | null>(null);
+  const [readingAnnouncement, setReadingAnnouncement] = useState<SchoolAnnouncement | null>(null);
 
   // Statistics calculation
   const totalCount = announcements.length;
   const activeCount = announcements.filter((a) => !isAnnouncementExpired(a)).length;
   const expiredCount = announcements.filter((a) => isAnnouncementExpired(a)).length;
-  const notasActive = announcements.some((a) => a.demandType === 'notas' && !isAnnouncementExpired(a));
-  const matriculasActive = announcements.some((a) => a.demandType === 'matriculas' && !isAnnouncementExpired(a));
+  const notasCount = announcements.filter((a) => a.demandType === 'notas').length;
+  const matriculasCount = announcements.filter((a) => a.demandType === 'matriculas').length;
 
-  // Filter announcements
+  // Filter & Sort announcements
   const filteredAnnouncements = useMemo(() => {
-    return announcements.filter((ad) => {
+    const list = announcements.filter((ad) => {
       const isExpired = isAnnouncementExpired(ad);
-      if (selectedFilter === 'active' && isExpired) return false;
-      if (selectedFilter === 'expired' && !isExpired) return false;
-      if (selectedFilter === 'notas' && ad.demandType !== 'notas') return false;
-      if (selectedFilter === 'matriculas' && ad.demandType !== 'matriculas') return false;
+      
+      // Filter by Status
+      if (statusFilter === 'active' && isExpired) return false;
+      if (statusFilter === 'expired' && !isExpired) return false;
 
+      // Filter by Category
+      if (categoryFilter !== 'all' && ad.demandType !== categoryFilter) return false;
+
+      // Filter by Search Term
       if (!searchTerm) return true;
       const term = searchTerm.toLowerCase();
       return (
@@ -74,7 +81,29 @@ export const AdminAnnouncementsPage: React.FC<AdminAnnouncementsPageProps> = ({
         ad.displayUrl.toLowerCase().includes(term)
       );
     });
-  }, [announcements, selectedFilter, searchTerm]);
+
+    // Sorting
+    list.sort((a, b) => {
+      if (sortBy === 'recent') {
+        const dateA = new Date(a.createdAt || a.expirationDate).getTime();
+        const dateB = new Date(b.createdAt || b.expirationDate).getTime();
+        return dateB - dateA;
+      }
+      if (sortBy === 'deadline') {
+        const aExpired = isAnnouncementExpired(a);
+        const bExpired = isAnnouncementExpired(b);
+        if (!aExpired && bExpired) return -1;
+        if (aExpired && !bExpired) return 1;
+        return new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime();
+      }
+      if (sortBy === 'title') {
+        return a.title.localeCompare(b.title);
+      }
+      return 0;
+    });
+
+    return list;
+  }, [announcements, statusFilter, categoryFilter, searchTerm, sortBy]);
 
   // Handle Save (Create or Edit)
   const handleSaveAnnouncement = (announcement: SchoolAnnouncement) => {
@@ -151,193 +180,256 @@ export const AdminAnnouncementsPage: React.FC<AdminAnnouncementsPageProps> = ({
         customSubtitle=""
       />
 
-      {/* Main Container */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Authority Context Banner */}
-        <div className="mb-6 p-4 sm:p-5 bg-gradient-to-r from-[#fef2f1] to-[#fef2f1] border border-[#fee4e2] rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs text-slate-800 shadow-2xs">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#e04436] text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Megaphone className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-black text-slate-900 block text-xs sm:text-sm">
-                Regulamentação Municipal: Editais Formato Google com Bloqueio Automático
-              </span>
-              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5 max-w-2xl">
-                O Administrador cadastra editais institucionais com capa gráfica e prazos improrrogáveis. Ao expirar a data limite, o sistema <strong>bloqueia automaticamente</strong> o lançamento de notas ou novas matrículas nas 31 escolas.
-              </p>
-            </div>
+      {/* Main Container - 1160px max-width, 24px consistent vertical rhythm (space-y-6) */}
+      <div className="max-w-[1160px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        
+        {/* 1. ABERTURA MAIS FUNCIONAL */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#002133]">
+              Acompanhe as publicações oficiais
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Consulte os prazos e as orientações para as escolas da rede municipal.
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Botão Principal Objetivo */}
+          <button
+            id="admin-btn-novo-edital"
+            onClick={() => {
+              setEditingAnnouncement(null);
+              setIsCreateModalOpen(true);
+            }}
+            className="inline-flex items-center justify-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs sm:text-sm font-bold px-4 sm:px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap shrink-0 self-start sm:self-auto active:scale-98"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Publicar edital</span>
+          </button>
+        </div>
+
+        {/* Banner Discreto de Regra: Bloqueio Automático */}
+        <div className="p-3 sm:py-2.5 sm:px-4 bg-amber-50/70 border border-amber-200/70 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+            <p className="text-[11px] sm:text-xs text-amber-800 leading-snug">
+              <strong className="font-semibold text-amber-900">Bloqueio automático:</strong> O sistema suspende o lançamento de notas ou matrículas nas 31 escolas assim que o prazo oficial expira.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
             {onNavigateToGrades && (
               <button
                 onClick={onNavigateToGrades}
-                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-amber-100/60 text-amber-900 rounded-lg text-[11px] font-semibold border border-amber-200/80 transition-colors cursor-pointer"
                 title="Acessar pauta de notas para testar o bloqueio"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+                <FileSpreadsheet className="w-3 h-3 text-blue-600" />
                 <span>Pauta de Notas</span>
               </button>
             )}
             {onNavigateToMatriculas && (
               <button
                 onClick={onNavigateToMatriculas}
-                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-amber-100/60 text-amber-900 rounded-lg text-[11px] font-semibold border border-amber-200/80 transition-colors cursor-pointer"
                 title="Acessar formulário de matrículas para testar o bloqueio"
               >
-                <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <UserCheck className="w-3 h-3 text-emerald-600" />
                 <span>Matrículas</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* 4 Metric Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Total de Editais</span>
-              <Layers className="w-4 h-4 text-slate-400" />
-            </div>
-            <p className="text-2xl font-black text-slate-900 mt-2">{totalCount}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Campanhas cadastradas</p>
+        {/* 2. INDICADORES COM MENOS PESO (Linha única compacta) */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 py-2.5 px-3.5 sm:px-4 bg-white border border-slate-200/80 rounded-xl text-xs text-slate-600 shadow-2xs">
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="text-slate-500">Total:</span>
+            <strong className="text-[#002133] font-bold">{totalCount}</strong>
+          </div>
+          
+          <span className="text-slate-300">|</span>
+
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span className="text-slate-500">Em andamento:</span>
+            <strong className="text-emerald-700 font-bold">{activeCount}</strong>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">Prazos Abertos</span>
-              <Unlock className="w-4 h-4 text-emerald-600" />
-            </div>
-            <p className="text-2xl font-black text-emerald-600 mt-2">{activeCount}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {notasActive && matriculasActive
-                ? 'Notas & matrículas em curso'
-                : notasActive
-                ? 'Notas liberadas'
-                : matriculasActive
-                ? 'Matrículas abertas'
-                : 'Nenhuma demanda de ação ativa'}
-            </p>
+          <span className="text-slate-300">|</span>
+
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span className="text-slate-500">Encerrados:</span>
+            <strong className="text-slate-700 font-bold">{expiredCount}</strong>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">Prazos Expirados</span>
-              <Lock className="w-4 h-4 text-rose-500" />
-            </div>
-            <p className="text-2xl font-black text-rose-600 mt-2">{expiredCount}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Ações com bloqueio ativo</p>
-          </div>
+          <span className="text-slate-300">|</span>
 
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Escolas Abrangidas</span>
-              <School className="w-4 h-4 text-slate-400" />
-            </div>
-            <p className="text-2xl font-black text-slate-900 mt-2">31</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Município do Quêssua</p>
+          <div className="flex items-center gap-1.5 font-medium">
+            <School className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-500">Escolas:</span>
+            <strong className="text-[#002133] font-bold">31</strong>
           </div>
         </div>
 
-        {/* Filter and Search Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar por título, escolas ou tema..."
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#e04436]"
-            />
+        {/* 3. BUSCA E FILTROS SEPARADOS DA AÇÃO PRINCIPAL (2 Níveis) */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+          {/* Nível 1: Campo de busca com ordenação ao lado */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Pesquisar por título, escolas ou tema..."
+                className="w-full pl-10 pr-9 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142] transition-all"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  title="Limpar busca"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Ordenação ao lado */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-semibold text-slate-500 hidden sm:inline-flex items-center gap-1">
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                <span>Ordenar:</span>
+              </span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-slate-50/70 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f75142]/20 focus:border-[#f75142] cursor-pointer"
+              >
+                <option value="recent">Mais recentes</option>
+                <option value="deadline">Prazo mais próximo</option>
+                <option value="title">Ordem alfabética (A-Z)</option>
+              </select>
+            </div>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-            <button
-              onClick={() => setSelectedFilter('all')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                selectedFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Todos ({totalCount})
-            </button>
-            <button
-              onClick={() => setSelectedFilter('active')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                selectedFilter === 'active'
-                  ? 'bg-emerald-700 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Ativos ({activeCount})
-            </button>
-            <button
-              onClick={() => setSelectedFilter('expired')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                selectedFilter === 'expired'
-                  ? 'bg-rose-700 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Expirados ({expiredCount})
-            </button>
-            <button
-              onClick={() => setSelectedFilter('notas')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                selectedFilter === 'notas'
-                  ? 'bg-blue-700 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Notas
-            </button>
-            <button
-              onClick={() => setSelectedFilter('matriculas')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                selectedFilter === 'matriculas'
-                  ? 'bg-emerald-800 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Matrículas
-            </button>
-          </div>
+          {/* Nível 2: Pílulas de filtro agrupadas por critério */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+              {/* Grupo: Por estado */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                  Por estado:
+                </span>
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    statusFilter === 'all'
+                      ? 'bg-[#002133] text-white shadow-2xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Todos ({totalCount})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('active')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    statusFilter === 'active'
+                      ? 'bg-emerald-700 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Ativos ({activeCount})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('expired')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    statusFilter === 'expired'
+                      ? 'bg-amber-700 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Expirados ({expiredCount})
+                </button>
+              </div>
 
-          {/* Action Button: Create Announcement */}
-          <div className="flex items-center gap-2">
-            <button
-              id="admin-btn-novo-anuncio"
-              onClick={() => {
-                setEditingAnnouncement(null);
-                setIsCreateModalOpen(true);
-              }}
-              className="flex items-center justify-center gap-2 bg-[#e04436] hover:bg-[#c9372a] text-white text-xs font-bold tracking-wide px-5 py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Publicar Edital com Capa</span>
-            </button>
+              {/* Divisor */}
+              <div className="hidden sm:block h-4 w-px bg-slate-200" />
+
+              {/* Grupo: Por categoria */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                  Por categoria:
+                </span>
+                <button
+                  onClick={() => setCategoryFilter('all')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    categoryFilter === 'all'
+                      ? 'bg-[#002133] text-white shadow-2xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('notas')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    categoryFilter === 'notas'
+                      ? 'bg-blue-700 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Notas ({notasCount})
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('matriculas')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    categoryFilter === 'matriculas'
+                      ? 'bg-emerald-800 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Matrículas ({matriculasCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Reset filters button if active */}
+            {(searchTerm || statusFilter !== 'all' || categoryFilter !== 'all' || sortBy !== 'recent') && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setCategoryFilter('all');
+                  setSortBy('recent');
+                }}
+                className="text-xs font-medium text-[#f75142] hover:underline self-start lg:self-auto cursor-pointer"
+              >
+                Limpar filtros
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Announcements List */}
+        {/* 4. CARDS ORIENTADOS À AÇÃO */}
         {filteredAnnouncements.length === 0 ? (
-          <div className="p-12 text-center bg-white rounded-3xl border border-slate-200/90 shadow-2xs">
+          <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
             <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
               <Filter className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-bold text-slate-800">Nenhum edital encontrado</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Não foram encontrados comunicados correspondentes ao filtro atual.
+              Não foram encontrados editais correspondentes aos filtros selecionados.
             </p>
             <button
               onClick={() => {
                 setSearchTerm('');
-                setSelectedFilter('all');
+                setStatusFilter('all');
+                setCategoryFilter('all');
+                setSortBy('recent');
               }}
               className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 rounded-xl transition-colors cursor-pointer"
             >
@@ -358,11 +450,16 @@ export const AdminAnnouncementsPage: React.FC<AdminAnnouncementsPageProps> = ({
                 onDelete={handleDeleteAnnouncement}
                 onToggleExpireNow={handleToggleExpireNow}
                 onExtendDeadline={handleExtendDeadline}
+                onViewDetails={(ad) => {
+                  setReadingAnnouncement(ad);
+                }}
                 onActionClick={(ad) => {
                   if (ad.demandType === 'notas' && onNavigateToGrades) {
                     onNavigateToGrades();
                   } else if (ad.demandType === 'matriculas' && onNavigateToMatriculas) {
                     onNavigateToMatriculas();
+                  } else {
+                    setReadingAnnouncement(ad);
                   }
                 }}
               />
@@ -381,6 +478,22 @@ export const AdminAnnouncementsPage: React.FC<AdminAnnouncementsPageProps> = ({
         onSave={handleSaveAnnouncement}
         editingAnnouncement={editingAnnouncement}
       />
+
+      {/* Reader / Detail Modal */}
+      <AnnouncementDetailModal
+        isOpen={!!readingAnnouncement}
+        announcement={readingAnnouncement}
+        onClose={() => setReadingAnnouncement(null)}
+        onNavigateToSection={(ad) => {
+          setReadingAnnouncement(null);
+          if (ad.demandType === 'notas' && onNavigateToGrades) {
+            onNavigateToGrades();
+          } else if (ad.demandType === 'matriculas' && onNavigateToMatriculas) {
+            onNavigateToMatriculas();
+          }
+        }}
+      />
     </div>
   );
 };
+

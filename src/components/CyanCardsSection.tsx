@@ -109,7 +109,7 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
         </p>
       </div>
 
-      {/* Grid of Cards with Unified Height and Balanced Hierarchy */}
+      {/* Grid of Cards with New Card Logic: 48px Outer Radius, 16px Padding, 32px Inner, 0 20px 40px Drop Shadow */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 items-stretch">
         {modulesData.map((module, idx) => (
           <div
@@ -117,37 +117,47 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
             id={`cyan-card-${module.id}`}
             onClick={() => handleModuleClick(module)}
             data-reveal-delay={(idx * 0.08).toFixed(2)}
-            className="reveal-up min-h-[300px] h-full bg-white hover:border-slate-300 rounded-2xl shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between p-5 group border border-slate-200 relative select-none"
+            className="reveal-up min-h-[340px] h-full bg-white hover:border-slate-300/80 rounded-[48px] shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:shadow-[0_25px_50px_rgba(0,0,0,0.13)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col justify-between p-4 group border border-slate-100/90 relative select-none"
           >
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-slate-900 flex items-center justify-center text-slate-600 group-hover:text-white font-mono font-bold text-xs transition-colors duration-200">
+              {/* Nested Radius Rule: Outer 48px - Padding 16px = Inner 32px */}
+              <div className="w-full bg-slate-50/90 group-hover:bg-slate-100/90 rounded-[32px] p-4 mb-4 border border-slate-100 flex items-center justify-between transition-colors duration-200">
+                <div className="w-10 h-10 rounded-full bg-white group-hover:bg-[#002133] flex items-center justify-center text-slate-800 group-hover:text-white font-mono font-black text-xs transition-colors duration-200 shadow-2xs">
                   {String(idx + 1).padStart(2, '0')}
                 </div>
                 {!isLoggedIn ? (
-                  <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400" title="Requer início de sessão">
+                  <div className="w-8 h-8 rounded-full bg-white/80 border border-slate-200/80 flex items-center justify-center text-slate-400" title="Requer início de sessão">
                     <Lock className="w-3.5 h-3.5" />
                   </div>
                 ) : (
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  <span className="text-[10px] uppercase tracking-[-0.01em] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
                     {module.status}
                   </span>
                 )}
               </div>
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-1">
-                {module.subtitle}
-              </p>
-              <h3 className="font-bold text-base text-slate-900 tracking-tight leading-snug group-hover:text-black transition-colors">
-                {module.title}
-              </h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed line-clamp-3">
-                {module.description}
-              </p>
+
+              <div className="px-2">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">
+                  {module.subtitle}
+                </p>
+                <h3 
+                  style={{ letterSpacing: '-0.02em' }}
+                  className="font-black text-base text-[#002133] tracking-[-0.02em] leading-snug group-hover:text-[#f75142] transition-colors"
+                >
+                  {module.title}
+                </h3>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed line-clamp-3">
+                  {module.description}
+                </p>
+              </div>
             </div>
 
-            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">
-              <span>Aceder módulo</span>
-              <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            {/* Bottom Action Pill Button */}
+            <div className="pt-3 px-1 mt-3">
+              <div className="w-full bg-slate-100 group-hover:bg-[#002133] text-slate-700 group-hover:text-white rounded-full py-2.5 px-4 text-xs font-bold flex items-center justify-between transition-all duration-300 shadow-2xs">
+                <span className="tracking-[-0.01em]">Aceder módulo</span>
+                <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </div>
             </div>
           </div>
         ))}

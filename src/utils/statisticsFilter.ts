@@ -141,9 +141,10 @@ export function matchesTeacher(teacher: AdminTeacher, filters: AdvancedFilterCri
 
   // 4. Turno
   if (filters.shift !== 'all') {
-    const tTurno = (teacher.registrationData?.turno || 'Manhã').trim().toLowerCase();
     const fTurno = filters.shift.trim().toLowerCase();
-    if (!tTurno.includes(fTurno)) return false;
+    const turnosArr = teacher.registrationData?.turnos || [];
+    const matchesTurno = turnosArr.some((t) => t.toLowerCase().includes(fTurno));
+    if (!matchesTurno) return false;
   }
 
   // 5. Faixa de assiduidade

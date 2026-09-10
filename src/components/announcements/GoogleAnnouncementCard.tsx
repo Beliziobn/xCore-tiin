@@ -1,18 +1,21 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
+  Calendar, 
+  Clock, 
+  School, 
+  MoreVertical, 
+  Edit3, 
+  RotateCcw, 
   Lock, 
   Unlock, 
-  School, 
-  Clock, 
-  Edit3, 
   Trash2, 
-  RotateCcw, 
-  ExternalLink,
-  ChevronRight,
-  Calendar,
+  FileText,
   AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+  BookOpen,
   Eye,
-  MousePointer
+  Info
 } from 'lucide-react';
 import { SchoolAnnouncement } from '../../types';
 import { isAnnouncementExpired } from '../../utils/announcementStorage';
@@ -24,8 +27,78 @@ interface GoogleAnnouncementCardProps {
   onToggleExpireNow?: (announcement: SchoolAnnouncement) => void;
   onExtendDeadline?: (announcement: SchoolAnnouncement, days: number) => void;
   onActionClick?: (announcement: SchoolAnnouncement) => void;
+  onViewDetails?: (announcement: SchoolAnnouncement) => void;
   isAdminView?: boolean;
   compact?: boolean;
+}
+
+// Format readable date range: e.g. "15 mar - 30 mar · 23:59"
+function formatDateRange(startDateStr?: string, endDateStr?: string): string {
+  try {
+    if (!endDateStr) return 'Prazo regulamentar';
+    const end = new Date(endDateStr);
+    
+    let start: Date;
+    if (startDateStr) {
+      start = new Date(startDateStr);
+    } else {
+      start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000);
+    }
+
+    const startDay = start.getDate().toString().padStart(2, '0');
+    const startMonth = start.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    
+    const endDay = end.getDate().toString().padStart(2, '0');
+    const endMonth = end.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    const endHours = end.getHours().toString().padStart(2, '0');
+    const endMinutes = end.getMinutes().toString().padStart(2, '0');
+
+    return `${startDay} ${startMonth} - ${endDay} ${endMonth} · ${endHours}:${endMinutes}`;
+  } catch {
+    return 'Prazo em vigor';
+  }
+}
+
+// Calculate elapsed percentage of deadline window
+function getDeadlineProgress(startDateStr?: string, endDateStr?: string): number {
+  try {
+    if (!endDateStr) return 0;
+    const end = new Date(endDateStr).getTime();
+    let start: number;
+    if (startDateStr) {
+      start = new Date(startDateStr).getTime();
+    } else {
+      start = end - 14 * 24 * 60 * 60 * 1000;
+    }
+    const now = Date.now();
+    
+    if (end <= start) return 100;
+    if (now >= end) return 100;
+    if (now <= start) return 0;
+
+    const pct = ((now - start) / (end - start)) * 100;
+    return Math.min(100, Math.max(0, Math.round(pct)));
+  } catch {
+    return 50;
+  }
+}
+
+// Countdown string
+function getRemainingTimeText(endDateStr: string, isExpired: boolean): string {
+  if (isExpired) return 'Prazo encerrado';
+  try {
+    const end = new Date(endDateStr).getTime();
+    const diffMs = end - Date.now();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    
+    if (diffDays > 1) return `Termina em ${diffDays} dias`;
+    if (diffHours > 1) return `Termina em ${diffHours} horas`;
+    if (diffHours > 0) return 'Termina em menos de 1h';
+    return 'Termina hoje';
+  } catch {
+    return 'Em andamento';
+  }
 }
 
 export const GoogleAnnouncementCard: React.FC<GoogleAnnouncementCardProps> = ({
@@ -35,12 +108,19 @@ export const GoogleAnnouncementCard: React.FC<GoogleAnnouncementCardProps> = ({
   onToggleExpireNow,
   onExtendDeadline,
   onActionClick,
+  onViewDetails,
   isAdminView = false,
   compact = false,
 }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const isExpired = isAnnouncementExpired(announcement);
-  const expirationDate = new Date(announcement.expirationDate);
-  const formattedExpDate = expirationDate.toLocaleString('pt-BR', {
+  const progressPct = getDeadlineProgress(announcement.createdAt, announcement.expirationDate);
+  const dateRangeText = formatDateRange(announcement.createdAt, announcement.expirationDate);
+  const remainingTimeText = getRemainingTimeText(announcement.expirationDate, isExpired);
+
+  const formattedExpDate = new Date(announcement.expirationDate).toLocaleString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -48,140 +128,265 @@ export const GoogleAnnouncementCard: React.FC<GoogleAnnouncementCardProps> = ({
     minute: '2-digit',
   });
 
-  // Calculate remaining time
-  const now = new Date().getTime();
-  const diffMs = expirationDate.getTime() - now;
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-
-  let timeRemainingText = '';
-  if (isExpired) {
-    timeRemainingText = 'Prazo expirado';
-  } else if (diffDays > 1) {
-    timeRemainingText = `Expira em ${diffDays} dias`;
-  } else if (diffHours > 0) {
-    timeRemainingText = `Expira em ${diffHours} horas`;
-  } else {
-    timeRemainingText = 'Expira hoje';
-  }
+  // Secondary explanation for expired lock
+  const blockExplanation = announcement.demandType === 'notas'
+    ? `Lançamento de notas bloqueado em ${formattedExpDate} por conformidade regimental.`
+    : announcement.demandType === 'matriculas'
+    ? `Novas matrículas bloqueadas em ${formattedExpDate} por encerramento de período.`
+    : `Prazo de vigência do edital concluído em ${formattedExpDate}.`;
 
   const demandBadge = {
-    notas: { label: 'Pauta de Notas', badge: 'Notas' },
-    matriculas: { label: 'Matrículas & Vagas', badge: 'Matrículas' },
-    geral: { label: 'Comunicado Geral', badge: 'Geral' },
-  }[announcement.demandType] || { label: 'Demanda Oficial', badge: 'Oficial' };
+    notas: { label: 'Notas', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
+    matriculas: { label: 'Matrículas', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    geral: { label: 'Geral', bg: 'bg-slate-100 text-slate-700 border-slate-200' },
+  }[announcement.demandType] || { label: 'Oficial', bg: 'bg-slate-100 text-slate-700 border-slate-200' };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
+  const handlePrimaryClick = () => {
+    if (onActionClick) {
+      onActionClick(announcement);
+    } else if (onViewDetails) {
+      onViewDetails(announcement);
+    }
+  };
 
   return (
     <article
-      id={`google-ad-${announcement.id}`}
-      className={`group relative bg-white rounded-2xl border transition-all duration-200 ${
+      id={`edital-card-${announcement.id}`}
+      className={`relative bg-white rounded-2xl border transition-all duration-200 ${
         isExpired 
-          ? 'border-slate-200/90 bg-slate-50/50 shadow-2xs' 
-          : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
+          ? 'border-slate-200/90 bg-slate-50/40 shadow-2xs hover:border-slate-300' 
+          : 'border-slate-200 shadow-2xs hover:border-slate-300 hover:shadow-md'
       } ${compact ? 'p-4' : 'p-5 sm:p-6'}`}
     >
-      {/* Header: Google-style Attribution & Origin */}
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Favicon avatar */}
-          <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-[10px] font-black text-slate-700">
-            {announcement.demandType === 'notas' ? 'N' : announcement.demandType === 'matriculas' ? 'M' : 'E'}
-          </div>
-
-          <div className="flex items-center gap-2 min-w-0 text-xs text-slate-600">
-            <span className="font-semibold text-slate-900 truncate">
-              {announcement.title}
-            </span>
-            <span className="text-slate-300 hidden sm:inline">•</span>
-            <span className="font-mono text-[11px] text-slate-500 truncate hidden sm:inline max-w-xs">
-              {announcement.displayUrl}
-            </span>
-          </div>
-        </div>
-
-        {/* Google Sponsored / Official Badge */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-bold tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
-            {announcement.badgeText || 'Anúncio Oficial'}
-          </span>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
-            isExpired
-              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-          }`}>
-            {isExpired ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
-            <span>{isExpired ? 'Bloqueado' : timeRemainingText}</span>
-          </span>
-        </div>
-      </div>
-
-      {/* Main Content Layout: Text details on left, Cover on right */}
-      <div className="flex flex-col md:flex-row items-start gap-4 sm:gap-6">
-        <div className="flex-1 min-w-0">
-          {/* Headline link */}
-          <h3 className="text-base sm:text-lg font-bold tracking-tight leading-snug">
-            <button
-              type="button"
-              onClick={() => onActionClick && onActionClick(announcement)}
-              className={`text-left transition-colors cursor-pointer ${
-                isExpired 
-                  ? 'text-slate-600 line-through decoration-slate-400' 
-                  : 'text-[#1a73e8] hover:text-[#1557b0] hover:underline'
-              }`}
-            >
-              {announcement.headline}
-            </button>
-          </h3>
-
-          {/* Description snippet */}
-          <p className="mt-1.5 text-xs sm:text-sm text-slate-600 leading-relaxed">
-            {announcement.description}
-          </p>
-
-          {/* Sitelinks / Extensions Bar */}
-          <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-700">
-              <School className="w-3 h-3 text-slate-400 shrink-0" />
-              <span className="truncate max-w-[220px]">{announcement.targetSchools}</span>
-            </span>
-
-            <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-700">
-              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-              <span>Prazo: <strong className="text-slate-900">{formattedExpDate}</strong></span>
-            </span>
-
-            <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-700 px-2 py-0.5 rounded text-[11px] font-bold">
+      {/* 1. Header: Title, Category, Status Tag and ... Menu */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex-1 min-w-0 pr-2">
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            {/* Category tag */}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${demandBadge.bg}`}>
               {demandBadge.label}
             </span>
 
-            {onActionClick && (
-              <button
-                type="button"
-                onClick={() => onActionClick(announcement)}
-                className="ml-auto inline-flex items-center gap-1 text-[11px] font-bold text-[#1a73e8] hover:text-[#1557b0] transition-colors cursor-pointer"
-              >
-                <span>{announcement.ctaText || 'Acessar no Sistema'}</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+            {/* Status tag */}
+            <span
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border ${
+                isExpired
+                  ? 'bg-amber-50/80 text-amber-800 border-amber-200/70'
+                  : progressPct > 80
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}
+            >
+              {isExpired ? (
+                <Lock className="w-3 h-3 text-amber-700 shrink-0" />
+              ) : (
+                <Clock className="w-3 h-3 text-emerald-600 shrink-0" />
+              )}
+              <span>{remainingTimeText}</span>
+            </span>
           </div>
+
+          {/* Title in uCore dark navy (#002133) */}
+          <h3 className="text-base sm:text-lg font-bold tracking-tight text-[#002133] leading-snug">
+            <button
+              type="button"
+              onClick={handlePrimaryClick}
+              className="text-left hover:text-[#f75142] transition-colors cursor-pointer"
+            >
+              {announcement.title}
+            </button>
+          </h3>
         </div>
 
-        {/* Cover Image Thumbnail */}
+        {/* Administrative ... Menu (Right corner) */}
+        {isAdminView && (
+          <div className="relative shrink-0" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Ações administrativas do edital"
+              aria-label="Opções administrativas"
+              aria-expanded={isMenuOpen}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-9 z-30 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 animate-in fade-in zoom-in-95 duration-100 text-xs text-slate-700">
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+                  Gestão do Edital
+                </div>
+
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onEdit(announcement);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Editar edital</span>
+                  </button>
+                )}
+
+                {onExtendDeadline && !isExpired && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onExtendDeadline(announcement, 7);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Prorrogar prazo (+7 dias)</span>
+                  </button>
+                )}
+
+                {onToggleExpireNow && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onToggleExpireNow(announcement);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    {isExpired ? (
+                      <>
+                        <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700">Reativar no sistema</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5 text-amber-600" />
+                        <span className="text-amber-800">Simular bloqueio agora</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {onDelete && (
+                  <div className="border-t border-slate-100 mt-1 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        onDelete(announcement.id);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Excluir edital</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Main Body Grid: Details & Deadline Block on Left, Cover on Right */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-start gap-4 sm:gap-6">
+        <div className="flex-1 min-w-0 space-y-3">
+          {/* Heart of the Card: Dedicated Deadline Block */}
+          <div className="bg-slate-50/90 border border-slate-200/70 rounded-xl p-3 sm:p-3.5 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 font-semibold text-slate-700">
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="text-[11px] sm:text-xs">
+                  {dateRangeText}
+                </span>
+              </div>
+
+              <span className={`text-[11px] font-bold ${
+                isExpired ? 'text-slate-500' : progressPct > 80 ? 'text-rose-600' : 'text-emerald-700'
+              }`}>
+                {isExpired ? '100% transcorrido' : `${progressPct}% do prazo`}
+              </span>
+            </div>
+
+            {/* Subtle Progress Bar */}
+            <div className="w-full h-1.5 bg-slate-200/80 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  isExpired
+                    ? 'bg-slate-400'
+                    : progressPct > 85
+                    ? 'bg-rose-500'
+                    : progressPct > 65
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Description Snippet (Max 2 lines) */}
+          <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
+            {announcement.description}
+          </p>
+
+          {/* Meta Information Bar: Target Schools & Secondary info */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="inline-flex items-center gap-1.5 bg-slate-100/80 border border-slate-200/60 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-700">
+              <School className="w-3 h-3 text-slate-400 shrink-0" />
+              <span>{announcement.targetSchools}</span>
+            </span>
+
+            {announcement.viewsCount !== undefined && announcement.viewsCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 px-1">
+                <Eye className="w-3 h-3 text-slate-400" />
+                <span>{announcement.viewsCount} consultas</span>
+              </span>
+            )}
+          </div>
+
+          {/* Secondary explanation if expired (Does NOT cover the card) */}
+          {isExpired && (
+            <div className="pt-1">
+              <p className="text-[11px] text-slate-500 flex items-center gap-1.5 italic">
+                <Info className="w-3 h-3 text-amber-600 shrink-0 not-italic" />
+                <span>{blockExplanation}</span>
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Cover Image Thumbnail (Right side on desktop, stacked on mobile) */}
         {announcement.coverImage && (
-          <div className="w-full md:w-44 lg:w-48 shrink-0 aspect-[16/10] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 relative group/thumb shadow-2xs">
+          <div className="w-full md:w-44 lg:w-48 shrink-0 aspect-[16/10] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 relative group/thumb shadow-2xs self-start">
             <img
               src={announcement.coverImage}
               alt={announcement.title}
               className={`w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105 ${
-                isExpired ? 'grayscale opacity-75' : ''
+                isExpired ? 'opacity-80 grayscale-[25%]' : ''
               }`}
               loading="lazy"
             />
             {isExpired && (
-              <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex flex-col items-center justify-center text-white p-2">
-                <Lock className="w-4 h-4 text-amber-300 mb-0.5" />
-                <span className="text-[10px] font-bold tracking-wider uppercase bg-rose-600 px-1.5 py-0.5 rounded">
+              <div className="absolute bottom-2 right-2">
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-slate-900/80 backdrop-blur-xs text-white px-2 py-0.5 rounded">
                   Encerrado
                 </span>
               </div>
@@ -190,85 +395,48 @@ export const GoogleAnnouncementCard: React.FC<GoogleAnnouncementCardProps> = ({
         )}
       </div>
 
-      {/* Notice alert when expired */}
-      {isExpired && (
-        <div className="mt-3.5 p-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center gap-2.5 text-xs text-slate-700">
-          <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-          <p>
-            Demanda encerrada em <strong>{formattedExpDate}</strong>. O lançamento de {announcement.demandType === 'notas' ? 'notas' : 'matrículas'} está suspenso para conformidade regimental.
-          </p>
+      {/* 3. Highlighted Primary Action Button at bottom */}
+      <div className="mt-4 pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="text-[11px] text-slate-400 hidden sm:block">
+          Publicado por <strong className="text-slate-600 font-medium">{announcement.createdBy}</strong>
         </div>
-      )}
 
-      {/* Admin Operations Bar */}
-      {isAdminView && (
-        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-3 text-slate-400 text-[11px]">
-            <span>Criado por: <span className="text-slate-700 font-medium">{announcement.createdBy}</span></span>
-            <span>•</span>
-            <span className="inline-flex items-center gap-1">
-              <Eye className="w-3 h-3 text-slate-400" />
-              <span>{announcement.viewsCount || 0} visualizações</span>
-            </span>
-          </div>
+        <div className="flex items-center justify-end gap-2 w-full sm:w-auto">
+          {onViewDetails && (
+            <button
+              type="button"
+              onClick={() => onViewDetails(announcement)}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Ver regulamento</span>
+            </button>
+          )}
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Toggle Expire Button */}
-            {onToggleExpireNow && (
-              <button
-                type="button"
-                onClick={() => onToggleExpireNow(announcement)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  isExpired
-                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                }`}
-                title={isExpired ? "Liberar novamente no sistema" : "Forçar bloqueio para simular prazo expirado"}
-              >
-                {isExpired ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                <span>{isExpired ? 'Reativar' : 'Simular Bloqueio'}</span>
-              </button>
+          <button
+            type="button"
+            onClick={handlePrimaryClick}
+            className={`w-full sm:w-auto px-5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer inline-flex items-center justify-center gap-2 ${
+              isExpired
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 shadow-2xs'
+                : 'bg-[#002133] hover:bg-[#001726] text-white shadow-xs hover:shadow-md active:scale-98'
+            }`}
+          >
+            {isExpired ? (
+              <>
+                <BookOpen className="w-3.5 h-3.5 text-slate-500" />
+                <span>Consultar histórico</span>
+              </>
+            ) : (
+              <>
+                <span>{announcement.ctaText || 'Consultar edital'}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </>
             )}
-
-            {/* Extend 7 days */}
-            {onExtendDeadline && !isExpired && (
-              <button
-                type="button"
-                onClick={() => onExtendDeadline(announcement, 7)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer inline-flex items-center gap-1"
-                title="Prorrogar prazo em 7 dias"
-              >
-                <RotateCcw className="w-3 h-3 text-slate-400" />
-                <span>+7 Dias</span>
-              </button>
-            )}
-
-            {/* Edit */}
-            {onEdit && (
-              <button
-                type="button"
-                onClick={() => onEdit(announcement)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer inline-flex items-center gap-1"
-              >
-                <Edit3 className="w-3 h-3 text-slate-400" />
-                <span>Editar</span>
-              </button>
-            )}
-
-            {/* Delete */}
-            {onDelete && (
-              <button
-                type="button"
-                onClick={() => onDelete(announcement.id)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                title="Remover anúncio"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          </button>
         </div>
-      )}
+      </div>
     </article>
   );
 };
+

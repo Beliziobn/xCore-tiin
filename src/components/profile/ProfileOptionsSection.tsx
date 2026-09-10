@@ -54,6 +54,7 @@ interface ProfileOptionsSectionProps {
   hideProfileHeaderCard?: boolean;
   externalActiveModal?: ProfileModalType;
   onCloseExternalModal?: () => void;
+  modalsOnly?: boolean;
 }
 
 export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
@@ -66,6 +67,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
   hideProfileHeaderCard = false,
   externalActiveModal,
   onCloseExternalModal,
+  modalsOnly = false,
 }) => {
   const [activeModal, setActiveModal] = useState<ProfileModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -319,8 +321,11 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
         </div>
       )}
 
-      {/* Top Header if requested (like in screenshot) */}
-      {showBackHeader && (
+      {/* Body Content - Omitted if modalsOnly */}
+      {!modalsOnly && (
+        <>
+          {/* Top Header if requested (like in screenshot) */}
+          {showBackHeader && (
         <div className="flex items-center justify-between py-4 mb-4">
           {onBack ? (
             <button
@@ -552,6 +557,8 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
           </button>
         </div>
       </div>
+      </>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL 1: MANAGE PROFILE                                                   */}

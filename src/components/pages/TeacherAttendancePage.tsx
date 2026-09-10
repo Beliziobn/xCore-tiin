@@ -264,7 +264,7 @@ export const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({
         </div>
       )}
 
-      <div className="attendance-content w-full max-w-[1180px] mx-auto px-4 sm:px-6 -mt-7 sm:-mt-8 relative z-10">
+      <div className="attendance-content w-full max-w-[1180px] mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 relative">
         {/* Page Context Bar: Voltar à Turma, Título, Docente e Data alinhada */}
         <div className="page-context flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-1">
           <div className="flex items-center gap-3">
@@ -589,7 +589,7 @@ export const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({
                     </div>
 
                     {/* Attendance Controls & Confirmation */}
-                    <div className="attendance-actions flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <div className="attendance-actions flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
                       {isLocked ? (
                         /* LOCKED STATE: READ-ONLY */
                         <div className="flex flex-col items-end gap-1">

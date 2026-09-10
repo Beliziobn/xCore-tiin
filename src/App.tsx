@@ -1,4 +1,7 @@
+"use client";
+
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { StatCards } from './components/StatCards';
@@ -85,7 +88,11 @@ export default function App() {
   const [authLoadingAction, setAuthLoadingAction] = useState<'login' | 'register' | null>(null);
   const [currentView, setCurrentView] = useState<string>(() => {
     try {
-      return localStorage.getItem('ucore_current_view') || 'home';
+      const saved = localStorage.getItem('ucore_current_view');
+      if (saved === 'ucore-home' || saved === 'ucore-parallax') {
+        return 'home';
+      }
+      return saved || 'home';
     } catch {
       return 'home';
     }
@@ -1459,6 +1466,15 @@ export default function App() {
 
           {/* Optional Academic Modules Section */}
           <CyanCardsSection onSelectModule={(module) => setSelectedModule(module)} />
+
+          {/* School Team Showcase (Professores Cadastrados no Sistema) - Only on home dashboard when session is started */}
+          {currentPage === 'home' && currentView === 'home' && isSessionStarted && (
+            <SchoolTeamSection
+              members={schoolMembers}
+              title="Professores Cadastrados no Sistema"
+              subtitle="Corpo docente oficial registado na rede escolar do município de Quêssua."
+            />
+          )}
         </main>
       </>
     );
@@ -1548,17 +1564,27 @@ export default function App() {
         onOpenDemoModal={() => setIsDemoModalOpen(true)}
       />
 
-      {/* Main Routed View */}
-      {renderCurrentView()}
-
-      {/* School Team Showcase (Professores Cadastrados no Sistema) - Only on home dashboard when session is started */}
-      {currentPage === 'home' && currentView === 'home' && isSessionStarted && (
-        <SchoolTeamSection
-          members={schoolMembers}
-          title="Professores Cadastrados no Sistema"
-          subtitle="Corpo docente oficial registado na rede escolar do município de Quêssua."
-        />
-      )}
+      {/* Main Routed View with smooth page transitions */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={
+            !currentUser
+              ? 'public-landing'
+              : currentPage === 'login' || currentPage === 'register'
+              ? `auth-${currentPage}`
+              : currentView === 'aluno-perfil'
+              ? `aluno-perfil-${selectedStudent?.id || 'current'}`
+              : `${activeRole}-${currentView}`
+          }
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="w-full flex-1 flex flex-col"
+        >
+          {renderCurrentView()}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Organic Cloud Wave Footer */}
       <CloudFooter

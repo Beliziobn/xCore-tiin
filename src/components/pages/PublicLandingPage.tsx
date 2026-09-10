@@ -153,120 +153,150 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           </p>
         </div>
 
-        {/* Personas Cards */}
+        {/* Personas Cards with New Card Logic: 48px Outer Radius, 16px Padding, 32px Inner, 0 20px 40px Drop Shadow */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* 1. Direção Escolar */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+          <div className="bg-white rounded-[48px] p-4 sm:p-5 border border-slate-100/90 shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:shadow-[0_25px_50px_rgba(0,0,0,0.13)] hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-red-50 text-[#f75142] flex items-center justify-center mb-4 shadow-2xs">
-                <School className="w-6 h-6" />
+              {/* Nested Radius: Outer 48px - Padding 16px = Inner 32px */}
+              <div className="bg-red-50/70 rounded-[32px] p-4 mb-4 border border-red-100/60 flex items-center justify-between">
+                <div className="w-12 h-12 rounded-full bg-white text-[#f75142] flex items-center justify-center shadow-2xs">
+                  <School className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] bg-[#f75142] text-white font-black px-3 py-1 rounded-full uppercase tracking-[-0.01em] shadow-2xs">
+                  Recomendado
+                </span>
               </div>
-              <div className="flex items-center justify-between mb-1">
+
+              <div className="px-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Perfil Diretor(a)</span>
-                <span className="text-[10px] bg-red-50 text-[#f75142] font-black px-2 py-0.5 rounded-full">Recomendado</span>
+                <h3 style={{ letterSpacing: '-0.02em' }} className="text-xl font-black text-[#002133] tracking-[-0.02em] mt-0.5">
+                  Carl Mendes
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 mb-3">Complexo Escolar de Quêssua</p>
+                <ul className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3 mb-6">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Livro de ponto & presenças dos professores</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Gestão de 16 turmas e 489 alunos</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Mapa de salas operacionais e faltas</span>
+                  </li>
+                </ul>
               </div>
-              <h3 className="text-lg font-black text-[#002133]">Carl Mendes</h3>
-              <p className="text-xs text-slate-500 mt-0.5 mb-3">Complexo Escolar de Quêssua</p>
-              <ul className="text-xs text-slate-600 space-y-1.5 border-t border-slate-100 pt-3 mb-6">
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Livro de ponto & presenças dos professores</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Gestão de 16 turmas e 489 alunos</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Mapa de salas operacionais e faltas</span>
-                </li>
-              </ul>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onDirectLogin('diretor')}
-              className="w-full py-3 px-4 rounded-xl bg-[#002133] hover:bg-[#001726] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm group"
-            >
-              <span>Iniciar Sessão como Diretor(a)</span>
-              <ArrowRight className="w-3.5 h-3.5 text-[#f75142] group-hover:translate-x-1 transition-transform" />
-            </button>
+            <div className="p-1">
+              <button
+                type="button"
+                onClick={() => onDirectLogin('diretor')}
+                className="w-full py-3.5 px-6 rounded-full bg-[#002133] hover:bg-[#f75142] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer shadow-sm group"
+              >
+                <span className="tracking-[-0.01em]">Iniciar Sessão como Diretor(a)</span>
+                <ArrowRight className="w-4 h-4 text-[#f75142] group-hover:text-white group-hover:translate-x-1 transition-all" />
+              </button>
+            </div>
           </div>
 
           {/* 2. Administração Central / SME */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+          <div className="bg-white rounded-[48px] p-4 sm:p-5 border border-slate-100/90 shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:shadow-[0_25px_50px_rgba(0,0,0,0.13)] hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center mb-4 shadow-2xs">
-                <Building2 className="w-6 h-6" />
+              {/* Nested Radius: Outer 48px - Padding 16px = Inner 32px */}
+              <div className="bg-blue-50/70 rounded-[32px] p-4 mb-4 border border-blue-100/60 flex items-center justify-between">
+                <div className="w-12 h-12 rounded-full bg-white text-blue-700 flex items-center justify-center shadow-2xs">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] bg-blue-100 text-blue-800 font-black px-3 py-1 rounded-full uppercase tracking-[-0.01em]">
+                  Rede Municipal
+                </span>
               </div>
-              <div className="flex items-center justify-between mb-1">
+
+              <div className="px-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Perfil Administração</span>
-                <span className="text-[10px] bg-blue-50 text-blue-700 font-black px-2 py-0.5 rounded-full">Rede Municipal</span>
+                <h3 style={{ letterSpacing: '-0.02em' }} className="text-xl font-black text-[#002133] tracking-[-0.02em] mt-0.5">
+                  Fred Silva
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 mb-3">Secretaria Municipal de Educação</p>
+                <ul className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3 mb-6">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Painel de 14 escolas e governança central</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Exportação consolidada para o Censo Escolar</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Homologação e cadastro de directores</span>
+                  </li>
+                </ul>
               </div>
-              <h3 className="text-lg font-black text-[#002133]">Fred Silva</h3>
-              <p className="text-xs text-slate-500 mt-0.5 mb-3">Secretaria Municipal de Educação</p>
-              <ul className="text-xs text-slate-600 space-y-1.5 border-t border-slate-100 pt-3 mb-6">
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Painel de 14 escolas e governança central</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Exportação consolidada para o Censo Escolar</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Homologação e cadastro de directores</span>
-                </li>
-              </ul>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onDirectLogin('admin')}
-              className="w-full py-3 px-4 rounded-xl bg-slate-100 hover:bg-[#002133] text-[#002133] hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs group"
-            >
-              <span>Iniciar Sessão como Administrador(a)</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </button>
+            <div className="p-1">
+              <button
+                type="button"
+                onClick={() => onDirectLogin('admin')}
+                className="w-full py-3.5 px-6 rounded-full bg-slate-100 hover:bg-[#002133] text-[#002133] hover:text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer shadow-2xs group"
+              >
+                <span className="tracking-[-0.01em]">Iniciar Sessão como Administrador(a)</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
           </div>
 
           {/* 3. Corpo Docente */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+          <div className="bg-white rounded-[48px] p-4 sm:p-5 border border-slate-100/90 shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:shadow-[0_25px_50px_rgba(0,0,0,0.13)] hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-4 shadow-2xs">
-                <GraduationCap className="w-6 h-6" />
+              {/* Nested Radius: Outer 48px - Padding 16px = Inner 32px */}
+              <div className="bg-emerald-50/70 rounded-[32px] p-4 mb-4 border border-emerald-100/60 flex items-center justify-between">
+                <div className="w-12 h-12 rounded-full bg-white text-emerald-700 flex items-center justify-center shadow-2xs">
+                  <GraduationCap className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-3 py-1 rounded-full uppercase tracking-[-0.01em]">
+                  Sala de Aula
+                </span>
               </div>
-              <div className="flex items-center justify-between mb-1">
+
+              <div className="px-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Perfil Docente</span>
-                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-black px-2 py-0.5 rounded-full">Sala de Aula</span>
+                <h3 style={{ letterSpacing: '-0.02em' }} className="text-xl font-black text-[#002133] tracking-[-0.02em] mt-0.5">
+                  Santar Goes
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 mb-3">Turma 1 - 4ª Classe</p>
+                <ul className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3 mb-6">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Chamada biométrica diária de 46 alunos</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Lançamento de notas P1, P2 e médias</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Fichas individuais e ocorrências discentes</span>
+                  </li>
+                </ul>
               </div>
-              <h3 className="text-lg font-black text-[#002133]">Santar Goes</h3>
-              <p className="text-xs text-slate-500 mt-0.5 mb-3">Turma 1 - 4ª Classe</p>
-              <ul className="text-xs text-slate-600 space-y-1.5 border-t border-slate-100 pt-3 mb-6">
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Chamada biométrica diária de 46 alunos</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Lançamento de notas P1, P2 e médias</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Fichas individuais e ocorrências discentes</span>
-                </li>
-              </ul>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onDirectLogin('professor')}
-              className="w-full py-3 px-4 rounded-xl bg-slate-100 hover:bg-[#002133] text-[#002133] hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs group"
-            >
-              <span>Iniciar Sessão como Professor(a)</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </button>
+            <div className="p-1">
+              <button
+                type="button"
+                onClick={() => onDirectLogin('professor')}
+                className="w-full py-3.5 px-6 rounded-full bg-slate-100 hover:bg-[#002133] text-[#002133] hover:text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer shadow-2xs group"
+              >
+                <span className="tracking-[-0.01em]">Iniciar Sessão como Professor(a)</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
           </div>
         </div>
 
