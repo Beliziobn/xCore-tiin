@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { X, ArrowUpRight, GraduationCap, Mail, Phone, Sparkles } from "lucide-react";
 
 export interface SchoolMember {
@@ -183,7 +183,13 @@ export default function SchoolTeamSection({
       id="equipa"
       className="relative w-full overflow-hidden bg-transparent py-20 text-slate-950"
     >
-      <div className="mx-auto mb-12 max-w-7xl px-5 text-center">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="mx-auto mb-12 max-w-7xl px-5 text-center"
+      >
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 backdrop-blur-xs px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#f75142] shadow-xs">
           <GraduationCap className="h-4 w-4 text-[#f75142]" />
           <span>Nossa Equipa Escolar</span>
@@ -196,7 +202,7 @@ export default function SchoolTeamSection({
         <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
           {subtitle}
         </p>
-      </div>
+      </motion.div>
 
       <div className="relative w-full">
         {/* 3 Continuous animated rows */}
@@ -217,13 +223,21 @@ export default function SchoolTeamSection({
                 ease: "linear",
               }}
             >
-              {[...row, ...row, ...row, ...row].map((member, index) => (
-                <MemberCapsule
-                  key={`${member.id}-${rowIndex}-${index}`}
-                  member={member}
-                  onClick={() => handleSelect(member)}
-                />
-              ))}
+              {[...row, ...row, ...row, ...row].map((member, index) => {
+                const colIndex = index % row.length;
+                const staggerOrder = colIndex * 3 + rowIndex;
+                const cardDelay = Math.min(staggerOrder * 0.055 + 0.1, 0.75);
+
+                return (
+                  <MemberCapsule
+                    key={`${member.id}-${rowIndex}-${index}`}
+                    id={`member-capsule-${member.id}-${rowIndex}-${index}`}
+                    member={member}
+                    delay={cardDelay}
+                    onClick={() => handleSelect(member)}
+                  />
+                );
+              })}
             </motion.div>
           ))}
         </div>
@@ -379,20 +393,43 @@ export default function SchoolTeamSection({
 interface MemberCapsuleProps {
   member: SchoolMember;
   onClick: () => void;
+  id?: string;
+  delay?: number;
   key?: React.Key;
 }
 
 function MemberCapsule({
   member,
   onClick,
+  id,
+  delay = 0,
 }: MemberCapsuleProps) {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <motion.button
+      id={id}
       type="button"
       onClick={onClick}
+      initial={
+        shouldReduceMotion
+          ? { opacity: 0 }
+          : { opacity: 0, y: 18, scale: 0.94 }
+      }
+      whileInView={
+        shouldReduceMotion
+          ? { opacity: 1 }
+          : { opacity: 1, y: 0, scale: 1 }
+      }
+      viewport={{ once: true, amount: 0.05 }}
+      transition={{
+        duration: shouldReduceMotion ? 0.2 : 0.45,
+        delay: shouldReduceMotion ? 0 : delay,
+        ease: [0.22, 1, 0.36, 1],
+      }}
       whileHover={{ scale: 1.045, y: -2 }}
       whileTap={{ scale: 0.97 }}
-      className="group flex shrink-0 items-center gap-3 rounded-full border border-slate-200 bg-white p-2 pr-7 text-left shadow-xs transition-all duration-300 hover:border-[#f75142] hover:shadow-lg sm:gap-4 sm:pr-8 cursor-pointer"
+      className="group flex shrink-0 items-center gap-3 rounded-full border border-slate-200 bg-white p-2 pr-7 text-left shadow-xs transition-colors duration-300 hover:border-[#f75142] hover:shadow-lg sm:gap-4 sm:pr-8 cursor-pointer"
     >
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 transition-colors group-hover:border-[#f75142] sm:h-16 sm:w-16">
         <MemberImage

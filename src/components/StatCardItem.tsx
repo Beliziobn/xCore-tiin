@@ -76,7 +76,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
         }
       }}
       aria-label={`${card.title}: ${card.value}${isClickable ? '. Clique para ver mais' : '. Indicador informativo'}`}
-      className={`stat-card reveal-up relative bg-white border-2 border-dashed border-slate-200/90 hover:border-[#f75142]/60 p-4 sm:p-5 flex flex-col justify-between h-full shadow-[0_4px_20px_-4px_rgba(0,33,51,0.05)] hover:shadow-[0_20px_40px_-8px_rgba(247,81,66,0.22)] hover:-translate-y-1.5 hover:scale-[1.03] active:scale-[0.99] transition-all duration-300 ease-out transform-gpu will-change-transform select-none w-full mx-auto group ${
+      className={`stat-card reveal-up relative bg-white border border-slate-200/90 ring-1 ring-slate-900/5 hover:border-[#f75142]/40 hover:ring-[#f75142]/20 p-4 sm:p-5 flex flex-col justify-between h-full shadow-[0_4px_20px_-4px_rgba(0,33,51,0.06)] hover:shadow-[0_20px_40px_-8px_rgba(247,81,66,0.20)] hover:-translate-y-1.5 hover:scale-[1.02] active:scale-[0.99] transition-all duration-300 ease-out transform-gpu will-change-transform select-none w-full mx-auto group ${
         isSmall
           ? 'rounded-[22px] sm:rounded-[24px] min-h-[260px] max-w-[260px]'
           : isLarge

@@ -3,12 +3,19 @@ import { Box, GraduationCap } from 'lucide-react';
 import heroImg from '../assets/images/hero_creative_desk.png';
 import { SectionShader } from './SectionShader';
 
+export interface BreadcrumbItem {
+  label: string;
+  onClick?: () => void;
+}
+
 interface HeroProps {
   onOpenGetStarted: () => void;
   greeting?: string;
   isLoggedIn?: boolean;
   customTitle?: string;
   customSubtitle?: string;
+  breadcrumbs?: BreadcrumbItem[];
+  badge?: string;
 }
 
 const SERVICE_TAGS = [
@@ -22,6 +29,8 @@ export const Hero: React.FC<HeroProps> = ({
   isLoggedIn,
   customTitle,
   customSubtitle,
+  breadcrumbs,
+  badge,
 }) => {
   const [scrollY, setScrollY] = useState(0);
 
@@ -41,13 +50,13 @@ export const Hero: React.FC<HeroProps> = ({
   }, []);
 
   /* ---------------------------------------------------------------------
-   * Inner-page banner (blue). Kept for every page that passes customTitle.
+   * Inner-page banner (coral). Kept for every page that passes customTitle.
    * ------------------------------------------------------------------- */
   if (customTitle) {
     return (
       <section
         id="ucore-hero-section"
-        className="relative w-full bg-gradient-to-br from-[#f75142] via-[#e54536] to-[#c9372a] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(247,81,66,0.45)] pt-10 sm:pt-14 pb-12 sm:pb-16 px-4 sm:px-8 lg:px-16 overflow-hidden"
+        className="relative w-full bg-gradient-to-br from-[#f75142] via-[#e54536] to-[#c9372a] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(247,81,66,0.45)] pt-8 sm:pt-12 pb-10 sm:pb-14 px-4 sm:px-8 lg:px-16 overflow-hidden"
       >
         <SectionShader variant="coral" />
         <div
@@ -59,11 +68,40 @@ export const Hero: React.FC<HeroProps> = ({
           }}
         />
         <div className="max-w-6xl mx-auto relative z-10 text-white">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]">
+          {/* Breadcrumb Trail & Optional Role Badge */}
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            {badge && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-white text-[11px] font-black uppercase tracking-wider">
+                {badge}
+              </span>
+            )}
+            {breadcrumbs && breadcrumbs.length > 0 && (
+              <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-semibold text-white/80 flex-wrap">
+                {breadcrumbs.map((crumb, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <span className="opacity-50">/</span>}
+                    {crumb.onClick ? (
+                      <button
+                        type="button"
+                        onClick={crumb.onClick}
+                        className="hover:text-white transition-colors cursor-pointer hover:underline text-white/85"
+                      >
+                        {crumb.label}
+                      </button>
+                    ) : (
+                      <span className="text-white font-bold">{crumb.label}</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </nav>
+            )}
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[1.1]">
             {customTitle}
           </h1>
           {customSubtitle && (
-            <p className="mt-4 text-sm sm:text-base font-medium text-white/85 leading-relaxed max-w-xl">
+            <p className="mt-3 text-sm sm:text-base font-medium text-white/90 leading-relaxed max-w-2xl">
               {customSubtitle}
             </p>
           )}

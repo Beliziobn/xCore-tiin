@@ -969,6 +969,13 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Livro de Ponto dos Professores"
+            customSubtitle="Homologação diária, assiduidade e controle de presenças da equipa docente da escola."
+            badge="Direção Escolar"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Professores', onClick: () => { setCurrentView('diretor-professores'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Livro de Ponto' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <DirectorAttendancePage
@@ -992,6 +999,12 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Analisa as suas estatísticas"
+            customSubtitle="Desempenho acadêmico, assiduidade e notas dos alunos da Turma 1 - 4ª Classe."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Estatísticas' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <TeacherStatisticsPage
@@ -1022,6 +1035,13 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Minha Turma"
+            customSubtitle="Gestão acadêmica, fichas cadastrais e acompanhamento pedagógico da 4ª Classe."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Estatísticas', onClick: () => { setCurrentView('professor-estatisticas'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Minha Turma' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <TeacherClassPage
@@ -1091,6 +1111,13 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Presença dos Alunos"
+            customSubtitle="Chamada eletrônica diária com validação biométrica e controle de faltas da turma."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Minha Turma', onClick: () => { setCurrentView('professor-turma'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Chamada Diária' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <TeacherAttendancePage
@@ -1358,8 +1385,10 @@ export default function App() {
         onNavigateToHome={() => {
           setCurrentPage('home');
           setCurrentView('home');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         currentPage={currentPage}
+        currentView={currentView}
         isAuthLoading={isAuthLoading}
         authLoadingAction={authLoadingAction}
         onOpenAbout={() => setInfoModalType('about')}
@@ -1382,18 +1411,35 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         activeRole={activeRole}
+        onSwitchRole={(newRole) => {
+          setActiveRole(newRole);
+          setCurrentView('home');
+          setCurrentPage('home');
+          showToast(
+            `Perfil alternado para: ${
+              newRole === 'admin'
+                ? 'Administração Central'
+                : newRole === 'diretor'
+                ? 'Direção Escolar'
+                : 'Corpo Docente'
+            }`
+          );
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         onOpenSettings={() => setSettingsModalOpen(true)}
       />
 
       {/* Main Routed View */}
       {renderCurrentView()}
 
-      {/* School Team Showcase (Professores Cadastrados no Sistema) before Footer */}
-      <SchoolTeamSection
-        members={schoolMembers}
-        title="Professores Cadastrados no Sistema"
-        subtitle="Corpo docente oficial registado na rede escolar do município de Quêssua."
-      />
+      {/* School Team Showcase (Professores Cadastrados no Sistema) - Only on home landing view to eliminate layout collisions */}
+      {currentPage === 'home' && currentView === 'home' && (
+        <SchoolTeamSection
+          members={schoolMembers}
+          title="Professores Cadastrados no Sistema"
+          subtitle="Corpo docente oficial registado na rede escolar do município de Quêssua."
+        />
+      )}
 
       {/* Organic Cloud Wave Footer */}
       <CloudFooter

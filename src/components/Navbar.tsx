@@ -17,6 +17,7 @@ interface NavbarProps {
   onLogout?: () => void;
   activeRole?: string;
   currentPage?: string;
+  currentView?: string;
   onSwitchRole?: (role: 'admin' | 'diretor' | 'professor') => void;
   isAuthLoading?: boolean;
   authLoadingAction?: 'login' | 'register' | null;
@@ -65,6 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   activeRole,
   currentPage = 'home',
+  currentView = 'home',
   onSwitchRole,
   isAuthLoading = false,
   authLoadingAction = null,
@@ -170,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         />
 
         {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 lg:gap-11 text-[15px] font-bold text-[#002133]">
+        <div className="hidden md:flex items-center gap-8 lg:gap-11 text-[15px] font-bold text-[#002133] ml-auto mr-6 lg:mr-8">
           {/* Páginas dropdown */}
           <div className="relative">
             <button
@@ -188,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {showPagesDropdown && (
-              <div className="absolute top-full left-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
                 {activeRole === 'admin' ? (
                   <>
                     <button
@@ -450,31 +452,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
           </div>
-
-          {/* Quick Access: Mural de Editais & Anúncios */}
-          <button
-            id="nav-btn-mural-editais"
-            onClick={() => onSelectPage('admin-anuncios')}
-            className="flex items-center gap-1.5 text-[#002133] hover:text-white font-bold transition-colors cursor-pointer py-1 text-[13.5px] uppercase tracking-wide"
-            title="Acessar Mural Oficial de Editais e Anúncios"
-          >
-            <Megaphone className="w-4 h-4 text-[#002133]" />
-            <span>Editais & Anúncios</span>
-          </button>
-
-          {/* Quick Access: Livro de Ponto & Calendário */}
-          <button
-            id="nav-btn-livro-ponto"
-            onClick={() => {
-              onSelectPage('diretor-presenca');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="flex items-center gap-1.5 bg-[#002133] hover:bg-[#002133]/90 text-white font-bold transition-all cursor-pointer py-1.5 px-3.5 rounded-xl text-xs uppercase tracking-wide shadow-xs active:scale-95"
-            title="Acessar Livro de Ponto e Calendário de Frequência"
-          >
-            <Calendar className="w-3.5 h-3.5 text-[#f75142]" />
-            <span>Livro de Ponto</span>
-          </button>
         </div>
 
         {/* Right CTA Actions */}
