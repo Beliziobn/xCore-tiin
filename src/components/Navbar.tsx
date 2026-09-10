@@ -23,6 +23,7 @@ interface NavbarProps {
   authLoadingAction?: 'login' | 'register' | null;
   onOpenSettings?: () => void;
   onOpenDemoModal?: () => void;
+  onOpenGoogleSheets?: () => void;
 }
 
 const mockNotifications: NotificationItem[] = [
@@ -73,6 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   authLoadingAction = null,
   onOpenSettings,
   onOpenDemoModal,
+  onOpenGoogleSheets,
 }) => {
   const [showPagesDropdown, setShowPagesDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -259,6 +261,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>Demandas & Editais</span>
                       <span className="text-[9px] bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded">Oficial</span>
                     </button>
+                    {onOpenGoogleSheets && (
+                      <button
+                        onClick={() => {
+                          onOpenGoogleSheets();
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-emerald-700 hover:bg-emerald-50 hover:text-emerald-950 transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                      >
+                        <span>Google Planilhas</span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Nuvem</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         onSelectPage('admin-perfil');

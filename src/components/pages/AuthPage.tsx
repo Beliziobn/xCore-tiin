@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole } from '../../types';
+import { GoogleSignInButton } from '../common/GoogleSignInButton';
+import { googleSignIn } from '../../utils/googleAuth';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -230,6 +232,54 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [adminRole, setAdminRole] = useState<AdminStaffRole>('diretor_municipal');
   const [schoolOrUnitName, setSchoolOrUnitName] = useState('');
   const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const handleGoogleSignInFlow = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setErrorMsg(null);
+      const res = await googleSignIn();
+      // If user closed the popup or cancelled without signing in, gracefully return
+      if (!res || res.cancelled || !res.user) {
+        return;
+      }
+      const user = res.user;
+      const names = (user.displayName || 'Utilizador Google').split(' ');
+      const gFirst = names[0] || 'Utilizador';
+      const gLast = names.slice(1).join(' ') || 'Google';
+
+      const googleAccount: UserAccount = {
+        id: user.uid,
+        firstName: gFirst,
+        lastName: gLast,
+        email: user.email || 'google.user@ucore.edu.ao',
+        role: 'admin',
+        scope: 'administracao',
+        adminRole: 'admin_sistema',
+        cargoTitle: 'Administrador de Sistema (Google)',
+        schoolName: 'Direcção Municipal da Educação de Quêssua',
+        municipalityOrDepartment: 'Quêssua / Malanje',
+        titlePrefix: 'Admin.',
+        greeting: `Olá, ${gFirst}`,
+      };
+
+      onLoginSuccess(googleAccount);
+    } catch (err: any) {
+      const isCancellation =
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        (typeof err?.message === 'string' && err.message.includes('auth/popup-closed-by-user'));
+
+      if (isCancellation) {
+        return;
+      }
+
+      console.warn('Aviso de autenticação Google:', err?.message || err);
+      setErrorMsg(err?.message || 'Erro ao autenticar com o Google.');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   useEffect(() => {
     setMode(initialMode);
@@ -893,6 +943,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       </>
                     )}
                   </button>
+
+                  {/* Google Workspace Sign In */}
+                  <div className="relative my-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200" />
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase">
+                      <span className="bg-white px-2.5 text-slate-400 font-bold tracking-wider">
+                        ou acesse com conta Google
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center">
+                    <GoogleSignInButton
+                      onClick={handleGoogleSignInFlow}
+                      isLoading={isGoogleLoading}
+                      label="Entrar com o Google"
+                      className="w-full max-w-full justify-center"
+                    />
+                  </div>
 
                   {/* Switch to Register */}
                   <div className="text-center pt-2 text-xs text-slate-600">

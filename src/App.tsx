@@ -33,6 +33,7 @@ import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
 import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
 import { AdminRegistrationModal, AdminModalType } from './components/pages/admin/AdminRegistrationModal';
 import { ExcelExportModal } from './components/modals/ExcelExportModal';
+import { GoogleSheetsModal } from './components/modals/GoogleSheetsModal';
 import { 
   initialAdminSchools, 
   initialAdminTeachers, 
@@ -143,6 +144,7 @@ export default function App() {
 
   const [adminModalType, setAdminModalType] = useState<AdminModalType>(null);
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
+  const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
   const [homeAIResponse, setHomeAIResponse] = useState<string | null>(null);
 
   const handleHomeAICommand = (prompt: string) => {
@@ -864,6 +866,7 @@ export default function App() {
           students={adminStudents}
           directors={adminDirectors}
           onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
+          onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
           onOpenRegisterModal={() => setAdminModalType('school')}
           onNavigateToSchools={() => {
             setCurrentView('admin-escolas');
@@ -1562,6 +1565,7 @@ export default function App() {
           }, 150);
         }}
         onOpenDemoModal={() => setIsDemoModalOpen(true)}
+        onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
       />
 
       {/* Main Routed View with smooth page transitions */}
@@ -1671,6 +1675,17 @@ export default function App() {
       <ExcelExportModal
         isOpen={isExcelExportModalOpen}
         onClose={() => setIsExcelExportModalOpen(false)}
+        schools={adminSchools}
+        teachers={adminTeachers}
+        directors={adminDirectors}
+        students={adminStudents}
+        onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+      />
+
+      {/* Google Sheets Integration Modal */}
+      <GoogleSheetsModal
+        isOpen={isGoogleSheetsModalOpen}
+        onClose={() => setIsGoogleSheetsModalOpen(false)}
         schools={adminSchools}
         teachers={adminTeachers}
         directors={adminDirectors}

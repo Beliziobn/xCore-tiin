@@ -33,6 +33,7 @@ interface AdminStatisticsPageProps {
   directors?: AdminDirector[];
   onOpenRegisterModal?: () => void;
   onOpenExcelExport?: () => void;
+  onOpenGoogleSheets?: () => void;
   isLoggedIn?: boolean;
 }
 
@@ -46,6 +47,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
   students,
   directors = [],
   onOpenExcelExport,
+  onOpenGoogleSheets,
   isLoggedIn,
 }) => {
   // Advanced Multi-Criteria Filter State
@@ -265,8 +267,18 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
               title="Baixar pasta consolidada com todas as abas nos critérios do filtro"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>{isExporting ? 'A Exportar...' : 'Baixar Dados Filtrados (.xlsx)'}</span>
+              <span>{isExporting ? 'A Exportar...' : 'Baixar (.xlsx)'}</span>
             </button>
+            {onOpenGoogleSheets && (
+              <button
+                onClick={onOpenGoogleSheets}
+                className="w-full md:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                title="Exportar ou sincronizar com o Google Planilhas (Google Sheets)"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+                <span>Google Planilhas</span>
+              </button>
+            )}
           </div>
         </div>
 
