@@ -15,6 +15,13 @@ import {
   Users,
   GraduationCap,
   ArrowRight,
+  Landmark,
+  UserPlus,
+  Eye,
+  Briefcase,
+  Plus,
+  X,
+  Check
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
@@ -23,7 +30,7 @@ import {
   UserProfileData,
   ProfileModalType,
 } from '../../profile/ProfileOptionsSection';
-import type { AdminSchool } from '../../../types';
+import type { AdminSchool, AdminStaffRole } from '../../../types';
 
 interface AdminProfilePageProps {
   onOpenGetStarted: () => void;
@@ -36,6 +43,71 @@ interface AdminProfilePageProps {
   settingsTrigger?: number;
 }
 
+export interface DMEStaffMember {
+  id: string;
+  name: string;
+  role: AdminStaffRole;
+  cargoTitle: string;
+  department: string;
+  email: string;
+  phone: string;
+  status: 'Ativo' | 'Em Exercício';
+}
+
+const DEFAULT_DME_STAFF: DMEStaffMember[] = [
+  {
+    id: 'dme-1',
+    name: 'Dr. Fred Silva',
+    role: 'diretor_municipal',
+    cargoTitle: 'Director(a) Municipal da Educação',
+    department: 'Gabinete do Director Municipal',
+    email: 'diretor.municipal@ucore.edu.ao',
+    phone: '+244 923 110 001',
+    status: 'Ativo',
+  },
+  {
+    id: 'dme-2',
+    name: 'Dr. Augusto Nvula',
+    role: 'chefe_reparticao',
+    cargoTitle: 'Chefe de Repartição do Ensino Geral',
+    department: 'Repartição do Ensino Primário e Secundário',
+    email: 'chefe.ensino@ucore.edu.ao',
+    phone: '+244 924 220 002',
+    status: 'Ativo',
+  },
+  {
+    id: 'dme-3',
+    name: 'Dra. Helena Manuel',
+    role: 'inspetor_escolar',
+    cargoTitle: 'Inspetora Escolar Municipal',
+    department: 'Gabinete de Inspecção e Supervisão Pedagógica',
+    email: 'inspecao.dme@ucore.edu.ao',
+    phone: '+244 925 330 003',
+    status: 'Ativo',
+  },
+  {
+    id: 'dme-4',
+    name: 'Eng. Marcos Dinis',
+    role: 'tecnico_estatistica',
+    cargoTitle: 'Técnico de Planeamento e Estatística',
+    department: 'Secção de Estatística e Censo Escolar',
+    email: 'estatistica.dme@ucore.edu.ao',
+    phone: '+244 926 440 004',
+    status: 'Ativo',
+  },
+  {
+    id: 'dme-5',
+    name: 'Dra. Teresa de Jesus Santos',
+    role: 'admin_sistema',
+    cargoTitle: 'Administradora de Sistema uCore & RH',
+    department: 'Secção de Recursos Humanos e Tecnologia',
+    email: 'rh.ti.dme@ucore.edu.ao',
+    phone: '+244 927 550 005',
+    status: 'Ativo',
+  },
+];
+
+const STORAGE_KEY_DME_STAFF = 'ucore_dme_staff_list';
 const STORAGE_KEY_ADMIN_AVATAR = 'ucore_admin_avatar';
 const STORAGE_KEY_ADMIN_DATA = 'ucore_admin_profile_data';
 
@@ -70,6 +142,75 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   });
 
   const [activeModal, setActiveModal] = useState<ProfileModalType>(null);
+
+  // DME Staff state with persistence
+  const [dmeStaff, setDmeStaff] = useState<DMEStaffMember[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DME_STAFF);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return DEFAULT_DME_STAFF;
+  });
+
+  const [isAddStaffModalOpen, setIsAddStaffModalOpen] = useState(false);
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState<AdminStaffRole>('inspetor_escolar');
+  const [newStaffDept, setNewStaffDept] = useState('');
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffPhone, setNewStaffPhone] = useState('');
+
+  const getRoleTitle = (role: AdminStaffRole): string => {
+    switch (role) {
+      case 'diretor_municipal': return 'Director(a) Municipal da Educação';
+      case 'inspetor_escolar': return 'Inspetor(a) Escolar Municipal';
+      case 'chefe_reparticao': return 'Chefe de Repartição / Ensino Geral';
+      case 'tecnico_estatistica': return 'Técnico(a) de Planeamento & Estatística';
+      case 'admin_sistema': return 'Administrador(a) de Sistema uCore';
+      default: return 'Funcionário da Administração';
+    }
+  };
+
+  const handleAddStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffName.trim()) return;
+
+    const newMember: DMEStaffMember = {
+      id: 'dme-' + Date.now(),
+      name: newStaffName.trim(),
+      role: newStaffRole,
+      cargoTitle: getRoleTitle(newStaffRole),
+      department: newStaffDept.trim() || 'Direcção Municipal da Educação',
+      email: newStaffEmail.trim() || `${newStaffName.toLowerCase().replace(/\s+/g, '.')}@ucore.edu.ao`,
+      phone: newStaffPhone.trim() || '+244 923 000 000',
+      status: 'Ativo',
+    };
+
+    const updated = [newMember, ...dmeStaff];
+    setDmeStaff(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_DME_STAFF, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+
+    setNewStaffName('');
+    setNewStaffDept('');
+    setNewStaffEmail('');
+    setNewStaffPhone('');
+    setIsAddStaffModalOpen(false);
+  };
+
+  const handleDeleteStaff = (id: string) => {
+    const updated = dmeStaff.filter((s) => s.id !== id);
+    setDmeStaff(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_DME_STAFF, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
 
   const [adminData, setAdminData] = useState<UserProfileData>(() => {
     try {
@@ -423,6 +564,90 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 </div>
               </div>
             </section>
+
+            {/* Bloco 3: Quadro de Funcionários da Administração Municipal da Educação (DME) */}
+            <section
+              id="municipal-admin-staff"
+              aria-label="Quadro de Funcionários da Administração Municipal da Educação"
+              className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-4"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-100">
+                    <Landmark className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900 leading-tight">
+                      Quadro de Funcionários da Administração (DME)
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Flexão de cargos executivos, inspecção escolar e repartições municipais
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddStaffModalOpen(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#002133] hover:bg-[#06283a] text-white shadow-2xs transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-[#f75142]" />
+                  <span>Cadastrar Funcionário DME</span>
+                </button>
+              </div>
+
+              {/* Staff grid */}
+              <div className="grid grid-cols-1 gap-3">
+                {dmeStaff.map((staff) => (
+                  <div
+                    key={staff.id}
+                    className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        {staff.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-sm">{staff.name}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                            {staff.cargoTitle}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{staff.department}</p>
+                        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3 text-slate-400" />
+                            {staff.email}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            {staff.phone}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <Check className="w-3 h-3" />
+                        {staff.status}
+                      </span>
+                      {staff.id.startsWith('dme-') && !['dme-1', 'dme-2', 'dme-3'].includes(staff.id) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteStaff(staff.id)}
+                          className="text-xs text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                          title="Remover funcionário"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
 
           {/* Coluna 2: Definições da Conta, Preferências e Segurança (lg:col-span-5) */}
@@ -458,6 +683,118 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Modal de Cadastro de Funcionário da Administração (DME) */}
+      {isAddStaffModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Novo Funcionário da Administração (DME)</h3>
+                  <p className="text-xs text-slate-500">Cadastre o cargo específico na Direcção Municipal</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddStaffModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStaff} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nome Completo <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newStaffName}
+                  onChange={(e) => setNewStaffName(e.target.value)}
+                  placeholder="Ex: Dr. Paulo Mateus"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Função / Cargo na Administração <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={newStaffRole}
+                  onChange={(e) => setNewStaffRole(e.target.value as AdminStaffRole)}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white font-semibold cursor-pointer"
+                >
+                  <option value="diretor_municipal">Director(a) Municipal da Educação</option>
+                  <option value="inspetor_escolar">Inspetor(a) Escolar Municipal</option>
+                  <option value="chefe_reparticao">Chefe de Repartição / Ensino Geral</option>
+                  <option value="tecnico_estatistica">Técnico(a) de Planeamento & Estatística</option>
+                  <option value="admin_sistema">Administrador(a) de Sistema uCore / RH</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Gabinete / Repartição Municipal <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newStaffDept}
+                  onChange={(e) => setNewStaffDept(e.target.value)}
+                  placeholder="Ex: Gabinete de Inspecção e Supervisão Pedagógica"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">E-mail Institucional</label>
+                  <input
+                    type="email"
+                    value={newStaffEmail}
+                    onChange={(e) => setNewStaffEmail(e.target.value)}
+                    placeholder="paulo.mateus@ucore.edu.ao"
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Telefone</label>
+                  <input
+                    type="tel"
+                    value={newStaffPhone}
+                    onChange={(e) => setNewStaffPhone(e.target.value)}
+                    placeholder="+244 923 000 000"
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddStaffModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#f75142] hover:bg-[#e04436] text-white shadow-xs transition-all"
+                >
+                  Salvar Funcionário
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

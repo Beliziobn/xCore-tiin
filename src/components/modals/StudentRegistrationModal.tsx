@@ -1,31 +1,15 @@
 import React, { useState, useId, useRef, useEffect, useMemo } from 'react';
 import {
   X,
-  Upload,
-  Camera,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-  Calendar,
-  User,
-  Users,
-  ShieldCheck,
-  GraduationCap,
-  Phone,
-  MapPin,
-  FileUp,
-  Sparkles,
-  RefreshCw,
-  Clock,
-  Trash2,
-  FileCheck,
-  AlertTriangle,
-  Ban,
-  Lock,
+  Check,
   Building,
   Layers,
   HeartHandshake,
-  Check
+  Clock,
+  Camera,
+  FileUp,
+  AlertCircle,
+  Zap,
 } from 'lucide-react';
 import type {
   StudentDocumentType,
@@ -41,17 +25,8 @@ import {
   saveStudent,
 } from '../../utils/studentStorage';
 import {
-  CLASS_GROUPS,
-  STANDARD_TURMAS,
-  getTurmaOccupancy,
-  isTurmaFull,
-  getTurmaRemainingSlots,
   incrementTurmaOccupancy,
-  MAX_TURMA_CAPACITY,
 } from '../../data/classesConfig';
-import { SmartAutofillBar } from '../common/SmartAutofillBar';
-import type { AutofillProfile } from '../../utils/smartAutofill';
-import { Textarea } from '@/components/ui/textarea';
 
 interface StudentRegistrationModalProps {
   isOpen: boolean;
@@ -74,15 +49,19 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   defaultTurma = 'Turma A',
   defaultRoom = 'Sala 03',
   defaultPeriod = 'Manhã',
-  schoolName = 'Escola Modelo Central de Quêssua',
+  schoolName = 'Escola Modelo Central do Quéssua',
 }) => {
   const photoInputId = useId();
   const docInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
 
-  // Active Wizard Tab: 1=Identificação, 2=Natureza & Modalidade, 3=Classe & Idade, 4=Complementares & Foto
+  // Active Wizard Step: 1=Identificação, 2=Natureza & Modalidade, 3=Classe & Faixa Etária, 4=Família & Documentos
   const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
+
+  // Smart Autofill state
+  const [isAutofillMinimized, setIsAutofillMinimized] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState<'admin' | 'guardian' | 'demo_student'>('admin');
 
   // 1. Identificação do Aluno
   const [nomeCompleto, setNomeCompleto] = useState(initialData?.nomeCompleto || initialData?.name || '');
@@ -94,18 +73,18 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   const [parentescoEncarregado, setParentescoEncarregado] = useState(initialData?.parentescoEncarregado || 'Mãe');
   const [telefone, setTelefone] = useState(initialData?.telefone || '+244 923 000 000');
   const [telefoneAlternativo, setTelefoneAlternativo] = useState(initialData?.telefoneAlternativo || '');
-  const [endereco, setEndereco] = useState(initialData?.endereco || 'Bairro Modelo - Quêssua');
+  const [endereco, setEndereco] = useState(initialData?.endereco || 'Bairro Modelo - Quéssua');
   const [provincia, setProvincia] = useState(initialData?.provincia || 'Malanje');
-  const [municipio, setMunicipio] = useState(initialData?.municipio || 'Quêssua');
+  const [municipio, setMunicipio] = useState(initialData?.municipio || 'Quéssua');
 
   // 2. Natureza & Modalidade da Escola
+  const [nomeEscola, setNomeEscola] = useState(initialData?.escola || schoolName);
   const [tipoEscolaModalidade, setTipoEscolaModalidade] = useState<StudentModalidadeKey>(
     initialData?.tipoEscolaModalidade || 'primario_regular'
   );
   const [naturezaEscola, setNaturezaEscola] = useState<StudentNaturezaEscola>(
     initialData?.naturezaEscola || 'Pública'
   );
-  const [nomeEscola, setNomeEscola] = useState(initialData?.escola || schoolName);
 
   // 3. Classe / Etapa / Módulo e Idade específica
   const selectedModalityConfig = useMemo(() => {
@@ -120,7 +99,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   });
 
   const [idadeEspecificaNivel, setIdadeEspecificaNivel] = useState<string>(() => {
-    return initialData?.idadeEspecificaNivel || selectedModalityConfig.agePresets[0] || '6 anos';
+    return initialData?.idadeEspecificaNivel || selectedModalityConfig.agePresets[0] || '10 anos';
   });
 
   // Selected Disabilities for Special Education (or mainstream with inclusive needs)
@@ -128,7 +107,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     initialData?.tiposDeficiencia || initialData?.deficienciasInclusivas || []
   );
 
-  // 4. Dados Complementares
+  // 4. Dados Complementares & Documentos
   const [alunoRepetente, setAlunoRepetente] = useState<boolean>(
     initialData?.alunoRepetente || initialData?.condicaoMatricula === 'repetente' || false
   );
@@ -169,7 +148,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       setIdadeEspecificaNivel(selectedModalityConfig.agePresets[0] || `${calculatedAgeData.age} anos`);
     }
 
-    // Critical rule: Special education modalities are strictly "Pública"
+    // Special education modalities are strictly "Pública"
     if (selectedModalityConfig.isSpecialEducation) {
       setNaturezaEscola('Pública');
       setTemNecessidadesEspeciais(true);
@@ -185,10 +164,13 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       setGenero(initialData.genero || 'F');
       setDataNascimento(initialData.dataNascimento || '2016-04-15');
       setEncarregado(initialData.encarregado || '');
+      setParentescoEncarregado(initialData.parentescoEncarregado || 'Mãe');
       setTelefone(initialData.telefone || '');
+      setTelefoneAlternativo(initialData.telefoneAlternativo || '');
       setEndereco(initialData.endereco || '');
       setProvincia(initialData.provincia || 'Malanje');
-      setMunicipio(initialData.municipio || 'Quêssua');
+      setMunicipio(initialData.municipio || 'Quéssua');
+      if (initialData.escola) setNomeEscola(initialData.escola);
       if (initialData.tipoEscolaModalidade) setTipoEscolaModalidade(initialData.tipoEscolaModalidade);
       if (initialData.naturezaEscola) setNaturezaEscola(initialData.naturezaEscola);
       if (initialData.classeEtapaModulo) setClasseEtapaModulo(initialData.classeEtapaModulo);
@@ -250,13 +232,92 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     reader.readAsDataURL(file);
   };
 
+  const handleApplySmartAutofill = () => {
+    if (selectedProfileId === 'admin') {
+      setEncarregado('Dr. Fred Silva');
+      setParentescoEncarregado('Pai');
+      setTelefone('+244 923 110 001');
+      setTelefoneAlternativo('+244 931 220 002');
+      setEndereco('Bairro Modelo - Quéssua');
+      setProvincia('Malanje');
+      setMunicipio('Quéssua');
+      setErrorMessage(null);
+    } else if (selectedProfileId === 'guardian') {
+      setEncarregado('Maria António Quessua');
+      setParentescoEncarregado('Mãe');
+      setTelefone('+244 923 000 000');
+      setTelefoneAlternativo('+244 931 000 000');
+      setEndereco('Bairro Modelo - Quéssua');
+      setProvincia('Malanje');
+      setMunicipio('Quéssua');
+      setErrorMessage(null);
+    } else if (selectedProfileId === 'demo_student') {
+      setNomeCompleto('Teresa Domingos Manuel');
+      setNumeroDocumento('008942125ME041');
+      setTipoDocumento('BI');
+      setGenero('F');
+      setDataNascimento('2016-04-15');
+      setEncarregado('Maria António Quessua');
+      setParentescoEncarregado('Mãe');
+      setTelefone('+244 923 000 000');
+      setTelefoneAlternativo('+244 931 000 000');
+      setEndereco('Bairro Modelo - Quéssua');
+      setProvincia('Malanje');
+      setMunicipio('Quéssua');
+      setNomeEscola('Escola Modelo Central do Quéssua');
+      setTipoEscolaModalidade('primario_regular');
+      setNaturezaEscola('Pública');
+      setClasseEtapaModulo('1.ª Classe');
+      setIdadeEspecificaNivel('10 anos');
+      setTurma('Turma A');
+      setSala('Sala 03');
+      setTurno('Manhã');
+      setAlunoRepetente(false);
+      setTransferido(false);
+      setErrorMessage(null);
+    }
+  };
+
+  const handleNextStep = () => {
+    setErrorMessage(null);
+    if (activeTab === 1) {
+      if (!nomeCompleto.trim()) {
+        setErrorMessage('Por favor informe o Nome Completo do Aluno.');
+        return;
+      }
+      if (!dataNascimento) {
+        setErrorMessage('A Data de Nascimento é obrigatória.');
+        return;
+      }
+      if (!encarregado.trim()) {
+        setErrorMessage('Por favor informe o Nome do Encarregado de Educação.');
+        return;
+      }
+      setActiveTab(2);
+    } else if (activeTab === 2) {
+      if (!nomeEscola.trim()) {
+        setErrorMessage('Por favor informe o Nome da Escola onde o Aluno está Matriculado.');
+        return;
+      }
+      setActiveTab(3);
+    } else if (activeTab === 3) {
+      if (!classeEtapaModulo) {
+        setErrorMessage('Selecione a Classe, Etapa ou Módulo.');
+        return;
+      }
+      if (selectedModalityConfig.isSpecialEducation && selectedDisabilities.length === 0) {
+        setErrorMessage('Para Ensino Especial, seleccione pelo menos um Tipo de Deficiência.');
+        return;
+      }
+      setActiveTab(4);
+    }
+  };
+
   // Submit Handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Mandatory fields check:
-    // "Campos obrigatórios: natureza, tipo de escola/modalidade, classe/etapa/módulo e idade."
     if (!nomeCompleto.trim()) {
       setErrorMessage('Por favor informe o Nome Completo do Aluno.');
       setActiveTab(1);
@@ -345,744 +406,868 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
         `MAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
     };
 
-    // Save in storage
     const saved = saveStudent(payload);
     incrementTurmaOccupancy(classeEtapaModulo, turma);
     onSuccess(saved);
     onClose();
   };
 
-  const handleSmartAutofill = (profile: AutofillProfile) => {
-    if (profile.address) setEndereco(profile.address);
-    if (profile.province) setProvincia(profile.province);
-    if (profile.municipality) setMunicipio(profile.municipality);
-    if (profile.phone) setTelefone(profile.phone);
-    if (profile.phoneAlternative) setTelefoneAlternativo(profile.phoneAlternative);
-    if (profile.guardianName) setEncarregado(profile.guardianName);
-    if (profile.guardianRelationship) setParentescoEncarregado(profile.guardianRelationship);
-    if (profile.documentNumber) setNumeroDocumento(profile.documentNumber);
-    if (profile.documentType) {
-      if (profile.documentType === 'BI') setTipoDocumento('BI');
-      else if (profile.documentType === 'Cédula Pessoal') setTipoDocumento('Cedula pessoal');
-      else if (profile.documentType === 'Certidão de Nascimento') setTipoDocumento('Assento');
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className="bg-white w-full max-w-4xl rounded-[28px] shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        className="flex flex-col h-full max-h-[90vh] w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header: Clean, Light, Friendly (Matches Reference Image) */}
-        <div className="px-6 sm:px-8 pt-7 pb-5 bg-white border-b border-slate-100 flex items-start justify-between gap-4 shrink-0">
-          <div className="flex items-start gap-4">
-            {/* Dark Rounded Squircle Icon */}
-            <div className="w-12 h-12 rounded-2xl bg-zinc-900 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <GraduationCap className="w-6 h-6" />
+        {/* ==================== HEADER ==================== */}
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shrink-0">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {initialData ? 'Atualizar Matrícula do Aluno' : 'Candidatura & Matrícula de Aluno'}
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5 max-w-xl">
+                  Preencha a ficha do aluno de forma simples e assistida — o uCore calcula automaticamente a idade, faixa etária e sugere a turma ideal.
+                </p>
+              </div>
             </div>
-
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                {initialData ? 'Atualizar Matrícula do Aluno' : 'Candidatura & Matrícula de Aluno'}
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed max-w-xl">
-                Preencha a ficha do aluno de forma simples e assistida — o uCore calcula automaticamente a idade, faixa etária e sugere a turma ideal.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              title="Fechar formulário"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          {/* Minimal Close Button */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            title="Fechar formulário"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          {/* STEPPER */}
+          <div className="mt-5 flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+            {/* Passo 1 */}
+            <button
+              type="button"
+              onClick={() => setActiveTab(1)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 1
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 1 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                1
+              </span>
+              <span className="hidden sm:inline">Identificação</span>
+            </button>
 
-        {/* Segmented Pill Tabs Bar (Matches Reference Image) */}
-        <div className="px-6 sm:px-8 py-3 bg-white border-b border-slate-100 shrink-0">
-          <div className="bg-[#f4f4f5] p-1.5 rounded-2xl flex items-center gap-1 border border-slate-200/60 overflow-x-auto scrollbar-none">
-            {[
-              { step: 1, label: 'Identificação', icon: User },
-              { step: 2, label: 'Natureza & Modalidade', icon: Building },
-              { step: 3, label: 'Classe & Faixa Etária', icon: Layers },
-              { step: 4, label: 'Família & Documentos', icon: HeartHandshake },
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.step;
-              return (
-                <button
-                  key={item.step}
-                  type="button"
-                  onClick={() => setActiveTab(item.step as any)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    isActive
-                      ? 'bg-white text-zinc-900 shadow-xs border border-slate-200/80 font-black'
-                      : 'text-slate-600 hover:text-slate-900 font-medium'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#f75142]' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
+            {/* Passo 2 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!nomeCompleto.trim()) {
+                  setErrorMessage('Por favor informe o Nome Completo antes de prosseguir.');
+                  return;
+                }
+                setErrorMessage(null);
+                setActiveTab(2);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 2
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 2 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                2
+              </span>
+              <span className="hidden sm:inline">Natureza & Modalidade</span>
+            </button>
+
+            {/* Passo 3 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!nomeCompleto.trim()) {
+                  setErrorMessage('Por favor informe o Nome Completo antes de prosseguir.');
+                  return;
+                }
+                setErrorMessage(null);
+                setActiveTab(3);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 3
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 3 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                3
+              </span>
+              <span className="hidden sm:inline">Classe & Faixa Etária</span>
+            </button>
+
+            {/* Passo 4 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!nomeCompleto.trim()) {
+                  setErrorMessage('Por favor informe o Nome Completo antes de prosseguir.');
+                  return;
+                }
+                setErrorMessage(null);
+                setActiveTab(4);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 4
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 4 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                4
+              </span>
+              <span className="hidden sm:inline">Família & Documentos</span>
+            </button>
           </div>
         </div>
 
-        {/* Error Banner */}
+        {/* Error message if any */}
         {errorMessage && (
-          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-xs text-rose-800 font-medium">
+          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-xs text-rose-800 font-medium shrink-0 animate-in fade-in duration-150">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-6">
-          {/* STEP 1: IDENTIFICAÇÃO DO ALUNO */}
-          {activeTab === 1 && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Smart Autofill Bar */}
-              <SmartAutofillBar
-                context="student"
-                onApplyProfile={handleSmartAutofill}
-              />
-
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#f75142]" />
-                  1. Identificação do Aluno
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Dados biográficos, identificação documental e contactos da família.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Nome Completo */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nome Completo do Aluno *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={nomeCompleto}
-                    onChange={(e) => setNomeCompleto(e.target.value)}
-                    placeholder="Ex: Teresa Domingos Manuel"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
-                </div>
-
-                {/* Tipo de Documento */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Documento de Identificação *
-                  </label>
-                  <select
-                    value={tipoDocumento}
-                    onChange={(e) => setTipoDocumento(e.target.value as StudentDocumentType)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  >
-                    <option value="BI">Bilhete de Identidade (BI)</option>
-                    <option value="Cedula pessoal">Cédula Pessoal</option>
-                    <option value="Passaporte">Passaporte</option>
-                    <option value="Assento">Assento de Nascimento</option>
-                    <option value="sem Documento">Sem Documento (Pendente de Registo)</option>
-                  </select>
-                </div>
-
-                {/* Número do Documento */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {tipoDocumento === 'sem Documento' ? 'Situação' : 'Número do Documento *'}
-                  </label>
-                  <input
-                    type="text"
-                    disabled={tipoDocumento === 'sem Documento'}
-                    value={tipoDocumento === 'sem Documento' ? 'Sem documento (Em processo)' : numeroDocumento}
-                    onChange={(e) => setNumeroDocumento(e.target.value)}
-                    placeholder="Ex: 008942125ME041"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142] disabled:bg-slate-100 disabled:text-slate-400 font-mono"
-                  />
-                </div>
-
-                {/* Sexo */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Sexo *</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['F', 'M', 'Outro'] as const).map((g) => (
-                      <button
-                        key={g}
-                        type="button"
-                        onClick={() => setGenero(g)}
-                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                          genero === g
-                            ? 'bg-[#002133] text-white border-[#002133]'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {g === 'F' ? 'Feminino' : g === 'M' ? 'Masculino' : 'Outro'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Data de Nascimento com cálculo automático */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>Data de Nascimento *</span>
-                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                      Cálculo Automático
-                    </span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={dataNascimento}
-                    onChange={(e) => setDataNascimento(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
-                  {/* Faixa Etária preview box */}
-                  <div className="mt-2 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-900 font-bold">
-                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Idade: {calculatedAgeData.ageLabel}</span>
+        {/* ==================== CONTEÚDO (scroll) ==================== */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <form id="student-registration-form" onSubmit={handleSubmit}>
+            {/* ========================================================
+                 PASSO 1 — IDENTIFICAÇÃO
+            ======================================================== */}
+            {activeTab === 1 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                {/* Preenchimento Inteligente */}
+                <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">Preenchimento Inteligente</p>
+                        <p className="text-xs text-slate-500">Carregue dados a partir de um perfil registado</p>
+                      </div>
                     </div>
-                    <span className="text-[11px] font-mono font-black text-emerald-800 bg-emerald-200/70 px-2 py-0.5 rounded">
-                      Faixa: {calculatedAgeData.suggestedFaixa}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAutofillMinimized(!isAutofillMinimized)}
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 cursor-pointer"
+                    >
+                      {isAutofillMinimized ? 'Expandir' : 'Minimizar'}
+                    </button>
                   </div>
-                </div>
 
-                {/* Encarregado e Contacto */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nome do Encarregado de Educação *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={encarregado}
-                    onChange={(e) => setEncarregado(e.target.value)}
-                    placeholder="Ex: Maria António Quessua"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Parentesco / Relação
-                  </label>
-                  <select
-                    value={parentescoEncarregado}
-                    onChange={(e) => setParentescoEncarregado(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  >
-                    <option value="Mãe">Mãe</option>
-                    <option value="Pai">Pai</option>
-                    <option value="Tio(a)">Tio(a)</option>
-                    <option value="Avô / Avó">Avô / Avó</option>
-                    <option value="Irmão / Irmã">Irmão / Irmã</option>
-                    <option value="Tutor Legal">Tutor Legal</option>
-                    <option value="Outro">Outro</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Contacto Telefónico Principal *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={telefone}
-                    onChange={(e) => setTelefone(e.target.value)}
-                    placeholder="+244 923 000 000"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Contacto Alternativo (Opcional)
-                  </label>
-                  <input
-                    type="tel"
-                    value={telefoneAlternativo}
-                    onChange={(e) => setTelefoneAlternativo(e.target.value)}
-                    placeholder="+244 931 000 000"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
-                </div>
-
-                {/* Morada, Província e Município */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Morada Actual de Residência *
-                  </label>
-                  <input
-                    type="text"
-                    value={endereco}
-                    onChange={(e) => setEndereco(e.target.value)}
-                    placeholder="Bairro, Rua, Nº de Casa ou Ponto de Referência"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Província</label>
-                  <input
-                    type="text"
-                    value={provincia}
-                    onChange={(e) => setProvincia(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Município</label>
-                  <input
-                    type="text"
-                    value={municipio}
-                    onChange={(e) => setMunicipio(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: NATUREZA & TIPO DE ESCOLA / MODALIDADE */}
-          {activeTab === 2 && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Building className="w-4 h-4 text-[#f75142]" />
-                  2. Natureza da Escola & Modalidade
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Selecione primeiro o tipo de escola / modalidade. Nos casos de Ensino Especial, a natureza fica fixa como Pública.
-                </p>
-              </div>
-
-              {/* School Name input */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Nome da Escola onde o Aluno está Matriculado *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nomeEscola}
-                  onChange={(e) => setNomeEscola(e.target.value)}
-                  placeholder="Ex: Complexo Escolar Nº 14 de Quêssua"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                />
-              </div>
-
-              {/* 3. Tipo de Escola / Modalidade (Escolha Principal A a O) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">
-                  Tipo de Escola / Modalidade (Escolha Principal de A a O) *
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
-                  {STUDENT_MODALITIES_CATALOG.map((mod) => {
-                    const isSelected = tipoEscolaModalidade === mod.key;
-                    return (
-                      <div
-                        key={mod.key}
-                        onClick={() => {
-                          setTipoEscolaModalidade(mod.key);
-                          if (mod.isSpecialEducation) {
-                            setNaturezaEscola('Pública');
-                          }
-                        }}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer text-left flex flex-col justify-between ${
-                          isSelected
-                            ? 'bg-[#fef2f1] border-[#f75142] ring-2 ring-[#f75142]/20'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100/80'
-                        }`}
+                  {!isAutofillMinimized && (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select
+                        value={selectedProfileId}
+                        onChange={(e) => setSelectedProfileId(e.target.value as any)}
+                        className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
-                        <div>
-                          <div className="flex items-center justify-between gap-1.5 mb-1">
-                            <span className="text-xs font-black text-slate-900 leading-tight">
-                              {mod.label}
+                        <option value="admin">Sua Conta Ativa (Fred Silva) — Sessão iniciada como ADMIN</option>
+                        <option value="guardian">Encarregado(a) Padrão — Maria António Quessua</option>
+                        <option value="demo_student">Ficha Demonstrativa — Teresa Domingos Manuel (10 anos)</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleApplySmartAutofill}
+                        className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs"
+                      >
+                        Preencher com este Perfil
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 1. Dados do Aluno */}
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                      1
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-800">Identificação do Aluno</h3>
+                      <p className="text-xs text-slate-500">Dados biográficos, identificação documental e contactos da família</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Nome Completo do Aluno <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={nomeCompleto}
+                        onChange={(e) => setNomeCompleto(e.target.value)}
+                        placeholder="Ex: Teresa Domingos Manuel"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Documento de Identificação <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          value={tipoDocumento}
+                          onChange={(e) => setTipoDocumento(e.target.value as StudentDocumentType)}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                          <option value="BI">Bilhete de Identidade (BI)</option>
+                          <option value="Cedula pessoal">Cédula Pessoal</option>
+                          <option value="Passaporte">Passaporte</option>
+                          <option value="Assento">Assento de Nascimento</option>
+                          <option value="sem Documento">Sem Documento (Pendente de Registo)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Número do Documento <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          disabled={tipoDocumento === 'sem Documento'}
+                          value={tipoDocumento === 'sem Documento' ? 'Sem documento' : numeroDocumento}
+                          onChange={(e) => setNumeroDocumento(e.target.value)}
+                          placeholder="Ex: 008942125ME041"
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Sexo <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setGenero('F')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                              genero === 'F'
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            Feminino
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGenero('M')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                              genero === 'M'
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            Masculino
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGenero('Outro')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                              genero === 'Outro'
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            Outro
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Data de Nascimento <span className="text-rose-500">*</span>
+                          <span className="ml-2 text-xs font-normal text-emerald-600">Cálculo Automático</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={dataNascimento}
+                          onChange={(e) => setDataNascimento(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/50">
+                            Idade: {calculatedAgeData.ageLabel}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/50">
+                            Faixa: {calculatedAgeData.suggestedFaixa}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Encarregado */}
+                <section>
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3">Encarregado de Educação</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Nome do Encarregado <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={encarregado}
+                        onChange={(e) => setEncarregado(e.target.value)}
+                        placeholder="Ex: Maria António Quessua"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Parentesco / Relação</label>
+                      <select
+                        value={parentescoEncarregado}
+                        onChange={(e) => setParentescoEncarregado(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="Mãe">Mãe</option>
+                        <option value="Pai">Pai</option>
+                        <option value="Avô/Avó">Avô/Avó</option>
+                        <option value="Tio/Tia">Tio/Tia</option>
+                        <option value="Tutor Legal">Tutor Legal</option>
+                        <option value="Outro">Outro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Contacto Telefónico Principal <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={telefone}
+                        onChange={(e) => setTelefone(e.target.value)}
+                        placeholder="+244 923 000 000"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Contacto Alternativo (Opcional)</label>
+                      <input
+                        type="tel"
+                        value={telefoneAlternativo}
+                        onChange={(e) => setTelefoneAlternativo(e.target.value)}
+                        placeholder="+244 931 000 000"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Residência */}
+                <section>
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3">Morada de Residência</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Morada Actual de Residência <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={endereco}
+                        onChange={(e) => setEndereco(e.target.value)}
+                        placeholder="Bairro Modelo - Quéssua"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Província</label>
+                        <input
+                          type="text"
+                          value={provincia}
+                          onChange={(e) => setProvincia(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-slate-50 text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Município</label>
+                        <input
+                          type="text"
+                          value={municipio}
+                          onChange={(e) => setMunicipio(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-slate-50 text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* ========================================================
+                 PASSO 2 — NATUREZA & MODALIDADE
+            ======================================================== */}
+            {activeTab === 2 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                      2
+                    </span>
+                    <h3 className="text-sm font-semibold text-slate-800">Natureza da Escola & Modalidade</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 ml-8">
+                    Selecione primeiro o tipo de escola / modalidade. Nos casos de Ensino Especial, a natureza fica fixa como Pública.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Nome da Escola onde o Aluno está Matriculado <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={nomeEscola}
+                    onChange={(e) => setNomeEscola(e.target.value)}
+                    placeholder="Escola Modelo Central do Quéssua"
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    Tipo de Escola / Modalidade (Escolha Principal de A a F) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {STUDENT_MODALITIES_CATALOG.slice(0, 6).map((mod) => {
+                      const isSelected = tipoEscolaModalidade === mod.key;
+                      return (
+                        <button
+                          key={mod.key}
+                          type="button"
+                          onClick={() => {
+                            setTipoEscolaModalidade(mod.key);
+                            if (mod.isSpecialEducation) {
+                              setNaturezaEscola('Pública');
+                              setTemNecessidadesEspeciais(true);
+                            }
+                          }}
+                          className={`text-left p-4 rounded-xl transition cursor-pointer relative ${
+                            isSelected
+                              ? 'border-2 border-rose-400 bg-rose-50/40'
+                              : 'border border-slate-200 hover:border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isSelected && (
+                            <span className="absolute top-3 right-3 text-xs font-medium text-rose-600 bg-white px-2 py-0.5 rounded-full border border-rose-200 flex items-center gap-1 shadow-2xs">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              Selecionado
                             </span>
+                          )}
+
+                          <div className="flex items-center gap-2 pr-24">
+                            <p className="font-medium text-slate-800">{mod.label}</p>
                             {mod.isSpecialEducation && (
-                              <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-1.5 py-0.5 rounded shrink-0">
+                              <span className="text-[10px] font-medium bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded shrink-0">
                                 Ensino Especial
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 leading-snug">
-                            {mod.description}
-                          </p>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
-                          <span>{mod.etapasOuClasses.length} opção(ões) de nível</span>
-                          {isSelected && (
-                            <span className="font-bold text-[#f75142] flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Selecionado
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 2. Natureza da Escola */}
-              <div className="pt-2 border-t border-slate-100">
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                  <span>Natureza da Escola *</span>
-                  {selectedModalityConfig.isSpecialEducation && (
-                    <span className="text-[10px] text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-bold flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-slate-600" />
-                      Fixa em "Pública" para Ensino Especial
-                    </span>
-                  )}
-                </label>
-
-                <div className="grid grid-cols-3 gap-3">
-                  {(['Pública', 'Público-Privada', 'Privada'] as const).map((nat) => {
-                    const isDisabled = selectedModalityConfig.isSpecialEducation && nat !== 'Pública';
-                    const isSelected = naturezaEscola === nat;
-                    return (
-                      <button
-                        key={nat}
-                        type="button"
-                        disabled={isDisabled}
-                        onClick={() => setNaturezaEscola(nat)}
-                        className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 text-center ${
-                          isSelected
-                            ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
-                            : isDisabled
-                            ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <Building className="w-4 h-4" />
-                        <span>{nat}</span>
-                        {isDisabled && <span className="text-[9px] font-normal">(Indisponível)</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: CLASSE / ETAPA / MÓDULO & IDADE ESPECÍFICA NO NÍVEL */}
-          {activeTab === 3 && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-[#f75142]" />
-                    3. Classe, Etapa ou Módulo & Validação da Idade
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Modalidade selecionada: <strong>{selectedModalityConfig.label}</strong>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab(2)}
-                  className="text-xs text-[#f75142] font-bold hover:underline cursor-pointer"
-                >
-                  Alterar Modalidade
-                </button>
-              </div>
-
-              {/* Classe / Etapa / Módulo picker */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">
-                  Selecione a Classe, Etapa ou Módulo correspondente *
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {selectedModalityConfig.etapasOuClasses.map((item) => {
-                    const isSelected = classeEtapaModulo === item;
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setClasseEtapaModulo(item)}
-                        className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-left flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
-                            : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span>{item}</span>
-                        {isSelected && <Check className="w-4 h-4 text-[#f75142]" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Idade no Nível & Validação */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-[#f75142]" />
-                    Faixa Etária / Idade no Nível Selecionado *
-                  </span>
-                  <span className="text-xs font-mono font-bold bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 text-slate-700">
-                    Idade Calculada: {calculatedAgeData.ageLabel}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {selectedModalityConfig.agePresets.map((opt) => {
-                    const isSelected = idadeEspecificaNivel === opt;
-                    const isCalculatedMatch = calculatedAgeData.suggestedFaixa === opt;
-                    return (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setIdadeEspecificaNivel(opt)}
-                        className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center relative ${
-                          isSelected
-                            ? 'bg-[#f75142] text-white border-[#f75142] shadow-xs'
-                            : isCalculatedMatch
-                            ? 'bg-slate-100 text-[#002133] border-slate-300 ring-1 ring-[#002133]/20'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span>{opt}</span>
-                        {isCalculatedMatch && !isSelected && (
-                          <span className="block text-[9px] font-bold text-slate-500">
-                            (Sugerida)
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* TIPO DE DEFICIÊNCIA (SE ENSINO ESPECIAL OU NECESSIDADES INCLUSIVAS) */}
-              {(selectedModalityConfig.supportsDisabilities || temNecessidadesEspeciais) && (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <HeartHandshake className="w-4 h-4 text-[#002133]" />
-                        Tipo de Deficiência / Necessidades Especiais (Pode marcar mais de uma) *
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        Classificação conforme as diretrizes do Ensino Especial do MED.
-                      </p>
-                    </div>
-                    <span className="text-xs font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full">
-                      {selectedDisabilities.length} Selecionada(s)
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {DISABILITY_TYPES_OPTIONS.map((dis) => {
-                      const isChecked = selectedDisabilities.includes(dis);
-                      return (
-                        <button
-                          key={dis}
-                          type="button"
-                          onClick={() => handleToggleDisability(dis)}
-                          className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-between ${
-                            isChecked
-                              ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span>{dis}</span>
-                          <div
-                            className={`w-4 h-4 rounded flex items-center justify-center border ${
-                              isChecked ? 'bg-white text-[#002133] border-white' : 'border-slate-300'
-                            }`}
-                          >
-                            {isChecked && <Check className="w-3 h-3" />}
-                          </div>
+                          <p className="text-xs text-slate-500 mt-1">{mod.description}</p>
+                          <p className="text-xs text-slate-400 mt-2">{mod.etapasOuClasses.length} opção(ões) de nível</p>
                         </button>
                       );
                     })}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* STEP 4: DADOS COMPLEMENTARES & FOTO */}
-          {activeTab === 4 && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <HeartHandshake className="w-4 h-4 text-[#f75142]" />
-                  4. Dados Complementares & Documentação Anexa
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Status de repetência, transferência, turno, turma atribuída e upload de fotos e comprovativos.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Repetente */}
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                    O aluno é repetente nesta classe? *
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAlunoRepetente(false)}
-                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                        !alunoRepetente
-                          ? 'bg-[#002133] text-white border-[#002133]'
-                          : 'bg-white text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      Não (1.ª Vez)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAlunoRepetente(true)}
-                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                        alunoRepetente
-                          ? 'bg-[#002133] text-white border-[#002133]'
-                          : 'bg-white text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      Sim (Repetente)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Necessidades Educativas Especiais fora de escola especial */}
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                    Possui Necessidades Educativas Especiais?
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTemNecessidadesEspeciais(false)}
-                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                        !temNecessidadesEspeciais
-                          ? 'bg-[#002133] text-white border-[#002133]'
-                          : 'bg-white text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      Não
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTemNecessidadesEspeciais(true)}
-                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                        temNecessidadesEspeciais
-                          ? 'bg-[#002133] text-white border-[#002133]'
-                          : 'bg-white text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      Sim (Atendimento Inclusivo)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Turno */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Turno *</label>
-                  <select
-                    value={turno}
-                    onChange={(e) => setTurno(e.target.value as any)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Natureza da Escola <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {(['Pública', 'Público-Privada', 'Privada'] as const).map((nat) => {
+                      const isDisabled = selectedModalityConfig.isSpecialEducation && nat !== 'Pública';
+                      const isSelected = naturezaEscola === nat;
+                      return (
+                        <button
+                          key={nat}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => setNaturezaEscola(nat)}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer flex items-center justify-center gap-2 ${
+                            isSelected
+                              ? 'bg-slate-900 text-white'
+                              : isDisabled
+                              ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {nat === 'Pública' && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                          )}
+                          <span>{nat}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedModalityConfig.isSpecialEducation && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      A natureza para instituições de Ensino Especial fica estritamente definida como Pública.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================
+                 PASSO 3 — CLASSE & FAIXA ETÁRIA
+            ======================================================== */}
+            {activeTab === 3 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                        3
+                      </span>
+                      <h3 className="text-sm font-semibold text-slate-800">Classe, Etapa ou Módulo & Validação da Idade</h3>
+                    </div>
+                    <p className="text-xs text-slate-500 ml-8">
+                      Modalidade selecionada: <span className="font-medium text-slate-700">{selectedModalityConfig.label}</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(2)}
+                    className="text-xs font-medium text-rose-600 hover:text-rose-700 cursor-pointer"
                   >
-                    <option value="Manhã">Manhã</option>
-                    <option value="Tarde">Tarde</option>
-                    <option value="Noite">Noite</option>
-                    <option value="Integral">Integral</option>
-                  </select>
+                    Alterar Modalidade
+                  </button>
                 </div>
 
-                {/* Turma e Sala */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Turma</label>
-                    <input
-                      type="text"
-                      value={turma}
-                      onChange={(e) => setTurma(e.target.value)}
-                      placeholder="Turma A"
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Sala</label>
-                    <input
-                      type="text"
-                      value={sala}
-                      onChange={(e) => setSala(e.target.value)}
-                      placeholder="Sala 03"
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                    />
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    Selecione a Classe, Etapa ou Módulo correspondente <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {selectedModalityConfig.etapasOuClasses.map((item) => {
+                      const isSelected = classeEtapaModulo === item;
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setClasseEtapaModulo(item)}
+                          className={`py-2.5 rounded-xl text-sm font-medium transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <span>{item}</span>
+                          {isSelected && (
+                            <svg className="w-4 h-4 text-white shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Transferência de outra escola */}
-                <div className="sm:col-span-2 p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800">
-                      O aluno é proveniente de outra escola (Transferido)?
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Faixa Etária / Idade no Nível Selecionado <span className="text-rose-500">*</span>
                     </label>
-                    <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      Idade calculada: {calculatedAgeData.ageLabel}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {selectedModalityConfig.agePresets.map((ageOpt) => {
+                      const isSelected = idadeEspecificaNivel === ageOpt;
+                      return (
+                        <button
+                          key={ageOpt}
+                          type="button"
+                          onClick={() => setIdadeEspecificaNivel(ageOpt)}
+                          className={`py-2 rounded-xl text-sm font-medium transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-rose-500 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {ageOpt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Se Ensino Especial ou Necessidades Inclusivas */}
+                {(selectedModalityConfig.supportsDisabilities || temNecessidadesEspeciais) && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">
+                          Tipo de Deficiência / Necessidades Especiais (Pode marcar mais de uma) *
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          Classificação conforme as diretrizes do Ensino Especial do MED.
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full">
+                        {selectedDisabilities.length} Selecionada(s)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {DISABILITY_TYPES_OPTIONS.map((dis) => {
+                        const isChecked = selectedDisabilities.includes(dis);
+                        return (
+                          <button
+                            key={dis}
+                            type="button"
+                            onClick={() => handleToggleDisability(dis)}
+                            className={`p-2.5 rounded-xl border text-xs font-medium transition cursor-pointer flex items-center justify-between ${
+                              isChecked
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>{dis}</span>
+                            <div
+                              className={`w-4 h-4 rounded flex items-center justify-center border ${
+                                isChecked ? 'bg-white text-slate-900 border-white' : 'border-slate-300'
+                              }`}
+                            >
+                              {isChecked && <Check className="w-3 h-3" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ========================================================
+                 PASSO 4 — FAMÍLIA & DOCUMENTOS
+            ======================================================== */}
+            {activeTab === 4 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                      4
+                    </span>
+                    <h3 className="text-sm font-semibold text-slate-800">Dados Complementares & Documentação Anexa</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 ml-8">
+                    Status de repetência, transferência, turno, turma atribuída e upload de fotos e comprovativos.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      O aluno é repetente nesta classe? <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => setTransferido(false)}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                          !transferido ? 'bg-[#002133] text-white' : 'bg-slate-200 text-slate-700'
+                        onClick={() => setAlunoRepetente(false)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          !alunoRepetente
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        Não (1.ª Vez)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAlunoRepetente(true)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          alunoRepetente
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        Sim (Repetente)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Possui Necessidades Educativas Especiais?</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTemNecessidadesEspeciais(false)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          !temNecessidadesEspeciais
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
                         Não
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTransferido(true)}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                          transferido ? 'bg-[#f75142] text-white' : 'bg-slate-200 text-slate-700'
+                        onClick={() => setTemNecessidadesEspeciais(true)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          temNecessidadesEspeciais
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        Sim
+                        Sim (Atendimento Inclusivo)
                       </button>
                     </div>
                   </div>
-                  {transferido && (
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Turno <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={turno}
+                      onChange={(e) => setTurno(e.target.value as any)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                      <option value="Manhã">Manhã</option>
+                      <option value="Tarde">Tarde</option>
+                      <option value="Noite">Noite</option>
+                      <option value="Integral">Integral</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma</label>
+                    <input
+                      type="text"
+                      value={turma}
+                      onChange={(e) => setTurma(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala</label>
+                    <input
+                      type="text"
+                      value={sala}
+                      onChange={(e) => setSala(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200">
+                  <span className="text-sm font-medium text-slate-700">O aluno é proveniente de outra escola (Transferido)?</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTransferido(false)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                        !transferido
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTransferido(true)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                        transferido
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Sim
+                    </button>
+                  </div>
+                </div>
+
+                {transferido && (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 animate-in fade-in duration-150">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nome da Escola e Município de Origem
+                    </label>
                     <input
                       type="text"
                       value={escolaOrigem}
                       onChange={(e) => setEscolaOrigem(e.target.value)}
-                      placeholder="Informe o nome da Escola e Município de Origem"
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                      placeholder="Ex: Escola Primária 28 de Agosto - Malanje"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
-                  )}
-                </div>
-
-                {/* Foto e Documentos Anexos */}
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-4">
-                  <div className="relative w-16 h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0 border border-slate-300 flex items-center justify-center">
-                    {foto ? (
-                      <img src={foto} alt="Foto Aluno" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-8 h-8 text-slate-400" />
-                    )}
                   </div>
-                  <div className="space-y-1 flex-1">
-                    <span className="text-xs font-bold text-slate-800 block">Fotografia Tipo Passe</span>
-                    <p className="text-[10px] text-slate-500">Formatos JPG ou PNG até 2MB.</p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Foto Upload */}
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-slate-500 shrink-0">
+                        {foto ? (
+                          <img src={foto} alt="Foto Aluno" className="w-full h-full object-cover" />
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">Fotografia Tipo Passe</p>
+                        <p className="text-xs text-slate-500">Formatos JPG ou PNG até 2MB</p>
+                      </div>
+                    </div>
                     <input
                       type="file"
                       accept="image/*"
@@ -1094,111 +1279,107 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer shadow-2xs"
+                      className="mt-3 w-full py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 transition cursor-pointer"
                     >
                       {foto ? 'Alterar Foto' : 'Carregar Foto'}
                     </button>
                   </div>
-                </div>
 
-                {/* Anexo de Documento */}
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <span className="text-xs font-bold text-slate-800 block">
-                    Comprovativo / Cópia de Documento
-                  </span>
-                  <p className="text-[10px] text-slate-500">
-                    Cópia do BI, Cédula, Atestado de Residência ou Ficha de Transferência.
-                  </p>
-                  <input
-                    type="file"
-                    ref={docInputRef}
-                    id={docInputId}
-                    onChange={handleDocUpload}
-                    className="hidden"
-                  />
-                  <div className="flex items-center justify-between gap-2">
+                  {/* Documento Upload */}
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800">Comprovativo / Cópia de Documento</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {anexoDocumentoNome || 'Cópia do BI, Cédula, Atestado de Residência ou Ficha'}
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      ref={docInputRef}
+                      id={docInputId}
+                      onChange={handleDocUpload}
+                      className="hidden"
+                    />
                     <button
                       type="button"
                       onClick={() => docInputRef.current?.click()}
-                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer shadow-2xs flex items-center gap-1.5"
+                      className="mt-3 w-full py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <FileUp className="w-3.5 h-3.5 text-[#f75142]" />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
                       <span>{anexoDocumentoNome ? 'Substituir Documento' : 'Anexar Ficheiro'}</span>
                     </button>
-                    {anexoDocumentoNome && (
-                      <span className="text-[11px] font-mono text-slate-700 font-bold truncate max-w-xs">
-                        {anexoDocumentoNome}
-                      </span>
-                    )}
                   </div>
                 </div>
 
-                {/* Observações */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     Observações Administrativas / Pedagógicas
                   </label>
-                  <Textarea
-                    rows={2}
+                  <textarea
+                    rows={3}
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}
                     placeholder="Informações adicionais relevantes sobre saúde, apoio pedagógico ou documentação..."
-                    className="w-full"
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                   />
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </form>
+        </div>
 
-          {/* Bottom Controls Bar */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-            {activeTab > 1 ? (
+        {/* ==================== FOOTER ==================== */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+          >
+            Cancelar
+          </button>
+
+          <div className="flex items-center gap-3">
+            {activeTab > 1 && (
               <button
                 type="button"
                 onClick={() => setActiveTab((activeTab - 1) as any)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 Voltar
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-slate-500 hover:text-slate-800 rounded-xl text-xs font-bold cursor-pointer"
-              >
-                Cancelar
-              </button>
             )}
 
-            <div className="flex items-center gap-2">
-              {activeTab < 4 ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Quick validation before advance
-                    if (activeTab === 1 && !nomeCompleto.trim()) {
-                      setErrorMessage('Por favor informe o Nome Completo antes de prosseguir.');
-                      return;
-                    }
-                    setErrorMessage(null);
-                    setActiveTab((activeTab + 1) as any);
-                  }}
-                  className="px-5 py-2 bg-[#002133] hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  Continuar
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{initialData ? 'Actualizar Aluno' : 'Finalizar Cadastro Oficial'}</span>
-                </button>
-              )}
-            </div>
+            {activeTab < 4 ? (
+              <button
+                type="button"
+                onClick={handleNextStep}
+                className="px-6 py-2.5 rounded-xl text-sm font-medium bg-slate-900 hover:bg-slate-800 text-white transition shadow-sm cursor-pointer"
+              >
+                Continuar
+              </button>
+            ) : (
+              <button
+                type="submit"
+                form="student-registration-form"
+                className="px-6 py-2.5 rounded-xl text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center gap-2 cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>{initialData ? 'Actualizar Matrícula' : 'Finalizar Cadastro Oficial'}</span>
+              </button>
+            )}
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

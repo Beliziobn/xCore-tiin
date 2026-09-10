@@ -26,6 +26,7 @@ import { StudentProfile, StudentGrade, defaultDisciplinasList } from '../../data
 import { getDemandStatus, getStoredAnnouncements, isAnnouncementExpired } from '../../utils/announcementStorage';
 import { ProfilePhotoUploader } from '../ProfilePhotoUploader';
 import { AnnouncementDetailModal } from '../announcements/AnnouncementDetailModal';
+import { StudentGradeHistoryChart } from '../charts/StudentGradeHistoryChart';
 import { SchoolAnnouncement } from '../../types';
 
 export type EducationalRegime = 'iniciacao' | 'primario_1_6' | 'secundario_7_9';
@@ -663,9 +664,19 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
         </div>
       )}
 
-      {/* ABA: RESUMO (Pauta unificada + Ficha biográfica em 2 colunas + Mural recolhido) */}
+      {/* ABA: RESUMO ou DESEMPENHO */}
       {(activeTab === 'resumo' || activeTab === 'desempenho') && (
         <div className="space-y-8">
+          {/* Gráfico de Barras de Histórico de Notas por Trimestre */}
+          <StudentGradeHistoryChart
+            grades={grades}
+            studentName={currentStudent.name}
+            studentId={currentStudent.id}
+            regime={activeRegime}
+            selectedSubject={selectedSubject}
+            onSelectSubject={setSelectedSubject}
+          />
+
           {/* Pauta de Notas Unificada */}
           <div className="bg-white rounded-2xl border border-[#e1e8ef] shadow-xs overflow-hidden">
             {/* Barra superior da Pauta */}
@@ -920,8 +931,11 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
             </div>
           </div>
 
-          {/* Ficha Biográfica em 2 Colunas Amplas */}
-          <div className="bg-white rounded-2xl border border-[#e1e8ef] shadow-xs overflow-hidden">
+          {/* Ficha Biográfica e Mural Oficial visíveis na aba Resumo */}
+          {activeTab === 'resumo' && (
+            <>
+              {/* Ficha Biográfica em 2 Colunas Amplas */}
+              <div className="bg-white rounded-2xl border border-[#e1e8ef] shadow-xs overflow-hidden">
             <div className="px-6 py-4 bg-slate-50/70 border-b border-[#e1e8ef] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#ff5148]" />
@@ -1085,6 +1099,8 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
       )}
 

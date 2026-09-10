@@ -23,8 +23,12 @@ import { initialAdminSchools } from '../data/adminData';
 export const STORAGE_KEY_DIRECTORS = 'ucore_registered_directors_v2';
 
 export const DIRECTOR_CARGO_OPTIONS: DirectorCargo[] = [
+  'Director(a) Geral',
+  'Subdirector(a) Pedagógico(a)',
+  'Subdirector(a) Administrativo(a)',
   'Director(a)',
   'Director(a) Adjunto(a)',
+  'Secretário(a) Geral / Administrativo',
   'Coordenador(a) Pedagógico(a)',
   'Outro',
 ];

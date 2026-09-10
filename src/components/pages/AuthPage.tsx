@@ -14,10 +14,19 @@ import {
   GraduationCap,
   Box,
   Loader2,
-  Info
+  Info,
+  BookOpen,
+  FileText,
+  Landmark,
+  Award,
+  BarChart3,
+  Settings,
+  School,
+  Briefcase,
+  Check
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
-import type { UserAccount } from '../../types';
+import type { UserAccount, SchoolStaffRole, AdminStaffRole } from '../../types';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -26,6 +35,166 @@ interface AuthPageProps {
   hideHeader?: boolean;
   onAuthLoadingChange?: (loading: boolean, action?: 'login' | 'register') => void;
 }
+
+export const SCHOOL_ROLES_CONFIG: {
+  id: SchoolStaffRole;
+  label: string;
+  badge: string;
+  icon: any;
+  desc: string;
+  prefix: string;
+  baseRole: 'diretor' | 'professor';
+  defaultEmail: string;
+  defaultFirst: string;
+  defaultLast: string;
+  cargoFull: string;
+}[] = [
+  {
+    id: 'diretor_geral',
+    label: 'Diretor(a) Geral',
+    badge: 'Direção Máxima',
+    icon: Building2,
+    desc: 'Liderança executiva, representação institucional e gestão global da unidade escolar',
+    prefix: 'Diretor Geral',
+    baseRole: 'diretor',
+    defaultEmail: 'diretor.carl@ucore.edu.br',
+    defaultFirst: 'Carl',
+    defaultLast: 'Mendes',
+    cargoFull: 'Diretor Geral da Escola Modelo Central',
+  },
+  {
+    id: 'subdiretor_pedagogico',
+    label: 'Subdiretor(a) Pedagógico(a)',
+    badge: 'Pedagógico',
+    icon: GraduationCap,
+    desc: 'Supervisão pedagógica, planos de aula, avaliações, turmas e rendimento escolar',
+    prefix: 'Subdiretor Pedagógico',
+    baseRole: 'diretor',
+    defaultEmail: 'subdiretor.pedagogico@ucore.edu.br',
+    defaultFirst: 'Carlos',
+    defaultLast: 'Silva',
+    cargoFull: 'Subdiretor Pedagógico do Iº e IIº Ciclos',
+  },
+  {
+    id: 'subdiretor_administrativo',
+    label: 'Subdiretor(a) Administrativo(a)',
+    badge: 'Administração',
+    icon: ShieldCheck,
+    desc: 'Gestão administrativa, recursos humanos locais, secretaria escolar e património',
+    prefix: 'Subdiretor Adm.',
+    baseRole: 'diretor',
+    defaultEmail: 'subdiretor.adm@ucore.edu.br',
+    defaultFirst: 'Teresa',
+    defaultLast: 'Santos',
+    cargoFull: 'Subdiretora Administrativa e Financeira',
+  },
+  {
+    id: 'professor',
+    label: 'Professor(a) / Docente',
+    badge: 'Docência',
+    icon: BookOpen,
+    desc: 'Regência de disciplinas, lançamento de notas contínuas, pautas e assiduidade',
+    prefix: 'Prof.',
+    baseRole: 'professor',
+    defaultEmail: 'prof.santar@ucore.edu.br',
+    defaultFirst: 'Santar',
+    defaultLast: 'Goes',
+    cargoFull: 'Professor Primário Efetivo - 4ª Classe',
+  },
+  {
+    id: 'secretario_escolar',
+    label: 'Secretário(a) Escolar',
+    badge: 'Secretaria',
+    icon: FileText,
+    desc: 'Matrículas, arquivos discentes, declarações com notas e processos administrativos',
+    prefix: 'Secretário(a)',
+    baseRole: 'diretor',
+    defaultEmail: 'secretaria.paula@ucore.edu.br',
+    defaultFirst: 'Paula',
+    defaultLast: 'Costa',
+    cargoFull: 'Secretária Geral da Unidade Escolar',
+  },
+];
+
+export const ADMIN_ROLES_CONFIG: {
+  id: AdminStaffRole;
+  label: string;
+  badge: string;
+  icon: any;
+  desc: string;
+  prefix: string;
+  baseRole: 'admin';
+  defaultEmail: string;
+  defaultFirst: string;
+  defaultLast: string;
+  cargoFull: string;
+}[] = [
+  {
+    id: 'diretor_municipal',
+    label: 'Diretor(a) Municipal da Educação',
+    badge: 'Liderança DME',
+    icon: Landmark,
+    desc: 'Liderança executiva municipal, coordenação da rede de todas as escolas do município',
+    prefix: 'Diretor Municipal',
+    baseRole: 'admin',
+    defaultEmail: 'admin.fred@ucore.edu.br',
+    defaultFirst: 'Fred',
+    defaultLast: 'Silva',
+    cargoFull: 'Diretor Municipal da Educação de Quêssua',
+  },
+  {
+    id: 'inspetor_escolar',
+    label: 'Inspetor(a) Escolar Municipal',
+    badge: 'Inspecção & Auditoria',
+    icon: Eye,
+    desc: 'Inspecção técnica, auditoria curricular, supervisão pedagógica e conformidade legal',
+    prefix: 'Inspetor Municipal',
+    baseRole: 'admin',
+    defaultEmail: 'inspetor.marcos@ucore.edu.br',
+    defaultFirst: 'Marcos',
+    defaultLast: 'Dinis',
+    cargoFull: 'Inspetor Técnico da Repartição Municipal',
+  },
+  {
+    id: 'chefe_reparticao',
+    label: 'Chefe de Repartição / Ensino Geral',
+    badge: 'Repartição de Ensino',
+    icon: Award,
+    desc: 'Supervisão do ensino primário e secundário, distribuição docente e rede curricular',
+    prefix: 'Chefe de Repartição',
+    baseRole: 'admin',
+    defaultEmail: 'chefe.ensino@ucore.edu.br',
+    defaultFirst: 'Augusto',
+    defaultLast: 'Nvula',
+    cargoFull: 'Chefe da Repartição do Ensino Geral',
+  },
+  {
+    id: 'tecnico_estatistica',
+    label: 'Técnico(a) de Planeamento & Estatística',
+    badge: 'Planeamento & Dados',
+    icon: BarChart3,
+    desc: 'Consolidação de dados do Censo Escolar, taxas de aprovação, fluxo e infraestrutura',
+    prefix: 'Técnico de Estatística',
+    baseRole: 'admin',
+    defaultEmail: 'estatistica.dme@ucore.edu.br',
+    defaultFirst: 'Helena',
+    defaultLast: 'Manuel',
+    cargoFull: 'Técnica de Estatística & Planeamento DME',
+  },
+  {
+    id: 'admin_sistema',
+    label: 'Administrador(a) de Sistema uCore',
+    badge: 'Super Admin TI',
+    icon: Settings,
+    desc: 'Gestão global da plataforma, parametrização dos módulos, utilizadores e segurança',
+    prefix: 'Admin.',
+    baseRole: 'admin',
+    defaultEmail: 'admin.sistema@ucore.edu.br',
+    defaultFirst: 'Suporte',
+    defaultLast: 'uCore',
+    cargoFull: 'Superintendente & Administrador de Sistemas TI',
+  },
+];
 
 export const AuthPage: React.FC<AuthPageProps> = ({
   initialMode = 'login',
@@ -54,7 +223,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'diretor' | 'professor'>('admin');
+
+  // Institutional Scope & Role Flexion State
+  const [institutionalScope, setInstitutionalScope] = useState<'escola' | 'administracao'>('escola');
+  const [schoolRole, setSchoolRole] = useState<SchoolStaffRole>('diretor_geral');
+  const [adminRole, setAdminRole] = useState<AdminStaffRole>('diretor_municipal');
+  const [schoolOrUnitName, setSchoolOrUnitName] = useState('');
+  const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
 
   useEffect(() => {
     setMode(initialMode);
@@ -70,27 +245,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setForgotPasswordOpen(false);
   };
 
-  const handleFillPreset = (preset: 'admin' | 'diretor' | 'professor') => {
-    setSelectedRole(preset);
-    if (preset === 'admin') {
-      setEmail('admin.fred@ucore.edu.br');
-      setPassword('Ucore@2026');
-      setFirstName('Fred');
-      setLastName('Silva');
-      setAgreeTerms(true);
-    } else if (preset === 'diretor') {
-      setEmail('diretor.carl@ucore.edu.br');
-      setPassword('Ucore@2026');
-      setFirstName('Carl');
-      setLastName('Mendes');
-      setAgreeTerms(true);
-    } else {
-      setEmail('prof.santar@ucore.edu.br');
-      setPassword('Ucore@2026');
-      setFirstName('Santar');
-      setLastName('Goes');
-      setAgreeTerms(true);
-    }
+  const handleFillSchoolPreset = (roleId: SchoolStaffRole) => {
+    const config = SCHOOL_ROLES_CONFIG.find((c) => c.id === roleId);
+    if (!config) return;
+    setInstitutionalScope('escola');
+    setSchoolRole(roleId);
+    setEmail(config.defaultEmail);
+    setPassword('Ucore@2026');
+    setFirstName(config.defaultFirst);
+    setLastName(config.defaultLast);
+    setSchoolOrUnitName('Escola Modelo Central');
+    setAgreeTerms(true);
+  };
+
+  const handleFillAdminPreset = (roleId: AdminStaffRole) => {
+    const config = ADMIN_ROLES_CONFIG.find((c) => c.id === roleId);
+    if (!config) return;
+    setInstitutionalScope('administracao');
+    setAdminRole(roleId);
+    setEmail(config.defaultEmail);
+    setPassword('Ucore@2026');
+    setFirstName(config.defaultFirst);
+    setLastName(config.defaultLast);
+    setSchoolOrUnitName('Direcção Municipal da Educação de Quêssua');
+    setAgreeTerms(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -107,13 +285,65 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
       setTimeout(() => {
         setLoading(false);
-        let resolvedRole: 'admin' | 'diretor' | 'professor' = selectedRole;
-        if (email.includes('admin') || email.includes('fred')) {
-          resolvedRole = 'admin';
-        } else if (email.includes('diretor') || email.includes('carl')) {
-          resolvedRole = 'diretor';
-        } else if (email.includes('prof') || email.includes('santar') || email.includes('john') || email.includes('docente')) {
+        
+        // Find if matches preset or detect context
+        let matchedScope: 'escola' | 'administracao' = institutionalScope;
+        let matchedSchoolRole = schoolRole;
+        let matchedAdminRole = adminRole;
+        let resolvedCargoTitle = '';
+        let resolvedPrefix = '';
+        let resolvedRole: 'admin' | 'diretor' | 'professor' = 'admin';
+
+        if (institutionalScope === 'escola') {
+          const cfg = SCHOOL_ROLES_CONFIG.find(c => c.id === schoolRole) || SCHOOL_ROLES_CONFIG[0];
+          resolvedRole = cfg.baseRole;
+          resolvedCargoTitle = cfg.label;
+          resolvedPrefix = cfg.prefix;
+        } else {
+          const cfg = ADMIN_ROLES_CONFIG.find(c => c.id === adminRole) || ADMIN_ROLES_CONFIG[0];
+          resolvedRole = cfg.baseRole;
+          resolvedCargoTitle = cfg.label;
+          resolvedPrefix = cfg.prefix;
+        }
+
+        // Email heuristics override if user typed freeform
+        const lowEmail = email.toLowerCase();
+        if (lowEmail.includes('prof') || lowEmail.includes('santar') || lowEmail.includes('docente')) {
+          matchedScope = 'escola';
+          matchedSchoolRole = 'professor';
           resolvedRole = 'professor';
+          resolvedCargoTitle = 'Professor(a) / Docente';
+          resolvedPrefix = 'Prof.';
+        } else if (lowEmail.includes('pedagogico')) {
+          matchedScope = 'escola';
+          matchedSchoolRole = 'subdiretor_pedagogico';
+          resolvedRole = 'diretor';
+          resolvedCargoTitle = 'Subdirector(a) Pedagógico(a)';
+          resolvedPrefix = 'Subdiretor Pedagógico';
+        } else if (lowEmail.includes('adm') && lowEmail.includes('subdiretor')) {
+          matchedScope = 'escola';
+          matchedSchoolRole = 'subdiretor_administrativo';
+          resolvedRole = 'diretor';
+          resolvedCargoTitle = 'Subdirector(a) Administrativo(a)';
+          resolvedPrefix = 'Subdiretor Adm.';
+        } else if (lowEmail.includes('inspetor')) {
+          matchedScope = 'administracao';
+          matchedAdminRole = 'inspetor_escolar';
+          resolvedRole = 'admin';
+          resolvedCargoTitle = 'Inspetor(a) Escolar Municipal';
+          resolvedPrefix = 'Inspetor';
+        } else if (lowEmail.includes('diretor') && (lowEmail.includes('carl') || lowEmail.includes('escola'))) {
+          matchedScope = 'escola';
+          matchedSchoolRole = 'diretor_geral';
+          resolvedRole = 'diretor';
+          resolvedCargoTitle = 'Director(a) Geral';
+          resolvedPrefix = 'Diretor Geral';
+        } else if (lowEmail.includes('fred') || lowEmail.includes('dme') || lowEmail.includes('municipal')) {
+          matchedScope = 'administracao';
+          matchedAdminRole = 'diretor_municipal';
+          resolvedRole = 'admin';
+          resolvedCargoTitle = 'Director(a) Municipal da Educação';
+          resolvedPrefix = 'Diretor Municipal';
         }
 
         const resolvedFirst = firstName.trim() || (resolvedRole === 'admin' ? 'Fred' : resolvedRole === 'diretor' ? 'Carl' : 'Santar');
@@ -124,19 +354,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           lastName: lastName.trim() || 'uCore',
           email: email.trim(),
           role: resolvedRole,
-          greeting: resolvedRole === 'admin' 
-            ? `Olá Admin. ${resolvedFirst}` 
-            : resolvedRole === 'diretor' 
-            ? `Olá Diretor ${resolvedFirst}` 
-            : `Olá Prof. ${resolvedFirst}`,
+          scope: matchedScope,
+          schoolRole: matchedScope === 'escola' ? matchedSchoolRole : undefined,
+          adminRole: matchedScope === 'administracao' ? matchedAdminRole : undefined,
+          cargoTitle: resolvedCargoTitle,
+          schoolName: matchedScope === 'escola' ? (schoolOrUnitName.trim() || 'Escola Modelo Central') : undefined,
+          municipalityOrDepartment: matchedScope === 'administracao' ? (schoolOrUnitName.trim() || 'Direcção Municipal da Educação') : undefined,
+          titlePrefix: resolvedPrefix,
+          greeting: `Olá ${resolvedPrefix} ${resolvedFirst}`,
           rememberMe,
         };
 
-        setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para a Central uCore...`);
+        setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para o ambiente de ${resolvedCargoTitle}...`);
         setTimeout(() => {
           onAuthLoadingChange?.(false);
           onLoginSuccess(loggedUser);
-        }, 900);
+        }, 800);
       }, 650);
     } else {
       // Register validation
@@ -166,22 +399,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setTimeout(() => {
         setLoading(false);
         const userFirst = firstName.trim();
-        const prefix = selectedRole === 'admin' ? 'Admin.' : selectedRole === 'diretor' ? 'Diretor' : 'Prof.';
+
+        const chosenConfig = institutionalScope === 'escola'
+          ? (SCHOOL_ROLES_CONFIG.find(c => c.id === schoolRole) || SCHOOL_ROLES_CONFIG[0])
+          : (ADMIN_ROLES_CONFIG.find(c => c.id === adminRole) || ADMIN_ROLES_CONFIG[0]);
+
+        const prefix = chosenConfig.prefix;
+        const baseRole = chosenConfig.baseRole;
+        const cargoTitle = chosenConfig.label;
+
         const newUser: UserAccount = {
           id: 'usr_' + Date.now(),
           firstName: userFirst,
           lastName: lastName.trim() || 'uCore',
           email: email.trim(),
-          role: selectedRole,
+          role: baseRole,
+          scope: institutionalScope,
+          schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
+          adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
+          cargoTitle: cargoTitle,
+          schoolName: institutionalScope === 'escola' ? (schoolOrUnitName.trim() || 'Escola Modelo Primária') : undefined,
+          municipalityOrDepartment: institutionalScope === 'administracao' ? (schoolOrUnitName.trim() || 'DME Municipal') : undefined,
+          titlePrefix: prefix,
           greeting: `Olá ${prefix} ${userFirst}`,
           rememberMe: true,
         };
 
-        setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${prefix} ${userFirst}...`);
+        setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${cargoTitle} (${userFirst})...`);
         setTimeout(() => {
           onAuthLoadingChange?.(false);
           onLoginSuccess(newUser);
-        }, 900);
+        }, 850);
       }, 700);
     }
   };
@@ -391,57 +639,165 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
                 )}
 
-                {/* Subtle Profile Demo Selector - Low Visual Weight to not compete with primary CTA */}
-                <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
-                      Acesso rápido por perfil:
+                {/* Profile Demo Selector with Scope Switcher */}
+                <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-[#f75142]" />
+                      <span>Acesso rápido por perfil:</span>
                     </span>
-                    <span className="text-[10px] text-slate-400">Clique para testar</span>
+                    {/* Scope Tabs in Login */}
+                    <div className="flex bg-slate-200/70 p-0.5 rounded-lg text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setLoginPresetTab('escola')}
+                        className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                          loginPresetTab === 'escola'
+                            ? 'bg-white text-[#002133] shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Escola
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLoginPresetTab('administracao')}
+                        className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                          loginPresetTab === 'administracao'
+                            ? 'bg-white text-[#002133] shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Administração (DME)
+                      </button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      id="preset-admin-btn"
-                      onClick={() => handleFillPreset('admin')}
-                      className={`py-2 px-2 rounded-xl text-xs font-medium transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
-                        selectedRole === 'admin'
-                          ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70 hover:text-slate-900'
-                      }`}
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                      <span>Admin</span>
-                    </button>
 
-                    <button
-                      type="button"
-                      id="preset-diretor-btn"
-                      onClick={() => handleFillPreset('diretor')}
-                      className={`py-2 px-2 rounded-xl text-xs font-medium transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
-                        selectedRole === 'diretor'
-                          ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70 hover:text-slate-900'
-                      }`}
-                    >
-                      <Building2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Diretor</span>
-                    </button>
+                  {loginPresetTab === 'escola' ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      <button
+                        type="button"
+                        id="preset-diretor-geral-btn"
+                        onClick={() => handleFillSchoolPreset('diretor_geral')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'escola' && schoolRole === 'diretor_geral'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Diretor Geral</span>
+                        <span className="text-[9px] opacity-75 font-normal">Carl Mendes</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      id="preset-professor-btn"
-                      onClick={() => handleFillPreset('professor')}
-                      className={`py-2 px-2 rounded-xl text-xs font-medium transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
-                        selectedRole === 'professor'
-                          ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70 hover:text-slate-900'
-                      }`}
-                    >
-                      <GraduationCap className="w-3.5 h-3.5 shrink-0" />
-                      <span>Professor</span>
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        id="preset-subdir-pedagogico-btn"
+                        onClick={() => handleFillSchoolPreset('subdiretor_pedagogico')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'escola' && schoolRole === 'subdiretor_pedagogico'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <GraduationCap className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Subdir. Pedagógico</span>
+                        <span className="text-[9px] opacity-75 font-normal">Carlos Silva</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="preset-subdir-adm-btn"
+                        onClick={() => handleFillSchoolPreset('subdiretor_administrativo')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'escola' && schoolRole === 'subdiretor_administrativo'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Subdir. Adm.</span>
+                        <span className="text-[9px] opacity-75 font-normal">Teresa Santos</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="preset-professor-btn"
+                        onClick={() => handleFillSchoolPreset('professor')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'escola' && schoolRole === 'professor'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Professor(a)</span>
+                        <span className="text-[9px] opacity-75 font-normal">Santar Goes</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      <button
+                        type="button"
+                        id="preset-diretor-municipal-btn"
+                        onClick={() => handleFillAdminPreset('diretor_municipal')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'administracao' && adminRole === 'diretor_municipal'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <Landmark className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Diretor Municipal</span>
+                        <span className="text-[9px] opacity-75 font-normal">Fred Silva</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="preset-inspetor-escolar-btn"
+                        onClick={() => handleFillAdminPreset('inspetor_escolar')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'administracao' && adminRole === 'inspetor_escolar'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <Eye className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Inspetor Escolar</span>
+                        <span className="text-[9px] opacity-75 font-normal">Marcos Dinis</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="preset-chefe-reparticao-btn"
+                        onClick={() => handleFillAdminPreset('chefe_reparticao')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'administracao' && adminRole === 'chefe_reparticao'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <Award className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Chefe Repartição</span>
+                        <span className="text-[9px] opacity-75 font-normal">Augusto Nvula</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="preset-admin-sistema-btn"
+                        onClick={() => handleFillAdminPreset('admin_sistema')}
+                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
+                          institutionalScope === 'administracao' && adminRole === 'admin_sistema'
+                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                        }`}
+                      >
+                        <Settings className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="font-bold text-[11px] leading-tight">Admin Sistema</span>
+                        <span className="text-[9px] opacity-75 font-normal">Super TI</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Login Form */}
@@ -585,45 +941,169 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
                 <form onSubmit={handleSubmit} className="space-y-3.5">
                   
-                  {/* Role Selector: Discreto e integrado, sem roubar atenção */}
+                  {/* 1. Âmbito Institucional de Atuação */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Perfil de Atuação na Escola
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>1. Âmbito Institucional de Atuação</span>
+                      <span className="text-[10px] font-normal text-slate-500">Selecione o seu setor</span>
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setSelectedRole('admin')}
-                        className={`py-2 px-1 text-center rounded-xl text-xs font-medium transition-all border cursor-pointer ${
-                          selectedRole === 'admin'
-                            ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        onClick={() => setInstitutionalScope('escola')}
+                        className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center gap-2.5 ${
+                          institutionalScope === 'escola'
+                            ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
-                        Administrador
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          institutionalScope === 'escola' ? 'bg-[#f75142] text-white' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold leading-tight">Âmbito Escolar</div>
+                          <div className="text-[10px] opacity-75">Direção, coordenação e docentes</div>
+                        </div>
                       </button>
+
                       <button
                         type="button"
-                        onClick={() => setSelectedRole('diretor')}
-                        className={`py-2 px-1 text-center rounded-xl text-xs font-medium transition-all border cursor-pointer ${
-                          selectedRole === 'diretor'
-                            ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        onClick={() => setInstitutionalScope('administracao')}
+                        className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center gap-2.5 ${
+                          institutionalScope === 'administracao'
+                            ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
-                        Diretor
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          institutionalScope === 'administracao' ? 'bg-[#f75142] text-white' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          <Landmark className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold leading-tight">Administração (DME)</div>
+                          <div className="text-[10px] opacity-75">Direção municipal e inspecção</div>
+                        </div>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRole('professor')}
-                        className={`py-2 px-1 text-center rounded-xl text-xs font-medium transition-all border cursor-pointer ${
-                          selectedRole === 'professor'
-                            ? 'bg-[#002133] text-white border-[#002133] font-semibold shadow-xs'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        Professor
-                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2. Flexão da Função / Cargo Específico */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>2. Função / Cargo a Desempenhar</span>
+                      <span className="text-[10px] font-semibold text-[#f75142]">Flexão Hierárquica</span>
+                    </label>
+
+                    {institutionalScope === 'escola' ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {SCHOOL_ROLES_CONFIG.map((roleItem) => {
+                            const isSelected = schoolRole === roleItem.id;
+                            const RoleIcon = roleItem.icon;
+                            return (
+                              <button
+                                key={roleItem.id}
+                                type="button"
+                                onClick={() => setSchoolRole(roleItem.id)}
+                                className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col gap-1 ${
+                                  isSelected
+                                    ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <RoleIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-[#f75142]' : 'text-slate-500'}`} />
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {roleItem.badge}
+                                  </span>
+                                </div>
+                                <span className="text-xs font-bold leading-tight">{roleItem.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Selected Role Info Pill */}
+                        {(() => {
+                          const active = SCHOOL_ROLES_CONFIG.find(r => r.id === schoolRole);
+                          return active ? (
+                            <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+                              <Info className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
+                              <span>{active.desc}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {ADMIN_ROLES_CONFIG.map((roleItem) => {
+                            const isSelected = adminRole === roleItem.id;
+                            const RoleIcon = roleItem.icon;
+                            return (
+                              <button
+                                key={roleItem.id}
+                                type="button"
+                                onClick={() => setAdminRole(roleItem.id)}
+                                className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col gap-1 ${
+                                  isSelected
+                                    ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <RoleIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-[#f75142]' : 'text-slate-500'}`} />
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {roleItem.badge}
+                                  </span>
+                                </div>
+                                <span className="text-xs font-bold leading-tight">{roleItem.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Selected Role Info Pill */}
+                        {(() => {
+                          const active = ADMIN_ROLES_CONFIG.find(r => r.id === adminRole);
+                          return active ? (
+                            <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+                              <Info className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
+                              <span>{active.desc}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Instituição / Local de Exercício */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      {institutionalScope === 'escola'
+                        ? 'Escola onde exerce funções'
+                        : 'Município / Direção Municipal da Educação'}
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        {institutionalScope === 'escola' ? <School className="w-4 h-4" /> : <Landmark className="w-4 h-4" />}
+                      </div>
+                      <input
+                        type="text"
+                        value={schoolOrUnitName}
+                        onChange={(e) => setSchoolOrUnitName(e.target.value)}
+                        placeholder={
+                          institutionalScope === 'escola'
+                            ? 'Ex.: Escola Primária e Iº Ciclo de Quêssua'
+                            : 'Ex.: Direcção Municipal da Educação de Quêssua (DME)'
+                        }
+                        className="w-full h-[46px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                      />
                     </div>
                   </div>
 

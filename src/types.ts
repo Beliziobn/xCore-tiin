@@ -1,5 +1,23 @@
 export type RoleType = 'admin' | 'diretor' | 'professor' | 'custom';
 
+// Flexão de Funções no Âmbito Escolar (School Scope)
+export type SchoolStaffRole = 
+  | 'diretor_geral'              // Diretor(a) Geral
+  | 'subdiretor_pedagogico'      // Subdiretor(a) Pedagógico(a)
+  | 'subdiretor_administrativo'  // Subdiretor(a) Administrativo(a)
+  | 'professor'                  // Professor(a) / Docente
+  | 'secretario_escolar'         // Secretário(a) Escolar
+  | 'coordenador_pedagogico';    // Coordenador(a) Pedagógico(a) / de Turno
+
+// Flexão de Funções no Âmbito Administrativo Municipal (DME - Direção Municipal da Educação / Nível Central)
+export type AdminStaffRole = 
+  | 'diretor_municipal'          // Diretor(a) Municipal da Educação
+  | 'chefe_reparticao'           // Chefe de Repartição / Departamento de Ensino Geral
+  | 'inspetor_escolar'           // Inspetor(a) Escolar Municipal
+  | 'tecnico_estatistica'        // Técnico(a) de Planeamento e Estatística
+  | 'tecnico_recursos_humanos'   // Técnico(a) de Recursos Humanos / Secretaria Municipal
+  | 'admin_sistema';             // Administrador(a) de Sistema uCore
+
 export interface SessionCard {
   id: string;
   title: string;
@@ -72,6 +90,12 @@ export interface UserAccount {
   lastName: string;
   email: string;
   role: RoleType;
+  scope?: 'escola' | 'administracao';
+  schoolRole?: SchoolStaffRole;
+  adminRole?: AdminStaffRole;
+  cargoTitle?: string;
+  schoolName?: string;
+  municipalityOrDepartment?: string;
   titlePrefix?: string;
   greeting?: string;
   avatar?: string;
@@ -504,8 +528,12 @@ export interface AdminDirector {
 // ==========================================
 
 export type DirectorCargo = 
+  | 'Director(a) Geral'
+  | 'Subdirector(a) Pedagógico(a)'
+  | 'Subdirector(a) Administrativo(a)'
   | 'Director(a)'
   | 'Director(a) Adjunto(a)'
+  | 'Secretário(a) Geral / Administrativo'
   | 'Coordenador(a) Pedagógico(a)'
   | 'Outro';
 
