@@ -40,14 +40,14 @@ export const StatCards: React.FC<StatCardsProps> = ({
       {!isLoggedIn && (
         <div 
           onClick={() => onRequireAuth?.('Autenticação no Sistema')}
-          className="mb-8 bg-[#fef2f1] hover:bg-[#fee4e2] border border-[#f75142]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-800 transition-all cursor-pointer shadow-xs"
+          className="mb-8 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-800 transition-all cursor-pointer shadow-2xs"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#f75142] text-white flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
               <Lock className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#f75142]">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Sessão Não Iniciada
               </span>
               <p className="text-xs sm:text-sm font-semibold text-slate-800">
@@ -57,23 +57,23 @@ export const StatCards: React.FC<StatCardsProps> = ({
           </div>
           <button 
             type="button"
-            className="shrink-0 bg-[#f75142] text-[#002133] text-[11px] font-black uppercase tracking-wider px-4 py-2 rounded-xl flex items-center gap-1.5 hover:bg-[#e04436] transition-colors"
+            className="shrink-0 bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 hover:bg-black transition-colors cursor-pointer"
           >
             <span>Iniciar Sessão</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[#002133]" />
+            <ArrowRight className="w-3.5 h-3.5 text-white" />
           </button>
         </div>
       )}
 
       {/* Card Classification Filter Chips & Settings Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-        <div className="flex items-center gap-1.5 bg-slate-200/60 p-1 rounded-xl text-xs font-bold">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-medium border border-slate-200/60">
           <button
             type="button"
             onClick={() => setFilter('all')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               filter === 'all'
-                ? 'bg-white text-slate-900 shadow-xs font-black'
+                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200/80'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -84,7 +84,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
             onClick={() => setFilter('clickable')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
               filter === 'clickable'
-                ? 'bg-white text-slate-900 shadow-xs font-black'
+                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200/80'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -95,7 +95,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
             onClick={() => setFilter('stats')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
               filter === 'stats'
-                ? 'bg-white text-slate-900 shadow-xs font-black'
+                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200/80'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >

@@ -299,7 +299,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                   {activeTeacher.niveisLecciona.map((nl, idx) => (
                     <span
                       key={idx}
-                      className="text-[11px] font-bold bg-[#fef2f1] text-[#f75142] px-2 py-0.5 rounded-md border border-[#fee4e2]"
+                      className="text-[11px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/80"
                     >
                       {nl.nome} {nl.detalhe ? `[${nl.detalhe}]` : ''}
                     </span>
@@ -325,10 +325,10 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
         )}
 
         {/* Teachers Table with Full 8-Point Attributes */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
-              <h4 className="text-sm font-bold text-slate-800">
+              <h4 className="text-sm font-bold text-slate-900">
                 Corpo Docente Cadastrado ({filteredTeachers.length} professores)
               </h4>
               <p className="text-xs text-slate-500">
@@ -342,7 +342,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider">
+              <thead className="bg-slate-50/90 text-slate-500 font-semibold text-[11px] border-b border-slate-200 uppercase tracking-wider">
                 <tr>
                   <th className="p-3.5">Docente & BI/NIF</th>
                   <th className="p-3.5">Escola & Natureza</th>
@@ -361,14 +361,14 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                     <tr
                       key={t.id}
                       onClick={() => setSelectedTeacherId(t.id)}
-                      className={`hover:bg-[#fef2f1]/50 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-[#fef2f1]/80 font-medium' : ''
+                      className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${
+                        isSelected ? 'bg-slate-100/90 font-medium' : ''
                       }`}
                     >
                       {/* Name & BI */}
                       <td className="p-3.5 font-bold text-slate-900">
                         <div className="flex items-center gap-2">
-                          <UserIcon className={`w-4 h-4 shrink-0 ${isSelected ? 'text-[#f75142]' : 'text-slate-400'}`} />
+                          <UserIcon className={`w-4 h-4 shrink-0 ${isSelected ? 'text-slate-900' : 'text-slate-400'}`} />
                           <div>
                             <span className="block text-slate-900 font-bold">{t.nomeCompleto}</span>
                             <span className="text-[10px] font-mono text-slate-500">{t.biNif}</span>

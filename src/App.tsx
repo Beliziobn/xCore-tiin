@@ -61,6 +61,8 @@ import { initSmoothScroll, scrollToTop, refreshScrollReveals } from './utils/scr
 // School Team Section (Professores, Gestores e Coordenadores)
 import SchoolTeamSection, { defaultSchoolMembers, SchoolMember } from './components/ui/school-team-section';
 import { AIInputWithLoading } from './components/ui/ai-input-with-loading';
+import { PublicLandingPage } from './components/pages/PublicLandingPage';
+import { DemoRequestModal } from './components/modals/DemoRequestModal';
 
 import type { 
   EducationalModule, 
@@ -93,6 +95,7 @@ export default function App() {
   const [selectedModule, setSelectedModule] = useState<EducationalModule | null>(null);
   const [infoModalType, setInfoModalType] = useState<InfoModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
 
   // Admin dynamic state
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
@@ -225,9 +228,13 @@ export default function App() {
     }
   }, [teacherProfile]);
 
-  // User persistence
+  // User persistence (starts on pre-session landing page unless active session exists)
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
+      const isSessionActive = sessionStorage.getItem('ucore_session_active') === 'true';
+      if (!isSessionActive) {
+        return null;
+      }
       const saved = localStorage.getItem('ucore_active_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
@@ -570,16 +577,17 @@ export default function App() {
   const handleLoginSuccess = (user: UserAccount) => {
     setIsAuthLoading(false);
     setAuthLoadingAction(null);
+    try {
+      sessionStorage.setItem('ucore_session_active', 'true');
+      if (user.rememberMe) {
+        localStorage.setItem('ucore_active_user', JSON.stringify(user));
+      }
+    } catch {
+      // ignore
+    }
     setCurrentUser(user);
     if (user.role === 'admin' || user.role === 'diretor' || user.role === 'professor') {
       setActiveRole(user.role);
-    }
-    if (user.rememberMe) {
-      try {
-        localStorage.setItem('ucore_active_user', JSON.stringify(user));
-      } catch {
-        // ignore
-      }
     }
     setCurrentPage('home');
     setCurrentView('home');
@@ -591,11 +599,48 @@ export default function App() {
     setCurrentPage('home');
     setCurrentView('home');
     try {
+      sessionStorage.removeItem('ucore_session_active');
       localStorage.removeItem('ucore_active_user');
     } catch {
       // ignore
     }
     showToast('Sessão encerrada com sucesso.');
+  };
+
+  const handleDirectDemoLogin = (role: 'admin' | 'diretor' | 'professor' = 'diretor') => {
+    let demoUser: UserAccount;
+    if (role === 'admin') {
+      demoUser = {
+        id: 'user-fred-admin',
+        firstName: 'Fred',
+        lastName: 'Silva',
+        email: 'admin.fred@ucore.edu.br',
+        role: 'admin',
+        greeting: 'Olá Admin. Fred',
+        rememberMe: true,
+      };
+    } else if (role === 'professor') {
+      demoUser = {
+        id: 'user-santar-prof',
+        firstName: 'Santar',
+        lastName: 'Goes',
+        email: 'prof.santar@ucore.edu.br',
+        role: 'professor',
+        greeting: 'Olá Prof. Santar',
+        rememberMe: true,
+      };
+    } else {
+      demoUser = {
+        id: 'user-carl-diretor',
+        firstName: 'Carl',
+        lastName: 'Mendes',
+        email: 'diretor.carl@ucore.edu.br',
+        role: 'diretor',
+        greeting: 'Olá Diretor Carl',
+        rememberMe: true,
+      };
+    }
+    handleLoginSuccess(demoUser);
   };
 
   const handleSaveSettings = (updated: SessionSettings) => {
@@ -779,6 +824,20 @@ export default function App() {
             setIsAuthLoading(loading);
             setAuthLoadingAction(loading ? (action || null) : null);
           }}
+        />
+      );
+    }
+
+    // 0.1 Public Pre-contact / Pre-session Landing Page
+    // "antes do usario entrar contacto com o nosso sistema devemos exibir uma pagina, assim que ele iniciar a sessão poderá ver"
+    if (!currentUser) {
+      return (
+        <PublicLandingPage
+          onAcessarPlataforma={() => handleOpenAuth('login')}
+          onOpenDemoModal={() => setIsDemoModalOpen(true)}
+          onDirectLogin={(role) => handleDirectDemoLogin(role)}
+          onOpenAbout={() => setInfoModalType('about')}
+          onOpenSupport={() => setInfoModalType('support')}
         />
       );
     }
@@ -1427,13 +1486,14 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenDemoModal={() => setIsDemoModalOpen(true)}
       />
 
       {/* Main Routed View */}
       {renderCurrentView()}
 
-      {/* School Team Showcase (Professores Cadastrados no Sistema) - Only on home landing view to eliminate layout collisions */}
-      {currentPage === 'home' && currentView === 'home' && (
+      {/* School Team Showcase (Professores Cadastrados no Sistema) - Only on home dashboard when session is started */}
+      {currentPage === 'home' && currentView === 'home' && isSessionStarted && (
         <SchoolTeamSection
           members={schoolMembers}
           title="Professores Cadastrados no Sistema"
@@ -1452,6 +1512,13 @@ export default function App() {
       <FloatingChatButton
         onClick={() => setIsChatOpen(true)}
         unreadCount={unreadChatCount}
+      />
+
+      {/* Demo Request Modal */}
+      <DemoRequestModal
+        isOpen={isDemoModalOpen}
+        onClose={() => setIsDemoModalOpen(false)}
+        onStartDemoSession={(role) => handleDirectDemoLogin(role || 'diretor')}
       />
 
       {/* Card Detail Modal */}

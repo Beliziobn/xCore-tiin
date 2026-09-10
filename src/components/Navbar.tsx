@@ -22,6 +22,7 @@ interface NavbarProps {
   isAuthLoading?: boolean;
   authLoadingAction?: 'login' | 'register' | null;
   onOpenSettings?: () => void;
+  onOpenDemoModal?: () => void;
 }
 
 const mockNotifications: NotificationItem[] = [
@@ -71,6 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isAuthLoading = false,
   authLoadingAction = null,
   onOpenSettings,
+  onOpenDemoModal,
 }) => {
   const [showPagesDropdown, setShowPagesDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);

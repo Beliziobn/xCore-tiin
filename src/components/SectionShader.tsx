@@ -231,8 +231,8 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
 
             // Twinkle factor using harmonic sin
             const twinkle = Math.sin(time * 2 + c * 0.5 + r * 0.7) * 0.5 + 0.5;
-            let baseSize = 0.8 + twinkle * 0.4;
-            let glowAlpha = variant === 'coral' ? 0.12 + twinkle * 0.08 : 0.06 + twinkle * 0.04;
+            let baseSize = variant === 'coral' ? (0.8 + twinkle * 0.4) : (1.15 + twinkle * 0.45);
+            let glowAlpha = variant === 'coral' ? (0.12 + twinkle * 0.08) : (0.16 + twinkle * 0.1);
 
             // Calculate distance to cursor & trail points (ChromaFlow)
             let trailInfluence = 0;
@@ -263,7 +263,7 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
               ctx.fillStyle =
                 variant === 'coral'
                   ? `rgba(255, 217, 196, ${trailInfluence * 0.5})`
-                  : `rgba(247, 81, 66, ${trailInfluence * 0.25})`;
+                  : `rgba(247, 81, 66, ${trailInfluence * 0.35})`;
               ctx.fill();
 
               // Bright core dot
@@ -272,7 +272,7 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
               ctx.fillStyle =
                 variant === 'coral'
                   ? `rgba(255, 255, 255, ${glowAlpha})`
-                  : `rgba(247, 81, 66, ${Math.min(0.8, glowAlpha)})`;
+                  : `rgba(247, 81, 66, ${Math.min(0.9, glowAlpha)})`;
               ctx.fill();
             } else {
               // Idle dot
@@ -281,7 +281,7 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
               ctx.fillStyle =
                 variant === 'coral'
                   ? `rgba(255, 255, 255, ${glowAlpha})`
-                  : `rgba(15, 23, 42, ${glowAlpha})`;
+                  : `rgba(71, 85, 105, ${glowAlpha})`;
               ctx.fill();
             }
           }

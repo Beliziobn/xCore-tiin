@@ -42,6 +42,8 @@ export interface UserProfileData {
   emergencyPhone?: string;
 }
 
+export type ProfileModalType = 'manage-profile' | 'personal-info' | 'notifications' | 'language' | 'theme' | 'change-password' | null;
+
 interface ProfileOptionsSectionProps {
   user: UserProfileData;
   onUpdateUser?: (updated: Partial<UserProfileData>) => void;
@@ -49,20 +51,35 @@ interface ProfileOptionsSectionProps {
   title?: string;
   className?: string;
   showBackHeader?: boolean;
+  hideProfileHeaderCard?: boolean;
+  externalActiveModal?: ProfileModalType;
+  onCloseExternalModal?: () => void;
 }
-
-type ModalType = 'manage-profile' | 'personal-info' | 'notifications' | 'language' | 'theme' | 'change-password' | null;
 
 export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
   user,
   onUpdateUser,
   onBack,
-  title = 'Profile',
+  title = 'Perfil',
   className = '',
   showBackHeader = false,
+  hideProfileHeaderCard = false,
+  externalActiveModal,
+  onCloseExternalModal,
 }) => {
-  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [activeModal, setActiveModal] = useState<ProfileModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (externalActiveModal !== undefined) {
+      setActiveModal(externalActiveModal);
+    }
+  }, [externalActiveModal]);
+
+  const closeModal = () => {
+    setActiveModal(null);
+    onCloseExternalModal?.();
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -321,86 +338,88 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
         </div>
       )}
 
-      {/* Profile Header Card matching Screenshot */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-2xs mb-6 flex items-center gap-4 sm:gap-5">
-        <div className="relative shrink-0">
-          {user.avatar ? (
-            <img
-              src={user.avatar}
-              alt={user.name}
-              className="w-16 h-16 sm:w-18 sm:h-18 rounded-full object-cover border-2 border-white shadow-xs"
-            />
-          ) : (
-            <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-gradient-to-tr from-[#f75142] to-[#ff7a6e] text-white font-black text-2xl flex items-center justify-center shadow-xs">
-              {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-            </div>
-          )}
-          <button
-            onClick={() => setActiveModal('manage-profile')}
-            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white text-slate-700 border border-slate-200 shadow-xs flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer"
-            title="Alterar Foto ou Dados"
-          >
-            <Camera className="w-3 h-3 text-[#f75142]" />
-          </button>
-        </div>
+      {/* Profile Header Card matching Screenshot (optional) */}
+      {!hideProfileHeaderCard && (
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs mb-6 flex items-center gap-4 sm:gap-5">
+          <div className="relative shrink-0">
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-16 h-16 sm:w-18 sm:h-18 rounded-full object-cover border-2 border-white shadow-xs"
+              />
+            ) : (
+              <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-gradient-to-tr from-[#f75142] to-[#ff7a6e] text-white font-black text-2xl flex items-center justify-center shadow-xs">
+                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+            )}
+            <button
+              onClick={() => setActiveModal('manage-profile')}
+              className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white text-slate-700 border border-slate-200 shadow-xs flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer"
+              title="Alterar Foto ou Dados"
+            >
+              <Camera className="w-3 h-3 text-[#f75142]" />
+            </button>
+          </div>
 
-        <div className="flex-1 min-w-0">
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate leading-snug">
-            {user.name}
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-500 truncate mt-0.5">
-            {user.email}
-          </p>
-          {user.roleTitle && (
-            <span className="inline-block mt-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#fef2f1] text-[#f75142] border border-[#fee4e2]">
-              {user.roleTitle}
-            </span>
-          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate leading-snug">
+              {user.name}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 truncate mt-0.5">
+              {user.email}
+            </p>
+            {user.roleTitle && (
+              <span className="inline-block mt-1.5 text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#fef2f1] text-[#f75142] border border-[#fee4e2]">
+                {user.roleTitle}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* SECTION 1: Account */}
-      <div className="mb-6">
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 px-1.5">
-          Account
+      {/* SECTION 1: Conta */}
+      <div className="mb-5">
+        <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1">
+          Conta
         </div>
-        <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-2xs divide-y divide-slate-100">
-          {/* Manage Profile */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs divide-y divide-slate-100">
+          {/* Gerir perfil */}
           <button
             onClick={() => setActiveModal('manage-profile')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
                 <User className="w-4 h-4 stroke-[2]" />
               </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-slate-950 block">
-                  Manage Profile
+                <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
+                  Gerir perfil
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  Nome, foto, cargo e contactos
+                <span className="text-xs text-slate-500 block">
+                  Nome, foto de exibição, cargo e contactos
                 </span>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
 
-          {/* Personal Information */}
+          {/* Informações pessoais */}
           <button
             onClick={() => setActiveModal('personal-info')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
                 <CreditCard className="w-4 h-4 stroke-[2]" />
               </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-slate-950 block">
-                  Personal Information
+                <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
+                  Informações pessoais
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  B.I., morada, emergência e dados institucionais
+                <span className="text-xs text-slate-500 block">
+                  B.I., morada oficial, dados de emergência e vínculo
                 </span>
               </div>
             </div>
@@ -409,84 +428,84 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
         </div>
       </div>
 
-      {/* SECTION 2: Preferences */}
-      <div className="mb-6">
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 px-1.5">
-          Preferences
+      {/* SECTION 2: Preferências */}
+      <div className="mb-5">
+        <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1">
+          Preferências
         </div>
-        <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-2xs divide-y divide-slate-100">
-          {/* Notifications */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs divide-y divide-slate-100">
+          {/* Notificações */}
           <button
             onClick={() => setActiveModal('notifications')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
                 <Bell className="w-4 h-4 stroke-[2]" />
               </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-slate-950 block">
-                  Notifications
+                <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
+                  Notificações
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  Push, e-mail e alertas acadêmicos
+                <span className="text-xs text-slate-500 block">
+                  Alertas em tempo real, e-mails e despachos
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 Ativo
               </span>
               <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
             </div>
           </button>
 
-          {/* Language Settings */}
+          {/* Idioma */}
           <button
             onClick={() => setActiveModal('language')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
                 <Globe className="w-4 h-4 stroke-[2]" />
               </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-slate-950 block">
-                  Language Settings
+                <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
+                  Idioma
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  Idioma da interface do sistema
+                <span className="text-xs text-slate-500 block">
+                  Língua da interface institucional
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
                 {getLanguageLabel()}
               </span>
               <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
             </div>
           </button>
 
-          {/* Theme (Light/Dark) */}
+          {/* Tema */}
           <button
             onClick={() => setActiveModal('theme')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
                 <Sun className="w-4 h-4 stroke-[2]" />
               </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-slate-950 block">
-                  Theme (Light/Dark)
+                <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
+                  Tema
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  Modo claro ou escuro
+                <span className="text-xs text-slate-500 block">
+                  Modo claro ou modo escuro
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
                 {getThemeLabel()}
               </span>
               <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
@@ -495,27 +514,27 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
         </div>
       </div>
 
-      {/* SECTION 3: Security */}
-      <div className="mb-6">
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 px-1.5">
-          Security
+      {/* SECTION 3: Segurança */}
+      <div className="mb-5">
+        <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1">
+          Segurança
         </div>
-        <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-2xs divide-y divide-slate-100">
-          {/* Change Password */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs divide-y divide-slate-100">
+          {/* Alterar palavra-passe */}
           <button
             onClick={() => setActiveModal('change-password')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
                 <Lock className="w-4 h-4 stroke-[2]" />
               </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-slate-950 block">
-                  Change Password
+                <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
+                  Alterar palavra-passe
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  Atualizar chave de acesso com segurança
+                <span className="text-xs text-slate-500 block">
+                  Atualizar credencial de acesso com segurança
                 </span>
               </div>
             </div>
@@ -536,12 +555,12 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <User className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Manage Profile</h4>
-                  <p className="text-xs text-white/70">Edite as informações públicas e de contato da sua conta</p>
+                  <h4 className="text-base font-bold text-white leading-tight">Gerir Perfil</h4>
+                  <p className="text-xs text-white/70">Edite as informações públicas e de contacto da sua conta</p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeModal}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -678,12 +697,12 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <CreditCard className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Personal Information</h4>
+                  <h4 className="text-base font-bold text-white leading-tight">Informações Pessoais</h4>
                   <p className="text-xs text-white/70">Documentos oficiais e dados de identificação do uCore</p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeModal}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -835,12 +854,12 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <Bell className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Notifications</h4>
+                  <h4 className="text-base font-bold text-white leading-tight">Notificações</h4>
                   <p className="text-xs text-white/70">Personalize os canais e frequência dos avisos do sistema</p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeModal}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1000,12 +1019,12 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <Globe className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Language Settings</h4>
-                  <p className="text-xs text-white/70">Selecione o idioma de preferência</p>
+                  <h4 className="text-base font-bold text-white leading-tight">Configurações de Idioma</h4>
+                  <p className="text-xs text-white/70">Selecione o idioma de preferência para a plataforma</p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeModal}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1072,12 +1091,12 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <Sun className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Theme (Light/Dark)</h4>
-                  <p className="text-xs text-white/70">Escolha a aparência da interface</p>
+                  <h4 className="text-base font-bold text-white leading-tight">Tema de Exibição</h4>
+                  <p className="text-xs text-white/70">Escolha a aparência da interface (Claro ou Escuro)</p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeModal}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1198,12 +1217,12 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <Lock className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Change Password</h4>
-                  <p className="text-xs text-white/70">Atualize sua senha de autenticação com segurança</p>
+                  <h4 className="text-base font-bold text-white leading-tight">Alterar Palavra-passe</h4>
+                  <p className="text-xs text-white/70">Atualize sua palavra-passe com segurança</p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeModal}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
