@@ -126,7 +126,6 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
             registrationData: regData,
           };
           onAddStudent?.(newStudent);
-          onClose();
         }}
         defaultGradeClass="4ª Classe"
         defaultTurma="Turma A"

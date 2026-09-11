@@ -48,6 +48,75 @@ type TabType =
   | 'naodoc'
   | 'consol';
 
+const ALUNOS_IDADE_COLUNAS = [
+  { key: '< 5 anos', short: '<5a', title: 'Menos de 5 anos' },
+  { key: '5 anos', short: '5a', title: '5 anos' },
+  { key: '6 anos', short: '6a', title: '6 anos' },
+  { key: '7 anos', short: '7a', title: '7 anos' },
+  { key: '8 anos', short: '8a', title: '8 anos' },
+  { key: '9 anos', short: '9a', title: '9 anos' },
+  { key: '10 anos', short: '10a', title: '10 anos' },
+  { key: '11 anos', short: '11a', title: '11 anos' },
+  { key: '12 anos', short: '12a', title: '12 anos' },
+  { key: '13 anos', short: '13a', title: '13 anos' },
+  { key: '14 anos', short: '14a', title: '14 anos' },
+  { key: '15 anos', short: '15a', title: '15 anos' },
+  { key: '16 anos', short: '16a', title: '16 anos' },
+  { key: '17 anos', short: '17a', title: '17 anos' },
+  { key: '18 anos', short: '18a', title: '18 anos' },
+  { key: '> 18 anos', short: '>18a', title: 'Mais de 18 anos' },
+];
+
+const REPETENTES_IDADE_COLUNAS = [
+  { key: '< 6 anos', short: '<6a', title: 'Menos de 6 anos' },
+  { key: '6 anos', short: '6a', title: '6 anos' },
+  { key: '7 anos', short: '7a', title: '7 anos' },
+  { key: '8 anos', short: '8a', title: '8 anos' },
+  { key: '9 anos', short: '9a', title: '9 anos' },
+  { key: '10 anos', short: '10a', title: '10 anos' },
+  { key: '11 anos', short: '11a', title: '11 anos' },
+  { key: '12 anos', short: '12a', title: '12 anos' },
+  { key: '13 anos', short: '13a', title: '13 anos' },
+  { key: '14 anos', short: '14a', title: '14 anos' },
+  { key: '15 anos', short: '15a', title: '15 anos' },
+  { key: '16 anos', short: '16a', title: '16 anos' },
+  { key: '> 16 anos', short: '>16a', title: 'Mais de 16 anos' },
+];
+
+function getAlunoIdadeCount(row: any, colKey: string) {
+  let mf = row.idades?.[colKey]?.mf || 0;
+  let f = row.idades?.[colKey]?.f || 0;
+  if (colKey === '> 18 anos' && mf === 0 && (row.idades?.['> 13 anos']?.mf || 0) > 0) {
+    mf = (row.idades?.['> 18 anos']?.mf || 0) + (row.idades?.['> 13 anos']?.mf || 0);
+    f = (row.idades?.['> 18 anos']?.f || 0) + (row.idades?.['> 13 anos']?.f || 0);
+  }
+  return { mf, f };
+}
+
+function getRepetenteIdadeCount(row: any, colKey: string) {
+  let mf = 0;
+  let f = 0;
+  if (colKey === '< 6 anos') {
+    mf = (row.idades?.['< 5 anos']?.mf || 0) + (row.idades?.['5 anos']?.mf || 0);
+    f = (row.idades?.['< 5 anos']?.f || 0) + (row.idades?.['5 anos']?.f || 0);
+  } else if (colKey === '> 16 anos') {
+    mf =
+      (row.idades?.['17 anos']?.mf || 0) +
+      (row.idades?.['18 anos']?.mf || 0) +
+      (row.idades?.['> 18 anos']?.mf || 0) +
+      (row.idades?.['> 13 anos']?.mf || 0);
+    f =
+      (row.idades?.['17 anos']?.f || 0) +
+      (row.idades?.['18 anos']?.f || 0) +
+      (row.idades?.['> 18 anos']?.f || 0) +
+      (row.idades?.['> 13 anos']?.f || 0);
+  } else {
+    mf = row.idades?.[colKey]?.mf || 0;
+    f = row.idades?.[colKey]?.f || 0;
+  }
+  return { mf, f };
+}
+
 export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = ({
   isOpen,
   onClose,
@@ -60,7 +129,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
   const [activeTab, setActiveTab] = useState<TabType>('capa');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNatureza, setSelectedNatureza] = useState('');
-  const [selectedNivel, setSelectedNsetSelectedNivel] = useState('');
+  const [selectedNivel, setSelectedNivel] = useState('');
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
 
@@ -103,7 +172,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedNatureza('');
-    setSelectedNsetSelectedNivel('');
+    setSelectedNivel('');
   };
 
   // Helper filter
@@ -125,6 +194,34 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
     return filterRecord(fullText, item.natureza, item.nivel);
   });
 
+  const alunosTotals = useMemo(() => {
+    const totals: {
+      totalMf: number;
+      totalF: number;
+      idades: Record<string, { mf: number; f: number }>;
+    } = {
+      totalMf: 0,
+      totalF: 0,
+      idades: {},
+    };
+
+    ALUNOS_IDADE_COLUNAS.forEach(col => {
+      totals.idades[col.key] = { mf: 0, f: 0 };
+    });
+
+    filteredAlunos.forEach(row => {
+      totals.totalMf += row.total.mf;
+      totals.totalF += row.total.f;
+      ALUNOS_IDADE_COLUNAS.forEach(col => {
+        const counts = getAlunoIdadeCount(row, col.key);
+        totals.idades[col.key].mf += counts.mf;
+        totals.idades[col.key].f += counts.f;
+      });
+    });
+
+    return totals;
+  }, [filteredAlunos]);
+
   const filteredDocentes = report.pessoalDocente.filter(item => {
     const fullText = `${item.nivelEnsino} ${item.natureza} ${item.grauAcademico} ${item.formacaoPedagogica} ${item.total.mf} ${item.total.f}`;
     return filterRecord(fullText, item.natureza, item.nivelEnsino);
@@ -144,6 +241,34 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
     const fullText = `${item.nivel} ${item.classe} ${item.natureza} ${item.total.mf} ${item.total.f}`;
     return filterRecord(fullText, item.natureza, item.nivel);
   });
+
+  const repetentesTotals = useMemo(() => {
+    const totals: {
+      totalMf: number;
+      totalF: number;
+      idades: Record<string, { mf: number; f: number }>;
+    } = {
+      totalMf: 0,
+      totalF: 0,
+      idades: {},
+    };
+
+    REPETENTES_IDADE_COLUNAS.forEach(col => {
+      totals.idades[col.key] = { mf: 0, f: 0 };
+    });
+
+    filteredRepetentes.forEach(row => {
+      totals.totalMf += row.total.mf;
+      totals.totalF += row.total.f;
+      REPETENTES_IDADE_COLUNAS.forEach(col => {
+        const counts = getRepetenteIdadeCount(row, col.key);
+        totals.idades[col.key].mf += counts.mf;
+        totals.idades[col.key].f += counts.f;
+      });
+    });
+
+    return totals;
+  }, [filteredRepetentes]);
 
   const filteredNee = report.necessidadesEspeciais.filter(item => {
     const fullText = `${item.tipoDeficiencia} ${item.nivel} ${item.natureza} ${item.total.mf} ${item.total.f}`;
@@ -198,7 +323,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-semibold tracking-tight leading-tight flex items-center gap-2">
-                Instrumento Complementar 2024/2025
+                Instrumento Complementar 2026/2027
               </h1>
               <p className="text-xs text-cyan-100 font-normal opacity-90">
                 Estatística Oficial · Município de {report.meta.municipio} · {report.meta.provincia}
@@ -441,7 +566,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 {(activeTab === 'alunos' || activeTab === 'rep' || activeTab === 'aprov' || activeTab === 'consol') && (
                   <select
                     value={selectedNivel}
-                    onChange={e => setSelectedNsetSelectedNivel(e.target.value)}
+                    onChange={e => setSelectedNivel(e.target.value)}
                     className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-700 cursor-pointer focus:outline-hidden focus:border-[#0891b2]"
                   >
                     <option value="">Todos os subsistemas / níveis</option>
@@ -472,52 +597,145 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
           {/* ════ ABA 2: 1 - ALUNOS MATRICULADOS ════ */}
           {activeTab === 'alunos' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                  1 — Alunos Matriculados
-                </h2>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  {filteredAlunos.length} linhas agregadas por idade e classe
-                </span>
+              <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 bg-slate-50">
+                <div>
+                  <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
+                    1 — Alunos Matriculados (Por Idades &amp; Classes)
+                  </h2>
+                  <p className="text-[11px] text-slate-500">
+                    Discriminação completa por idades oficiais (&lt;5 a &gt;18 anos), classes e gênero (MF/F)
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                    Idades 5 a 18+ anos activas
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {filteredAlunos.length} linhas
+                  </span>
+                </div>
               </div>
-              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider z-10">
+              <div className="overflow-x-auto max-h-[540px] overflow-y-auto">
+                <table className="w-full text-xs text-left border-collapse min-w-[1700px]">
+                  <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[10px] font-semibold tracking-wider z-10 select-none">
                     <tr>
-                      <th className="p-2.5">Subsistema / Nível</th>
-                      <th className="p-2.5">Natureza</th>
-                      <th className="p-2.5">Classe</th>
-                      <th className="p-2.5 text-right">Total MF</th>
-                      <th className="p-2.5 text-right">Total F</th>
-                      <th className="p-2.5 text-right">5a MF</th>
-                      <th className="p-2.5 text-right">5a F</th>
-                      <th className="p-2.5 text-right">6a MF</th>
-                      <th className="p-2.5 text-right">6a F</th>
-                      <th className="p-2.5 text-right">7a MF</th>
-                      <th className="p-2.5 text-right">7a F</th>
-                      <th className="p-2.5 text-right">&gt;13a MF</th>
-                      <th className="p-2.5 text-right">&gt;13a F</th>
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[180px] sticky left-0 bg-[#0b3d5c] z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
+                        Subsistema / Nível
+                      </th>
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
+                        Natureza
+                      </th>
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
+                        Classe
+                      </th>
+                      <th colSpan={2} className="p-1.5 text-center border-r border-[#082a40] bg-[#082f49]">
+                        Total Geral
+                      </th>
+                      {ALUNOS_IDADE_COLUNAS.map(col => (
+                        <th
+                          key={col.key}
+                          colSpan={2}
+                          title={col.title}
+                          className="p-1.5 text-center border-r border-[#082a40] last:border-r-0 whitespace-nowrap"
+                        >
+                          {col.short}
+                        </th>
+                      ))}
+                    </tr>
+                    <tr className="bg-[#0e486c] text-[10px] text-sky-100">
+                      <th className="p-1.5 text-right font-medium min-w-[48px]">MF</th>
+                      <th className="p-1.5 text-right font-medium min-w-[48px] border-r border-[#082a40]">F</th>
+                      {ALUNOS_IDADE_COLUNAS.map(col => (
+                        <React.Fragment key={`${col.key}-sub`}>
+                          <th className="p-1.5 text-right font-medium min-w-[44px]">MF</th>
+                          <th className="p-1.5 text-right font-medium min-w-[44px] border-r border-[#082a40] last:border-r-0">F</th>
+                        </React.Fragment>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredAlunos.map((row, idx) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
-                        <td className="p-2.5 font-medium text-slate-800">{row.nivel}</td>
-                        <td className="p-2.5"><NatureBadge natureza={row.natureza} /></td>
-                        <td className="p-2.5 font-semibold text-slate-700">{row.classe}</td>
-                        <td className="p-2.5 text-right tabular-nums font-bold text-[#0b3d5c]">{row.total.mf}</td>
-                        <td className="p-2.5 text-right tabular-nums font-semibold text-slate-700">{row.total.f}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['5 anos']?.mf || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['5 anos']?.f || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['6 anos']?.mf || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['6 anos']?.f || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['7 anos']?.mf || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['7 anos']?.f || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['> 13 anos']?.mf || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['> 13 anos']?.f || 0}</td>
+                    {filteredAlunos.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5 + ALUNOS_IDADE_COLUNAS.length * 2}
+                          className="p-8 text-center text-slate-400 italic"
+                        >
+                          Nenhum registo encontrado para os filtros seleccionados.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredAlunos.map((row, idx) => (
+                        <tr
+                          key={idx}
+                          className={idx % 2 === 0 ? 'bg-white hover:bg-sky-50/70' : 'bg-slate-50/60 hover:bg-sky-50/70'}
+                        >
+                          <td className="p-2.5 font-medium text-slate-800 border-r border-slate-100 sticky left-0 bg-inherit z-10">
+                            {row.nivel}
+                          </td>
+                          <td className="p-2.5 border-r border-slate-100">
+                            <NatureBadge natureza={row.natureza} />
+                          </td>
+                          <td className="p-2.5 font-semibold text-slate-700 border-r border-slate-100">
+                            {row.classe}
+                          </td>
+                          <td className="p-2 text-right tabular-nums font-bold text-[#0b3d5c] bg-sky-50/40">
+                            {row.total.mf}
+                          </td>
+                          <td className="p-2 text-right tabular-nums font-semibold text-slate-700 border-r border-slate-200 bg-sky-50/40">
+                            {row.total.f}
+                          </td>
+                          {ALUNOS_IDADE_COLUNAS.map(col => {
+                            const counts = getAlunoIdadeCount(row, col.key);
+                            const hasCount = counts.mf > 0;
+                            return (
+                              <React.Fragment key={col.key}>
+                                <td
+                                  className={`p-2 text-right tabular-nums ${
+                                    hasCount ? 'font-semibold text-slate-800' : 'text-slate-300'
+                                  }`}
+                                >
+                                  {counts.mf}
+                                </td>
+                                <td
+                                  className={`p-2 text-right tabular-nums border-r border-slate-100 last:border-r-0 ${
+                                    counts.f > 0 ? 'font-medium text-slate-700' : 'text-slate-300'
+                                  }`}
+                                >
+                                  {counts.f}
+                                </td>
+                              </React.Fragment>
+                            );
+                          })}
+                        </tr>
+                      ))
+                    )}
                   </tbody>
+                  {filteredAlunos.length > 0 && (
+                    <tfoot className="sticky bottom-0 bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-800 z-10">
+                      <tr>
+                        <td colSpan={3} className="p-2.5 uppercase tracking-wider text-[11px] text-[#0b3d5c] sticky left-0 bg-slate-100 z-20">
+                          Total Geral Agregado
+                        </td>
+                        <td className="p-2 text-right tabular-nums text-[#0b3d5c]">
+                          {alunosTotals.totalMf}
+                        </td>
+                        <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-300">
+                          {alunosTotals.totalF}
+                        </td>
+                        {ALUNOS_IDADE_COLUNAS.map(col => (
+                          <React.Fragment key={`tot-${col.key}`}>
+                            <td className="p-2 text-right tabular-nums text-slate-800">
+                              {alunosTotals.idades[col.key]?.mf || 0}
+                            </td>
+                            <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-200 last:border-r-0">
+                              {alunosTotals.idades[col.key]?.f || 0}
+                            </td>
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             </div>
@@ -686,52 +904,145 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
           {/* ════ ABA 6: 5 - REPETENTES ════ */}
           {activeTab === 'rep' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                  5 — Alunos Repetentes
-                </h2>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  Sem misturar PRAEER / EJA nas tabelas regulares
-                </span>
+              <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 bg-slate-50">
+                <div>
+                  <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
+                    5 — Alunos Repetentes (Por Idades &amp; Classes)
+                  </h2>
+                  <p className="text-[11px] text-slate-500">
+                    Discriminação etária completa oficial (&lt;6 a &gt;16 anos) para ensino regular
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                    Idades oficiais 6 a 16+ anos
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {filteredRepetentes.length} linhas
+                  </span>
+                </div>
               </div>
-              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider z-10">
+              <div className="overflow-x-auto max-h-[540px] overflow-y-auto">
+                <table className="w-full text-xs text-left border-collapse min-w-[1550px]">
+                  <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[10px] font-semibold tracking-wider z-10 select-none">
                     <tr>
-                      <th className="p-2.5">Subsistema / Nível</th>
-                      <th className="p-2.5">Natureza</th>
-                      <th className="p-2.5">Classe</th>
-                      <th className="p-2.5 text-right">Total Rep. MF</th>
-                      <th className="p-2.5 text-right">Total Rep. F</th>
-                      <th className="p-2.5 text-right">6a MF</th>
-                      <th className="p-2.5 text-right">6a F</th>
-                      <th className="p-2.5 text-right">7a MF</th>
-                      <th className="p-2.5 text-right">7a F</th>
-                      <th className="p-2.5 text-right">&gt;12a MF</th>
-                      <th className="p-2.5 text-right">&gt;12a F</th>
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[180px] sticky left-0 bg-[#0b3d5c] z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
+                        Subsistema / Nível
+                      </th>
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
+                        Natureza
+                      </th>
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
+                        Classe
+                      </th>
+                      <th colSpan={2} className="p-1.5 text-center border-r border-[#082a40] bg-[#082f49]">
+                        Total Repetentes
+                      </th>
+                      {REPETENTES_IDADE_COLUNAS.map(col => (
+                        <th
+                          key={col.key}
+                          colSpan={2}
+                          title={col.title}
+                          className="p-1.5 text-center border-r border-[#082a40] last:border-r-0 whitespace-nowrap"
+                        >
+                          {col.short}
+                        </th>
+                      ))}
+                    </tr>
+                    <tr className="bg-[#0e486c] text-[10px] text-sky-100">
+                      <th className="p-1.5 text-right font-medium min-w-[48px]">MF</th>
+                      <th className="p-1.5 text-right font-medium min-w-[48px] border-r border-[#082a40]">F</th>
+                      {REPETENTES_IDADE_COLUNAS.map(col => (
+                        <React.Fragment key={`${col.key}-rep-sub`}>
+                          <th className="p-1.5 text-right font-medium min-w-[44px]">MF</th>
+                          <th className="p-1.5 text-right font-medium min-w-[44px] border-r border-[#082a40] last:border-r-0">F</th>
+                        </React.Fragment>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredRepetentes.map((row, idx) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
-                        <td className="p-2.5 font-medium text-slate-800">{row.nivel}</td>
-                        <td className="p-2.5"><NatureBadge natureza={row.natureza} /></td>
-                        <td className="p-2.5 font-semibold text-slate-700">{row.classe}</td>
-                        <td className="p-2.5 text-right tabular-nums font-bold text-[#0b3d5c]">{row.total.mf}</td>
-                        <td className="p-2.5 text-right tabular-nums font-semibold text-slate-700">{row.total.f}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['6 anos']?.mf || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['6 anos']?.f || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['7 anos']?.mf || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">{row.idades['7 anos']?.f || 0}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">
-                          {(row.idades['13 anos']?.mf || 0) + (row.idades['> 13 anos']?.mf || 0)}
-                        </td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-500">
-                          {(row.idades['13 anos']?.f || 0) + (row.idades['> 13 anos']?.f || 0)}
+                    {filteredRepetentes.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5 + REPETENTES_IDADE_COLUNAS.length * 2}
+                          className="p-8 text-center text-slate-400 italic"
+                        >
+                          Nenhum registo de repetentes encontrado para os filtros seleccionados.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredRepetentes.map((row, idx) => (
+                        <tr
+                          key={idx}
+                          className={idx % 2 === 0 ? 'bg-white hover:bg-sky-50/70' : 'bg-slate-50/60 hover:bg-sky-50/70'}
+                        >
+                          <td className="p-2.5 font-medium text-slate-800 border-r border-slate-100 sticky left-0 bg-inherit z-10">
+                            {row.nivel}
+                          </td>
+                          <td className="p-2.5 border-r border-slate-100">
+                            <NatureBadge natureza={row.natureza} />
+                          </td>
+                          <td className="p-2.5 font-semibold text-slate-700 border-r border-slate-100">
+                            {row.classe}
+                          </td>
+                          <td className="p-2 text-right tabular-nums font-bold text-[#0b3d5c] bg-amber-50/40">
+                            {row.total.mf}
+                          </td>
+                          <td className="p-2 text-right tabular-nums font-semibold text-slate-700 border-r border-slate-200 bg-amber-50/40">
+                            {row.total.f}
+                          </td>
+                          {REPETENTES_IDADE_COLUNAS.map(col => {
+                            const counts = getRepetenteIdadeCount(row, col.key);
+                            const hasCount = counts.mf > 0;
+                            return (
+                              <React.Fragment key={col.key}>
+                                <td
+                                  className={`p-2 text-right tabular-nums ${
+                                    hasCount ? 'font-semibold text-slate-800' : 'text-slate-300'
+                                  }`}
+                                >
+                                  {counts.mf}
+                                </td>
+                                <td
+                                  className={`p-2 text-right tabular-nums border-r border-slate-100 last:border-r-0 ${
+                                    counts.f > 0 ? 'font-medium text-slate-700' : 'text-slate-300'
+                                  }`}
+                                >
+                                  {counts.f}
+                                </td>
+                              </React.Fragment>
+                            );
+                          })}
+                        </tr>
+                      ))
+                    )}
                   </tbody>
+                  {filteredRepetentes.length > 0 && (
+                    <tfoot className="sticky bottom-0 bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-800 z-10">
+                      <tr>
+                        <td colSpan={3} className="p-2.5 uppercase tracking-wider text-[11px] text-[#0b3d5c] sticky left-0 bg-slate-100 z-20">
+                          Total Repetentes Agregado
+                        </td>
+                        <td className="p-2 text-right tabular-nums text-[#0b3d5c]">
+                          {repetentesTotals.totalMf}
+                        </td>
+                        <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-300">
+                          {repetentesTotals.totalF}
+                        </td>
+                        {REPETENTES_IDADE_COLUNAS.map(col => (
+                          <React.Fragment key={`tot-rep-${col.key}`}>
+                            <td className="p-2 text-right tabular-nums text-slate-800">
+                              {repetentesTotals.idades[col.key]?.mf || 0}
+                            </td>
+                            <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-200 last:border-r-0">
+                              {repetentesTotals.idades[col.key]?.f || 0}
+                            </td>
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             </div>

@@ -27,6 +27,7 @@ import {
 import {
   incrementTurmaOccupancy,
 } from '../../data/classesConfig';
+import { BoletimMatriculaModal } from './BoletimMatriculaModal';
 
 interface StudentRegistrationModalProps {
   isOpen: boolean;
@@ -58,6 +59,17 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
 
   // Active Wizard Step: 1=Identificação, 2=Natureza & Modalidade, 3=Classe & Faixa Etária, 4=Família & Documentos
   const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
+
+  // Exibir Boletim de Matrícula imediatamente após cadastrar
+  const [registeredStudentForBoletim, setRegisteredStudentForBoletim] = useState<StudentRegistrationData | null>(null);
+  const prevIsOpenRef = useRef(isOpen);
+
+  useEffect(() => {
+    if (!prevIsOpenRef.current && isOpen) {
+      setRegisteredStudentForBoletim(null);
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]);
 
   // Smart Autofill state
   const [isAutofillMinimized, setIsAutofillMinimized] = useState(false);
@@ -409,8 +421,24 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     const saved = saveStudent(payload);
     incrementTurmaOccupancy(classeEtapaModulo, turma);
     onSuccess(saved);
-    onClose();
+    setRegisteredStudentForBoletim(saved);
   };
+
+  if (registeredStudentForBoletim) {
+    return (
+      <BoletimMatriculaModal
+        isOpen={true}
+        onClose={() => {
+          setRegisteredStudentForBoletim(null);
+          onClose();
+        }}
+        student={registeredStudentForBoletim}
+        isJustRegistered={true}
+      />
+    );
+  }
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Printer,
@@ -14,11 +14,13 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
+  FileCheck,
   Clock,
   Download,
   Share2
 } from 'lucide-react';
 import type { StudentRegistrationData } from '../../types';
+import { BoletimMatriculaModal } from './BoletimMatriculaModal';
 
 interface StudentDetailModalProps {
   isOpen: boolean;
@@ -33,6 +35,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   student,
   onEdit,
 }) => {
+  const [isBoletimOpen, setIsBoletimOpen] = useState(false);
+
   if (!isOpen || !student) return null;
 
   const handlePrint = () => {
@@ -67,6 +71,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsBoletimOpen(true)}
+              className="px-3 py-1.5 bg-[#0b3d5c] hover:bg-[#0e7490] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs border border-cyan-800"
+              title="Gerar e visualizar Boletim Oficial de Matrícula"
+            >
+              <FileCheck className="w-3.5 h-3.5 text-cyan-300" />
+              <span className="hidden sm:inline">Boletim de Matrícula</span>
+            </button>
             <button
               type="button"
               onClick={handlePrint}
@@ -329,6 +342,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Modal do Boletim Oficial de Matrícula */}
+      <BoletimMatriculaModal
+        isOpen={isBoletimOpen}
+        onClose={() => setIsBoletimOpen(false)}
+        student={student}
+      />
     </div>
   );
 };

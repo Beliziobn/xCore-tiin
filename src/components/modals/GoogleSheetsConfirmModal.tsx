@@ -33,13 +33,13 @@ export const GoogleSheetsConfirmModal: React.FC<GoogleSheetsConfirmModalProps> =
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-5 bg-amber-50 border-b border-amber-200/80 flex items-start justify-between gap-3">
+        <div className="px-6 py-4.5 bg-amber-50/80 border-b border-amber-200/80 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-300/60">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-300/60 shadow-2xs">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
@@ -52,11 +52,13 @@ export const GoogleSheetsConfirmModal: React.FC<GoogleSheetsConfirmModalProps> =
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="w-8 h-8 rounded-full hover:bg-black/5 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-black/5 rounded-xl transition-colors cursor-pointer"
+            title="Fechar"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 

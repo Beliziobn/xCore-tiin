@@ -463,7 +463,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
               </p>
             </div>
             <span className="text-[10px] font-semibold bg-slate-50 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200/70">
-              Ano Letivo 2024 / 2025
+              Ano Lectivo 2026 / 2027
             </span>
           </div>
 

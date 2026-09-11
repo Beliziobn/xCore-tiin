@@ -10,15 +10,14 @@ import {
   Layers,
   Users,
   GraduationCap,
-  School,
-  FileText,
   Copy,
   Check,
   Eye,
-  ArrowRight,
   AlertCircle,
-  Database,
-  History
+  History,
+  ShieldCheck,
+  Table,
+  ArrowRight
 } from 'lucide-react';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
 import { GoogleSheetsConfirmModal } from './GoogleSheetsConfirmModal';
@@ -38,7 +37,6 @@ import {
   buildStudentsSheetDefinition,
   buildTeachersSheetDefinition,
   buildOfficialSigeSheetDefinitions,
-  recordsToSheetDefinition,
   getSavedSpreadsheets,
   SavedSpreadsheetRecord,
   GoogleSpreadsheetResult
@@ -76,7 +74,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   // Export options
   const [exportScope, setExportScope] = useState<'sige_official' | 'all' | 'students' | 'teachers'>('sige_official');
   const [spreadsheetTitle, setSpreadsheetTitle] = useState(
-    prefilledTitle || `SIGE 2024/2025 - Estatística Oficial de Quêssua (${new Date().toLocaleDateString('pt-PT')})`
+    prefilledTitle || `SIGE 2026/2027 - Estatística Oficial de Quêssua (${new Date().toLocaleDateString('pt-PT')})`
   );
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<GoogleSpreadsheetResult | null>(null);
@@ -134,6 +132,12 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
   const dataset = getUnifiedSystemDataset({ schools, teachers, directors, students });
 
+  const totalTeachers = dataset.teachers.length;
+  const totalDirectors = dataset.directors.length;
+  const totalStudents = dataset.students.length;
+  const totalSchools = dataset.schools.length;
+  const totalRecords = totalTeachers + totalDirectors + totalStudents + totalSchools;
+
   const handleConnectGoogle = async () => {
     try {
       setIsAuthLoading(true);
@@ -143,16 +147,13 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
         setGoogleUser(res.user);
         setIsConnected(true);
       }
-      // If user closed or cancelled the popup without completing, res is null and we return quietly
     } catch (err: any) {
       const isCancellation =
         err?.code === 'auth/popup-closed-by-user' ||
         err?.code === 'auth/cancelled-popup-request' ||
         (typeof err?.message === 'string' && err.message.includes('auth/popup-closed-by-user'));
 
-      if (isCancellation) {
-        return;
-      }
+      if (isCancellation) return;
 
       console.warn('Google Sign-in não concluído:', err?.message || err);
       setAuthError(err.message || 'Não foi possível autorizar o acesso ao Google Sheets.');
@@ -210,7 +211,6 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  // Open confirmation modal for destructive update
   const handleInitiateSync = () => {
     if (!targetSpreadsheetId.trim()) {
       setAuthError('Por favor, informe o ID ou o link da planilha Google para sincronizar.');
@@ -220,7 +220,6 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     setIsSyncConfirmOpen(true);
   };
 
-  // Actual execution after explicit user confirmation
   const handleConfirmSync = async () => {
     setIsSyncConfirmOpen(false);
     setIsSyncing(true);
@@ -295,60 +294,63 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
         <div
-          className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+          className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="bg-[#002133] px-6 py-5 flex items-center justify-between text-white shrink-0 border-b border-slate-800">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-                <FileSpreadsheet className="w-6 h-6" />
+          {/* ================= 1. HEADER LEVE E CONTEXTUAL ================= */}
+          <div className="px-6 py-4.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200/70 shadow-2xs">
+                <FileSpreadsheet className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg sm:text-xl font-bold tracking-tight">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                     Google Planilhas (Google Sheets)
                   </h2>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold tracking-wider uppercase border border-emerald-500/30">
+                  <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md font-semibold tracking-wider uppercase">
                     Nuvem Google
                   </span>
                 </div>
-                <p className="text-xs text-slate-300">
-                  Exportação, sincronização bidirecional e leitura direta com a conta Google institucional
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Exportação direta, sincronização e leitura em tempo real na sua conta Google Drive.
                 </p>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              title="Fechar janela"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* User Google Auth Bar */}
-          <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* ================= 2. STATUS DE CONEXÃO GOOGLE (COMPACTO) ================= */}
+          <div className="bg-slate-50/90 px-6 py-2.5 border-b border-slate-200/90 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-700">Conta Google:</span>
+              <span className="font-semibold text-slate-600 text-[11px] uppercase tracking-wider">Conta Google:</span>
               {isConnected && googleUser ? (
-                <div className="flex items-center gap-2 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 font-medium">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-emerald-200/90 rounded-lg text-emerald-900 font-medium shadow-2xs">
                   {googleUser.photoURL ? (
                     <img
                       src={googleUser.photoURL}
-                      alt="Google avatar"
+                      alt="Avatar"
                       className="w-4 h-4 rounded-full"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   )}
-                  <span>{googleUser.displayName || googleUser.email}</span>
+                  <span className="text-xs font-semibold">{googleUser.displayName || googleUser.email}</span>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.2 rounded">Ativa</span>
                 </div>
               ) : (
-                <span className="text-slate-500 italic">Desconectado da conta Google</span>
+                <span className="text-slate-500 text-xs italic">Não conectada</span>
               )}
             </div>
 
@@ -357,7 +359,8 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 <button
                   type="button"
                   onClick={handleDisconnect}
-                  className="text-xs font-semibold text-slate-500 hover:text-red-600 flex items-center gap-1 cursor-pointer transition-colors"
+                  className="text-xs font-semibold text-slate-500 hover:text-rose-600 flex items-center gap-1.5 cursor-pointer transition-colors py-1 px-2 rounded-lg hover:bg-rose-50"
+                  title="Terminar sessão Google"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Desconectar</span>
@@ -366,82 +369,89 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 <GoogleSignInButton
                   onClick={handleConnectGoogle}
                   isLoading={isAuthLoading}
-                  label="Conectar ao Google"
+                  label="Conectar Google"
                 />
               )}
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="px-6 border-b border-slate-200 bg-white flex gap-6 overflow-x-auto text-xs font-bold">
+          {/* ================= 3. NAVEGAÇÃO POR ABAS ================= */}
+          <div className="px-6 bg-white border-b border-slate-200 flex gap-1 sm:gap-2 overflow-x-auto text-xs shrink-0 pt-1">
             <button
+              type="button"
               onClick={() => setActiveTab('export')}
-              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              className={`py-2.5 px-3.5 font-bold transition-all flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
                 activeTab === 'export'
-                  ? 'border-[#002133] text-[#002133]'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-emerald-600 text-emerald-900 bg-emerald-50/40 rounded-t-lg'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-t-lg'
               }`}
             >
               <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>Criar & Exportar Folha</span>
+              <span>Criar & Exportar</span>
             </button>
+
             <button
+              type="button"
               onClick={() => setActiveTab('sync')}
-              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              className={`py-2.5 px-3.5 font-bold transition-all flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
                 activeTab === 'sync'
-                  ? 'border-[#002133] text-[#002133]'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-emerald-600 text-emerald-900 bg-emerald-50/40 rounded-t-lg'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-t-lg'
               }`}
             >
               <RefreshCw className="w-4 h-4 text-sky-600" />
-              <span>Sincronizar Planilha Existente</span>
+              <span>Sincronizar Existente</span>
             </button>
+
             <button
+              type="button"
               onClick={() => setActiveTab('preview')}
-              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              className={`py-2.5 px-3.5 font-bold transition-all flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
                 activeTab === 'preview'
-                  ? 'border-[#002133] text-[#002133]'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-emerald-600 text-emerald-900 bg-emerald-50/40 rounded-t-lg'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-t-lg'
               }`}
             >
               <Eye className="w-4 h-4 text-amber-600" />
               <span>Visualizar Planilha</span>
             </button>
+
             <button
+              type="button"
               onClick={() => setActiveTab('history')}
-              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              className={`py-2.5 px-3.5 font-bold transition-all flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
                 activeTab === 'history'
-                  ? 'border-[#002133] text-[#002133]'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-emerald-600 text-emerald-900 bg-emerald-50/40 rounded-t-lg'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-t-lg'
               }`}
             >
               <History className="w-4 h-4 text-purple-600" />
-              <span>Histórico ({syncHistory.length})</span>
+              <span>Histórico {syncHistory.length > 0 && `(${syncHistory.length})`}</span>
             </button>
           </div>
 
-          {/* Main Content Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* ================= 4. ÁREA PRINCIPAL DO CONTEÚDO ================= */}
+          <div className="flex-1 overflow-y-auto p-6 sm:p-7 space-y-6 bg-[#fbfcfd]">
             {authError && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-800 text-xs flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold">Atenção:</span> {authError}
                 </div>
               </div>
             )}
 
-            {/* TAB 1: EXPORT */}
+            {/* TAB 1: CRIAR & EXPORTAR */}
             {activeTab === 'export' && (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {!isConnected && (
-                  <div className="p-5 rounded-2xl bg-amber-50/80 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-amber-900">
-                        Conecte a sua conta Google para criar planilhas
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs font-bold text-slate-800">
+                        Conecte a sua conta Google para gravar diretamente no Google Drive
                       </h4>
-                      <p className="text-xs text-amber-800/90 leading-relaxed">
-                        Ao autenticar-se, o uCore criará uma nova planilha no seu Google Drive com todas as abas e cabeçalhos formatados.
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Ao autorizar, a planilha será criada no seu Google Sheets com todas as abas e cabeçalhos formatados.
                       </p>
                     </div>
                     <GoogleSignInButton
@@ -453,27 +463,27 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 )}
 
                 {exportResult ? (
-                  <div className="p-6 rounded-3xl bg-emerald-50/80 border border-emerald-200 space-y-4 animate-in fade-in">
-                    <div className="flex items-center gap-3 text-emerald-800">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                  <div className="p-6 rounded-2xl bg-white border border-emerald-200 shadow-xs space-y-4 animate-in fade-in">
+                    <div className="flex items-start gap-3 text-emerald-900">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200">
+                        <CheckCircle2 className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-base font-bold text-emerald-950">
+                        <h3 className="text-base font-bold text-slate-900">
                           Planilha criada com sucesso no Google Sheets!
                         </h3>
-                        <p className="text-xs text-emerald-800">
-                          Título: <span className="font-semibold">{exportResult.title}</span> ({exportResult.sheetsCount} abas · {exportResult.totalRows} registos exportados)
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Documento: <strong className="text-slate-800">{exportResult.title}</strong> ({exportResult.sheetsCount} abas · {exportResult.totalRows} linhas estruturadas)
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-100">
                       <a
                         href={exportResult.spreadsheetUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+                        className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer no-underline"
                       >
                         <ExternalLink className="w-4 h-4" />
                         <span>Abrir no Google Planilhas</span>
@@ -481,135 +491,135 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleCopyLink(exportResult.spreadsheetUrl)}
-                        className="px-4 py-2.5 bg-white border border-emerald-300 text-emerald-900 text-xs font-semibold rounded-xl hover:bg-emerald-50 transition-all flex items-center gap-2 cursor-pointer"
+                        className="h-10 px-4 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
                       >
                         {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                        <span>{copiedLink ? 'Link copiado!' : 'Copiar Link da Folha'}</span>
+                        <span>{copiedLink ? 'Link copiado!' : 'Copiar Link'}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setExportResult(null)}
-                        className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+                        className="h-10 px-3 text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
                       >
-                        Criar outra folha
+                        Criar outra planilha
                       </button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    {/* Title Input */}
+                    {/* Título da Planilha */}
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Título da Nova Planilha Google
+                        Título da Nova Planilha no Google Drive
                       </label>
                       <input
                         type="text"
                         value={spreadsheetTitle}
                         onChange={(e) => setSpreadsheetTitle(e.target.value)}
-                        placeholder="Ex: uCore - Pauta Geral do Iº Ciclo"
-                        className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm focus:border-[#002133] focus:ring-2 focus:ring-slate-900/10 outline-none transition-all shadow-2xs font-medium"
+                        placeholder="Ex: SIGE 2026/2027 - Estatística Oficial de Quêssua"
+                        className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 outline-none transition-all shadow-2xs font-medium"
                       />
                     </div>
 
-                    {/* Scope Selector */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
+                    {/* Modelos de Exportação */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
                         <label className="block text-xs font-bold text-slate-700">
                           Selecione o Modelo de Exportação
                         </label>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          Conforme finalidade estatística ou administrativa
+                        <span className="text-[11px] text-slate-400">
+                          Escolha conforme o destino da informação
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-3.5">
-                        {/* Option 1: SIGE OFICIAL (Agregado) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        {/* Opção 1: SIGE OFICIAL */}
                         <div
                           onClick={() => {
                             setExportScope('sige_official');
-                            setSpreadsheetTitle(`SIGE 2024/2025 - Estatística Oficial de Quêssua (${new Date().toLocaleDateString('pt-PT')})`);
+                            setSpreadsheetTitle(`SIGE 2026/2027 - Estatística Oficial de Quêssua (${new Date().toLocaleDateString('pt-PT')})`);
                           }}
-                          className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative ${
+                          className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
                             exportScope === 'sige_official'
-                              ? 'border-[#1F4E79] bg-[#1F4E79]/5 text-[#1F4E79] ring-2 ring-[#1F4E79]/30 shadow-xs'
+                              ? 'border-[#0b3d5c] bg-[#0b3d5c]/5 text-[#0b3d5c] shadow-xs'
                               : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
                           }`}
                         >
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <FileSpreadsheet className="w-4 h-4 text-[#1F4E79]" />
-                                <span className="text-sm font-bold text-[#1F4E79]">Instrumento Oficial SIGE</span>
+                                <ShieldCheck className="w-4 h-4 text-[#0b3d5c]" />
+                                <span className="text-sm font-bold text-slate-900">Instrumento Oficial SIGE</span>
                               </div>
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
                                 Oficial GEPE
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-600 leading-relaxed">
-                              <strong>8 Abas Oficiais:</strong> CAPA, 1-Alunos, 2-Docentes, 3-Infra, 4-Aproveitamento, 5-Repetentes, 6-NEE, 7-Não Docentes.
+                              <strong>8 Abas Estatísticas:</strong> Capa, 1-Alunos, 2-Docentes, 3-Infra, 4-Aproveitamento, 5-Repetentes, 6-NEE e 7-Não Docentes.
                             </p>
-                            <div className="p-2 bg-emerald-50/70 rounded-lg border border-emerald-200/60 text-[10px] text-emerald-800 font-medium">
-                              ✓ <strong>Zero Dados Nominais:</strong> 100% contagens por nível, classe, idade e gênero (MF/F).
+                            <div className="p-2 bg-emerald-50/80 rounded-lg border border-emerald-200/70 text-[10px] text-emerald-800 font-medium">
+                              ✓ <strong>Zero Dados Nominais:</strong> Agregações por nível, classe, idade e gênero.
                             </div>
                           </div>
-                          <span className="text-[10px] font-bold text-[#1F4E79] mt-2.5 flex items-center gap-1">
+                          <span className="text-[10px] font-bold text-[#0b3d5c] mt-2.5">
                             ● Recomendado para o Ministério da Educação
                           </span>
                         </div>
 
-                        {/* Option 2: LISTAGEM DE GESTÃO INTERNA (uCore) */}
+                        {/* Opção 2: LISTAGEM INTERNA */}
                         <div
                           onClick={() => {
                             setExportScope('all');
                             setSpreadsheetTitle(`uCore - Gestão Operacional Interna (${new Date().toLocaleDateString('pt-PT')})`);
                           }}
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                          className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
                             exportScope === 'all'
-                              ? 'border-[#002133] bg-[#002133]/5 text-[#002133] ring-2 ring-[#002133]/20 shadow-xs'
+                              ? 'border-slate-900 bg-slate-50 text-slate-900 shadow-xs'
                               : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
                           }`}
                         >
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-slate-800" />
+                                <Layers className="w-4 h-4 text-slate-700" />
                                 <span className="text-sm font-bold text-slate-900">Listagem de Gestão Interna</span>
                               </div>
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
                                 Secretaria
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-600 leading-relaxed">
-                              <strong>5 Abas Operacionais:</strong> Resumo, Alunos, Professores, Diretores e Escolas da Rede.
+                              <strong>5 Abas Operacionais:</strong> Resumo Geral, Alunos, Professores, Diretores e Escolas da Rede.
                             </p>
-                            <div className="p-2 bg-slate-50 rounded-lg border border-slate-200/70 text-[10px] text-slate-600">
-                              ℹ Contém pautas nominais completas (nomes, contactos, processos) para gestão escolar.
+                            <div className="p-2 bg-slate-100 rounded-lg border border-slate-200 text-[10px] text-slate-600">
+                              ℹ Contém dados nominais completos para suporte e administração escolar.
                             </div>
                           </div>
                           <span className="text-[10px] font-bold text-slate-600 mt-2.5">
-                            {dataset.students.length + dataset.teachers.length + dataset.directors.length} registos administrativos
+                            {totalRecords} registos cadastrados
                           </span>
                         </div>
                       </div>
 
-                      {/* Micro individual cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Sub-seletores compactos */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                         <div
                           onClick={() => {
                             setExportScope('students');
                             setSpreadsheetTitle(`uCore - Registo de Alunos (${new Date().toLocaleDateString('pt-PT')})`);
                           }}
-                          className={`px-3 py-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                          className={`px-3 py-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                             exportScope === 'students'
-                              ? 'border-[#002133] bg-[#002133]/5 font-bold text-[#002133]'
+                              ? 'border-emerald-600 bg-emerald-50/50 font-bold text-emerald-900'
                               : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'
                           }`}
                         >
                           <span className="flex items-center gap-1.5">
-                            <GraduationCap className="w-3.5 h-3.5 text-sky-600" />
-                            Apenas Registo de Alunos (Interno)
+                            <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
+                            Apenas Pauta de Alunos (Nominal)
                           </span>
-                          <span className="text-[10px] text-slate-500 font-semibold">{dataset.students.length}</span>
+                          <span className="text-[10px] text-slate-500 font-semibold">{totalStudents}</span>
                         </div>
 
                         <div
@@ -617,28 +627,28 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                             setExportScope('teachers');
                             setSpreadsheetTitle(`uCore - Quadro de Professores (${new Date().toLocaleDateString('pt-PT')})`);
                           }}
-                          className={`px-3 py-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                          className={`px-3 py-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                             exportScope === 'teachers'
-                              ? 'border-[#002133] bg-[#002133]/5 font-bold text-[#002133]'
+                              ? 'border-emerald-600 bg-emerald-50/50 font-bold text-emerald-900'
                               : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'
                           }`}
                         >
                           <span className="flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5 text-amber-600" />
-                            Apenas Quadro Docente (Interno)
+                            Apenas Quadro Docente (Nominal)
                           </span>
-                          <span className="text-[10px] text-slate-500 font-semibold">{dataset.teachers.length}</span>
+                          <span className="text-[10px] text-slate-500 font-semibold">{totalTeachers}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Action Button */}
+                    {/* Botão de Ação */}
                     <div className="pt-2">
                       <button
                         type="button"
                         onClick={handleExecuteExport}
                         disabled={isExporting}
-                        className="w-full sm:w-auto px-6 py-3 bg-[#002133] hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-50"
+                        className="h-11 px-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-50"
                       >
                         {isExporting ? (
                           <>
@@ -647,7 +657,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                           </>
                         ) : (
                           <>
-                            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                            <FileSpreadsheet className="w-4 h-4" />
                             <span>Exportar para o Google Planilhas</span>
                           </>
                         )}
@@ -658,44 +668,43 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 2: SYNC / OVERWRITE */}
+            {/* TAB 2: SINCRONIZAR EXISTENTE */}
             {activeTab === 'sync' && (
-              <div className="space-y-6">
-                <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl text-xs text-sky-900 space-y-1">
+              <div className="space-y-5">
+                <div className="p-4 bg-sky-50/80 border border-sky-200 rounded-xl text-xs text-sky-900 space-y-1">
                   <div className="font-bold flex items-center gap-1.5">
                     <RefreshCw className="w-4 h-4 text-sky-600" />
                     Sincronização com Planilha Google Existente
                   </div>
-                  <p className="text-sky-800 leading-relaxed">
-                    Atualize os dados de uma planilha previamente gerada pelo uCore no Google Drive.
-                    Por segurança, uma janela de confirmação explícita será apresentada antes de sobrescrever as linhas.
+                  <p className="text-sky-800 text-[11px] leading-relaxed">
+                    Atualize os dados de uma planilha previamente gerada no Google Drive. Uma janela de confirmação explícita será apresentada antes de atualizar as linhas.
                   </p>
                 </div>
 
                 {syncSuccessMsg && (
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>{syncSuccessMsg}</span>
                   </div>
                 )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    ID ou Link da Planilha Google (Google Sheets URL)
+                    ID ou Link da Planilha Google (URL)
                   </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={targetSpreadsheetId}
                       onChange={(e) => setTargetSpreadsheetId(e.target.value)}
-                      placeholder="Ex: https://docs.google.com/spreadsheets/d/1BxiMVs0XR.../edit ou o ID"
-                      className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200 text-sm focus:border-[#002133] focus:ring-2 focus:ring-slate-900/10 outline-none transition-all shadow-2xs font-mono text-xs"
+                      placeholder="Ex: https://docs.google.com/spreadsheets/d/1BxiMVs... ou o ID"
+                      className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200 text-xs focus:border-sky-600 focus:ring-2 focus:ring-sky-500/10 outline-none transition-all shadow-2xs font-mono"
                     />
                     <button
                       type="button"
                       onClick={handleInitiateSync}
                       disabled={isSyncing || !targetSpreadsheetId.trim()}
-                      className="px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                      className="h-11 px-5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 shrink-0"
                     >
                       <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                       <span>{isSyncing ? 'A sincronizar...' : 'Sincronizar'}</span>
@@ -703,21 +712,20 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                   </div>
                 </div>
 
-                {/* Quick Pick from History */}
                 {syncHistory.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-2">
-                      Planilhas Criadas Recentemente Nesta Sessão:
+                  <div className="space-y-2 pt-2">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Planilhas Criadas Recentemente:
                     </label>
                     <div className="space-y-2">
                       {syncHistory.map((item) => (
                         <div
                           key={item.id}
-                          className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs hover:bg-white transition-colors"
+                          className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs hover:border-slate-300 transition-colors shadow-2xs"
                         >
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 truncate">{item.title}</div>
-                            <div className="text-[11px] text-slate-500 font-mono truncate">
+                            <div className="text-[11px] text-slate-400 font-mono truncate">
                               ID: {item.id} · {item.sheets.join(', ')}
                             </div>
                           </div>
@@ -725,7 +733,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => setTargetSpreadsheetId(item.id)}
-                              className="px-2.5 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 rounded-lg border border-sky-200"
+                              className="px-2.5 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 rounded-lg border border-sky-200 cursor-pointer"
                             >
                               Selecionar
                             </button>
@@ -746,7 +754,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 3: PREVIEW */}
+            {/* TAB 3: VISUALIZAR PLANILHA */}
             {activeTab === 'preview' && (
               <div className="space-y-5">
                 <div>
@@ -759,13 +767,13 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                       value={previewId}
                       onChange={(e) => setPreviewId(e.target.value)}
                       placeholder="Ex: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms ou URL completa"
-                      className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200 text-sm focus:border-[#002133] focus:ring-2 focus:ring-slate-900/10 outline-none transition-all shadow-2xs font-mono text-xs"
+                      className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200 text-xs focus:border-[#0b3d5c] focus:ring-2 focus:ring-slate-900/10 outline-none transition-all shadow-2xs font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => handleLoadPreview()}
                       disabled={isLoadingPreview || !previewId.trim()}
-                      className="px-5 py-2.5 bg-[#002133] hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                      className="h-11 px-5 bg-[#0b3d5c] hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 shrink-0"
                     >
                       <Eye className="w-4 h-4" />
                       <span>{isLoadingPreview ? 'A carregar...' : 'Ler Planilha'}</span>
@@ -774,14 +782,14 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 </div>
 
                 {previewError && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800">
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
                     {previewError}
                   </div>
                 )}
 
                 {previewMetadata && (
-                  <div className="space-y-4 pt-2">
-                    <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="space-y-3 pt-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
                       <div>
                         <div className="text-sm font-bold text-slate-900">{previewMetadata.title}</div>
                         <div className="text-xs text-slate-500">
@@ -792,22 +800,23 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                         href={`https://docs.google.com/spreadsheets/d/${previewMetadata.id}/edit`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+                        className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 no-underline"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                         <span>Abrir no Google Sheets</span>
                       </a>
                     </div>
 
-                    {/* Sheet Tabs */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {/* Abas disponíveis */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                       {previewMetadata.sheets.map((sheet: any) => (
                         <button
                           key={sheet.id}
+                          type="button"
                           onClick={() => handleSelectPreviewSheet(sheet.title)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                             previewSelectedSheet === sheet.title
-                              ? 'bg-[#002133] text-white'
+                              ? 'bg-[#0b3d5c] text-white'
                               : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                           }`}
                         >
@@ -816,15 +825,15 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                       ))}
                     </div>
 
-                    {/* Values Table */}
+                    {/* Tabela de valores */}
                     {previewValues && previewValues.headers.length > 0 ? (
-                      <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
                         <div className="max-h-72 overflow-auto">
                           <table className="w-full text-left text-xs border-collapse">
-                            <thead className="bg-[#002133] text-white sticky top-0">
+                            <thead className="bg-[#0b3d5c] text-white sticky top-0">
                               <tr>
                                 {previewValues.headers.map((h, i) => (
-                                  <th key={i} className="px-3.5 py-2.5 font-bold whitespace-nowrap border-r border-slate-800 last:border-r-0">
+                                  <th key={i} className="px-3.5 py-2 font-bold whitespace-nowrap border-r border-slate-700 last:border-r-0">
                                     {h}
                                   </th>
                                 ))}
@@ -834,7 +843,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                               {previewValues.rows.map((row, rIdx) => (
                                 <tr key={rIdx} className="hover:bg-slate-50 transition-colors">
                                   {row.map((cell, cIdx) => (
-                                    <td key={cIdx} className="px-3.5 py-2 whitespace-nowrap text-slate-700 border-r border-slate-100 last:border-r-0">
+                                    <td key={cIdx} className="px-3.5 py-1.5 whitespace-nowrap text-slate-700 border-r border-slate-100 last:border-r-0 text-[11px]">
                                       {cell}
                                     </td>
                                   ))}
@@ -845,8 +854,8 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-xs text-slate-500 italic">
-                        Nenhum valor retornado para esta aba.
+                      <div className="text-center py-6 text-xs text-slate-400 italic">
+                        Nenhum registo retornado para esta aba.
                       </div>
                     )}
                   </div>
@@ -854,7 +863,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 4: HISTORY */}
+            {/* TAB 4: HISTÓRICO */}
             {activeTab === 'history' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -867,34 +876,34 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 </div>
 
                 {syncHistory.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500">
-                    Ainda não gerou planilhas no Google Sheets nesta sessão. Utilize a aba "Criar & Exportar Folha".
+                  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 text-xs text-slate-500">
+                    Ainda não gerou planilhas no Google Sheets nesta sessão. Utilize a aba "Criar & Exportar".
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {syncHistory.map((item) => (
                       <div
                         key={item.id}
-                        className="p-4 bg-white border border-slate-200 rounded-2xl shadow-2xs hover:border-slate-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                        className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs hover:border-slate-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                       >
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                            <h5 className="text-sm font-bold text-slate-900">{item.title}</h5>
+                            <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <h5 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{item.title}</h5>
                           </div>
-                          <p className="text-xs text-slate-500">
-                            Criado em: {new Date(item.createdAt).toLocaleString('pt-PT')} · {item.totalRows} registos
+                          <p className="text-[11px] text-slate-400">
+                            {new Date(item.createdAt).toLocaleString('pt-PT')} · {item.totalRows} registos
                           </p>
-                          <div className="flex flex-wrap gap-1.5 pt-1">
+                          <div className="flex flex-wrap gap-1 pt-0.5">
                             {item.sheets.map((s, idx) => (
-                              <span key={idx} className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-medium">
+                              <span key={idx} className="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-medium">
                                 {s}
                               </span>
                             ))}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             onClick={() => {
@@ -902,7 +911,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                               setActiveTab('preview');
                               handleLoadPreview(item.id);
                             }}
-                            className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors"
+                            className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
                           >
                             Visualizar
                           </button>
@@ -910,7 +919,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                             href={item.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                            className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 no-underline"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             <span>Abrir</span>
@@ -923,10 +932,28 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* ================= 5. FOOTER FIXO E LIMPO ================= */}
+          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 shrink-0">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                Total de Registos Disponíveis na Rede: <strong className="text-slate-900">{totalRecords}</strong>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+            >
+              Fechar Janela
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Explicit User Confirmation Dialog for Overwrite / Mutation as required by Google Workspace integration */}
+      {/* Confirmação explícita de sobrescrita */}
       <GoogleSheetsConfirmModal
         isOpen={isSyncConfirmOpen}
         onClose={() => setIsSyncConfirmOpen(false)}

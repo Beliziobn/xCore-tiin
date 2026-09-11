@@ -22,47 +22,40 @@ interface QuessuaMunicipalitiesMapProps {
   highlightedZones?: Set<string> | string[];
 }
 
-// Harmonious cartographic palette for Quêssua districts
-const ZONE_COLOR_PALETTES: Record<string, { baseFrom: string; baseTo: string; stroke: string; accent: string }> = {
+// Harmonious cartographic palette for Quêssua districts (solid flat colors)
+const ZONE_COLOR_PALETTES: Record<string, { fill: string; stroke: string; accent: string }> = {
   'Alto-Guiné': {
-    baseFrom: '#e0ecfe',
-    baseTo: '#d0e1fc',
+    fill: '#dbeafe',
     stroke: '#b9d4fa',
     accent: '#3b82f6',
   },
   'Carreira de Tiro': {
-    baseFrom: '#e6f0ff',
-    baseTo: '#d8e7fc',
+    fill: '#e0e7ff',
     stroke: '#c1dbfb',
     accent: '#f75142',
   },
   'Cassembele': {
-    baseFrom: '#e3ecfd',
-    baseTo: '#d2e2fa',
+    fill: '#ede9fe',
     stroke: '#bcd7f9',
     accent: '#6366f1',
   },
   'Caezo': {
-    baseFrom: '#e7effe',
-    baseTo: '#d6e6fc',
+    fill: '#e0f2fe',
     stroke: '#c0dafa',
     accent: '#f75142',
   },
   'Quêssua': {
-    baseFrom: '#dae7fc',
-    baseTo: '#cadcfb',
+    fill: '#dbeafe',
     stroke: '#b0cff7',
     accent: '#f75142',
   },
   'Quizanga': {
-    baseFrom: '#e8effe',
-    baseTo: '#d7e5fb',
+    fill: '#e0f2fe',
     stroke: '#bfd9f9',
     accent: '#60a5fa',
   },
   'Vila Matilde': {
-    baseFrom: '#e1ecfd',
-    baseTo: '#d0e1fc',
+    fill: '#ede9fe',
     stroke: '#b9d5f9',
     accent: '#818cf8',
   },
@@ -104,51 +97,14 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
           <defs>
             {/* Soft Ambient Map Shadow for Active Zone */}
             <filter id="quessuaSelectedGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feDropShadow dx="0" dy="7" stdDeviation="10" floodColor="#3851eb" floodOpacity="0.45" />
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#f75142" floodOpacity="0.3" />
+              <feDropShadow dx="0" dy="7" stdDeviation="10" floodColor="#3851eb" floodOpacity="0.3" />
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#f75142" floodOpacity="0.25" />
             </filter>
 
             {/* Hover Filter for Soft Elevation */}
             <filter id="quessuaHoverElevation" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="5" stdDeviation="6" floodColor="#f75142" floodOpacity="0.32" />
+              <feDropShadow dx="0" dy="5" stdDeviation="6" floodColor="#f75142" floodOpacity="0.25" />
             </filter>
-
-            {/* Distinct Base Gradients per zone */}
-            {zones.map((zone) => {
-              const palette = ZONE_COLOR_PALETTES[zone.name] || {
-                baseFrom: '#e0ecfe',
-                baseTo: '#d0e1fc',
-                stroke: '#b9d4fa',
-                accent: '#f75142',
-              };
-
-              return (
-                <linearGradient
-                  key={`grad-zone-${zone.id}`}
-                  id={`grad-zone-${zone.id}`}
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
-                  <stop offset="0%" stopColor={palette.baseFrom} />
-                  <stop offset="100%" stopColor={palette.baseTo} />
-                </linearGradient>
-              );
-            })}
-
-            {/* Selected Zone Gradient (Vibrant highlight) */}
-            <linearGradient id="grad-selected-zone" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#5d75ff" />
-              <stop offset="50%" stopColor="#f75142" />
-              <stop offset="100%" stopColor="#384ee6" />
-            </linearGradient>
-
-            {/* Hover Zone Gradient */}
-            <linearGradient id="grad-hover-zone" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#7a90ff" />
-              <stop offset="100%" stopColor="#f75142" />
-            </linearGradient>
           </defs>
 
           {/* Outer Perimeter Underlay */}
@@ -167,12 +123,17 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
             const isSelected = selectedMunicipality === zone.name;
             const isHovered = hoveredZone === zone.name;
             const highlighted = isZoneHighlighted(zone.name);
+            const palette = ZONE_COLOR_PALETTES[zone.name] || {
+              fill: '#dbeafe',
+              stroke: '#b9d4fa',
+              accent: '#f75142',
+            };
 
-            let fillColor = `url(#grad-zone-${zone.id})`;
+            let fillColor = palette.fill;
             if (isSelected) {
-              fillColor = 'url(#grad-selected-zone)';
+              fillColor = '#f75142';
             } else if (isHovered) {
-              fillColor = 'url(#grad-hover-zone)';
+              fillColor = '#fca5a5';
             }
 
             return (

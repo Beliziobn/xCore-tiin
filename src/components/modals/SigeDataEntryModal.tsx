@@ -406,14 +406,14 @@ export const SigeDataEntryModal: React.FC<SigeDataEntryModalProps> = ({ isOpen, 
   }, [data]);
 
   const handleCopyPythonCode = () => {
-    const code = `# Fluxo Automatizado SIGE 2024/2025
+    const code = `# Fluxo Automatizado SIGE 2026/2027
 from validacao_sige import processar_com_validacao
 
 dados = ${JSON.stringify(data, null, 2)}
 
 # Executar validação e preenchimento automático das 11 folhas do Excel
 resultado = processar_com_validacao(
-    "Instrumento_Complementar_SIGE_2024_2025.xlsx",
+    "Instrumento_Complementar_SIGE_2026_2027.xlsx",
     dados,
     "Instrumento_PREENCHIDO.xlsx",
     bloquear_se_erro=True
@@ -440,7 +440,7 @@ print("Ficheiro gerado:", resultado["arquivo_gerado"])
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold">Portal de Entrada & Validação SIGE 2024/2025</h2>
+                <h2 className="text-base sm:text-lg font-bold">Portal de Entrada & Validação SIGE 2026/2027</h2>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-400/30">
                   Fluxo Oficial
                 </span>
@@ -990,7 +990,7 @@ print("Ficheiro gerado:", resultado["arquivo_gerado"])
             </button>
             <a
               href={`data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`}
-              download="dados_sige_2024_2025.json"
+              download="dados_sige_2026_2027.json"
               className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-white text-slate-700 text-xs font-semibold flex items-center gap-2 transition-all shadow-xs no-underline"
             >
               <Download className="w-4 h-4 text-slate-500" />
@@ -1009,8 +1009,8 @@ print("Ficheiro gerado:", resultado["arquivo_gerado"])
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <a
-              href="/Instrumento_Complementar_SIGE_2024_2025.xlsx"
-              download="Instrumento_Complementar_SIGE_2024_2025.xlsx"
+              href="/Instrumento_Complementar_SIGE_2026_2027.xlsx"
+              download="Instrumento_Complementar_SIGE_2026_2027.xlsx"
               className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[#1F4E79] text-[#1F4E79] hover:bg-[#1F4E79]/5 text-xs font-bold transition-all text-center no-underline"
             >
               Baixar Modelo em Branco

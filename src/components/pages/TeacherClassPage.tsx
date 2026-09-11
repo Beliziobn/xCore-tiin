@@ -1411,7 +1411,6 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         onClose={() => setIsRegisterModalOpen(false)}
         onSuccess={(data) => {
           handleSuccessRegistration(data);
-          setIsRegisterModalOpen(false);
         }}
         defaultGradeClass="4ª Classe"
         defaultTurma="Turma 1"

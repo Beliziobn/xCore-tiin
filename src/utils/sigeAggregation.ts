@@ -36,6 +36,27 @@ export interface GenderCount {
   f: number;  // Feminino
 }
 
+/** Faixas etárias oficiais para tabelas do SIGE / GEPE */
+export const SIGE_IDADES_COLUNAS = [
+  '< 5 anos',
+  '5 anos',
+  '6 anos',
+  '7 anos',
+  '8 anos',
+  '9 anos',
+  '10 anos',
+  '11 anos',
+  '12 anos',
+  '13 anos',
+  '14 anos',
+  '15 anos',
+  '16 anos',
+  '17 anos',
+  '18 anos',
+  '> 18 anos',
+  '> 13 anos', // Retido para compatibilidade de regras legado
+] as const;
+
 export interface SigeAggregatedReport {
   meta: {
     pais: string;
@@ -203,7 +224,7 @@ export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedRepo
     { nivel: 'Formação de Professores (Magistério)', classe: '13ª Classe' },
   ];
 
-  const idadesColunas = ['5 anos', '6 anos', '7 anos', '8 anos', '9 anos', '10 anos', '11 anos', '12 anos', '13 anos', '> 13 anos'];
+  const idadesColunas = SIGE_IDADES_COLUNAS;
 
   interface AlunoAgregadoBucket {
     nivel: string;
@@ -334,10 +355,24 @@ export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedRepo
     const schoolObj = schools.find(sc => sc.name === st.schoolName || sc.id === st.schoolName);
     const natureza = schoolObj?.natureza || 'Pública';
 
-    // Idade
-    const idadeNum = detailed?.idade || st.idade || (6 + (idx % 8));
+    // Idade com cálculo robusto de data de nascimento se necessário
+    const rawBirthDate = detailed?.dataNascimento || st.dataNascimento || (st as any)?.birthDate;
+    let computedAge = detailed?.idade || st.idade;
+    if (!computedAge && rawBirthDate) {
+      const bDate = new Date(rawBirthDate);
+      if (!isNaN(bDate.getTime())) {
+        const now = new Date();
+        let diff = now.getFullYear() - bDate.getFullYear();
+        const m = now.getMonth() - bDate.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < bDate.getDate())) diff--;
+        if (diff >= 0 && diff < 100) computedAge = diff;
+      }
+    }
+    const idadeNum = computedAge !== undefined ? computedAge : (6 + (idx % 8));
+
     let idadeTag = '9 anos';
-    if (idadeNum <= 5) idadeTag = '5 anos';
+    if (idadeNum < 5) idadeTag = '< 5 anos';
+    else if (idadeNum === 5) idadeTag = '5 anos';
     else if (idadeNum === 6) idadeTag = '6 anos';
     else if (idadeNum === 7) idadeTag = '7 anos';
     else if (idadeNum === 8) idadeTag = '8 anos';
@@ -346,7 +381,12 @@ export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedRepo
     else if (idadeNum === 11) idadeTag = '11 anos';
     else if (idadeNum === 12) idadeTag = '12 anos';
     else if (idadeNum === 13) idadeTag = '13 anos';
-    else idadeTag = '> 13 anos';
+    else if (idadeNum === 14) idadeTag = '14 anos';
+    else if (idadeNum === 15) idadeTag = '15 anos';
+    else if (idadeNum === 16) idadeTag = '16 anos';
+    else if (idadeNum === 17) idadeTag = '17 anos';
+    else if (idadeNum === 18) idadeTag = '18 anos';
+    else idadeTag = '> 18 anos';
 
     // Repetente
     const isRepetente = (st.condicaoMatricula || detailed?.condicaoMatricula) === 'repetente' || (idx % 7 === 0);
@@ -382,6 +422,15 @@ export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedRepo
     bucket.idades[idadeTag].mf += 1;
     if (isFemale) bucket.idades[idadeTag].f += 1;
 
+    // Manter compatibilidade com leituras de faixa legado (> 13 anos)
+    if (idadeNum > 13) {
+      if (!bucket.idades['> 13 anos']) {
+        bucket.idades['> 13 anos'] = { mf: 0, f: 0 };
+      }
+      bucket.idades['> 13 anos'].mf += 1;
+      if (isFemale) bucket.idades['> 13 anos'].f += 1;
+    }
+
     // Repetentes
     if (isRepetente) {
       bucket.repetentesTotal.mf += 1;
@@ -391,6 +440,14 @@ export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedRepo
       }
       bucket.repetentesIdades[idadeTag].mf += 1;
       if (isFemale) bucket.repetentesIdades[idadeTag].f += 1;
+
+      if (idadeNum > 13) {
+        if (!bucket.repetentesIdades['> 13 anos']) {
+          bucket.repetentesIdades['> 13 anos'] = { mf: 0, f: 0 };
+        }
+        bucket.repetentesIdades['> 13 anos'].mf += 1;
+        if (isFemale) bucket.repetentesIdades['> 13 anos'].f += 1;
+      }
     }
   });
 
@@ -643,7 +700,7 @@ export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedRepo
       direccao: 'GEPE - Gabinete de Estudos, Planeamento e Estatística',
       provincia,
       municipio,
-      anoLectivo: '2024 / 2025',
+      anoLectivo: '2026 / 2027',
       dataEmissao: new Date().toLocaleDateString('pt-PT'),
       responsavel: 'Gabinete Municipal de Estatística e Planeamento',
       cargo: 'Responsável Estatístico Municipal',
@@ -717,6 +774,8 @@ export function buildSigeAlunosMatriculadosRows(report: SigeAggregatedReport): R
       'CLASSE': item.classe,
       'TOTAL (MF)': item.total.mf,
       'TOTAL (F)': item.total.f,
+      '< 5 ANOS (MF)': item.idades['< 5 anos']?.mf || 0,
+      '< 5 ANOS (F)': item.idades['< 5 anos']?.f || 0,
       '5 ANOS (MF)': item.idades['5 anos']?.mf || 0,
       '5 ANOS (F)': item.idades['5 anos']?.f || 0,
       '6 ANOS (MF)': item.idades['6 anos']?.mf || 0,
@@ -735,8 +794,18 @@ export function buildSigeAlunosMatriculadosRows(report: SigeAggregatedReport): R
       '12 ANOS (F)': item.idades['12 anos']?.f || 0,
       '13 ANOS (MF)': item.idades['13 anos']?.mf || 0,
       '13 ANOS (F)': item.idades['13 anos']?.f || 0,
-      '> 13 ANOS (MF)': item.idades['> 13 anos']?.mf || 0,
-      '> 13 ANOS (F)': item.idades['> 13 anos']?.f || 0,
+      '14 ANOS (MF)': item.idades['14 anos']?.mf || 0,
+      '14 ANOS (F)': item.idades['14 anos']?.f || 0,
+      '15 ANOS (MF)': item.idades['15 anos']?.mf || 0,
+      '15 ANOS (F)': item.idades['15 anos']?.f || 0,
+      '16 ANOS (MF)': item.idades['16 anos']?.mf || 0,
+      '16 ANOS (F)': item.idades['16 anos']?.f || 0,
+      '17 ANOS (MF)': item.idades['17 anos']?.mf || 0,
+      '17 ANOS (F)': item.idades['17 anos']?.f || 0,
+      '18 ANOS (MF)': item.idades['18 anos']?.mf || 0,
+      '18 ANOS (F)': item.idades['18 anos']?.f || 0,
+      '> 18 ANOS (MF)': (item.idades['> 18 anos']?.mf || 0) + (item.idades['> 13 anos']?.mf || 0),
+      '> 18 ANOS (F)': (item.idades['> 18 anos']?.f || 0) + (item.idades['> 13 anos']?.f || 0),
       'VALIDAÇÃO GÊNERO': item.total.f <= item.total.mf ? 'Válido (F ≤ MF)' : 'Inconsistente'
     };
     return row;
@@ -817,8 +886,8 @@ export function buildSigeAlunosRepetentesRows(report: SigeAggregatedReport): Rec
     'CLASSE': item.classe,
     'TOTAL REPETENTES (MF)': item.total.mf,
     'TOTAL REPETENTES (F)': item.total.f,
-    '5 ANOS (MF)': item.idades['5 anos']?.mf || 0,
-    '5 ANOS (F)': item.idades['5 anos']?.f || 0,
+    '< 6 ANOS (MF)': (item.idades['< 5 anos']?.mf || 0) + (item.idades['5 anos']?.mf || 0),
+    '< 6 ANOS (F)': (item.idades['< 5 anos']?.f || 0) + (item.idades['5 anos']?.f || 0),
     '6 ANOS (MF)': item.idades['6 anos']?.mf || 0,
     '6 ANOS (F)': item.idades['6 anos']?.f || 0,
     '7 ANOS (MF)': item.idades['7 anos']?.mf || 0,
@@ -833,8 +902,24 @@ export function buildSigeAlunosRepetentesRows(report: SigeAggregatedReport): Rec
     '11 ANOS (F)': item.idades['11 anos']?.f || 0,
     '12 ANOS (MF)': item.idades['12 anos']?.mf || 0,
     '12 ANOS (F)': item.idades['12 anos']?.f || 0,
-    '> 12 ANOS (MF)': (item.idades['13 anos']?.mf || 0) + (item.idades['> 13 anos']?.mf || 0),
-    '> 12 ANOS (F)': (item.idades['13 anos']?.f || 0) + (item.idades['> 13 anos']?.f || 0),
+    '13 ANOS (MF)': item.idades['13 anos']?.mf || 0,
+    '13 ANOS (F)': item.idades['13 anos']?.f || 0,
+    '14 ANOS (MF)': item.idades['14 anos']?.mf || 0,
+    '14 ANOS (F)': item.idades['14 anos']?.f || 0,
+    '15 ANOS (MF)': item.idades['15 anos']?.mf || 0,
+    '15 ANOS (F)': item.idades['15 anos']?.f || 0,
+    '16 ANOS (MF)': item.idades['16 anos']?.mf || 0,
+    '16 ANOS (F)': item.idades['16 anos']?.f || 0,
+    '> 16 ANOS (MF)':
+      (item.idades['17 anos']?.mf || 0) +
+      (item.idades['18 anos']?.mf || 0) +
+      (item.idades['> 18 anos']?.mf || 0) +
+      (item.idades['> 13 anos']?.mf || 0),
+    '> 16 ANOS (F)':
+      (item.idades['17 anos']?.f || 0) +
+      (item.idades['18 anos']?.f || 0) +
+      (item.idades['> 18 anos']?.f || 0) +
+      (item.idades['> 13 anos']?.f || 0),
   }));
 }
 
@@ -1047,7 +1132,7 @@ export function buildSigeConsolidadoRows(report: SigeAggregatedReport): Record<s
     },
     {
       'SUBSISTEMA / NÍVEL DE ENSINO': 'TOTAL GERAL CONSOLIDADO',
-      'DETALHE / ABRANGÊNCIA': 'MUNICÍPIO DE QUÊSSUA - ANO LECTIVO 2024 / 2025',
+      'DETALHE / ABRANGÊNCIA': 'MUNICÍPIO DE QUÊSSUA - ANO LECTIVO 2026 / 2027',
       'NATUREZA': 'REDE GLOBAL',
       'ALUNOS MATRICULADOS (MF)': t.totalAlunosMatriculados.mf,
       'ALUNOS MATRICULADOS (F)': t.totalAlunosMatriculados.f,
@@ -1157,7 +1242,7 @@ export async function exportOfficialSigeExcel(
     XLSX.utils.book_append_sheet(wb, wsAlunos, '1 - ALUNOS MATRICULADOS');
 
     const dateTag = new Date().toISOString().substring(0, 10);
-    const filename = customFileName || `SIGE_2024_2025_Estatistica_Oficial_${report.meta.municipio}_${dateTag}.xlsx`;
+    const filename = customFileName || `SIGE_2026_2027_Estatistica_Oficial_${report.meta.municipio}_${dateTag}.xlsx`;
     XLSX.writeFile(wb, filename);
   }
 }

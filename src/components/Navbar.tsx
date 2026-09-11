@@ -211,16 +211,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onSelectPage('admin-estatisticas');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs text-cyan-900 bg-cyan-50/70 hover:bg-cyan-100 hover:text-[#0b3d5c] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                    >
-                      <span>SIGE Oficial 2024/2025</span>
-                      <span className="text-[10px] bg-[#0b3d5c] text-white px-1.5 py-0.5 rounded font-semibold">GEPE</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-estatisticas');
-                        setShowPagesDropdown(false);
-                      }}
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
                       Estatísticas da Rede
@@ -271,18 +261,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>Demandas & Editais</span>
                       <span className="text-[9px] bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded">Oficial</span>
                     </button>
-                    {onOpenGoogleSheets && (
-                      <button
-                        onClick={() => {
-                          onOpenGoogleSheets();
-                          setShowPagesDropdown(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs text-emerald-700 hover:bg-emerald-50 hover:text-emerald-950 transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                      >
-                        <span>Google Planilhas</span>
-                        <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Nuvem</span>
-                      </button>
-                    )}
                     <button
                       onClick={() => {
                         onSelectPage('admin-perfil');
@@ -459,22 +437,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </>
                 )}
 
-                {/* Session Settings Trigger in Pages Dropdown */}
-                {onOpenSettings && (
-                  <button
-                    onClick={() => {
-                      onOpenSettings();
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-slate-800 hover:bg-slate-50 hover:text-[#f75142] transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Settings className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Configurações da Sessão</span>
-                    </span>
-                    <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">Sistema</span>
-                  </button>
-                )}
               </div>
             )}
           </div>

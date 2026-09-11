@@ -17,7 +17,7 @@ import {
 
 /**
  * ============================================================================
- * EXPORTAÇÃO SIGE COM DESIGN E IDENTIDADE VISUAL OFICIAL (2024 / 2025)
+ * EXPORTAÇÃO SIGE COM DESIGN E IDENTIDADE VISUAL OFICIAL (2026 / 2027)
  * ============================================================================
  * Replica fielmente o visual do "Painel Oficial SIGE":
  * - Cabeçalhos em Azul-Petróleo Oficial (#0B3D5C / #0E7490) com texto em branco
@@ -234,6 +234,20 @@ function buildStyledCapaSheet(wb: ExcelJS.Workbook, report: SigeAggregatedReport
 }
 
 /**
+ * Converte índice de coluna (1-based) para letra no Excel (A, B, ..., Z, AA, AB, ...)
+ */
+function getColumnLetter(colNumber: number): string {
+  let temp: number;
+  let letter = '';
+  while (colNumber > 0) {
+    temp = (colNumber - 1) % 26;
+    letter = String.fromCharCode(temp + 65) + letter;
+    colNumber = Math.floor((colNumber - temp - 1) / 26);
+  }
+  return letter;
+}
+
+/**
  * Adiciona e formata uma folha de dados agregados com o design oficial SIGE
  */
 function addStyledDataSheet(
@@ -296,12 +310,6 @@ function addStyledDataSheet(
       right: { style: 'thin', color: { argb: SIGE_COLORS.petroleumDark } }
     };
   });
-
-  // Auto-filtro activo para consultas imediatas
-  ws.autoFilter = {
-    from: { row: 1, column: 1 },
-    to: { row: 1, column: columns.length }
-  };
 
   // Preenchimento e Estilização de Linhas de Dados
   rows.forEach((rowData, index) => {
@@ -402,6 +410,18 @@ function addStyledDataSheet(
     });
   });
 
+  // Auto-filtro activo abrangendo toda a área de dados (do cabeçalho à última linha preenchida)
+  const lastColLetter = getColumnLetter(columns.length);
+  const lastRowIndex = ws.actualRowCount;
+  if (lastRowIndex > 1) {
+    ws.autoFilter = `A1:${lastColLetter}${lastRowIndex}`;
+    try {
+      wb.definedNames.add(`'${sheetName}'!$A$1:$${lastColLetter}$${lastRowIndex}`, '_xlnm._FilterDatabase');
+    } catch {
+      // Fallback gracioso
+    }
+  }
+
   return ws;
 }
 
@@ -461,7 +481,7 @@ export async function exportOfficialSigeExcel(
   addStyledDataSheet(wb, 'ESCOLAS SEM DADOS', escolasSemDadosRows, SIGE_COLORS.textMuted);
 
   const dateTag = new Date().toISOString().substring(0, 10);
-  const filename = customFileName || `SIGE_2024_2025_Estatistica_Oficial_${report.meta.municipio}_${dateTag}.xlsx`;
+  const filename = customFileName || `SIGE_2026_2027_Estatistica_Oficial_${report.meta.municipio}_${dateTag}.xlsx`;
 
   // Gerar Buffer e accionar download no browser
   const buffer = await wb.xlsx.writeBuffer();
@@ -492,7 +512,7 @@ export function exportStandaloneSigeHtml(
 ): void {
   const report = aggregateSigeDataset(dataset);
   const dateTag = new Date().toISOString().substring(0, 10);
-  const filename = customFileName || `SIGE_2024_2025_Relatorio_Oficial_${report.meta.municipio}_${dateTag}.html`;
+  const filename = customFileName || `SIGE_2026_2027_Relatorio_Oficial_${report.meta.municipio}_${dateTag}.html`;
 
   const htmlContent = generateStandaloneHtmlDocument(report, dataset);
   const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -567,7 +587,7 @@ function generateStandaloneHtmlDocument(report: SigeAggregatedReport, dataset: S
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SIGE 2024/2025 · Estatística Oficial — Quêssua</title>
+  <title>SIGE 2026/2027 · Estatística Oficial — Quêssua</title>
   <style>
     :root {
       --bg: #f4f6f9;
@@ -755,7 +775,7 @@ function generateStandaloneHtmlDocument(report: SigeAggregatedReport, dataset: S
     <div class="header-left">
       <div class="sige-badge">SIGE</div>
       <div class="header-title">
-        <h1>Instrumento Complementar 2024/2025</h1>
+        <h1>Instrumento Complementar 2026/2027</h1>
         <p>Estatística Oficial · Município de ${report.meta.municipio} · Província de ${report.meta.provincia}</p>
       </div>
     </div>

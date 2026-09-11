@@ -1,5 +1,5 @@
 /**
- * SIGE 2024/2025 Business Rules & Consistency Engine
+ * SIGE 2026/2027 Business Rules & Consistency Engine
  * 
  * Implements Ministério da Educação de Angola statistical consistency standards:
  * 1. Gender Validation Rule: F (Feminino) <= MF (Total)
@@ -109,7 +109,7 @@ export function balanceAproveitamento(
 }
 
 /**
- * 18 Chaves de Topo do Schema Oficial SIGE 2024/2025 (alinhadas ao motor de preenchimento)
+ * 18 Chaves de Topo do Schema Oficial SIGE 2026/2027 (alinhadas ao motor de preenchimento)
  */
 export const SIGE_TOP_LEVEL_KEYS = [
   'meta',
@@ -135,7 +135,7 @@ export const SIGE_TOP_LEVEL_KEYS = [
 export type SigeTopLevelKey = typeof SIGE_TOP_LEVEL_KEYS[number];
 
 /**
- * 9 Folhas Oficiais Documentadas do SIGE 2024/2025
+ * 9 Folhas Oficiais Documentadas do SIGE 2026/2027
  */
 export const SIGE_OFFICIAL_SHEETS = [
   { numero: 1, nome: 'CAPA', chave: 'meta', descricao: 'Identificação institucional e ciclo escolar.' },

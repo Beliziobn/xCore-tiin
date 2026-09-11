@@ -215,63 +215,6 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Banner Institucional SIGE 2024/2025 Quêssua */}
-        <div className="bg-gradient-to-r from-[#0b3d5c] via-[#0b3d5c] to-[#0e7490] rounded-2xl p-5 sm:p-6 mb-8 text-white shadow-lg border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-          <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="w-8 h-8 rounded-lg bg-white/15 border border-white/25 flex items-center justify-center font-bold text-xs text-white">
-                SIGE
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/15 text-white border border-white/20">
-                Instrumento Complementar 2024/2025
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/25 border border-emerald-400/40 text-emerald-200">
-                ✓ Apenas dados agregados
-              </span>
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold tracking-tight">
-              Estatística Oficial de Quêssua · Malanje (GEPE)
-            </h3>
-            <p className="text-xs sm:text-sm text-cyan-100/90 leading-relaxed">
-              Consulta agregada das 9 folhas oficiais do Ministério da Educação: Capa, 1 Alunos, 2 Docentes, 3 Infraestruturas, 4 Aproveitamento (validação M=A+R+D), 5 Repetentes, 6 NEE, 7 Não Docente e 9 Consolidado.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto shrink-0">
-            <button
-              onClick={() => setIsSigeViewerOpen(true)}
-              className="px-4 py-2.5 bg-[#0891b2] hover:bg-[#0e7490] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Abrir Painel SIGE (Abas 1-7, 9)</span>
-            </button>
-
-            <button
-              onClick={() => {
-                const unified = getUnifiedSystemDataset({ schools, teachers, directors, students });
-                exportOfficialSigeExcel(unified);
-              }}
-              className="px-4 py-2.5 bg-white hover:bg-slate-100 text-[#0b3d5c] font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-              title="Baixar planilha Excel estilizada com a identidade visual oficial SIGE (cabeçalhos azul-petróleo, zebrado, abas e validações)"
-            >
-              <Download className="w-4 h-4 text-[#0b3d5c]" />
-              <span>Baixar Excel (.xlsx)</span>
-            </button>
-
-            <button
-              onClick={() => {
-                const unified = getUnifiedSystemDataset({ schools, teachers, directors, students });
-                exportStandaloneSigeHtml(unified);
-              }}
-              className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              title="Baixar relatório web autónomo (.html) com o mesmo visual, abas e filtros"
-            >
-              <Globe className="w-4 h-4 text-cyan-200" />
-              <span>Relatório Web (.html)</span>
-            </button>
-          </div>
-        </div>
-
         {/* Advanced Interactive Filtering System */}
         <AdminAdvancedFilter
           schools={schools}
@@ -460,6 +403,63 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
               subtitle={`Decomposição por gênero de alunos pendentes (${filterStats.contextLabel})`}
               isFocusWithoutDocs={true}
             />
+          </div>
+        </div>
+
+        {/* Banner Institucional SIGE 2026/2027 Quêssua (Última posição antes do rodapé) */}
+        <div className="bg-transparent rounded-2xl p-5 sm:p-6 mt-12 border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="w-8 h-8 rounded-lg bg-[#0b3d5c] text-white flex items-center justify-center font-bold text-xs">
+                SIGE
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                Instrumento Complementar 2026/2027
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                ✓ Apenas dados agregados
+              </span>
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
+              Estatística Oficial de Quêssua · Malanje (GEPE)
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Consulta agregada das 9 folhas oficiais do Ministério da Educação: Capa, 1 Alunos, 2 Docentes, 3 Infraestruturas, 4 Aproveitamento (validação M=A+R+D), 5 Repetentes, 6 NEE, 7 Não Docente e 9 Consolidado.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto shrink-0">
+            <button
+              onClick={() => setIsSigeViewerOpen(true)}
+              className="px-4 py-2.5 bg-[#0b3d5c] hover:bg-[#082a40] text-white font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-cyan-300" />
+              <span>Abrir Painel SIGE (Abas 1-7, 9)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const unified = getUnifiedSystemDataset({ schools, teachers, directors, students });
+                exportOfficialSigeExcel(unified);
+              }}
+              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              title="Baixar planilha Excel estilizada com a identidade visual oficial SIGE (cabeçalhos azul-petróleo, zebrado, abas e validações)"
+            >
+              <Download className="w-4 h-4 text-[#0b3d5c]" />
+              <span>Baixar Excel (.xlsx)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const unified = getUnifiedSystemDataset({ schools, teachers, directors, students });
+                exportStandaloneSigeHtml(unified);
+              }}
+              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              title="Baixar relatório web autónomo (.html) com o mesmo visual, abas e filtros"
+            >
+              <Globe className="w-4 h-4 text-slate-600" />
+              <span>Relatório Web (.html)</span>
+            </button>
           </div>
         </div>
       </div>

@@ -12,13 +12,15 @@ import {
   FileText,
   Edit3,
   Download,
-  GraduationCap
+  GraduationCap,
+  FileCheck
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminStudent, AdminSchool, StudentRegistrationData } from '../../../types';
 import { StudentAnalyticalMatrixModal } from '../../modals/StudentAnalyticalMatrixModal';
 import { StudentDetailModal } from '../../modals/StudentDetailModal';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import { BoletimMatriculaModal } from '../../modals/BoletimMatriculaModal';
 import { getStoredStudents, saveStudent } from '../../../utils/studentStorage';
 
 interface AdminStudentsPageProps {
@@ -46,6 +48,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentRegistrationData | null>(null);
+  const [boletimStudent, setBoletimStudent] = useState<StudentRegistrationData | null>(null);
 
   // Stored detailed students
   const [detailedStudents, setDetailedStudents] = useState<StudentRegistrationData[]>(() => {
@@ -548,6 +551,18 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setBoletimStudent(getRegistrationDataFromAdminStudent(st));
+                            }}
+                            className="px-2 py-1 bg-[#0b3d5c]/10 hover:bg-[#0b3d5c]/20 text-[#0b3d5c] rounded-lg font-bold text-[11px] cursor-pointer transition-colors flex items-center gap-1"
+                            title="Gerar Boletim Oficial de Matrícula"
+                          >
+                            <FileCheck className="w-3 h-3 text-[#0b3d5c]" />
+                            <span className="hidden sm:inline">Boletim</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedStudentId(st.id);
                               setIsDetailModalOpen(true);
                             }}
@@ -604,10 +619,15 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
         initialData={editingStudent}
         onSuccess={(updated) => {
           setDetailedStudents(getStoredStudents());
-          setIsEditModalOpen(false);
-          setEditingStudent(null);
         }}
         schoolName={activeStudent?.schoolName || 'Escola Modelo Central de Quêssua'}
+      />
+
+      {/* Standalone Boletim de Matrícula Modal */}
+      <BoletimMatriculaModal
+        isOpen={Boolean(boletimStudent)}
+        onClose={() => setBoletimStudent(null)}
+        student={boletimStudent}
       />
     </div>
   );
