@@ -23,7 +23,7 @@ import { AdminAdvancedFilter } from './AdminAdvancedFilter';
 import type { AdvancedFilterCriteria } from '../../../types/filterTypes';
 import { defaultFilterCriteria } from '../../../types/filterTypes';
 import { applyAdvancedFilters } from '../../../utils/statisticsFilter';
-import { Download, FileSpreadsheet, Globe } from 'lucide-react';
+import { Download, FileSpreadsheet, Globe, ShieldCheck, Lock } from 'lucide-react';
 import { SigeOfficialViewerModal } from '../../sige/SigeOfficialViewerModal';
 
 interface AdminStatisticsPageProps {
@@ -38,6 +38,7 @@ interface AdminStatisticsPageProps {
   onOpenRegisterModal?: () => void;
   onOpenExcelExport?: () => void;
   onOpenGoogleSheets?: () => void;
+  onOpenAuditLogs?: () => void;
   isLoggedIn?: boolean;
 }
 
@@ -52,6 +53,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
   directors = [],
   onOpenExcelExport,
   onOpenGoogleSheets,
+  onOpenAuditLogs,
   isLoggedIn,
 }) => {
   // Advanced Multi-Criteria Filter State
@@ -282,6 +284,16 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
                 <span>Google Planilhas</span>
+              </button>
+            )}
+            {onOpenAuditLogs && (
+              <button
+                onClick={onOpenAuditLogs}
+                className="w-full md:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-700"
+                title="Visualizar trilha imutável de logs de auditoria e conformidade SSD / RLS"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Logs de Auditoria (SSD)</span>
               </button>
             )}
           </div>

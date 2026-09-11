@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all
+    // Default deny all - Least Privilege Principle (SSD)
     match /{document=**} {
       allow read, write: if false;
     }
@@ -32,9 +32,10 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    function isValidUser(data) {
+    // Schema and boundary validations
+    function isValidUserBase(data) {
       return data.keys().hasAll(['userId', 'email', 'firstName', 'role', 'status', 'createdAt']) &&
-        data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+        data.userId is string && data.userId.size() <= 128 &&
         data.email is string && data.email.size() <= 120 &&
         data.firstName is string && data.firstName.size() <= 80 &&
         data.role in ['admin', 'diretor', 'professor', 'custom'] &&
@@ -53,34 +54,119 @@ service cloud.firestore {
         (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
     }
 
+    // Prevent privilege escalation on user self-registration
+    function isNonPrivilegedRegistration(data) {
+      return data.role in ['diretor', 'professor', 'custom'] &&
+        data.status in ['pendente', 'em_analise'] &&
+        (!('accountValidated' in data) || data.accountValidated == false);
+    }
+
+    // Audit Log Schema Validation
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['id', 'action', 'actorId', 'actorRole', 'details', 'timestamp']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.action is string && data.action.size() <= 60 &&
+        data.actorId is string && data.actorId == request.auth.uid &&
+        data.actorRole is string && data.actorRole.size() <= 50 &&
+        data.details is string && data.details.size() <= 500 &&
+        data.timestamp is string && data.timestamp.size() <= 50 &&
+        (!('severity' in data) || data.severity in ['INFO', 'WARNING', 'CRITICAL']) &&
+        (!('targetId' in data) || (data.targetId is string && data.targetId.size() <= 128)) &&
+        (!('targetType' in data) || (data.targetType is string && data.targetType.size() <= 50));
+    }
+
+    // Student Schema & Constraint Validation
+    function isValidStudent(data) {
+      return data.keys().hasAll(['id', 'nomeCompleto', 'schoolId', 'turma', 'classe']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.nomeCompleto is string && data.nomeCompleto.size() >= 3 && data.nomeCompleto.size() <= 120 &&
+        data.schoolId is string && data.schoolId.size() <= 128 &&
+        data.turma is string && data.turma.size() <= 50 &&
+        data.classe is string && data.classe.size() <= 50 &&
+        (!('numeroDocumento' in data) || (data.numeroDocumento is string && data.numeroDocumento.size() <= 30));
+    }
+
+    // Grade Constraint Validation (Angolan 0-20 scale enforced at DB level)
+    function isValidGrade(data) {
+      return data.keys().hasAll(['studentId', 'disciplina', 'nota', 'trimestre', 'updatedAt']) &&
+        data.studentId is string && data.studentId.size() <= 128 &&
+        data.disciplina is string && data.disciplina.size() <= 80 &&
+        data.nota is number && data.nota >= 0 && data.nota <= 20 &&
+        data.trimestre in [1, 2, 3] &&
+        data.updatedAt is string && data.updatedAt.size() <= 50;
+    }
+
+    // ==========================================
     // Collection: /users/{userId}
+    // ==========================================
     match /users/{userId} {
-      // Direct document get: owner or admin
       allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
-      
-      // List users: strictly enforce query owner or admin
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
 
-      // Create profile: owner creating their own record with validation
-      allow create: if isValidId(userId) && isOwner(userId) && isValidUser(incoming());
+      // Create: Owner creating record; if not admin, cannot elevate privileges
+      allow create: if isValidId(userId) && isOwner(userId) &&
+        isValidUserBase(incoming()) &&
+        (isAdmin() || isNonPrivilegedRegistration(incoming()));
 
-      // Update profile: owner or admin with validation
-      allow update: if isValidId(userId) && (isOwner(userId) || isAdmin()) && isValidUser(incoming());
+      // Update: Owner can update personal profile info, but cannot alter status/role without admin
+      allow update: if isValidId(userId) && isValidUserBase(incoming()) && (
+        isAdmin() || (
+          isOwner(userId) &&
+          incoming().role == existing().role &&
+          incoming().status == existing().status &&
+          incoming().accountValidated == existing().accountValidated
+        )
+      );
 
-      // Delete: admin only
+      // Delete: Strictly admin only
       allow delete: if isValidId(userId) && isAdmin();
     }
 
+    // ==========================================
     // Collection: /admins/{adminId}
+    // ==========================================
     match /admins/{adminId} {
       allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
       allow list: if isAdmin();
       allow write: if isAdmin();
     }
 
-    // Connection test document
+    // ==========================================
+    // Collection: /audit_logs/{logId}
+    // Tamper-proof, append-only security ledger
+    // ==========================================
+    match /audit_logs/{logId} {
+      // Read: Strictly Admins only. Regular users cannot view audit trails.
+      allow get, list: if isAdmin();
+
+      // Create: Any authenticated user can log their own action with strict schema validation
+      allow create: if isSignedIn() && isValidId(logId) && isValidAuditLog(incoming());
+
+      // Update & Delete: Strictly FORBIDDEN. Audit logs are permanently immutable.
+      allow update, delete: if false;
+    }
+
+    // ==========================================
+    // Collection: /students/{studentId}
+    // ==========================================
+    match /students/{studentId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // Collection: /grades/{gradeId}
+    // ==========================================
+    match /grades/{gradeId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(gradeId) && isValidGrade(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Connection test document (requires authentication)
     match /test/connection {
-      allow read: if true;
+      allow read: if isSignedIn();
     }
   }
 }

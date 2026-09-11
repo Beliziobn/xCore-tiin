@@ -23,6 +23,16 @@ import {
   saveTeacher,
   TEACHING_LEVELS_CATALOG,
 } from '../../utils/teacherStorage';
+import {
+  validateAngolaBI,
+  validateAngolaPhone,
+  validateFullName,
+  validateEmail,
+} from '../../utils/formConstraints';
+import { AuditLogger } from '../../services/auditLogger';
+import { SearchIndexer } from '../../utils/searchIndexer';
+import { DualValidationService } from '../../services/dualValidationService';
+import { RollbackManager } from '../../services/rollbackManager';
 
 interface TeacherRegistrationModalProps {
   isOpen: boolean;
@@ -293,16 +303,19 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   const handleNextStep = () => {
     setErrorMessage(null);
     if (activeTab === 1) {
-      if (!nomeCompleto.trim()) {
-        setErrorMessage('Por favor informe o Nome Completo do professor.');
+      const nameVal = validateFullName(nomeCompleto);
+      if (!nameVal.isValid) {
+        setErrorMessage(nameVal.error || 'Nome inválido.');
         return;
       }
-      if (!biNif.trim()) {
-        setErrorMessage('O Número do Bilhete de Identidade / NIF é obrigatório.');
+      const biVal = validateAngolaBI(biNif);
+      if (!biVal.isValid) {
+        setErrorMessage(biVal.error || 'Bilhete de Identidade inválido.');
         return;
       }
-      if (!telefone.trim()) {
-        setErrorMessage('O Contacto Telefónico é obrigatório.');
+      const phoneVal = validateAngolaPhone(telefone);
+      if (!phoneVal.isValid) {
+        setErrorMessage(phoneVal.error || 'Contacto telefónico inválido.');
         return;
       }
       setActiveTab(2);
@@ -325,20 +338,45 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   };
 
   // Final Form Validation and Submission
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMessage(null);
 
-    if (!nomeCompleto.trim()) {
-      setErrorMessage('Por favor preencha o Nome Completo do professor.');
+    // Validação Dual Simultânea (Frontend + Backend)
+    const dualVal = await DualValidationService.validateTeacher({
+      nomeCompleto,
+      biNif,
+      telefone,
+      email,
+      nomeEscola,
+    });
+    if (!dualVal.isValid) {
+      setErrorMessage(dualVal.errors.join(' | '));
       setActiveTab(1);
       return;
     }
 
-    if (!biNif.trim()) {
-      setErrorMessage('O Bilhete de Identidade ou NIF é obrigatório.');
+    const nameVal = validateFullName(nomeCompleto);
+    if (!nameVal.isValid) {
+      setErrorMessage(nameVal.error || 'Nome inválido.');
       setActiveTab(1);
       return;
+    }
+
+    const biVal = validateAngolaBI(biNif);
+    if (!biVal.isValid) {
+      setErrorMessage(biVal.error || 'Bilhete de Identidade inválido.');
+      setActiveTab(1);
+      return;
+    }
+
+    if (email) {
+      const emailVal = validateEmail(email, false);
+      if (!emailVal.isValid) {
+        setErrorMessage(emailVal.error || 'E-mail inválido.');
+        setActiveTab(1);
+        return;
+      }
     }
 
     if (!nomeEscola.trim()) {
@@ -415,8 +453,45 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
       atualizadoEm: new Date().toISOString(),
     };
 
-    const updated = saveTeacher(payload, authorName);
-    const savedRecord = updated.find((t) => t.id === payload.id) || payload;
+    const searchTokens = SearchIndexer.generateSearchTokens([
+      payload.nomeCompleto,
+      payload.biNif,
+      payload.nomeEscola,
+      payload.funcaoCategoria,
+      payload.disciplinas,
+      payload.email,
+    ]);
+
+    const teacherWithIndex = {
+      ...payload,
+      searchTokens,
+    };
+
+    const updated = saveTeacher(teacherWithIndex, authorName);
+    const savedRecord = updated.find((t) => t.id === payload.id) || teacherWithIndex;
+
+    // Rollback Snapshot Transaction
+    RollbackManager.recordTransaction({
+      entityType: 'teacher',
+      entityId: savedRecord.id,
+      action: initialData ? 'UPDATE' : 'CREATE',
+      description: `${initialData ? 'Atualização cadastral' : 'Homologação e cadastro'} do docente ${savedRecord.nomeCompleto} (${savedRecord.funcaoCategoria || ''} - ${savedRecord.nomeEscola || ''})`,
+      authorId: 'admin-current',
+      authorName: authorName || 'Administrador',
+      authorRole: 'admin',
+      previousState: initialData || null,
+      newState: savedRecord,
+    });
+
+    AuditLogger.log({
+      action: initialData ? 'TEACHER_UPDATE' : 'TEACHER_CREATE',
+      severity: 'INFO',
+      targetId: savedRecord.id,
+      targetType: 'Docente',
+      schoolId: savedRecord.nomeEscola,
+      details: `${initialData ? 'Atualização' : 'Cadastro'} do docente ${savedRecord.nomeCompleto} (${savedRecord.funcaoCategoria}) na escola ${savedRecord.nomeEscola}.`,
+    });
+
     onSuccess(savedRecord);
     onClose();
   };

@@ -1,0 +1,55 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "role", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolName", "order": "ASCENDING" },
+        { "fieldPath": "role", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "audit_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "action", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "audit_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "actorId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "turma", "order": "ASCENDING" },
+        { "fieldPath": "nomeCompleto", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "teachers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

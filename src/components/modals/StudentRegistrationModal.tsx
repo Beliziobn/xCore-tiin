@@ -28,6 +28,16 @@ import {
   incrementTurmaOccupancy,
 } from '../../data/classesConfig';
 import { BoletimMatriculaModal } from './BoletimMatriculaModal';
+import {
+  validateAngolaBI,
+  validateAngolaPhone,
+  validateFullName,
+  validateBirthDate,
+} from '../../utils/formConstraints';
+import { AuditLogger } from '../../services/auditLogger';
+import { SearchIndexer } from '../../utils/searchIndexer';
+import { DualValidationService } from '../../services/dualValidationService';
+import { RollbackManager } from '../../services/rollbackManager';
 
 interface StudentRegistrationModalProps {
   isOpen: boolean;
@@ -326,20 +336,54 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   };
 
   // Submit Handler
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!nomeCompleto.trim()) {
-      setErrorMessage('Por favor informe o Nome Completo do Aluno.');
+    // Validação Dual Simultânea (Frontend + Backend)
+    const dualVal = await DualValidationService.validateStudent({
+      nomeCompleto,
+      biOuCedula: numeroDocumento,
+      tipoDocumento,
+      dataNascimento,
+      nomeEscola,
+    });
+    if (!dualVal.isValid) {
+      setErrorMessage(dualVal.errors.join(' | '));
       setActiveTab(1);
       return;
     }
 
-    if (!dataNascimento) {
-      setErrorMessage('A Data de Nascimento é obrigatória para o cálculo e validação da faixa etária.');
+    const nameValidation = validateFullName(nomeCompleto);
+    if (!nameValidation.isValid) {
+      setErrorMessage(nameValidation.error || 'Nome inválido.');
       setActiveTab(1);
       return;
+    }
+
+    const birthValidation = validateBirthDate(dataNascimento);
+    if (!birthValidation.isValid) {
+      setErrorMessage(birthValidation.error || 'Data de nascimento inválida.');
+      setActiveTab(1);
+      return;
+    }
+
+    if (tipoDocumento === 'BI') {
+      const biValidation = validateAngolaBI(numeroDocumento);
+      if (!biValidation.isValid) {
+        setErrorMessage(biValidation.error || 'Bilhete de Identidade inválido.');
+        setActiveTab(1);
+        return;
+      }
+    }
+
+    if (telefone) {
+      const phoneValidation = validateAngolaPhone(telefone, false);
+      if (!phoneValidation.isValid) {
+        setErrorMessage(phoneValidation.error || 'Número de telefone inválido.');
+        setActiveTab(1);
+        return;
+      }
     }
 
     if (!naturezaEscola) {
@@ -418,8 +462,46 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
         `MAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
     };
 
-    const saved = saveStudent(payload);
+    const searchTokens = SearchIndexer.generateSearchTokens([
+      payload.nomeCompleto,
+      payload.name,
+      payload.numeroDocumento,
+      payload.escola,
+      payload.turma,
+      payload.classe,
+    ]);
+
+    const studentWithIndex = {
+      ...payload,
+      searchTokens,
+    };
+
+    const saved = saveStudent(studentWithIndex);
     incrementTurmaOccupancy(classeEtapaModulo, turma);
+
+    // Rollback Snapshot Transaction
+    RollbackManager.recordTransaction({
+      entityType: 'student',
+      entityId: saved.id,
+      action: initialData ? 'UPDATE' : 'CREATE',
+      description: `${initialData ? 'Atualização cadastral' : 'Matrícula'} do estudante ${saved.nomeCompleto || saved.name} (${saved.classe || ''} - ${saved.turma || ''})`,
+      authorId: 'admin-current',
+      authorName: 'Administrador Escolar',
+      authorRole: 'admin',
+      previousState: initialData || null,
+      newState: saved,
+    });
+
+    // SSD Audit Trail
+    AuditLogger.log({
+      action: initialData ? 'STUDENT_UPDATE' : 'STUDENT_CREATE',
+      severity: 'INFO',
+      targetId: saved.id,
+      targetType: 'Estudante',
+      schoolId: saved.escola,
+      details: `${initialData ? 'Atualização' : 'Matrícula'} do estudante ${saved.nomeCompleto || saved.name} na turma ${saved.turma} (${saved.classe || ''}) - Escola: ${saved.escola || ''}.`,
+    });
+
     onSuccess(saved);
     setRegisteredStudentForBoletim(saved);
   };

@@ -31,11 +31,17 @@ export interface MeetingRoom {
   hostName: string;
   schoolName: string;
   createdAt: string;
-  participants: Map<string, { ws: WebSocket; info: ParticipantInfo }>;
+  participants: Map<string, { ws: WebSocket; info: ParticipantInfo; lastActive?: number }>;
   chatHistory: MeetingChatMessage[];
 }
 
 const rooms = new Map<string, MeetingRoom>();
+const roomDeleteTimers = new Map<string, NodeJS.Timeout>();
+
+export function normalizeRoomId(rawId: string): string {
+  if (!rawId) return '';
+  return rawId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+}
 
 // Seed default standard school meeting rooms
 const defaultRooms = [
@@ -104,7 +110,8 @@ export function getRoomsList() {
   return list;
 }
 
-export function createOrGetRoom(id: string, title?: string, hostName?: string, schoolName?: string): MeetingRoom {
+export function createOrGetRoom(rawId: string, title?: string, hostName?: string, schoolName?: string): MeetingRoom {
+  const id = normalizeRoomId(rawId) || `ucore-${Math.random().toString(36).substring(2, 8)}`;
   let room = rooms.get(id);
   if (!room) {
     room = {
@@ -119,7 +126,50 @@ export function createOrGetRoom(id: string, title?: string, hostName?: string, s
     };
     rooms.set(id, room);
   }
+
+  // Cancel pending deletion timer if room is accessed
+  if (roomDeleteTimers.has(id)) {
+    clearTimeout(roomDeleteTimers.get(id)!);
+    roomDeleteTimers.delete(id);
+  }
+
   return room;
+}
+
+export function getRoomPresence(rawId: string) {
+  const id = normalizeRoomId(rawId);
+  const room = rooms.get(id);
+  if (!room) return null;
+  return {
+    id: room.id,
+    title: room.title,
+    hostName: room.hostName,
+    schoolName: room.schoolName,
+    createdAt: room.createdAt,
+    participantCount: room.participants.size,
+    participants: Array.from(room.participants.values()).map((p) => p.info),
+    chatHistory: room.chatHistory,
+  };
+}
+
+export function dispatchHttpSignal(rawRoomId: string, fromSocketId: string, targetSocketId: string, signalData: any, fromUser?: any) {
+  const id = normalizeRoomId(rawRoomId);
+  const room = rooms.get(id);
+  if (!room) return false;
+
+  const targetClient = room.participants.get(targetSocketId);
+  if (targetClient && targetClient.ws.readyState === WebSocket.OPEN) {
+    targetClient.ws.send(
+      JSON.stringify({
+        type: 'signal',
+        fromSocketId,
+        fromUser,
+        signalData,
+      })
+    );
+    return true;
+  }
+  return false;
 }
 
 export function setupSignalingServer(httpServer: HttpServer) {
@@ -127,7 +177,32 @@ export function setupSignalingServer(httpServer: HttpServer) {
 
   console.log('[WebSocket] Real-time WebRTC Signaling Server mounted on /ws');
 
+  // Ping-pong heartbeat to keep connections alive across proxies (Cloud Run, Nginx)
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((client: any) => {
+      if (client.isAlive === false) {
+        return client.terminate();
+      }
+      client.isAlive = false;
+      try {
+        client.ping();
+      } catch {
+        client.terminate();
+      }
+    });
+  }, 15000);
+
+  wss.on('close', () => {
+    clearInterval(heartbeatInterval);
+  });
+
   wss.on('connection', (ws: WebSocket) => {
+    (ws as any).isAlive = true;
+
+    ws.on('pong', () => {
+      (ws as any).isAlive = true;
+    });
+
     const socketId = `sock_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
     let currentRoomId: string | null = null;
     let currentParticipant: ParticipantInfo | null = null;
@@ -135,31 +210,41 @@ export function setupSignalingServer(httpServer: HttpServer) {
     ws.on('message', (rawMessage: string) => {
       try {
         const data = JSON.parse(rawMessage.toString());
+        (ws as any).isAlive = true;
 
         switch (data.type) {
+          // PING / PONG HEARTBEAT
+          case 'ping': {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+            }
+            break;
+          }
+
           // JOIN ROOM
           case 'join-room': {
-            const { roomId, title, user } = data;
-            currentRoomId = roomId;
+            const rawRoomId = data.roomId;
+            const normalizedId = normalizeRoomId(rawRoomId) || `ucore-${Math.random().toString(36).substring(2, 8)}`;
+            currentRoomId = normalizedId;
 
-            const room = createOrGetRoom(roomId, title, user?.name, user?.schoolName);
+            const room = createOrGetRoom(normalizedId, data.title, data.user?.name, data.user?.schoolName);
 
             currentParticipant = {
-              id: user?.id || socketId,
+              id: data.user?.id || socketId,
               socketId,
-              name: user?.name || 'Participante',
-              role: user?.role || 'convidado',
-              schoolName: user?.schoolName || 'Escola',
-              avatar: user?.avatar || '',
+              name: data.user?.name || 'Participante',
+              role: data.user?.role || 'convidado',
+              schoolName: data.user?.schoolName || 'Escola',
+              avatar: data.user?.avatar || '',
               joinedAt: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-              audioMuted: !!user?.audioMuted,
-              videoOff: !!user?.videoOff,
+              audioMuted: !!data.user?.audioMuted,
+              videoOff: !!data.user?.videoOff,
               handRaised: false,
               isScreenSharing: false,
             };
 
             // Register in room
-            room.participants.set(socketId, { ws, info: currentParticipant });
+            room.participants.set(socketId, { ws, info: currentParticipant, lastActive: Date.now() });
 
             // Send full room state to the newly joined participant
             const existingParticipants = Array.from(room.participants.values())
@@ -169,7 +254,7 @@ export function setupSignalingServer(httpServer: HttpServer) {
             ws.send(
               JSON.stringify({
                 type: 'room-joined',
-                roomId,
+                roomId: normalizedId,
                 socketId,
                 roomTitle: room.title,
                 self: currentParticipant,
@@ -190,7 +275,7 @@ export function setupSignalingServer(httpServer: HttpServer) {
               }
             }
 
-            console.log(`[WebSocket] ${currentParticipant.name} (${socketId}) joined room: ${roomId}. Total: ${room.participants.size}`);
+            console.log(`[WebSocket] ${currentParticipant.name} (${socketId}) joined room: ${normalizedId}. Total: ${room.participants.size}`);
             break;
           }
 
@@ -388,9 +473,21 @@ export function setupSignalingServer(httpServer: HttpServer) {
 
         console.log(`[WebSocket] ${currentParticipant?.name || socketId} left room ${currentRoomId}. Remaining: ${room.participants.size}`);
 
-        // If it's a dynamic room (not a default room) and empty, clean it up after a while
+        // If it's a dynamic room and empty, keep it alive for a 10-minute grace period
+        // so guests or hosts that reload or switch tabs can rejoin seamlessly.
         if (room.participants.size === 0 && !defaultRooms.some((d) => d.id === currentRoomId)) {
-          rooms.delete(currentRoomId);
+          if (roomDeleteTimers.has(currentRoomId)) {
+            clearTimeout(roomDeleteTimers.get(currentRoomId)!);
+          }
+          const timer = setTimeout(() => {
+            const r = rooms.get(currentRoomId!);
+            if (r && r.participants.size === 0) {
+              rooms.delete(currentRoomId!);
+              console.log(`[MeetingRoom] Empty room ${currentRoomId} deleted after 10-minute grace period.`);
+            }
+            roomDeleteTimers.delete(currentRoomId!);
+          }, 10 * 60 * 1000); // 10 minutes grace period
+          roomDeleteTimers.set(currentRoomId, timer);
         }
       }
       currentRoomId = null;

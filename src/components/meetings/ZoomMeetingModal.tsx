@@ -63,6 +63,8 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const cleanRoomId = (roomId || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+
   const userPayload = {
     id: currentUser?.id || `user_${Math.random().toString(36).substring(2, 9)}`,
     name: currentUser
@@ -97,7 +99,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
     hostEndMeeting,
     toggleRecording,
   } = useWebRTCMeeting({
-    roomId,
+    roomId: cleanRoomId,
     roomTitle,
     user: userPayload,
     initialVideo,
@@ -134,8 +136,16 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
   };
 
   const handleCopyInvite = () => {
-    const inviteText = `Participe da reunião "${roomTitle}" no SIGE uCore!\nCódigo da Sala: ${roomId}\nLink Direto: ${window.location.origin}/?meet=${roomId}`;
+    const directUrl = `${window.location.origin}/?meet=${cleanRoomId}`;
+    const inviteText = `Participe da reunião "${roomTitle}" no SIGE uCore!\nCódigo da Sala: ${cleanRoomId}\nLink Direto: ${directUrl}`;
     navigator.clipboard.writeText(inviteText);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleCopyDirectLink = () => {
+    const directUrl = `${window.location.origin}/?meet=${cleanRoomId}`;
+    navigator.clipboard.writeText(directUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
   };
@@ -289,20 +299,42 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
         <main className="flex-1 p-3 sm:p-5 flex flex-col justify-center overflow-y-auto">
           {/* Quick empty room banner if only 1 user */}
           {participants.length === 0 && (
-            <div className="mb-4 bg-white/5 border border-white/10 rounded-xl p-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-300 animate-in fade-in">
-              <div className="flex items-center gap-2.5 text-center sm:text-left">
-                <Share2 className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>
-                  Você é o primeiro a entrar nesta sala. Partilhe o código <strong>{roomId}</strong> com os colegas para começarem a chamada de vídeo em tempo real.
-                </span>
+            <div className="mb-4 bg-slate-900/90 border border-blue-500/30 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-300 shadow-xl backdrop-blur-sm animate-in fade-in">
+              <div className="flex items-start gap-3 text-left">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Share2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold text-sm">Aguardando participantes nesta sala</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Você já está conectado! Partilhe o link direto com os participantes convidados para que eles entrem automaticamente.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-[11px] text-blue-300 select-all">
+                      {`${window.location.origin}/?meet=${cleanRoomId}`}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyInvite}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs shrink-0 cursor-pointer transition-all shadow-sm"
-              >
-                {copiedLink ? 'Código Copiado!' : 'Copiar Convite'}
-              </button>
+              <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+                <button
+                  type="button"
+                  onClick={handleCopyDirectLink}
+                  className="flex-1 md:flex-none px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-white" />
+                      <span>Link Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copiar Link Direto</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           )}
 

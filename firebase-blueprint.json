@@ -2,7 +2,7 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "Perfil de usuário institucional da plataforma uCore para validação de contas",
+      "description": "Perfil de usuário institucional da plataforma uCore com restrições de permissão e RLS",
       "type": "object",
       "properties": {
         "userId": {
@@ -27,7 +27,7 @@
         },
         "role": {
           "type": "string",
-          "description": "Perfil base de acesso ao sistema",
+          "description": "Perfil base de acesso ao sistema com privilégios restritos",
           "enum": ["admin", "diretor", "professor", "custom"],
           "maxLength": 30
         },
@@ -54,7 +54,7 @@
         },
         "schoolName": {
           "type": "string",
-          "description": "Nome da unidade escolar vinculada",
+          "description": "Nome da unidade escolar vinculada (FK)",
           "maxLength": 150
         },
         "municipalityOrDepartment": {
@@ -96,7 +96,7 @@
     },
     "Admin": {
       "title": "Admin",
-      "description": "Registo de administradores do sistema uCore",
+      "description": "Registo de administradores do sistema uCore com acesso privilegiado",
       "type": "object",
       "properties": {
         "userId": {
@@ -116,6 +116,108 @@
         }
       },
       "required": ["userId", "email", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Registo imutável de trilha de auditoria para ações críticas e segurança (SSD)",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único do log de auditoria",
+          "maxLength": 128
+        },
+        "action": {
+          "type": "string",
+          "description": "Tipo de evento de auditoria",
+          "maxLength": 60
+        },
+        "severity": {
+          "type": "string",
+          "description": "Nível de severidade do evento",
+          "enum": ["INFO", "WARNING", "CRITICAL"],
+          "maxLength": 20
+        },
+        "actorId": {
+          "type": "string",
+          "description": "ID do usuário autor da ação",
+          "maxLength": 128
+        },
+        "actorRole": {
+          "type": "string",
+          "description": "Cargo/Papel do autor da ação",
+          "maxLength": 50
+        },
+        "targetId": {
+          "type": "string",
+          "description": "ID da entidade alvo",
+          "maxLength": 128
+        },
+        "targetType": {
+          "type": "string",
+          "description": "Tipo da entidade alvo",
+          "maxLength": 50
+        },
+        "details": {
+          "type": "string",
+          "description": "Descrição detalhada da ação realizada",
+          "maxLength": 500
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Carimbo de data/hora ISO 8601 do evento",
+          "maxLength": 50
+        }
+      },
+      "required": ["id", "action", "actorId", "actorRole", "details", "timestamp"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Registo do estudante com constraints de validação e chave estrangeira para escola e turma",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único do estudante",
+          "maxLength": 128
+        },
+        "nomeCompleto": {
+          "type": "string",
+          "description": "Nome completo do estudante",
+          "maxLength": 120
+        },
+        "numeroDocumento": {
+          "type": "string",
+          "description": "Número do BI ou Cédula com constraint",
+          "maxLength": 30
+        },
+        "schoolId": {
+          "type": "string",
+          "description": "Chave Estrangeira (FK) referenciando a Escola",
+          "maxLength": 128
+        },
+        "turma": {
+          "type": "string",
+          "description": "Turma do estudante",
+          "maxLength": 50
+        },
+        "classe": {
+          "type": "string",
+          "description": "Classe do estudante",
+          "maxLength": 50
+        },
+        "dataNascimento": {
+          "type": "string",
+          "description": "Data de nascimento do aluno",
+          "maxLength": 30
+        },
+        "genero": {
+          "type": "string",
+          "enum": ["M", "F", "Outro"],
+          "maxLength": 10
+        }
+      },
+      "required": ["id", "nomeCompleto", "schoolId", "turma", "classe"]
     }
   },
   "firestore": {
@@ -123,13 +225,25 @@
       "schema": {
         "$ref": "#/entities/User"
       },
-      "description": "Contas de usuários institucionais e estado de validação"
+      "description": "Contas de usuários institucionais e estado de validação com RLS estrito"
     },
     "/admins/{adminId}": {
       "schema": {
         "$ref": "#/entities/Admin"
       },
-      "description": "Registro de permissões de administrador de sistema"
+      "description": "Registro restrito de permissões de administrador de sistema"
+    },
+    "/audit_logs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/AuditLog"
+      },
+      "description": "Trilha imutável de auditoria, append-only e leitura exclusiva de administradores"
+    },
+    "/students/{studentId}": {
+      "schema": {
+        "$ref": "#/entities/Student"
+      },
+      "description": "Registo de alunos vinculados a escolas e turmas com integridade referencial"
     }
   }
 }

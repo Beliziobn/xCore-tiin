@@ -34,6 +34,7 @@ import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
 import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
 import { AdminApprovalsPage } from './components/pages/admin/AdminApprovalsPage';
 import { AdminRegistrationModal, AdminModalType } from './components/pages/admin/AdminRegistrationModal';
+import { AdminAuditLogsModal } from './components/pages/admin/AdminAuditLogsModal';
 import { ExcelExportModal } from './components/modals/ExcelExportModal';
 import { GoogleSheetsModal } from './components/modals/GoogleSheetsModal';
 import { 
@@ -179,6 +180,7 @@ export default function App() {
   const [adminModalType, setAdminModalType] = useState<AdminModalType>(null);
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
   const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
+  const [isAuditLogsModalOpen, setIsAuditLogsModalOpen] = useState(false);
   const [homeAIResponse, setHomeAIResponse] = useState<string | null>(null);
 
   const handleHomeAICommand = (prompt: string) => {
@@ -411,9 +413,12 @@ export default function App() {
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const meetCode = params.get('meet') || params.get('room');
+      const meetCode = params.get('meet') || params.get('room') || params.get('sala');
       if (meetCode) {
-        handleOpenMeeting(meetCode, `Reunião ${meetCode.toUpperCase()}`, true);
+        const cleanCode = meetCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        if (cleanCode) {
+          handleOpenMeeting(cleanCode, `Reunião ${cleanCode.toUpperCase()}`, true);
+        }
       }
 
       const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1120,6 +1125,7 @@ export default function App() {
           directors={adminDirectors}
           onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
           onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+          onOpenAuditLogs={() => setIsAuditLogsModalOpen(true)}
           onOpenRegisterModal={() => setAdminModalType('school')}
           onNavigateToSchools={() => {
             setCurrentView('admin-escolas');
@@ -2278,6 +2284,12 @@ export default function App() {
         teachers={adminTeachers}
         directors={adminDirectors}
         students={adminStudents}
+      />
+
+      {/* Admin Audit Logs & Security Modal (SSD & RLS) */}
+      <AdminAuditLogsModal
+        isOpen={isAuditLogsModalOpen}
+        onClose={() => setIsAuditLogsModalOpen(false)}
       />
 
       {/* Live Support & Assistance Chat Modal */}
