@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2, School, GraduationCap, Settings } from 'lucide-react';
+import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2, School, GraduationCap, Settings, Lock } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
 import { ProfileOptionsSection, UserProfileData } from '../../profile/ProfileOptionsSection';
+import { AccessDeniedGuard } from '../../common/AccessDeniedGuard';
 import { directorProfileData as initialProfile } from '../../../data/directorData';
-import type { DirectorProfileInfo } from '../../../types';
+import type { DirectorProfileInfo, UserAccount } from '../../../types';
 
 interface DirectorProfilePageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
+  currentUser?: UserAccount | null;
   onOpenSettings?: () => void;
+  onNavigateToOwnProfile?: () => void;
+  onBackToHome?: () => void;
+  onLogout?: () => void;
   focusZone?: boolean;
   settingsTrigger?: number;
 }
@@ -19,10 +24,28 @@ const STORAGE_KEY_DIRECTOR = 'ucore_director_profile';
 export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
+  currentUser,
   onOpenSettings,
+  onNavigateToOwnProfile,
+  onBackToHome,
+  onLogout,
   focusZone,
   settingsTrigger,
 }) => {
+  // 1. Strict Security Guard: User can NEVER enter or modify someone else's profile
+  if (currentUser && currentUser.role !== 'diretor') {
+    return (
+      <AccessDeniedGuard
+        currentUser={currentUser}
+        attemptedView="diretor-perfil"
+        reason={`A sua conta (${currentUser.firstName} • ${currentUser.role.toUpperCase()}) não tem permissão para aceder ao Perfil da Direção Escolar. Cada utilizador tem acesso estrito e exclusivo apenas ao seu próprio perfil.`}
+        onNavigateToOwnProfile={onNavigateToOwnProfile || (() => {})}
+        onBackToHome={onBackToHome || (() => {})}
+        onLogout={onLogout || (() => {})}
+      />
+    );
+  }
+
   useEffect(() => {
     if (focusZone || settingsTrigger) {
       const timer = setTimeout(() => {
@@ -35,14 +58,24 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
     }
   }, [focusZone, settingsTrigger]);
 
+  const userStorageKey = currentUser?.id
+    ? `${STORAGE_KEY_DIRECTOR}_${currentUser.id}`
+    : STORAGE_KEY_DIRECTOR;
+
   const [profile, setProfile] = useState<DirectorProfileInfo>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_DIRECTOR);
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) return JSON.parse(saved);
     } catch {
       // fallback
     }
-    return initialProfile;
+    return {
+      ...initialProfile,
+      name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : initialProfile.name,
+      email: currentUser?.email || initialProfile.email,
+      schoolName: currentUser?.schoolName || initialProfile.schoolName,
+      avatar: currentUser?.avatarUrl || initialProfile.avatar,
+    };
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(profile.name);
@@ -59,7 +92,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
     };
     setProfile(updated);
     try {
-      localStorage.setItem(STORAGE_KEY_DIRECTOR, JSON.stringify(updated));
+      localStorage.setItem(userStorageKey, JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -73,7 +106,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
     };
     setProfile(updated);
     try {
-      localStorage.setItem(STORAGE_KEY_DIRECTOR, JSON.stringify(updated));
+      localStorage.setItem(userStorageKey, JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -90,7 +123,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
     };
     setProfile(next);
     try {
-      localStorage.setItem(STORAGE_KEY_DIRECTOR, JSON.stringify(next));
+      localStorage.setItem(userStorageKey, JSON.stringify(next));
     } catch {
       // ignore
     }

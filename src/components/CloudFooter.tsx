@@ -60,104 +60,150 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
       </div>
 
       {/* Main Footer Container with #f75142 background */}
-      <div className="bg-[#f75142] text-[#002133] px-6 sm:px-12 pt-6 sm:pt-8 pb-8 border-t border-[#f75142]">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 pb-6 border-b border-[#002133]/15">
-            {/* Brand column */}
-            <div className="md:col-span-5">
+      <div className="bg-[#f75142] text-white px-6 sm:px-12 pt-8 sm:pt-10 pb-10 border-t border-[#f75142]">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 pb-10 border-b border-white/20">
+            {/* Brand & Overview column */}
+            <div className="md:col-span-5 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#002133] border border-[#002133] flex items-center justify-center shadow-inner">
-                  <GraduationCap className="w-5 h-5 text-white" />
+                <div className="w-11 h-11 rounded-xl bg-[#002133] border border-white/10 flex items-center justify-center shadow-md shrink-0">
+                  <GraduationCap className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-2xl font-black tracking-tight font-display text-[#002133]">
-                  u<span className="text-white">Core</span>
-                </span>
+                <div>
+                  <div className="text-2xl font-black tracking-tight font-display text-white leading-none">
+                    u<span className="text-[#002133]">Core</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-white/85 tracking-wider uppercase mt-1 block">
+                    Sistema Integrado de Gestão Escolar
+                  </span>
+                </div>
               </div>
-              <p className="mt-4 text-sm text-[#002133]/90 font-medium leading-relaxed max-w-sm">
-                Plataforma integrada de gestão educacional uCore. Organização unificada,
-                indicadores pedagógicos e controlo escolar de excelência para direções,
-                professores e alunos.
+
+              <p className="text-sm text-white/90 leading-relaxed max-w-sm font-normal">
+                Ecossistema digital unificado para modernização pedagógica, controlo biométrico de assiduidade e monitorização em tempo real para directores, professores e estudantes em Angola.
               </p>
-              <div className="mt-5 flex items-center gap-2 text-xs font-bold text-[#002133]">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-700 animate-pulse"></span>
-                <span>Sistema online • Ano Letivo 2026</span>
+
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/20 border border-white/15 text-xs text-white font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Plataforma Ativa • Ano Letivo 2026</span>
               </div>
             </div>
 
             {/* Institucional column */}
-            <div className="md:col-span-4">
-              <span className="text-[11px] font-black tracking-[0.18em] uppercase text-[#002133]">
+            <div className="md:col-span-3 space-y-3.5">
+              <h4 className="text-xs font-black tracking-widest uppercase text-white/95 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                 Institucional
-              </span>
-              <div className="mt-4 flex flex-col gap-3">
-                <button
-                  id="footer-link-sobre-nos"
-                  onClick={onOpenAbout}
-                  className="text-sm text-[#002133]/90 hover:text-white hover:translate-x-1 transition-all cursor-pointer text-left w-fit flex items-center gap-2 font-bold"
-                >
-                  <span>Sobre nós</span>
-                </button>
-                <button
-                  id="footer-link-termos-privacidade"
-                  onClick={onOpenTerms}
-                  className="text-sm text-[#002133]/90 hover:text-white hover:translate-x-1 transition-all cursor-pointer text-left w-fit flex items-center gap-2 font-bold"
-                >
-                  <span>Termos e Privacidade</span>
-                </button>
-              </div>
+              </h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <button
+                    id="footer-link-sobre-nos"
+                    onClick={onOpenAbout}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium">Sobre a Plataforma</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    id="footer-link-termos-privacidade"
+                    onClick={onOpenTerms}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium">Termos de Utilização</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    id="footer-link-privacidade"
+                    onClick={onOpenTerms}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium">Política de Privacidade</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    id="footer-link-seguranca"
+                    onClick={onOpenAbout}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium">Segurança e Proteção de Dados</span>
+                  </button>
+                </li>
+              </ul>
             </div>
 
-            {/* Suporte column */}
-            <div className="md:col-span-3">
-              <span className="text-[11px] font-black tracking-[0.18em] uppercase text-[#002133]">
-                Suporte & Ajuda
-              </span>
-              <div className="mt-4 flex flex-col gap-3">
+            {/* Suporte & Contacto column */}
+            <div className="md:col-span-4 space-y-3.5">
+              <h4 className="text-xs font-black tracking-widest uppercase text-white/95 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                Suporte & Apoio
+              </h4>
+              
+              <div className="space-y-3">
                 <button
                   id="footer-link-contact"
                   onClick={handleSupport}
-                  className="text-sm text-[#002133]/90 hover:text-white hover:translate-x-1 transition-all cursor-pointer text-left w-fit flex items-center gap-2 font-bold"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold uppercase tracking-wider text-white transition-all cursor-pointer flex items-center justify-center sm:justify-start gap-2.5 shadow-xs"
                 >
-                  <HelpCircle className="w-4 h-4 text-[#002133]" />
-                  <span>Central de Ajuda</span>
+                  <HelpCircle className="w-4 h-4 text-white" />
+                  <span>Central de Apoio uCore</span>
                 </button>
-                <div className="pt-2">
-                  <span className="text-xs text-[#002133]/80 block mb-1 font-semibold">Linha Pedagógica</span>
+
+                <div className="bg-black/15 rounded-xl p-3.5 border border-white/15 text-xs space-y-1.5">
+                  <span className="text-white/75 font-medium block">Linha de Suporte Técnico & Pedagógico:</span>
                   <a
                     href="mailto:suporte@ucore.ao"
-                    className="text-xs font-black text-[#002133] hover:text-white transition-colors underline decoration-[#002133]/30"
+                    className="font-bold text-sm text-white hover:underline flex items-center gap-1.5 transition-colors"
                   >
-                    suporte@ucore.ao
+                    <span>suporte@ucore.ao</span>
                   </a>
+                  <p className="text-[11px] text-white/70 leading-normal">
+                    Atendimento disponível nos dias úteis, das 08h00 às 17h00 (WAT).
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom bar */}
-          <div className="pt-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#002133]/85 font-medium">
-            <p className="tracking-wide text-center sm:text-left">
-              © 2026 <strong className="text-[#002133] font-black">uCore</strong> — Todos os direitos reservados.
-            </p>
-            <div className="flex items-center gap-6">
+          {/* Bottom Bar: aligned, scannable & balanced */}
+          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/85">
+            <div className="text-center sm:text-left space-y-0.5">
+              <p className="tracking-normal font-normal">
+                © 2026 <strong className="text-white font-bold">uCore Angola</strong>. Todos os direitos reservados.
+              </p>
+              <p className="text-[11px] text-white/70">
+                Ministério da Educação • Direcções Municipais e Gabinetes Provinciais
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium">
               <button
                 onClick={onOpenTerms}
-                className="hover:text-white transition-colors cursor-pointer font-bold"
+                className="hover:text-white transition-colors cursor-pointer text-white/85"
               >
-                Privacidade
+                Termos & Condições
               </button>
+              <span className="text-white/30 hidden sm:inline">•</span>
               <button
                 onClick={onOpenAbout}
-                className="hover:text-white transition-colors cursor-pointer font-bold"
+                className="hover:text-white transition-colors cursor-pointer text-white/85"
               >
                 Segurança
               </button>
+              <span className="text-white/30 hidden sm:inline">•</span>
               <button
                 onClick={scrollToTop}
-                className="hover:text-white font-bold transition-colors cursor-pointer flex items-center gap-1 text-[#002133]"
+                className="hover:text-white font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 text-white bg-black/15 px-3 py-1 rounded-lg border border-white/10"
               >
-                <span>Topo</span>
-                <ArrowUp className="w-3.5 h-3.5 text-[#002133]" />
+                <span>Voltar ao topo</span>
+                <ArrowUp className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

@@ -16,13 +16,17 @@ import {
   GraduationCap,
   ShieldCheck,
   X,
-  FileText
+  FileText,
+  Sparkles,
+  UserCheck
 } from 'lucide-react';
 import { Hero } from '../../Hero';
-import type { AdminDirector, AdminSchool, DirectorRegistrationData } from '../../../types';
+import type { AdminDirector, AdminSchool, DirectorRegistrationData, PendingApplication } from '../../../types';
 import { getStoredDirectors, saveDirector, buildInitialDirectorDossier } from '../../../utils/directorStorage';
+import { getPendingApplications, approveApplication, rejectApplication } from '../../../utils/authApprovalStorage';
 import { DirectorDetailModal } from '../../modals/DirectorDetailModal';
 import { DirectorRegistrationModal } from '../../modals/DirectorRegistrationModal';
+import { DirectorApplicationModal } from '../../modals/DirectorApplicationModal';
 
 interface AdminDirectorsPageProps {
   onOpenGetStarted: () => void;
@@ -62,11 +66,59 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
   const [editingDirectorData, setEditingDirectorData] = useState<DirectorRegistrationData | null>(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
-  // Sync stored directors on mount and updates
+  // Pending Director Candidacies Workflow State
+  const [activeTab, setActiveTab] = useState<'diretores' | 'candidaturas'>('diretores');
+  const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>(() => {
+    return getPendingApplications('diretor').filter((a) => a.status === 'pendente');
+  });
+  const [selectedApplication, setSelectedApplication] = useState<PendingApplication | null>(null);
+  const [approvalToast, setApprovalToast] = useState<string | null>(null);
+
+  const refreshPending = () => {
+    setPendingApplications(getPendingApplications('diretor').filter((a) => a.status === 'pendente'));
+  };
+
+  // Sync stored directors and pending candidacies on mount and updates
   useEffect(() => {
     const list = getStoredDirectors();
     setDetailedDirectors(list);
+    refreshPending();
   }, []);
+
+  const handleApproveApplication = (appId: string) => {
+    const updated = approveApplication(appId, 'Administrador Central (DME)');
+    if (updated) {
+      refreshPending();
+      setApprovalToast(`Candidatura de ${updated.fullName} homologada com sucesso! Diretor(a) credenciado(a).`);
+      setTimeout(() => setApprovalToast(null), 4500);
+
+      if (onAddDirector) {
+        const newDirector: AdminDirector = {
+          id: 'dir-' + Date.now(),
+          name: updated.fullName,
+          schoolName: updated.schoolName,
+          email: updated.email,
+          phone: updated.phone,
+          status: 'Ativo',
+          appointmentYear: 2026,
+          performanceRating: 9.8,
+          teachersCount: 24,
+          studentsCount: 650,
+          location: updated.municipality || 'Luanda',
+        };
+        onAddDirector(newDirector);
+      }
+    }
+  };
+
+  const handleRejectApplication = (appId: string, reason: string) => {
+    const updated = rejectApplication(appId, reason, 'Administrador Central (DME)');
+    if (updated) {
+      refreshPending();
+      setApprovalToast(`Candidatura recusada. Notificação emitida para o candidato.`);
+      setTimeout(() => setApprovalToast(null), 4500);
+    }
+  };
 
   // Reset pagination when search or filters change
   useEffect(() => {
@@ -218,6 +270,162 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
           </button>
         </div>
 
+        {/* Notificação de Homologação */}
+        {approvalToast && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between shadow-xs animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <p className="text-sm font-semibold text-emerald-900">{approvalToast}</p>
+            </div>
+            <button
+              onClick={() => setApprovalToast(null)}
+              className="text-emerald-700 hover:text-emerald-900 text-xs font-bold px-2 py-1"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
+
+        {/* Tab Switcher: Homologados vs Candidaturas Pendentes */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+          <button
+            id="tab-diretores-homologados"
+            onClick={() => setActiveTab('diretores')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'diretores'
+                ? 'bg-[#002133] text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Diretores Homologados</span>
+            <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-white/20 text-white font-semibold">
+              {filteredDirectors.length}
+            </span>
+          </button>
+
+          <button
+            id="tab-candidaturas-pendentes"
+            onClick={() => setActiveTab('candidaturas')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'candidaturas'
+                ? 'bg-[#f75142] text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Candidaturas Pendentes de Homologação</span>
+            {pendingApplications.length > 0 && (
+              <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-white text-[#f75142] font-black animate-pulse">
+                {pendingApplications.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Seção de Candidaturas Pendentes */}
+        {activeTab === 'candidaturas' && (
+          <div className="space-y-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Inscrições de Diretores Aguardando Validação e Despacho
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Conforme o protocolo uCore, os novos diretores permanecem em espera até homologação pelo Administrador Central.
+                  </p>
+                </div>
+                <button
+                  onClick={refreshPending}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Atualizar
+                </button>
+              </div>
+
+              {pendingApplications.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-slate-800">Todas as candidaturas de diretores foram despachadas!</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Novas solicitações de gestores escolares criadas na plataforma aparecerão nesta fila de validação.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {pendingApplications.map((app) => (
+                    <div
+                      key={app.id}
+                      className="p-4 rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/40 via-white to-white hover:shadow-md transition-all flex flex-col justify-between gap-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#002133] text-white flex items-center justify-center font-bold text-sm">
+                            {app.fullName.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-900">{app.fullName}</h4>
+                            <p className="text-xs text-slate-500">{app.email}</p>
+                          </div>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          <Clock className="w-3 h-3" />
+                          Pendente
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/70 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Unidade Escolar:</span>
+                          <span className="font-bold text-slate-800">{app.schoolName}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Município / Jurisdição:</span>
+                          <span className="font-semibold text-slate-700">{app.municipality}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Bilhete de Identidade:</span>
+                          <span className="font-mono text-slate-800">{app.biNumber || '008921045LA044'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Submetido em:</span>
+                          <span className="text-slate-600">{app.createdAt}</span>
+                        </div>
+                      </div>
+
+                      {app.isPreRegistered && (
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Identificado no Censo Escolar Pré-Cadastrado</span>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-slate-500">
+                          Autoridade: Administrador Central
+                        </span>
+                        <button
+                          id={`btn-validar-candidatura-${app.id}`}
+                          onClick={() => setSelectedApplication(app)}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                          <span>Validar Candidatura</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 2. Conteúdo do Quadro Homologado (pesquisa, filtros e tabela) */}
+        {activeTab === 'diretores' && (
+          <>
         {/* 2. Pesquisa com mais espaço e filtros organizados */}
         <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-4">
           {/* Campo amplo de pesquisa */}
@@ -667,7 +875,26 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
+
+      {/* Modal: Validação de Candidatura Específica do Diretor */}
+      {selectedApplication && (
+        <DirectorApplicationModal
+          isOpen={selectedApplication !== null}
+          onClose={() => setSelectedApplication(null)}
+          application={selectedApplication}
+          onApprove={(appId) => {
+            handleApproveApplication(appId);
+            setSelectedApplication(null);
+          }}
+          onReject={(appId, reason) => {
+            handleRejectApplication(appId, reason);
+            setSelectedApplication(null);
+          }}
+        />
+      )}
 
       {/* Drawer / Painel Lateral: Ver Ficha Cadastral Completa / Histórico */}
       {detailModalDirector && (

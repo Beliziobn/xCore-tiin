@@ -95,11 +95,52 @@ export interface UserAccount {
   adminRole?: AdminStaffRole;
   cargoTitle?: string;
   schoolName?: string;
+  schoolId?: string;
   municipalityOrDepartment?: string;
   titlePrefix?: string;
   greeting?: string;
   avatar?: string;
   rememberMe?: boolean;
+  // Authorization & Pending Approval Workflow
+  status?: 'ativo' | 'pendente' | 'rejeitado';
+  biNumber?: string;
+  phone?: string;
+  subject?: string;
+  gradeClass?: string;
+  linkedPreRegistrationId?: string;
+  isPreRegistered?: boolean;
+  submittedAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  approverTargetRole?: 'admin' | 'diretor';
+  approverTargetSchoolName?: string;
+  rejectionReason?: string;
+}
+
+export interface PendingApplication {
+  id: string;
+  userId: string;
+  type: 'diretor' | 'professor';
+  fullName: string;
+  email: string;
+  phone: string;
+  biNumber: string;
+  schoolName: string;
+  schoolId?: string;
+  municipality: string;
+  targetApproverRole: 'admin' | 'diretor';
+  approverDirectorName?: string;
+  subject?: string;
+  gradeClass?: string;
+  status: 'pendente' | 'aprovado' | 'rejeitado';
+  isPreRegistered: boolean;
+  preRegisteredDetails?: string;
+  createdAt: string;
+  updatedAt?: string;
+  notes?: string;
+  rejectionReason?: string;
+  approvedBy?: string;
+  approvedAt?: string;
 }
 
 export type DirectorPageType = 

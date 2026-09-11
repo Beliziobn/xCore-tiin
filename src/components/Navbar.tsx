@@ -382,18 +382,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onSelectPage('perfil-professor');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Perfil do Professor
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('perfil-aluno');
-                        setShowPagesDropdown(false);
-                      }}
                       className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
                     >
-                      Perfil do Aluno (Albert)
+                      Meu Perfil de Docente
                     </button>
                   </>
                 ) : (
@@ -805,16 +796,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
               >
-                Perfil do Professor
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('perfil-aluno');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Perfil do Aluno (Albert)
+                Meu Perfil de Docente
               </button>
             </>
           ) : (

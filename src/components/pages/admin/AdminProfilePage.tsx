@@ -30,13 +30,18 @@ import {
   UserProfileData,
   ProfileModalType,
 } from '../../profile/ProfileOptionsSection';
-import type { AdminSchool, AdminStaffRole } from '../../../types';
+import { AccessDeniedGuard } from '../../common/AccessDeniedGuard';
+import type { AdminSchool, AdminStaffRole, UserAccount } from '../../../types';
 
 interface AdminProfilePageProps {
   onOpenGetStarted: () => void;
   schools: AdminSchool[];
   onNavigateToStatistics: () => void;
   isLoggedIn?: boolean;
+  currentUser?: UserAccount | null;
+  onNavigateToOwnProfile?: () => void;
+  onBackToHome?: () => void;
+  onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenExcelExport?: () => void;
   focusZone?: boolean;
@@ -116,11 +121,37 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   schools,
   onNavigateToStatistics,
   isLoggedIn,
+  currentUser,
+  onNavigateToOwnProfile,
+  onBackToHome,
+  onLogout,
   onOpenSettings,
   onOpenExcelExport,
   focusZone,
   settingsTrigger,
 }) => {
+  // 1. Strict Security Guard: User can NEVER enter or modify someone else's profile
+  if (currentUser && currentUser.role !== 'admin') {
+    return (
+      <AccessDeniedGuard
+        currentUser={currentUser}
+        attemptedView="admin-perfil"
+        reason={`A sua conta (${currentUser.firstName} • ${currentUser.role.toUpperCase()}) não possui privilégios de Administração Central. Cada utilizador tem acesso estrito e exclusivo apenas ao seu próprio perfil.`}
+        onNavigateToOwnProfile={onNavigateToOwnProfile || (() => {})}
+        onBackToHome={onBackToHome || (() => {})}
+        onLogout={onLogout || (() => {})}
+      />
+    );
+  }
+
+  const userAdminAvatarKey = currentUser?.id
+    ? `${STORAGE_KEY_ADMIN_AVATAR}_${currentUser.id}`
+    : STORAGE_KEY_ADMIN_AVATAR;
+
+  const userAdminDataKey = currentUser?.id
+    ? `${STORAGE_KEY_ADMIN_DATA}_${currentUser.id}`
+    : STORAGE_KEY_ADMIN_DATA;
+
   useEffect(() => {
     if (focusZone || settingsTrigger) {
       const timer = setTimeout(() => {
@@ -135,9 +166,9 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
 
   const [adminPhoto, setAdminPhoto] = useState<string | null>(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY_ADMIN_AVATAR);
+      return localStorage.getItem(userAdminAvatarKey) || currentUser?.avatarUrl || null;
     } catch {
-      return null;
+      return currentUser?.avatarUrl || null;
     }
   });
 
@@ -214,17 +245,19 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
 
   const [adminData, setAdminData] = useState<UserProfileData>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_ADMIN_DATA);
+      const saved = localStorage.getItem(userAdminDataKey);
       if (saved) return JSON.parse(saved);
     } catch {
       // ignore
     }
+    const adminName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Dr. Fred Silva';
+    const adminEmail = currentUser?.email || 'diretor.municipal@ucore.edu.ao';
     return {
-      name: 'Super Admin uCore',
-      email: 'fred.admin@ucore.edu.ao',
+      name: adminName,
+      email: adminEmail,
       phone: '+244 923 001 100',
       roleTitle: 'Superintendente & Administrador Geral da Rede uCore',
-      schoolName: 'Ministério da Educação & Rede uCore Escolas',
+      schoolName: 'Direcção Municipal da Educação & Rede uCore',
       biNumber: '005481920LA031',
       address: 'Edifício Monumental, Ingombota, Luanda',
     };
@@ -240,14 +273,14 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     if (updated.avatar !== undefined) {
       setAdminPhoto(updated.avatar);
       try {
-        if (updated.avatar) localStorage.setItem(STORAGE_KEY_ADMIN_AVATAR, updated.avatar);
-        else localStorage.removeItem(STORAGE_KEY_ADMIN_AVATAR);
+        if (updated.avatar) localStorage.setItem(userAdminAvatarKey, updated.avatar);
+        else localStorage.removeItem(userAdminAvatarKey);
       } catch {
         // ignore
       }
     }
     try {
-      localStorage.setItem(STORAGE_KEY_ADMIN_DATA, JSON.stringify(next));
+      localStorage.setItem(userAdminDataKey, JSON.stringify(next));
     } catch {
       // ignore
     }
@@ -258,9 +291,9 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     setAdminData((prev) => ({ ...prev, avatar: newPhoto }));
     try {
       if (newPhoto) {
-        localStorage.setItem(STORAGE_KEY_ADMIN_AVATAR, newPhoto);
+        localStorage.setItem(userAdminAvatarKey, newPhoto);
       } else {
-        localStorage.removeItem(STORAGE_KEY_ADMIN_AVATAR);
+        localStorage.removeItem(userAdminAvatarKey);
       }
     } catch {
       // ignore

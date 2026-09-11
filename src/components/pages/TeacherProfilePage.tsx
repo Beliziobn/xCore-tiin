@@ -22,12 +22,18 @@ import {
 import { initialTeacherData, TeacherData, StudentProfile } from '../../data/teacherData';
 import { ProfilePhotoUploader } from '../ProfilePhotoUploader';
 import { ProfileOptionsSection, UserProfileData, ProfileModalType } from '../profile/ProfileOptionsSection';
+import { AccessDeniedGuard } from '../common/AccessDeniedGuard';
+import type { UserAccount } from '../../types';
 
 interface TeacherProfilePageProps {
   onBackToStats: () => void;
   onNavigateToClass: () => void;
   teacher?: TeacherData;
   students?: StudentProfile[];
+  currentUser?: UserAccount | null;
+  onNavigateToOwnProfile?: () => void;
+  onBackToHome?: () => void;
+  onLogout?: () => void;
   onUpdateTeacher?: (updated: Partial<TeacherData>) => void;
   initialTab?: 'visao-geral' | 'configuracoes';
   focusZone?: boolean;
@@ -41,11 +47,29 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   onNavigateToClass,
   teacher = initialTeacherData,
   students = [],
+  currentUser,
+  onNavigateToOwnProfile,
+  onBackToHome,
+  onLogout,
   onUpdateTeacher,
   initialTab,
   focusZone,
   settingsTrigger,
 }) => {
+  // 1. Strict Security Guard: User can NEVER enter or modify someone else's profile
+  if (currentUser && currentUser.role !== 'professor') {
+    return (
+      <AccessDeniedGuard
+        currentUser={currentUser}
+        attemptedView="professor-perfil"
+        reason={`A sua conta (${currentUser.firstName} • ${currentUser.role.toUpperCase()}) não tem permissão para aceder ao Perfil de Docente. Cada utilizador tem acesso estrito e exclusivo apenas ao seu próprio perfil.`}
+        onNavigateToOwnProfile={onNavigateToOwnProfile || (() => {})}
+        onBackToHome={onBackToHome || (() => {})}
+        onLogout={onLogout || (() => {})}
+      />
+    );
+  }
+
   const [activeTab, setActiveTab] = useState<'visao-geral' | 'configuracoes'>(initialTab || 'visao-geral');
   const [selectedDay, setSelectedDay] = useState('Segunda-feira');
   const [activeModal, setActiveModal] = useState<ProfileModalType>(null);
@@ -69,21 +93,28 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
     }
   }, [focusZone, settingsTrigger]);
 
+  const userAvatarStorageKey = currentUser?.id
+    ? `${STORAGE_KEY_TEACHER_AVATAR}_${currentUser.id}`
+    : STORAGE_KEY_TEACHER_AVATAR;
+
   const [teacherAvatar, setTeacherAvatar] = useState<string | null>(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY_TEACHER_AVATAR) || teacher.avatar || null;
+      return localStorage.getItem(userAvatarStorageKey) || currentUser?.avatarUrl || teacher.avatar || null;
     } catch {
-      return teacher.avatar || null;
+      return currentUser?.avatarUrl || teacher.avatar || null;
     }
   });
 
   const [teacherProfileData, setTeacherProfileData] = useState<UserProfileData>(() => {
+    const teacherName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : teacher.name;
+    const teacherEmail = currentUser?.email || teacher.email || 'santar.goes@ucore.edu.ao';
+    const school = currentUser?.schoolName || teacher.escola || 'Escola Primária Nº 1024 - Quessua';
     return {
-      name: teacher.name,
-      email: teacher.email || 'santar.goes@ucore.edu.ao',
+      name: teacherName,
+      email: teacherEmail,
       phone: teacher.telefone || '+244 931 224 550',
       roleTitle: `Docente Titular • Turma ${teacher.turma} (${teacher.classe} Classe)`,
-      schoolName: teacher.escola,
+      schoolName: school,
       biNumber: '006849102LA089',
       address: 'Bairro Palanca, Kilamba Kiaxi, Luanda',
     };
@@ -108,9 +139,9 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
     setTeacherAvatar(newPhoto);
     try {
       if (newPhoto) {
-        localStorage.setItem(STORAGE_KEY_TEACHER_AVATAR, newPhoto);
+        localStorage.setItem(userAvatarStorageKey, newPhoto);
       } else {
-        localStorage.removeItem(STORAGE_KEY_TEACHER_AVATAR);
+        localStorage.removeItem(userAvatarStorageKey);
       }
     } catch {
       // ignore

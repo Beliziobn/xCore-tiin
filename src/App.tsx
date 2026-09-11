@@ -66,7 +66,10 @@ import { initSmoothScroll, scrollToTop, refreshScrollReveals } from './utils/scr
 import SchoolTeamSection, { defaultSchoolMembers, SchoolMember } from './components/ui/school-team-section';
 import { AIInputWithLoading } from './components/ui/ai-input-with-loading';
 import { PublicLandingPage } from './components/pages/PublicLandingPage';
+import { PendingApprovalPage } from './components/pages/PendingApprovalPage';
 import { DemoRequestModal } from './components/modals/DemoRequestModal';
+import { AccessDeniedGuard } from './components/common/AccessDeniedGuard';
+import { canUserAccessView, getOwnProfileViewForUser } from './utils/authGuard';
 
 import type { 
   EducationalModule, 
@@ -684,6 +687,22 @@ export default function App() {
       return;
     }
 
+    // 1. Strict Authorization Guard: A user can never and must never enter or tamper with someone else's profile
+    if (currentUser) {
+      let targetView = pageId;
+      if (pageId === 'perfil-professor' || pageId === 'perfil') targetView = 'professor-perfil';
+      if (pageId === 'perfil-aluno') targetView = 'aluno-perfil';
+
+      const accessCheck = canUserAccessView(currentUser, targetView);
+      if (!accessCheck.allowed) {
+        showToast(
+          accessCheck.reason ||
+            'Acesso negado: Política de segurança uCore proíbe entrar ou alterar o perfil de outros utilizadores.'
+        );
+        return;
+      }
+    }
+
     // Admin Views Routing
     if (
       pageId === 'admin-estatisticas' ||
@@ -856,6 +875,49 @@ export default function App() {
       );
     }
 
+    // 0.2 Pending Approval Waiting Screen
+    // "se um diretor de escola criar a conta dele , vai ficar pendente em uma tela de espera até o admin autorizar, se for o professor o director é quem deve autorizar"
+    if (currentUser.status === 'pendente') {
+      return (
+        <PendingApprovalPage
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onApprovalConfirmed={(updatedUser) => {
+            setCurrentUser(updatedUser);
+            try {
+              localStorage.setItem('ucore_active_user', JSON.stringify(updatedUser));
+            } catch {}
+            showToast(`Conta ativada com sucesso! Bem-vindo(a) à plataforma uCore, ${updatedUser.firstName}.`);
+          }}
+          showToast={showToast}
+          onOpenSupport={() => setInfoModalType('support')}
+        />
+      );
+    }
+
+    // 0.3 Strict Privacy & Identity Protection Guard:
+    // "um usuario nunca pode e nem deve mexer e nem entrar no perfil dos outros"
+    const accessCheck = canUserAccessView(currentUser, currentView);
+    if (!accessCheck.allowed) {
+      return (
+        <AccessDeniedGuard
+          currentUser={currentUser}
+          attemptedView={currentView}
+          reason={accessCheck.reason}
+          onNavigateToOwnProfile={() => {
+            const ownProfile = getOwnProfileViewForUser(currentUser);
+            setCurrentView(ownProfile);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToHome={() => {
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={handleLogout}
+        />
+      );
+    }
+
     // 1. Admin Pages
     if (currentView === 'admin-estatisticas') {
       return (
@@ -951,6 +1013,17 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          onNavigateToOwnProfile={() => {
+            const own = getOwnProfileViewForUser(currentUser);
+            setCurrentView(own);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToHome={() => {
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={handleLogout}
           onOpenSettings={() => {
             setProfileFocusZone(true);
             setSettingsTriggerCount((c) => c + 1);
@@ -1038,6 +1111,17 @@ export default function App() {
         <DirectorProfilePage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          onNavigateToOwnProfile={() => {
+            const own = getOwnProfileViewForUser(currentUser);
+            setCurrentView(own);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToHome={() => {
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={handleLogout}
           onOpenSettings={() => {
             setProfileFocusZone(true);
             setSettingsTriggerCount((c) => c + 1);
@@ -1252,6 +1336,17 @@ export default function App() {
             }}
             teacher={teacherProfile}
             students={teacherStudents}
+            currentUser={currentUser}
+            onNavigateToOwnProfile={() => {
+              const own = getOwnProfileViewForUser(currentUser);
+              setCurrentView(own);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onBackToHome={() => {
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onLogout={handleLogout}
             onUpdateTeacher={(updated) => {
               setTeacherProfile((prev) => ({ ...prev, ...updated }));
             }}
@@ -1512,13 +1607,8 @@ export default function App() {
           setCurrentPage('home');
           setProfileInitialTab('visao-geral');
           setProfileFocusZone(false);
-          if (activeRole === 'admin') {
-            setCurrentView('admin-perfil');
-          } else if (activeRole === 'diretor') {
-            setCurrentView('diretor-perfil');
-          } else {
-            setCurrentView('professor-perfil');
-          }
+          const ownProfile = getOwnProfileViewForUser(currentUser);
+          setCurrentView(ownProfile);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenSupport={() => setInfoModalType('support')}
@@ -1529,6 +1619,12 @@ export default function App() {
         onLogout={handleLogout}
         activeRole={activeRole}
         onSwitchRole={(newRole) => {
+          if (currentUser) {
+            showToast(
+              `Operação bloqueada: A sua conta está autenticada como ${currentUser.firstName} (${currentUser.role.toUpperCase()}). Por segurança, encerre a sessão para aceder com outro utilizador.`
+            );
+            return;
+          }
           setActiveRole(newRole);
           setCurrentView('home');
           setCurrentPage('home');
@@ -1548,13 +1644,8 @@ export default function App() {
           setProfileInitialTab('configuracoes');
           setProfileFocusZone(true);
           setSettingsTriggerCount((c) => c + 1);
-          if (activeRole === 'admin') {
-            setCurrentView('admin-perfil');
-          } else if (activeRole === 'diretor') {
-            setCurrentView('diretor-perfil');
-          } else {
-            setCurrentView('professor-perfil');
-          }
+          const ownProfile = getOwnProfileViewForUser(currentUser);
+          setCurrentView(ownProfile);
           setTimeout(() => {
             const el = document.getElementById('zona-dados-senha');
             if (el) {

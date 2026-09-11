@@ -23,12 +23,24 @@ import {
   Settings,
   School,
   Briefcase,
-  Check
+  Check,
+  Sparkles,
+  Phone
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
 import { googleSignIn } from '../../utils/googleAuth';
+import { 
+  UCORE_MUNICIPALITIES, 
+  UCORE_DISCIPLINAS, 
+  UCORE_GRAUS_CLASSES, 
+  searchPreRegisteredTeacher, 
+  searchPreRegisteredDirector,
+  savePendingApplication,
+  checkUserApprovalStatus
+} from '../../utils/authApprovalStorage';
+import { initialAdminSchools } from '../../data/adminData';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -231,8 +243,43 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [schoolRole, setSchoolRole] = useState<SchoolStaffRole>('diretor_geral');
   const [adminRole, setAdminRole] = useState<AdminStaffRole>('diretor_municipal');
   const [schoolOrUnitName, setSchoolOrUnitName] = useState('');
+  
+  // uCore Predefined System Selection Options
+  const [selectedMunicipality, setSelectedMunicipality] = useState<string>(UCORE_MUNICIPALITIES[0]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>(initialAdminSchools[0]?.id || 'esc-01');
+  const [biNumber, setBiNumber] = useState('');
+  const [phone, setPhone] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState<string>(UCORE_DISCIPLINAS[0]);
+  const [selectedGradeClass, setSelectedGradeClass] = useState<string>(UCORE_GRAUS_CLASSES[1]);
+  const [preRegResult, setPreRegResult] = useState<{ found: boolean; details?: string; teacherName?: string; directorName?: string } | null>(null);
+
   const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // Real-time pre-registration search across uCore roster
+  useEffect(() => {
+    if (mode !== 'register') {
+      setPreRegResult(null);
+      return;
+    }
+    const currentSchool = initialAdminSchools.find((s) => s.id === selectedSchoolId)?.name || initialAdminSchools[0]?.name || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    if (institutionalScope === 'escola') {
+      if (schoolRole === 'professor') {
+        const res = searchPreRegisteredTeacher(email, biNumber, fullName, currentSchool);
+        setPreRegResult(res.found ? res : null);
+      } else if (schoolRole.includes('diretor')) {
+        const res = searchPreRegisteredDirector(email, biNumber, fullName, currentSchool);
+        setPreRegResult(res.found ? res : null);
+      } else {
+        setPreRegResult(null);
+      }
+    } else {
+      const res = searchPreRegisteredDirector(email, biNumber, fullName, selectedMunicipality);
+      setPreRegResult(res.found ? res : null);
+    }
+  }, [mode, email, biNumber, firstName, lastName, selectedSchoolId, selectedMunicipality, schoolRole, institutionalScope]);
 
   const handleGoogleSignInFlow = async () => {
     try {
@@ -398,6 +445,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         const resolvedFirst = firstName.trim() || (resolvedRole === 'admin' ? 'Fred' : resolvedRole === 'diretor' ? 'Carl' : 'Santar');
         
+        const matchedSchool = initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0];
+
         const loggedUser: UserAccount = {
           id: 'usr_' + Date.now(),
           firstName: resolvedFirst,
@@ -408,14 +457,29 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           schoolRole: matchedScope === 'escola' ? matchedSchoolRole : undefined,
           adminRole: matchedScope === 'administracao' ? matchedAdminRole : undefined,
           cargoTitle: resolvedCargoTitle,
-          schoolName: matchedScope === 'escola' ? (schoolOrUnitName.trim() || 'Escola Modelo Central') : undefined,
-          municipalityOrDepartment: matchedScope === 'administracao' ? (schoolOrUnitName.trim() || 'Direcção Municipal da Educação') : undefined,
+          schoolName: matchedScope === 'escola' ? (matchedSchool.name) : undefined,
+          schoolId: matchedScope === 'escola' ? matchedSchool.id : undefined,
+          municipalityOrDepartment: selectedMunicipality,
           titlePrefix: resolvedPrefix,
           greeting: `Olá ${resolvedPrefix} ${resolvedFirst}`,
           rememberMe,
         };
 
-        setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para o ambiente de ${resolvedCargoTitle}...`);
+        // Check if this account is pending approval
+        const approvalCheck = checkUserApprovalStatus(loggedUser.id, email.trim());
+        if (approvalCheck.status === 'pendente') {
+          loggedUser.status = 'pendente';
+          setSuccessMsg(`A sua candidatura continua em análise aguardando despacho. Redirecionando para a tela de espera...`);
+        } else if (approvalCheck.status === 'rejeitado') {
+          setErrorMsg(`A sua candidatura foi recusada pela administração: ${approvalCheck.app?.rejectionReason || 'Contacte a direcção'}`);
+          setLoading(false);
+          onAuthLoadingChange?.(false);
+          return;
+        } else {
+          loggedUser.status = 'ativo';
+          setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para o ambiente de ${resolvedCargoTitle}...`);
+        }
+
         setTimeout(() => {
           onAuthLoadingChange?.(false);
           onLoginSuccess(loggedUser);
@@ -425,6 +489,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       // Register validation
       if (!firstName.trim()) {
         setErrorMsg('Por favor, informe o seu primeiro nome.');
+        return;
+      }
+      if (!biNumber.trim()) {
+        setErrorMsg('Por favor, indique o número do Bilhete de Identidade (BI) para verificação institucional.');
         return;
       }
       if (!email.trim()) {
@@ -457,9 +525,43 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const prefix = chosenConfig.prefix;
         const baseRole = chosenConfig.baseRole;
         const cargoTitle = chosenConfig.label;
+        const matchedSchool = initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0];
+
+        const isDirectorCandidate = baseRole === 'diretor';
+        const isTeacherCandidate = baseRole === 'professor';
+        const isPending = isDirectorCandidate || isTeacherCandidate;
+        const newUserId = 'usr_' + Date.now();
+
+        // Create pending application record
+        if (isPending) {
+          const appId = `app-${baseRole}-${Date.now()}`;
+          savePendingApplication({
+            id: appId,
+            userId: newUserId,
+            type: isDirectorCandidate ? 'diretor' : 'professor',
+            fullName: `${userFirst} ${lastName.trim() || 'uCore'}`.trim(),
+            email: email.trim(),
+            phone: phone.trim() || '+244 923 000 000',
+            biNumber: biNumber.trim(),
+            schoolName: matchedSchool.name,
+            schoolId: matchedSchool.id,
+            municipality: selectedMunicipality,
+            targetApproverRole: isDirectorCandidate ? 'admin' : 'diretor',
+            approverDirectorName: isTeacherCandidate ? matchedSchool.directorName : undefined,
+            subject: isTeacherCandidate ? selectedSubject : undefined,
+            gradeClass: isTeacherCandidate ? selectedGradeClass : undefined,
+            status: 'pendente',
+            isPreRegistered: Boolean(preRegResult?.found),
+            preRegisteredDetails: preRegResult?.details,
+            createdAt: new Date().toLocaleString('pt-AO'),
+            notes: preRegResult?.found 
+              ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.` 
+              : `Nova candidatura institucional para ${matchedSchool.name}.`,
+          });
+        }
 
         const newUser: UserAccount = {
-          id: 'usr_' + Date.now(),
+          id: newUserId,
           firstName: userFirst,
           lastName: lastName.trim() || 'uCore',
           email: email.trim(),
@@ -468,14 +570,31 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
           adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
           cargoTitle: cargoTitle,
-          schoolName: institutionalScope === 'escola' ? (schoolOrUnitName.trim() || 'Escola Modelo Primária') : undefined,
-          municipalityOrDepartment: institutionalScope === 'administracao' ? (schoolOrUnitName.trim() || 'DME Municipal') : undefined,
+          schoolName: institutionalScope === 'escola' ? matchedSchool.name : undefined,
+          schoolId: matchedSchool.id,
+          municipalityOrDepartment: selectedMunicipality,
           titlePrefix: prefix,
           greeting: `Olá ${prefix} ${userFirst}`,
           rememberMe: true,
+          status: isPending ? 'pendente' : 'ativo',
+          biNumber: biNumber.trim(),
+          phone: phone.trim() || '+244 923 000 000',
+          subject: isTeacherCandidate ? selectedSubject : undefined,
+          gradeClass: isTeacherCandidate ? selectedGradeClass : undefined,
+          isPreRegistered: Boolean(preRegResult?.found),
+          submittedAt: new Date().toLocaleString('pt-AO'),
         };
 
-        setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${cargoTitle} (${userFirst})...`);
+        if (isPending) {
+          setSuccessMsg(
+            isDirectorCandidate
+              ? `Candidatura enviada! A sua conta de Diretor aguarda validação do Administrador Central.`
+              : `Inscrição submetida! A sua conta de Professor aguarda validação da Direção da ${matchedSchool.name}.`
+          );
+        } else {
+          setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${cargoTitle} (${userFirst})...`);
+        }
+
         setTimeout(() => {
           onAuthLoadingChange?.(false);
           onLoginSuccess(newUser);
@@ -1153,30 +1272,183 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     )}
                   </div>
 
-                  {/* Instituição / Local de Exercício */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {institutionalScope === 'escola'
-                        ? 'Escola onde exerce funções'
-                        : 'Município / Direção Municipal da Educação'}
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        {institutionalScope === 'escola' ? <School className="w-4 h-4" /> : <Landmark className="w-4 h-4" />}
+                  {/* 3. Lotação Institucional Pré-Definida na uCore */}
+                  <div className="space-y-3 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-[#002133]" />
+                        3. Lotação Institucional uCore
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                        Opções Cadastradas na Rede
+                      </span>
+                    </div>
+
+                    {/* Município Dropdown */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Município / Repartição da Educação
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                          <Landmark className="w-4 h-4" />
+                        </div>
+                        <select
+                          id="register-municipality-select"
+                          value={selectedMunicipality}
+                          onChange={(e) => setSelectedMunicipality(e.target.value)}
+                          className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer"
+                        >
+                          {UCORE_MUNICIPALITIES.map((mun) => (
+                            <option key={mun} value={mun}>
+                              {mun}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <input
-                        type="text"
-                        value={schoolOrUnitName}
-                        onChange={(e) => setSchoolOrUnitName(e.target.value)}
-                        placeholder={
-                          institutionalScope === 'escola'
-                            ? 'Ex.: Escola Primária e Iº Ciclo de Quêssua'
-                            : 'Ex.: Direcção Municipal da Educação de Quêssua (DME)'
-                        }
-                        className="w-full h-[46px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                      />
+                    </div>
+
+                    {/* Escola Dropdown (only for school scope) */}
+                    {institutionalScope === 'escola' && (
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
+                          <span>Unidade Escolar de Lotação</span>
+                          <span className="text-[10px] text-slate-400 font-normal">
+                            {initialAdminSchools.length} escolas municipais
+                          </span>
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <School className="w-4 h-4" />
+                          </div>
+                          <select
+                            id="register-school-select"
+                            value={selectedSchoolId}
+                            onChange={(e) => setSelectedSchoolId(e.target.value)}
+                            className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer truncate"
+                          >
+                            {initialAdminSchools.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} ({s.category})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Se Professor: Disciplina & Classe */}
+                    {institutionalScope === 'escola' && schoolRole === 'professor' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Disciplina / Cadeira
+                          </label>
+                          <select
+                            id="register-subject-select"
+                            value={selectedSubject}
+                            onChange={(e) => setSelectedSubject(e.target.value)}
+                            className="w-full h-[42px] px-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer"
+                          >
+                            {UCORE_DISCIPLINAS.map((disc) => (
+                              <option key={disc} value={disc}>
+                                {disc}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Nível / Grau
+                          </label>
+                          <select
+                            id="register-grade-select"
+                            value={selectedGradeClass}
+                            onChange={(e) => setSelectedGradeClass(e.target.value)}
+                            className="w-full h-[42px] px-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer"
+                          >
+                            {UCORE_GRAUS_CLASSES.map((grau) => (
+                              <option key={grau} value={grau}>
+                                {grau}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Documento de Identificação (BI) e Contacto */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Nº Bilhete de Identidade (BI) *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <input
+                          id="register-bi-input"
+                          type="text"
+                          required
+                          value={biNumber}
+                          onChange={(e) => setBiNumber(e.target.value)}
+                          placeholder="Ex: 008892144LA012"
+                          className="w-full h-[46px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-xs text-slate-900 uppercase font-semibold placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Telefone / Telemóvel
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Phone className="w-4 h-4" />
+                        </div>
+                        <input
+                          id="register-phone-input"
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+244 923 000 000"
+                          className="w-full h-[46px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                        />
+                      </div>
                     </div>
                   </div>
+
+                  {/* Real-time Pre-Registration Detection Banner */}
+                  {preRegResult?.found ? (
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                      <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <p className="font-bold text-emerald-900">
+                          Registro Pré-Existente Localizado no Sistema uCore!
+                        </p>
+                        <p className="text-emerald-700 mt-0.5">
+                          {preRegResult.details}
+                        </p>
+                        <span className="inline-block mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                          Homologação simplificada ativada
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    (schoolRole.includes('diretor') || schoolRole === 'professor') && (
+                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-[11px] text-slate-500">
+                        <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span>
+                          {schoolRole.includes('diretor')
+                            ? 'A candidatura de Diretor será enviada ao Administrador Central (DME) para homologação.'
+                            : 'A inscrição docente será enviada à Direção da escola selecionada para aprovação.'}
+                        </span>
+                      </div>
+                    )
+                  )}
 
                   {/* Nome e Sobrenome lado a lado no desktop */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

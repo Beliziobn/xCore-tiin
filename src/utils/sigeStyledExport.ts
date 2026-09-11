@@ -411,15 +411,12 @@ function addStyledDataSheet(
   });
 
   // Auto-filtro activo abrangendo toda a área de dados (do cabeçalho à última linha preenchida)
-  const lastColLetter = getColumnLetter(columns.length);
   const lastRowIndex = ws.actualRowCount;
-  if (lastRowIndex > 1) {
-    ws.autoFilter = `A1:${lastColLetter}${lastRowIndex}`;
-    try {
-      wb.definedNames.add(`'${sheetName}'!$A$1:$${lastColLetter}$${lastRowIndex}`, '_xlnm._FilterDatabase');
-    } catch {
-      // Fallback gracioso
-    }
+  if (lastRowIndex > 1 && columns.length > 0) {
+    ws.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: lastRowIndex, column: columns.length }
+    };
   }
 
   return ws;

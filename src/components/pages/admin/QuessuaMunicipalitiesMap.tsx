@@ -64,7 +64,7 @@ const ZONE_COLOR_PALETTES: Record<string, { fill: string; stroke: string; accent
 export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> = ({
   selectedMunicipality,
   onSelectMunicipality,
-  schoolsPerZone,
+  schoolsPerZone: _schoolsPerZone,
   highlightedZones,
 }) => {
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
@@ -150,6 +150,7 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                 }}
               >
                 {/* Zone Area with clean boundary */}
+                <title>{zone.name}</title>
                 <path
                   d={zone.path}
                   fill={fillColor}
@@ -159,65 +160,6 @@ export const QuessuaMunicipalitiesMap: React.FC<QuessuaMunicipalitiesMapProps> =
                   strokeLinecap="round"
                   className="transition-all duration-200"
                 />
-              </g>
-            );
-          })}
-
-          {/* Dynamic Pinpoints / Badges for Filtered Schools */}
-          {zones.map((zone) => {
-            const count = schoolsPerZone ? schoolsPerZone[zone.name] || 0 : undefined;
-            if (count === undefined || count === 0) return null;
-            const isSelected = selectedMunicipality === zone.name;
-
-            return (
-              <g
-                key={`pin-${zone.id}`}
-                onClick={() => onSelectMunicipality(zone.name)}
-                transform={`translate(${zone.labelX}, ${zone.labelY})`}
-                className="cursor-pointer transition-transform duration-300 hover:scale-110 select-none"
-              >
-                {/* Ambient pulse */}
-                <circle
-                  r={isSelected ? 18 : 14}
-                  fill="#f75142"
-                  fillOpacity={isSelected ? 0.35 : 0.22}
-                  className="animate-pulse"
-                />
-                {/* Solid pill badge */}
-                <rect
-                  x="-16"
-                  y="-11"
-                  width="32"
-                  height="22"
-                  rx="11"
-                  fill={isSelected ? '#f75142' : '#0f172a'}
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="shadow-sm"
-                />
-                {/* Count */}
-                <text
-                  y="4"
-                  textAnchor="middle"
-                  fill="#ffffff"
-                  fontSize="11"
-                  fontWeight="900"
-                  fontFamily="sans-serif"
-                >
-                  {count}
-                </text>
-                {/* Zone name */}
-                <text
-                  y="22"
-                  textAnchor="middle"
-                  fill="#0f172a"
-                  fontSize="9.5"
-                  fontWeight="800"
-                  fontFamily="sans-serif"
-                  filter="drop-shadow(0 1px 2px rgba(255,255,255,0.95))"
-                >
-                  {zone.name}
-                </text>
               </g>
             );
           })}

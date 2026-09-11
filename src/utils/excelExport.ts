@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type { 
   AdminSchool, 
   AdminTeacher, 
@@ -292,124 +293,326 @@ export function buildSchoolsSheetData(schools: AdminSchool[]): Record<string, an
 }
 
 /**
+ * Helper to add a styled sheet with pinned frozen header, autoFilter, auto-column widths,
+ * zebra stripes, and clean numeric formatting.
+ */
+function appendExcelJsSheet(
+  wb: ExcelJS.Workbook,
+  sheetName: string,
+  data: Record<string, any>[],
+  options?: { enableFilter?: boolean; tabColor?: string; headerBg?: string }
+): ExcelJS.Worksheet {
+  const ws = wb.addWorksheet(sheetName, {
+    properties: options?.tabColor ? { tabColor: { argb: options.tabColor } } : undefined,
+    views: [{ state: 'frozen', ySplit: 1, showGridLines: true }],
+  });
+
+  if (!data || data.length === 0) {
+    ws.addRow(['Sem registos disponíveis']);
+    return ws;
+  }
+
+  const columns = Object.keys(data[0]);
+
+  // Set columns and auto widths
+  ws.columns = columns.map((col) => {
+    let maxLen = col.length;
+    for (const row of data) {
+      const val = row[col];
+      const strVal = val !== undefined && val !== null ? String(val) : '';
+      if (strVal.length > maxLen) {
+        maxLen = strVal.length;
+      }
+    }
+    return {
+      header: col,
+      key: col,
+      width: Math.min(Math.max(maxLen + 4, 12), 48),
+    };
+  });
+
+  // Header Row styling (Linha 1) - Estilo Institucional
+  const headerRow = ws.getRow(1);
+  headerRow.height = 28;
+  headerRow.eachCell((cell) => {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: options?.headerBg || 'FF0B3D5C' },
+    };
+    cell.font = {
+      name: 'Segoe UI',
+      size: 10,
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
+    cell.alignment = {
+      vertical: 'middle',
+      horizontal: 'center',
+      wrapText: false,
+    };
+    cell.border = {
+      top: { style: 'medium', color: { argb: 'FF0E7490' } },
+      bottom: { style: 'medium', color: { argb: 'FF0E7490' } },
+      left: { style: 'thin', color: { argb: 'FF0B3D5C' } },
+      right: { style: 'thin', color: { argb: 'FF0B3D5C' } },
+    };
+  });
+
+  // Add rows with zebra styling & borders
+  data.forEach((rowData, idx) => {
+    const row = ws.addRow(rowData);
+    row.height = 22;
+    const isEven = idx % 2 === 1;
+
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = {
+        name: 'Segoe UI',
+        size: 9.5,
+        color: { argb: 'FF1E293B' },
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: isEven ? 'FFF8FAFC' : 'FFFFFFFF' },
+      };
+
+      const val = cell.value;
+      const strVal = String(val ?? '').trim();
+
+      if (typeof val === 'number') {
+        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+        cell.numFmt = Number.isInteger(val) ? '#,##0' : '#,##0.0';
+      } else if (strVal.endsWith('%')) {
+        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+      } else {
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      }
+    });
+  });
+
+  // Apply native Excel AutoFilter cleanly from row 1 to last row
+  if (options?.enableFilter !== false && ws.actualRowCount > 1 && columns.length > 0) {
+    ws.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: ws.actualRowCount, column: columns.length },
+    };
+  }
+
+  return ws;
+}
+
+/**
+ * Triggers native browser download for an ExcelJS workbook
+ */
+async function triggerWorkbookDownload(wb: ExcelJS.Workbook, filename: string): Promise<void> {
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
  * EXPORT 1: Full Consolidated Multi-Tab Workbook (.xlsx)
  * Exports all data into a single, perfectly structured Excel document with separate tabs:
- * 1. Resumo Executivo
- * 2. Professores
- * 3. Diretores
- * 4. Alunos
- * 5. Escolas da Rede
+ * 1. Resumo Geral
+ * 2. Professores (c/ auto-filtros)
+ * 3. Diretores (c/ auto-filtros)
+ * 4. Alunos (c/ auto-filtros)
+ * 5. Escolas da Rede (c/ auto-filtros)
  */
-export function exportConsolidatedExcel(
+export async function exportConsolidatedExcel(
   dataset?: Partial<SystemDataset>, 
   customFileName?: string
-): void {
+): Promise<void> {
   const unified = getUnifiedSystemDataset(dataset);
-  const wb = XLSX.utils.book_new();
-
-  // 1. Resumo Executivo
-  const summaryData = buildExecutiveSummarySheet(unified);
-  const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-  wsSummary['!cols'] = calculateColumnWidths(summaryData);
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo Geral');
-
-  // 2. Professores
-  const teachersData = buildTeachersSheetData(unified.teachers);
-  const wsTeachers = XLSX.utils.json_to_sheet(teachersData);
-  wsTeachers['!cols'] = calculateColumnWidths(teachersData);
-  if (wsTeachers['!ref']) wsTeachers['!autofilter'] = { ref: wsTeachers['!ref'] };
-  XLSX.utils.book_append_sheet(wb, wsTeachers, 'Professores');
-
-  // 3. Diretores
-  const directorsData = buildDirectorsSheetData(unified.directors);
-  const wsDirectors = XLSX.utils.json_to_sheet(directorsData);
-  wsDirectors['!cols'] = calculateColumnWidths(directorsData);
-  if (wsDirectors['!ref']) wsDirectors['!autofilter'] = { ref: wsDirectors['!ref'] };
-  XLSX.utils.book_append_sheet(wb, wsDirectors, 'Diretores');
-
-  // 4. Alunos
-  const studentsData = buildStudentsSheetData(unified.students);
-  const wsStudents = XLSX.utils.json_to_sheet(studentsData);
-  wsStudents['!cols'] = calculateColumnWidths(studentsData);
-  if (wsStudents['!ref']) wsStudents['!autofilter'] = { ref: wsStudents['!ref'] };
-  XLSX.utils.book_append_sheet(wb, wsStudents, 'Alunos');
-
-  // 5. Escolas da Rede
-  const schoolsData = buildSchoolsSheetData(unified.schools);
-  const wsSchools = XLSX.utils.json_to_sheet(schoolsData);
-  wsSchools['!cols'] = calculateColumnWidths(schoolsData);
-  if (wsSchools['!ref']) wsSchools['!autofilter'] = { ref: wsSchools['!ref'] };
-  XLSX.utils.book_append_sheet(wb, wsSchools, 'Escolas da Rede');
-
-  // File name format
   const dateTag = new Date().toISOString().substring(0, 10);
   const filename = customFileName || `uCore_Relatorio_Geral_Consolidado_${dateTag}.xlsx`;
 
-  XLSX.writeFile(wb, filename);
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'uCore';
+    wb.lastModifiedBy = 'Administrador Municipal';
+    wb.created = new Date();
+
+    // 1. Resumo Executivo
+    const summaryData = buildExecutiveSummarySheet(unified);
+    appendExcelJsSheet(wb, 'Resumo Geral', summaryData, { enableFilter: false, tabColor: 'FF0B3D5C' });
+
+    // 2. Professores
+    const teachersData = buildTeachersSheetData(unified.teachers);
+    appendExcelJsSheet(wb, 'Professores', teachersData, { enableFilter: true, tabColor: 'FF0E7490' });
+
+    // 3. Diretores
+    const directorsData = buildDirectorsSheetData(unified.directors);
+    appendExcelJsSheet(wb, 'Diretores', directorsData, { enableFilter: true, tabColor: 'FF0E7490' });
+
+    // 4. Alunos
+    const studentsData = buildStudentsSheetData(unified.students);
+    appendExcelJsSheet(wb, 'Alunos', studentsData, { enableFilter: true, tabColor: 'FF0891B2' });
+
+    // 5. Escolas da Rede
+    const schoolsData = buildSchoolsSheetData(unified.schools);
+    appendExcelJsSheet(wb, 'Escolas da Rede', schoolsData, { enableFilter: true, tabColor: 'FF0B3D5C' });
+
+    await triggerWorkbookDownload(wb, filename);
+  } catch (err) {
+    console.warn('Fallback para XLSX SheetJS na exportação consolidada:', err);
+    const wb = XLSX.utils.book_new();
+
+    const summaryData = buildExecutiveSummarySheet(unified);
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    wsSummary['!cols'] = calculateColumnWidths(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo Geral');
+
+    const teachersData = buildTeachersSheetData(unified.teachers);
+    const wsTeachers = XLSX.utils.json_to_sheet(teachersData);
+    wsTeachers['!cols'] = calculateColumnWidths(teachersData);
+    if (wsTeachers['!ref']) wsTeachers['!autofilter'] = { ref: wsTeachers['!ref'] };
+    XLSX.utils.book_append_sheet(wb, wsTeachers, 'Professores');
+
+    const directorsData = buildDirectorsSheetData(unified.directors);
+    const wsDirectors = XLSX.utils.json_to_sheet(directorsData);
+    wsDirectors['!cols'] = calculateColumnWidths(directorsData);
+    if (wsDirectors['!ref']) wsDirectors['!autofilter'] = { ref: wsDirectors['!ref'] };
+    XLSX.utils.book_append_sheet(wb, wsDirectors, 'Diretores');
+
+    const studentsData = buildStudentsSheetData(unified.students);
+    const wsStudents = XLSX.utils.json_to_sheet(studentsData);
+    wsStudents['!cols'] = calculateColumnWidths(studentsData);
+    if (wsStudents['!ref']) wsStudents['!autofilter'] = { ref: wsStudents['!ref'] };
+    XLSX.utils.book_append_sheet(wb, wsStudents, 'Alunos');
+
+    const schoolsData = buildSchoolsSheetData(unified.schools);
+    const wsSchools = XLSX.utils.json_to_sheet(schoolsData);
+    wsSchools['!cols'] = calculateColumnWidths(schoolsData);
+    if (wsSchools['!ref']) wsSchools['!autofilter'] = { ref: wsSchools['!ref'] };
+    XLSX.utils.book_append_sheet(wb, wsSchools, 'Escolas da Rede');
+
+    XLSX.writeFile(wb, filename);
+  }
 }
 
 /**
- * EXPORT 2: Single Sheet Export for Teachers (.xlsx)
+ * EXPORT 2: Single Sheet Export for Teachers (.xlsx) with auto-filter enabled
  */
-export function exportTeachersExcel(teachers?: AdminTeacher[], customFileName?: string): void {
+export async function exportTeachersExcel(teachers?: AdminTeacher[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ teachers });
-  const wb = XLSX.utils.book_new();
-  const teachersData = buildTeachersSheetData(unified.teachers);
-  const ws = XLSX.utils.json_to_sheet(teachersData);
-  ws['!cols'] = calculateColumnWidths(teachersData);
-  XLSX.utils.book_append_sheet(wb, ws, 'Professores Cadastrados');
-
   const dateTag = new Date().toISOString().substring(0, 10);
   const filename = customFileName || `uCore_Planilha_Professores_${dateTag}.xlsx`;
-  XLSX.writeFile(wb, filename);
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'uCore';
+    wb.created = new Date();
+    const teachersData = buildTeachersSheetData(unified.teachers);
+    appendExcelJsSheet(wb, 'Professores Cadastrados', teachersData, { enableFilter: true, tabColor: 'FF0E7490' });
+    await triggerWorkbookDownload(wb, filename);
+  } catch (err) {
+    console.warn('Fallback para XLSX SheetJS:', err);
+    const wb = XLSX.utils.book_new();
+    const teachersData = buildTeachersSheetData(unified.teachers);
+    const ws = XLSX.utils.json_to_sheet(teachersData);
+    ws['!cols'] = calculateColumnWidths(teachersData);
+    if (ws['!ref']) ws['!autofilter'] = { ref: ws['!ref'] };
+    XLSX.utils.book_append_sheet(wb, ws, 'Professores Cadastrados');
+    XLSX.writeFile(wb, filename);
+  }
 }
 
 /**
- * EXPORT 3: Single Sheet Export for Directors (.xlsx)
+ * EXPORT 3: Single Sheet Export for Directors (.xlsx) with auto-filter enabled
  */
-export function exportDirectorsExcel(directors?: AdminDirector[], customFileName?: string): void {
+export async function exportDirectorsExcel(directors?: AdminDirector[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ directors });
-  const wb = XLSX.utils.book_new();
-  const directorsData = buildDirectorsSheetData(unified.directors);
-  const ws = XLSX.utils.json_to_sheet(directorsData);
-  ws['!cols'] = calculateColumnWidths(directorsData);
-  XLSX.utils.book_append_sheet(wb, ws, 'Diretores Homologados');
-
   const dateTag = new Date().toISOString().substring(0, 10);
   const filename = customFileName || `uCore_Planilha_Diretores_${dateTag}.xlsx`;
-  XLSX.writeFile(wb, filename);
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'uCore';
+    wb.created = new Date();
+    const directorsData = buildDirectorsSheetData(unified.directors);
+    appendExcelJsSheet(wb, 'Diretores Homologados', directorsData, { enableFilter: true, tabColor: 'FF0E7490' });
+    await triggerWorkbookDownload(wb, filename);
+  } catch (err) {
+    console.warn('Fallback para XLSX SheetJS:', err);
+    const wb = XLSX.utils.book_new();
+    const directorsData = buildDirectorsSheetData(unified.directors);
+    const ws = XLSX.utils.json_to_sheet(directorsData);
+    ws['!cols'] = calculateColumnWidths(directorsData);
+    if (ws['!ref']) ws['!autofilter'] = { ref: ws['!ref'] };
+    XLSX.utils.book_append_sheet(wb, ws, 'Diretores Homologados');
+    XLSX.writeFile(wb, filename);
+  }
 }
 
 /**
- * EXPORT 4: Single Sheet Export for Students (.xlsx)
+ * EXPORT 4: Single Sheet Export for Students (.xlsx) with auto-filter enabled
  */
-export function exportStudentsExcel(students?: AdminStudent[], customFileName?: string): void {
+export async function exportStudentsExcel(students?: AdminStudent[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ students });
-  const wb = XLSX.utils.book_new();
-  const studentsData = buildStudentsSheetData(unified.students);
-  const ws = XLSX.utils.json_to_sheet(studentsData);
-  ws['!cols'] = calculateColumnWidths(studentsData);
-  XLSX.utils.book_append_sheet(wb, ws, 'Alunos Matriculados');
-
   const dateTag = new Date().toISOString().substring(0, 10);
   const filename = customFileName || `uCore_Planilha_Alunos_${dateTag}.xlsx`;
-  XLSX.writeFile(wb, filename);
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'uCore';
+    wb.created = new Date();
+    const studentsData = buildStudentsSheetData(unified.students);
+    appendExcelJsSheet(wb, 'Alunos Matriculados', studentsData, { enableFilter: true, tabColor: 'FF0891B2' });
+    await triggerWorkbookDownload(wb, filename);
+  } catch (err) {
+    console.warn('Fallback para XLSX SheetJS:', err);
+    const wb = XLSX.utils.book_new();
+    const studentsData = buildStudentsSheetData(unified.students);
+    const ws = XLSX.utils.json_to_sheet(studentsData);
+    ws['!cols'] = calculateColumnWidths(studentsData);
+    if (ws['!ref']) ws['!autofilter'] = { ref: ws['!ref'] };
+    XLSX.utils.book_append_sheet(wb, ws, 'Alunos Matriculados');
+    XLSX.writeFile(wb, filename);
+  }
 }
 
 /**
- * EXPORT 5: Single Sheet Export for Schools (.xlsx)
+ * EXPORT 5: Single Sheet Export for Schools (.xlsx) with auto-filter enabled
  */
-export function exportSchoolsExcel(schools?: AdminSchool[], customFileName?: string): void {
+export async function exportSchoolsExcel(schools?: AdminSchool[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ schools });
-  const wb = XLSX.utils.book_new();
-  const schoolsData = buildSchoolsSheetData(unified.schools);
-  const ws = XLSX.utils.json_to_sheet(schoolsData);
-  ws['!cols'] = calculateColumnWidths(schoolsData);
-  XLSX.utils.book_append_sheet(wb, ws, 'Escolas Municipais');
-
   const dateTag = new Date().toISOString().substring(0, 10);
   const filename = customFileName || `uCore_Planilha_Escolas_${dateTag}.xlsx`;
-  XLSX.writeFile(wb, filename);
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'uCore';
+    wb.created = new Date();
+    const schoolsData = buildSchoolsSheetData(unified.schools);
+    appendExcelJsSheet(wb, 'Escolas Municipais', schoolsData, { enableFilter: true, tabColor: 'FF0B3D5C' });
+    await triggerWorkbookDownload(wb, filename);
+  } catch (err) {
+    console.warn('Fallback para XLSX SheetJS:', err);
+    const wb = XLSX.utils.book_new();
+    const schoolsData = buildSchoolsSheetData(unified.schools);
+    const ws = XLSX.utils.json_to_sheet(schoolsData);
+    ws['!cols'] = calculateColumnWidths(schoolsData);
+    if (ws['!ref']) ws['!autofilter'] = { ref: ws['!ref'] };
+    XLSX.utils.book_append_sheet(wb, ws, 'Escolas Municipais');
+    XLSX.writeFile(wb, filename);
+  }
 }
 
 // Re-export official ministerial SIGE statistical export functions
