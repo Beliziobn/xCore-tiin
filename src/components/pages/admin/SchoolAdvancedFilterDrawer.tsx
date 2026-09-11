@@ -35,8 +35,6 @@ export const SchoolAdvancedFilterDrawer: React.FC<SchoolAdvancedFilterDrawerProp
   onFilterChange,
   schools,
 }) => {
-  if (!isOpen) return null;
-
   // Extract unique directors for identification dropdown
   const directorsList = useMemo(() => {
     const set = new Set<string>();
@@ -66,6 +64,8 @@ export const SchoolAdvancedFilterDrawer: React.FC<SchoolAdvancedFilterDrawerProp
   const handleReset = () => {
     onFilterChange(defaultSchoolFilterCriteria);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

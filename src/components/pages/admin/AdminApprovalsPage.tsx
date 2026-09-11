@@ -22,16 +22,24 @@ import {
   UserX,
   MapPin,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  GraduationCap,
+  Briefcase,
+  BookOpen
 } from 'lucide-react';
-import type { PendingApplication, AdminDirector, AdminSchool } from '../../../types';
+import type { 
+  PendingApplication, 
+  AdminDirector, 
+  AdminSchool, 
+  PendingApprovalComplementaryData 
+} from '../../../types';
 import {
   getPendingApplications,
   approveApplication,
   rejectApplication,
   savePendingApplication
 } from '../../../utils/authApprovalStorage';
-import { buildInitialDirectorDossier } from '../../../utils/directorStorage';
+import { buildInitialDirectorDossier, saveDirector } from '../../../utils/directorStorage';
 import { Hero } from '../../Hero';
 
 interface AdminApprovalsPageProps {
@@ -66,6 +74,19 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [dispatchNumber, setDispatchNumber] = useState('Despacho nº 104/DME/2026');
   const [appointmentYear, setAppointmentYear] = useState(2026);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Complementary Fields State (Directly filled by Admin when physical documents are in hand)
+  const [nivelAcademico, setNivelAcademico] = useState<string>('Licenciado');
+  const [nivelAcademicoOutro, setNivelAcademicoOutro] = useState<string>('');
+  const [anosServico, setAnosServico] = useState<number>(6);
+  const [classificacaoPedagogica, setClassificacaoPedagogica] = useState<string>('Com magistério e com IMNE completo');
+  const [especialidadeCurso, setEspecialidadeCurso] = useState<string>('Gestão e Administração Escolar');
+  const [regimeTrabalho, setRegimeTrabalho] = useState<string>('Efectivo');
+  const [numeroMecanograficoOuNif, setNumeroMecanograficoOuNif] = useState<string>('');
+  const [numeroCertificadoDiploma, setNumeroCertificadoDiploma] = useState<string>('');
+  const [documentosConferidosPresencialmente, setDocumentosConferidosPresencialmente] = useState<boolean>(true);
+  const [dataInicioFuncoes, setDataInicioFuncoes] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [approvalNotes, setApprovalNotes] = useState<string>('');
 
   // Rejection Modal State
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -128,6 +149,26 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     setAppToApprove(app);
     setTargetSchoolName(app.schoolName || (schools[0]?.name || 'Escola Modelo Central do Quêssua'));
     setDispatchNumber(`Despacho de Homologação nº ${Math.floor(100 + Math.random() * 900)}/DME/2026`);
+    setAppointmentYear(2026);
+    setApprovalNotes(`Homologado e empossado pela Direção Municipal da Educação.`);
+
+    // Intelligent default values for complementary fields based on candidate or role
+    const defaultNivel = app.nivelAcademico || (
+      app.type === 'diretor' ? 'Licenciado' :
+      app.type === 'professor' ? 'Licenciado' :
+      '11.ª a 12.ª classe'
+    );
+    setNivelAcademico(defaultNivel);
+    setNivelAcademicoOutro(app.nivelAcademicoOutro || '');
+    setAnosServico(typeof app.anosServico === 'number' ? app.anosServico : (app.type === 'diretor' ? 6 : 3));
+    setClassificacaoPedagogica(app.classificacaoPedagogica || 'Com magistério e com IMNE completo');
+    setEspecialidadeCurso(app.especialidadeCurso || (app.type === 'diretor' ? 'Gestão e Administração Escolar' : (app.subject || 'Educação Básica')));
+    setRegimeTrabalho(app.regimeTrabalho || 'Efectivo');
+    setNumeroMecanograficoOuNif(app.numeroMecanograficoOuNif || '');
+    setNumeroCertificadoDiploma(app.numeroCertificadoDiploma || `DIP-MED-${Math.floor(100000 + Math.random() * 900000)}/2026`);
+    setDocumentosConferidosPresencialmente(app.documentosConferidosPresencialmente ?? true);
+    setDataInicioFuncoes(app.dataInicioFuncoes || new Date().toISOString().split('T')[0]);
+
     setIsApproveModalOpen(true);
   };
 
@@ -136,13 +177,31 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     if (!appToApprove) return;
     setIsSubmitting(true);
 
+    const finalNivelAcademico = nivelAcademico === 'Outro' && nivelAcademicoOutro.trim()
+      ? nivelAcademicoOutro.trim()
+      : nivelAcademico;
+
+    const compData: PendingApprovalComplementaryData = {
+      nivelAcademico: finalNivelAcademico,
+      nivelAcademicoOutro: nivelAcademicoOutro.trim(),
+      anosServico: Number(anosServico) || 0,
+      classificacaoPedagogica,
+      especialidadeCurso: especialidadeCurso.trim() || 'Gestão e Administração Escolar',
+      regimeTrabalho,
+      numeroMecanograficoOuNif: numeroMecanograficoOuNif.trim(),
+      numeroCertificadoDiploma: numeroCertificadoDiploma.trim(),
+      documentosConferidosPresencialmente,
+      dataInicioFuncoes,
+      observacoesComplementares: `${dispatchNumber} - ${approvalNotes.trim() || 'Homologação e posse oficial concedidas.'}`,
+    };
+
     setTimeout(() => {
-      const res = approveApplication(appToApprove.id, adminName);
+      const res = approveApplication(appToApprove.id, adminName, compData);
       if (res.success && res.app) {
         const updated = res.app;
         loadApplications();
 
-        // Add to global directors state
+        // Add to global directors state if director
         if (onAddDirectorGlobal) {
           const dirId = updated.userId || 'dir-' + Date.now();
           const targetSchool = schools.find((s) => s.name === (targetSchoolName || updated.schoolName)) || schools[0] || {
@@ -159,6 +218,33 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           };
           const baseDossier = buildInitialDirectorDossier(targetSchool, 0);
 
+          const fullRegistrationData: any = {
+            ...baseDossier,
+            id: `dir-dossier-${dirId}`,
+            nomeCompleto: updated.fullName,
+            biNif: updated.biNumber,
+            telefone: updated.phone || '+244 923 000 000',
+            emailPessoal: updated.email,
+            nomeEscola: targetSchoolName || updated.schoolName,
+            dataNomeacao: dataInicioFuncoes || `${appointmentYear}-02-01`,
+            nivelAcademico: finalNivelAcademico,
+            nivelAcademicoOutro: nivelAcademicoOutro.trim(),
+            anosServicoEducacao: Number(anosServico) || 6,
+            regime: regimeTrabalho,
+            classificacaoPedagogica: classificacaoPedagogica,
+            possuiValidacaoHabilitacoesCargo: documentosConferidosPresencialmente,
+            historicoAlteracoes: [
+              {
+                id: `audit-${Date.now()}`,
+                data: new Date().toISOString(),
+                autor: adminName,
+                acao: 'Homologação',
+                detalhes: `Homologação ministerial/municipal pelo Administrador com conferência presencial de documentos em mãos. ${dispatchNumber}. Nível: ${finalNivelAcademico}, ${anosServico} anos de serviço, Regime: ${regimeTrabalho}.`,
+              },
+              ...(baseDossier.historicoAlteracoes || []),
+            ],
+          };
+
           const newDirector: AdminDirector = {
             id: dirId,
             name: updated.fullName,
@@ -171,22 +257,14 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
             teachersCount: targetSchool.teachersCount || 24,
             studentsCount: targetSchool.studentsCount || 450,
             location: 'Quêssua, Malanje',
-            registrationData: {
-              ...baseDossier,
-              id: `dir-dossier-${dirId}`,
-              nomeCompleto: updated.fullName,
-              biNif: updated.biNumber,
-              telefone: updated.phone || '+244 923 000 000',
-              emailPessoal: updated.email,
-              nomeEscola: targetSchoolName || updated.schoolName,
-              dataNomeacao: `${appointmentYear}-02-01`,
-            },
+            registrationData: fullRegistrationData,
           };
           onAddDirectorGlobal(newDirector);
+          saveDirector(fullRegistrationData, adminName);
         }
 
         const notify = showToast || alert;
-        notify(`Diretor(a) "${updated.fullName}" homologado(a) com sucesso no uCore! Acesso liberado.`);
+        notify(`Registo de "${updated.fullName}" homologado com sucesso com dados complementares no uCore! Acesso liberado.`);
       }
       setIsSubmitting(false);
       setIsApproveModalOpen(false);
@@ -545,6 +623,35 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                           )}
                         </div>
 
+                        {/* Complementary Data Badges if available */}
+                        {(app.nivelAcademico || typeof app.anosServico === 'number' || app.regimeTrabalho || app.documentosConferidosPresencialmente) && (
+                          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]">
+                            {app.nivelAcademico && (
+                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <GraduationCap className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span>{app.nivelAcademico}</span>
+                              </span>
+                            )}
+                            {typeof app.anosServico === 'number' && (
+                              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-900 border border-blue-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <Briefcase className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span>{app.anosServico} {app.anosServico === 1 ? 'ano' : 'anos'} de serviço</span>
+                              </span>
+                            )}
+                            {app.regimeTrabalho && (
+                              <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-900 border border-purple-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <span>Regime: {app.regimeTrabalho}</span>
+                              </span>
+                            )}
+                            {app.documentosConferidosPresencialmente && (
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>Docs em mãos conferidos</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         {/* Approval or Rejection details */}
                         {isApproved && (
                           <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
@@ -604,98 +711,343 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       {/* APPROVE MODAL */}
       {isApproveModalOpen && appToApprove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                   <Award className="w-5 h-5" />
                 </span>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Homologar Nomeação de Direção</h3>
-                  <p className="text-xs text-slate-500">Validação para {appToApprove.fullName}</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">Homologação e Enquadramento de Direção</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      Administração Municipal
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Validação oficial de mandato e dados cadastrais para {appToApprove.fullName}
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsApproveModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-4">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs">
-                <div className="grid grid-cols-2 gap-2">
+            {/* Scrollable Form Body */}
+            <div className="mt-4 space-y-4 overflow-y-auto pr-1 text-xs">
+              {/* Candidate Quick Summary */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <span className="text-slate-400 block font-semibold">Diretor(a) Candidato</span>
-                    <strong className="text-slate-900">{appToApprove.fullName}</strong>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Candidato(a)</span>
+                    <strong className="text-slate-900 text-xs">{appToApprove.fullName}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">BI</span>
-                    <span className="font-mono text-slate-800">{appToApprove.biNumber}</span>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Nº do BI</span>
+                    <span className="font-mono text-slate-800 text-xs font-semibold">{appToApprove.biNumber}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Email</span>
-                    <span className="text-slate-800">{appToApprove.email}</span>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Cargo Solicitado</span>
+                    <span className="text-slate-800 text-xs font-medium">{appToApprove.roleRequested || 'Diretor(a) Geral'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Telefone</span>
-                    <span className="text-slate-800">{appToApprove.phone}</span>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Contacto</span>
+                    <span className="text-slate-800 text-xs">{appToApprove.phone}</span>
                   </div>
                 </div>
               </div>
 
+              {/* SECTION 1: Nomeação Institucional & Escola */}
+              <div className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3">
+                <div className="flex items-center gap-2 font-bold text-blue-900 text-xs">
+                  <Building2 className="w-4 h-4 text-blue-700" />
+                  <span>1. Nomeação Institucional e Afetação Escolar</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Escola Afeta ao Mandato
+                  </label>
+                  <select
+                    value={targetSchoolName}
+                    onChange={(e) => setTargetSchoolName(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                  >
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Nº do Despacho de Nomeação / Portaria
+                    </label>
+                    <input
+                      type="text"
+                      value={dispatchNumber}
+                      onChange={(e) => setDispatchNumber(e.target.value)}
+                      placeholder="Ex.: Despacho nº 104/DME/2026"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Ano de Posse / Entrada em Exercício
+                    </label>
+                    <input
+                      type="number"
+                      value={appointmentYear}
+                      onChange={(e) => setAppointmentYear(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Dados Complementares de Enquadramento com Documentos em Mãos */}
+              <div className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200/90 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-amber-950 text-xs">
+                    <GraduationCap className="w-4 h-4 text-amber-700" />
+                    <span>2. Dados Complementares de Enquadramento (Documentos em Mãos)</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-md">
+                    Conferência Oficial
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-amber-900/80">
+                  Preencha os campos abaixo com os documentos físicos originais apresentados pelo candidato para registo cadastral imediato e emissão de credenciais no SIGE.
+                </p>
+
+                {/* Nível Académico & Outro */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Nível Académico / Habilitações Oficiais (SIGE)
+                    </label>
+                    <select
+                      value={nivelAcademico}
+                      onChange={(e) => setNivelAcademico(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    >
+                      <option value="Licenciado">Licenciado</option>
+                      <option value="Bacharelato">Bacharelato</option>
+                      <option value="Pós-licenciado (mestrado / doutoramento)">Pós-licenciado (Mestrado / Doutoramento)</option>
+                      <option value="11.ª a 12.ª classe">11.ª a 12.ª classe (Técnico Médio / Magistério)</option>
+                      <option value="9.ª a 10.ª classe">9.ª a 10.ª classe</option>
+                      <option value="7.ª a 8.ª classe">7.ª a 8.ª classe</option>
+                      <option value="Ensino Primário">Ensino Primário</option>
+                      <option value="Outro">Outro nível</option>
+                    </select>
+                  </div>
+
+                  {nivelAcademico === 'Outro' ? (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Especifique o Nível Académico
+                      </label>
+                      <input
+                        type="text"
+                        value={nivelAcademicoOutro}
+                        onChange={(e) => setNivelAcademicoOutro(e.target.value)}
+                        placeholder="Ex.: Especialização Internacional"
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Regime de Trabalho / Vínculo
+                      </label>
+                      <select
+                        value={regimeTrabalho}
+                        onChange={(e) => setRegimeTrabalho(e.target.value)}
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      >
+                        <option value="Efectivo">Efectivo (Quadro Definitivo MED)</option>
+                        <option value="Em comissão de serviço">Em comissão de serviço</option>
+                        <option value="Contratado">Contratado a termo</option>
+                        <option value="Colaborador">Colaborador</option>
+                        <option value="Outro">Outro</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tempo de Serviço na Educação com atalhos */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Tempo de Serviço na Educação (Anos)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      {[0, 2, 5, 10, 15].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setAnosServico(preset)}
+                          className={`px-2 py-0.5 text-[10px] rounded-md font-semibold transition-colors cursor-pointer ${
+                            anosServico === preset
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {preset}a
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAnosServico(Math.max(0, anosServico - 1))}
+                      className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={anosServico}
+                      onChange={(e) => setAnosServico(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-center text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAnosServico(anosServico + 1)}
+                      className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Classificação Pedagógica & Especialidade */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Classificação / Formação Pedagógica
+                    </label>
+                    <select
+                      value={classificacaoPedagogica}
+                      onChange={(e) => setClassificacaoPedagogica(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    >
+                      <option value="Com magistério e com IMNE completo">Com magistério e com IMNE completo</option>
+                      <option value="Com magistério e sem IMNE">Com magistério e sem IMNE</option>
+                      <option value="Sem magistério e com formação pedagógica">Sem magistério e com formação pedagógica</option>
+                      <option value="Sem magistério e sem formação pedagógica">Sem magistério e sem formação pedagógica</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Especialidade / Curso de Formação
+                    </label>
+                    <input
+                      type="text"
+                      value={especialidadeCurso}
+                      onChange={(e) => setEspecialidadeCurso(e.target.value)}
+                      placeholder="Ex.: Gestão e Administração Escolar"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+                </div>
+
+                {/* Nº Diploma & Nº Mecanográfico */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Nº do Certificado / Diploma de Habilitações
+                    </label>
+                    <input
+                      type="text"
+                      value={numeroCertificadoDiploma}
+                      onChange={(e) => setNumeroCertificadoDiploma(e.target.value)}
+                      placeholder="Ex.: DIP-MED-2018/88921"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Nº Mecanográfico (Folha) ou NIF
+                    </label>
+                    <input
+                      type="text"
+                      value={numeroMecanograficoOuNif}
+                      onChange={(e) => setNumeroMecanograficoOuNif(e.target.value)}
+                      placeholder="Ex.: MEC-008921 ou NIF oficial"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+                </div>
+
+                {/* Data de Início e Confirmação Presencial */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Data Oficial de Início de Funções
+                    </label>
+                    <input
+                      type="date"
+                      value={dataInicioFuncoes}
+                      onChange={(e) => setDataInicioFuncoes(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+
+                  <div className="flex items-center">
+                    <label className="flex items-center gap-2 p-2.5 bg-white border border-amber-200/80 rounded-xl cursor-pointer hover:bg-amber-50/50 transition-colors w-full">
+                      <input
+                        type="checkbox"
+                        checked={documentosConferidosPresencialmente}
+                        onChange={(e) => setDocumentosConferidosPresencialmente(e.target.checked)}
+                        className="w-4 h-4 text-emerald-600 rounded-sm focus:ring-emerald-500 border-slate-300"
+                      />
+                      <span className="text-xs font-semibold text-slate-800 select-none">
+                        Documentos físicos originais conferidos presencialmente
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: Despacho e Observações */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Associar à Escola
+                  Parecer / Observações do Administrador
                 </label>
-                <select
-                  value={targetSchoolName}
-                  onChange={(e) => setTargetSchoolName(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                >
-                  {schools.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                <textarea
+                  rows={2}
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  placeholder="Ex.: Processo conferido de acordo com o estatuto dos agentes da Educação. Apto para início de exercício funcional."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nº do Despacho de Nomeação
-                  </label>
-                  <input
-                    type="text"
-                    value={dispatchNumber}
-                    onChange={(e) => setDispatchNumber(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Ano de Posse
-                  </label>
-                  <input
-                    type="number"
-                    value={appointmentYear}
-                    onChange={(e) => setAppointmentYear(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                  />
-                </div>
-              </div>
-
+              {/* Information Alert */}
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
                 <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                 <span>
-                  Ao confirmar a homologação, o status do Diretor muda para <strong>Ativo</strong>. A tela de espera será desbloqueada e ele assumirá a gestão pedagógica e administrativa da escola associada.
+                  Ao confirmar a homologação, o status do Diretor muda para <strong>Ativo</strong>. O seu dossiê completo de direção é gerado com os dados acadêmicos e pedagógicos informados, liberando o acesso total à gestão escolar no uCore.
                 </span>
               </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-2">
+            {/* Footer */}
+            <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsApproveModalOpen(false)}
@@ -710,11 +1062,11 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl cursor-pointer shadow-xs flex items-center gap-1.5"
               >
                 {isSubmitting ? (
-                  <span>A homologar...</span>
+                  <span>A homologar dados...</span>
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    <span>Confirmar Homologação</span>
+                    <span>Confirmar Homologação com Documentos</span>
                   </>
                 )}
               </button>
@@ -838,6 +1190,64 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </div>
               </div>
 
+              {/* Complementary data if available */}
+              {(selectedApp.nivelAcademico || typeof selectedApp.anosServico === 'number' || selectedApp.regimeTrabalho) && (
+                <div className="p-3 bg-amber-50/70 rounded-xl space-y-2 border border-amber-200 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                    <GraduationCap className="w-4 h-4 text-amber-700" />
+                    <span>Dados de Enquadramento Oficial (Conferidos pelo Administrador)</span>
+                  </div>
+                  {selectedApp.nivelAcademico && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Nível Académico:</span>
+                      <strong className="text-amber-950">{selectedApp.nivelAcademico}</strong>
+                    </div>
+                  )}
+                  {typeof selectedApp.anosServico === 'number' && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Tempo de Serviço:</span>
+                      <strong className="text-amber-950">{selectedApp.anosServico} anos</strong>
+                    </div>
+                  )}
+                  {selectedApp.regimeTrabalho && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Regime de Trabalho:</span>
+                      <strong className="text-amber-950">{selectedApp.regimeTrabalho}</strong>
+                    </div>
+                  )}
+                  {selectedApp.classificacaoPedagogica && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Classif. Pedagógica:</span>
+                      <span className="text-amber-950 font-medium text-right max-w-[220px]">{selectedApp.classificacaoPedagogica}</span>
+                    </div>
+                  )}
+                  {selectedApp.especialidadeCurso && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Especialidade / Curso:</span>
+                      <span className="text-amber-950 font-medium text-right max-w-[220px]">{selectedApp.especialidadeCurso}</span>
+                    </div>
+                  )}
+                  {selectedApp.numeroCertificadoDiploma && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Diploma / Certificado:</span>
+                      <span className="font-mono text-amber-950 font-semibold">{selectedApp.numeroCertificadoDiploma}</span>
+                    </div>
+                  )}
+                  {selectedApp.numeroMecanograficoOuNif && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Mecanográfico / NIF:</span>
+                      <span className="font-mono text-amber-950 font-semibold">{selectedApp.numeroMecanograficoOuNif}</span>
+                    </div>
+                  )}
+                  {selectedApp.documentosConferidosPresencialmente && (
+                    <div className="flex items-center gap-1.5 text-emerald-800 font-semibold pt-1 border-t border-amber-200/60">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Documentação física original conferida em mãos pela Administração</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {selectedApp.notes && (
                 <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
                   <span className="font-bold text-amber-900 block mb-1">Notas e Despacho:</span>
@@ -846,11 +1256,27 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               )}
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex items-center justify-between gap-2">
+              <div>
+                {selectedApp.status === 'pendente' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const app = selectedApp;
+                      setSelectedApp(null);
+                      handleOpenApprove(app);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Homologar com Documentos</span>
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedApp(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
               >
                 Fechar
               </button>

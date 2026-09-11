@@ -3,10 +3,12 @@ import {
   Search, ArrowLeft, GraduationCap, Phone, User, CheckCircle2, AlertCircle, 
   Plus, Eye, Award, Sparkles, RefreshCw, FileText, CalendarCheck, Lock, 
   LayoutList, LayoutGrid, ArrowUpDown, X, Users, AlertTriangle, ChevronRight,
-  Clock, Megaphone, Check, Save, ExternalLink, Filter, TrendingUp, TrendingDown
+  Clock, Megaphone, Check, Save, ExternalLink, Filter, TrendingUp, TrendingDown,
+  FileDown
 } from 'lucide-react';
 import { StudentProfile, defaultDisciplinasList } from '../../data/teacherData';
 import { StudentRegistrationModal } from '../modals/StudentRegistrationModal';
+import { TurmaStudentListPdfModal } from '../modals/TurmaStudentListPdfModal';
 import type { StudentRegistrationData, SchoolAnnouncement } from '../../types';
 import { getStoredAnnouncements, isAnnouncementExpired } from '../../utils/announcementStorage';
 
@@ -35,6 +37,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
   const [sortBy, setSortBy] = useState<'numero' | 'nome' | 'media' | 'media_asc' | 'presenca' | 'presenca_asc' | 'status' | 'risco'>('numero');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isTurmaPdfModalOpen, setIsTurmaPdfModalOpen] = useState(false);
   const [isAnnouncementsModalOpen, setIsAnnouncementsModalOpen] = useState(false);
   const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
   const [selectedDiscipline, setSelectedDiscipline] = useState('Língua Portuguesa');
@@ -368,6 +371,16 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
 
         {/* Ações principais à direita */}
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto shrink-0">
+          <button
+            id="btn-baixar-lista-turma-teacher"
+            onClick={() => setIsTurmaPdfModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95 flex-1 md:flex-initial"
+            title="Baixar lista completa de alunos da turma em PDF organizada de A a Z"
+          >
+            <FileDown className="w-4 h-4 text-[#f75142]" />
+            <span>Baixar Lista em PDF (A-Z)</span>
+          </button>
+
           {onNavigateToAttendance && (
             <button
               id="btn-fazer-chamada-principal"
@@ -1417,6 +1430,15 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         defaultRoom="Sala 04"
         defaultPeriod="Manhã"
         schoolName="Escola Modelo Central"
+      />
+
+      {/* Modal de Lista de Alunos em PDF (A-Z) */}
+      <TurmaStudentListPdfModal
+        isOpen={isTurmaPdfModalOpen}
+        onClose={() => setIsTurmaPdfModalOpen(false)}
+        initialClass="4ª Classe"
+        initialTurma="Turma A"
+        schoolName="Escola Primária e Iº Ciclo Modelo Central de Quêssua"
       />
     </div>
   );

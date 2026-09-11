@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, BookOpen, Layers, Users, ChevronDown, CheckCircle2, Award, Ban, AlertCircle } from 'lucide-react';
+import { Search, Plus, Filter, BookOpen, Layers, Users, ChevronDown, CheckCircle2, Award, Ban, AlertCircle, FileDown } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorClassesData as initialClasses } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
+import { TurmaStudentListPdfModal } from '../../modals/TurmaStudentListPdfModal';
 import type { DirectorClass } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
@@ -22,6 +23,9 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
   const [filterCycle, setFilterCycle] = useState<string>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfModalClass, setPdfModalClass] = useState<string>('4ª Classe');
+  const [pdfModalTurma, setPdfModalTurma] = useState<string>('Turma A');
 
   // Filtered classes
   const filteredClasses = useMemo(() => {
@@ -164,15 +168,31 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
             />
           </div>
 
-          {/* Right: Cadastrar Button */}
-          <button
-            id="btn-cadastrar-classe"
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Cadastrar</span>
-          </button>
+          {/* Actions: Baixar Listas PDF & Cadastrar Button */}
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-baixar-listas-pdf-director"
+              onClick={() => {
+                setPdfModalClass(currentClass?.name || '4ª Classe');
+                setPdfModalTurma('Turma A');
+                setIsPdfModalOpen(true);
+              }}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer border border-slate-200 flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs active:scale-95"
+              title="Baixar lista de alunos de qualquer turma em PDF organizada de A a Z"
+            >
+              <FileDown className="w-4 h-4 text-[#f75142]" />
+              <span>Baixar Listas em PDF (A-Z)</span>
+            </button>
+
+            <button
+              id="btn-cadastrar-classe"
+              onClick={() => setIsModalOpen(true)}
+              className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cadastrar</span>
+            </button>
+          </div>
         </div>
 
         {/* Classes Selector Chips */}
@@ -386,6 +406,26 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                         </span>
                       )}
                     </p>
+
+                    {/* Button: Baixar Lista em PDF (A-Z) */}
+                    <div className="mt-3 pt-3 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold text-slate-400">
+                        Pauta Nominal A-Z
+                      </span>
+                      <button
+                        id={`btn-baixar-lista-turma-${turmaItem.name.replace(/\s+/g, '-').toLowerCase()}`}
+                        onClick={() => {
+                          setPdfModalClass(currentClass?.name || '4ª Classe');
+                          setPdfModalTurma(turmaItem.name);
+                          setIsPdfModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 bg-[#002133] hover:bg-[#00314d] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-2xs hover:shadow active:scale-95 cursor-pointer"
+                        title="Baixar lista completa de alunos da turma em PDF organizada de A a Z"
+                      >
+                        <FileDown className="w-3.5 h-3.5 text-[#f75142]" />
+                        <span>Baixar Lista em PDF (A-Z)</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -400,6 +440,15 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
         onClose={() => setIsModalOpen(false)}
         entityType="classes"
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* Turma Student List PDF Modal (A-Z) */}
+      <TurmaStudentListPdfModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        initialClass={pdfModalClass}
+        initialTurma={pdfModalTurma}
+        schoolName="Escola Primária e Iº Ciclo Modelo Central de Quêssua"
       />
     </div>
   );

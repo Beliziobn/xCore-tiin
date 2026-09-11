@@ -120,6 +120,29 @@ export interface UserAccount {
   approverTargetRole?: 'admin' | 'diretor';
   approverTargetSchoolName?: string;
   rejectionReason?: string;
+  nivelAcademico?: string;
+  anosServico?: number;
+  regimeTrabalho?: string;
+  classificacaoPedagogica?: string;
+  numeroMecanograficoOuNif?: string;
+  documentosConferidosPresencialmente?: boolean;
+}
+
+export interface PendingApprovalComplementaryData {
+  nivelAcademico?: string;
+  nivelAcademicoOutro?: string;
+  anosServico?: number;
+  classificacaoPedagogica?: string;
+  especialidadeCurso?: string;
+  regimeTrabalho?: string;
+  numeroMecanograficoOuNif?: string;
+  numeroCertificadoDiploma?: string;
+  documentosConferidosPresencialmente?: boolean;
+  dataInicioFuncoes?: string;
+  observacoesComplementares?: string;
+  condicaoMatricula?: 'primeira_vez' | 'repetente';
+  documentoTipoApresentado?: string;
+  grauEscolaridadeAnterior?: string;
 }
 
 export interface PendingApplication {
@@ -147,6 +170,21 @@ export interface PendingApplication {
   rejectionReason?: string;
   approvedBy?: string;
   approvedAt?: string;
+  // Complementary data added upon approval by Director or Admin
+  complementaryData?: PendingApprovalComplementaryData;
+  nivelAcademico?: string;
+  nivelAcademicoOutro?: string;
+  anosServico?: number;
+  regimeTrabalho?: string;
+  classificacaoPedagogica?: string;
+  especialidadeCurso?: string;
+  numeroMecanograficoOuNif?: string;
+  numeroCertificadoDiploma?: string;
+  documentosConferidosPresencialmente?: boolean;
+  dataInicioFuncoes?: string;
+  assignedRoom?: string;
+  assignedTurma?: string;
+  assignedShift?: string;
 }
 
 export type DirectorPageType = 

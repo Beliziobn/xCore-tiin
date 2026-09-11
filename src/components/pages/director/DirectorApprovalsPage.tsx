@@ -29,7 +29,13 @@ import {
   Building2,
   Printer
 } from 'lucide-react';
-import type { PendingApplication, DirectorTeacher, AdminStudent } from '../../../types';
+import type { 
+  PendingApplication, 
+  DirectorTeacher, 
+  AdminStudent, 
+  PendingApprovalComplementaryData, 
+  TeacherRegistrationData 
+} from '../../../types';
 import {
   getPendingApplications,
   approveApplication,
@@ -70,6 +76,18 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   const [assignedTurma, setAssignedTurma] = useState('Turma B');
   const [assignedShift, setAssignedShift] = useState<'Manhã' | 'Tarde'>('Manhã');
   const [approvalNotes, setApprovalNotes] = useState('');
+
+  // Complementary Fields State (Directly filled by Director when documents are in hand)
+  const [nivelAcademico, setNivelAcademico] = useState<string>('Licenciado');
+  const [nivelAcademicoOutro, setNivelAcademicoOutro] = useState<string>('');
+  const [anosServico, setAnosServico] = useState<number>(3);
+  const [classificacaoPedagogica, setClassificacaoPedagogica] = useState<string>('Com magistério e com IMNE completo');
+  const [especialidadeCurso, setEspecialidadeCurso] = useState<string>('');
+  const [regimeTrabalho, setRegimeTrabalho] = useState<string>('Efectivo');
+  const [numeroMecanograficoOuNif, setNumeroMecanograficoOuNif] = useState<string>('');
+  const [numeroCertificadoDiploma, setNumeroCertificadoDiploma] = useState<string>('');
+  const [documentosConferidosPresencialmente, setDocumentosConferidosPresencialmente] = useState<boolean>(true);
+  const [dataInicioFuncoes, setDataInicioFuncoes] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Rejection Modal State
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -132,10 +150,28 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   // Handle open approval modal
   const handleOpenApprove = (app: PendingApplication) => {
     setAppToApprove(app);
-    setAssignedRoom('Sala 03');
-    setAssignedTurma(app.gradeClass || 'Turma A');
-    setAssignedShift('Manhã');
-    setApprovalNotes(`Homologado e integrado no corpo escolar da ${schoolName}.`);
+    setAssignedRoom(app.assignedRoom || 'Sala 03');
+    setAssignedTurma(app.gradeClass || app.assignedTurma || 'Turma A');
+    setAssignedShift((app.assignedShift as any) || 'Manhã');
+    setApprovalNotes(app.notes || `Homologado e integrado no corpo escolar da ${schoolName}.`);
+
+    // Intelligent default values for complementary fields based on role or prior data
+    const defaultNivel = app.nivelAcademico || (
+      app.type === 'professor' ? 'Licenciado' : 
+      app.type === 'aluno' ? '7.ª a 8.ª classe' : 
+      '11.ª a 12.ª classe'
+    );
+    setNivelAcademico(defaultNivel);
+    setNivelAcademicoOutro(app.nivelAcademicoOutro || '');
+    setAnosServico(typeof app.anosServico === 'number' ? app.anosServico : (app.type === 'professor' ? 4 : 1));
+    setClassificacaoPedagogica(app.classificacaoPedagogica || 'Com magistério e com IMNE completo');
+    setEspecialidadeCurso(app.especialidadeCurso || app.subject || (app.type === 'professor' ? 'Língua Portuguesa' : 'Educação Básica'));
+    setRegimeTrabalho(app.regimeTrabalho || 'Efectivo');
+    setNumeroMecanograficoOuNif(app.numeroMecanograficoOuNif || '');
+    setNumeroCertificadoDiploma(app.numeroCertificadoDiploma || `CERT-MED-${Math.floor(100000 + Math.random() * 900000)}/2026`);
+    setDocumentosConferidosPresencialmente(app.documentosConferidosPresencialmente ?? true);
+    setDataInicioFuncoes(app.dataInicioFuncoes || new Date().toISOString().split('T')[0]);
+
     setIsApproveModalOpen(true);
   };
 
@@ -144,29 +180,94 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
     if (!appToApprove) return;
     setIsSubmitting(true);
 
+    const finalNivelAcademico = nivelAcademico === 'Outro' && nivelAcademicoOutro.trim()
+      ? nivelAcademicoOutro.trim()
+      : nivelAcademico;
+
+    const compData: PendingApprovalComplementaryData = {
+      nivelAcademico: finalNivelAcademico,
+      nivelAcademicoOutro: nivelAcademicoOutro.trim(),
+      anosServico: Number(anosServico) || 0,
+      classificacaoPedagogica,
+      especialidadeCurso: especialidadeCurso.trim() || appToApprove.subject || '',
+      regimeTrabalho,
+      numeroMecanograficoOuNif: numeroMecanograficoOuNif.trim(),
+      numeroCertificadoDiploma: numeroCertificadoDiploma.trim(),
+      documentosConferidosPresencialmente,
+      dataInicioFuncoes,
+      observacoesComplementares: approvalNotes.trim(),
+    };
+
     setTimeout(() => {
-      const res = approveApplication(appToApprove.id, directorName);
+      const res = approveApplication(appToApprove.id, directorName, compData);
       if (res.success && res.app) {
         const updated = res.app;
         loadApplications();
 
-        // If teacher, integrate into school teachers
+        // If teacher, integrate into school teachers with full registrationData enriched
         if (updated.type === 'professor') {
+          const regData: TeacherRegistrationData = {
+            id: 'reg-' + Date.now(),
+            nomeCompleto: updated.fullName,
+            biNif: updated.biNumber,
+            sexo: 'Masculino',
+            dataNascimento: '1988-06-15',
+            faixaEtaria: (Number(anosServico) >= 10 ? '35-39' : Number(anosServico) >= 5 ? '30-34' : '25-29') as any,
+            telefone: updated.phone,
+            email: updated.email,
+            morada: 'Bairro Central, Quêssua',
+            provinciaResidencia: 'Malanje',
+            municipioResidencia: 'Quêssua',
+            naturezaEscola: 'Pública',
+            nomeEscola: schoolName,
+            provinciaEscola: 'Malanje',
+            municipioEscola: 'Quêssua',
+            tipoInstituicao: 'Escola com classe de Iniciação',
+            niveisLecciona: [{ id: 'primario', nome: 'Ensino Primário Regular' }],
+            funcaoCategoria: 'Docente / Professor',
+            temFormacaoPedagogica: classificacaoPedagogica !== 'Sem Magistério e sem Formação pedagógica',
+            temMagisterioCompleto: classificacaoPedagogica.includes('magistério'),
+            temImneCompleto: classificacaoPedagogica.includes('IMNE'),
+            temOutraFormacaoPedagogica: false,
+            classificacaoPedagogica: classificacaoPedagogica as any,
+            nivelAcademico: finalNivelAcademico as any,
+            regimeTrabalho: regimeTrabalho as any,
+            anosServico: Number(anosServico) || 0,
+            disciplinas: especialidadeCurso || updated.subject || 'Educação Básica',
+            possuiValidacaoHabilitacoes: documentosConferidosPresencialmente,
+            documentoValidacaoNome: numeroCertificadoDiploma || 'Certificado Oficial Homologado',
+            numeroTurmas: 1,
+            numeroAlunosAproximado: 45,
+            turnos: [assignedShift],
+            historicoAlteracoes: [
+              {
+                id: 'log-' + Date.now(),
+                data: new Date().toLocaleDateString('pt-AO'),
+                autor: directorName,
+                acao: 'Homologação',
+                detalhes: `Homologação direta pelo Diretor da Escola com documentos em mãos. Nível: ${finalNivelAcademico}, Tempo de Serviço: ${anosServico} anos, Regime: ${regimeTrabalho}.`,
+              },
+            ],
+            criadoEm: new Date().toISOString(),
+            atualizadoEm: new Date().toISOString(),
+          };
+
           const newTeacher: DirectorTeacher = {
             id: updated.userId || 'prof-' + Date.now(),
             name: updated.fullName,
             schoolName: updated.schoolName || schoolName,
-            gradeClass: updated.gradeClass || '6ª Classe',
+            gradeClass: updated.gradeClass || assignedTurma || '6ª Classe',
             room: assignedRoom,
             turma: assignedTurma,
             directorName: directorName,
             location: `${assignedRoom} - Bloco Pedagógico`,
-            subject: updated.subject || 'Educação Básica',
+            subject: especialidadeCurso || updated.subject || 'Educação Básica',
             presenceRate: 100,
             shift: assignedShift,
+            registrationData: regData,
             schedule: [
-              { day: 'Segunda', period: '07h30 - 09h10', subject: updated.subject || 'Educação Básica', room: assignedRoom },
-              { day: 'Quarta', period: '09h30 - 11h10', subject: updated.subject || 'Educação Básica', room: assignedRoom },
+              { day: 'Segunda', period: assignedShift === 'Manhã' ? '07h30 - 09h10' : '13h00 - 14h40', subject: especialidadeCurso || updated.subject || 'Educação Básica', room: assignedRoom },
+              { day: 'Quarta', period: assignedShift === 'Manhã' ? '09h30 - 11h10' : '15h00 - 16h40', subject: especialidadeCurso || updated.subject || 'Educação Básica', room: assignedRoom },
             ],
           };
 
@@ -178,22 +279,39 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
             id: updated.userId || 'alu-' + Date.now(),
             name: updated.fullName,
             gender: 'M',
-            gradeClass: updated.gradeClass || '7ª Classe',
+            gradeClass: updated.gradeClass || assignedTurma || '7ª Classe',
             room: assignedRoom,
             turma: assignedTurma,
             guardianName: 'Encarregado(a) de Educação',
             location: 'Quêssua, Malanje',
             presenceRate: 100,
-            hasDocuments: true,
+            hasDocuments: documentosConferidosPresencialmente,
             numeroDocumento: updated.biNumber,
             performanceScore: 85,
             schoolName: updated.schoolName || schoolName,
+            registrationData: {
+              name: updated.fullName,
+              genero: 'M',
+              dataNascimento: '2012-03-10',
+              idade: 14,
+              tipoDocumento: 'BI',
+              numeroDocumento: updated.biNumber,
+              classe: updated.gradeClass || '7ª Classe',
+              turma: assignedTurma,
+              sala: assignedRoom,
+              turno: assignedShift,
+              escola: schoolName,
+              condicaoMatricula: 'primeira_vez',
+              encarregado: 'Encarregado(a) de Educação',
+              telefone: updated.phone,
+              observacoes: approvalNotes,
+            }
           };
           onAddStudentGlobal(newStudent);
         }
 
         const notify = showToast || alert;
-        notify(`Inscrição de ${updated.fullName} homologada com sucesso pela Direção Escolar!`);
+        notify(`Inscrição de ${updated.fullName} homologada com dados complementares pela Direção!`);
       }
       setIsSubmitting(false);
       setIsApproveModalOpen(false);
@@ -610,6 +728,35 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                           )}
                         </div>
 
+                        {/* Complementary data badge if present */}
+                        {(app.nivelAcademico || typeof app.anosServico === 'number' || app.documentosConferidosPresencialmente) && (
+                          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]">
+                            {app.nivelAcademico && (
+                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <GraduationCap className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span>{app.nivelAcademico}</span>
+                              </span>
+                            )}
+                            {typeof app.anosServico === 'number' && (
+                              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-900 border border-blue-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <Briefcase className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span>{app.anosServico} {app.anosServico === 1 ? 'ano' : 'anos'} de serviço</span>
+                              </span>
+                            )}
+                            {app.regimeTrabalho && (
+                              <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-900 border border-purple-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <span>Regime: {app.regimeTrabalho}</span>
+                              </span>
+                            )}
+                            {app.documentosConferidosPresencialmente && (
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>Docs em mãos conferidos</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         {/* Approval or Rejection details */}
                         {isApproved && (
                           <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
@@ -666,115 +813,341 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
         </div>
       </main>
 
-      {/* APPROVAL MODAL */}
+      {/* APPROVAL MODAL WITH COMPLEMENTARY FIELDS (DOCS IN HAND) */}
       {isApproveModalOpen && appToApprove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200 my-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-10 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5" />
                 </span>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Homologar Inscrição</h3>
-                  <p className="text-xs text-slate-500">Validação oficial para {appToApprove.fullName}</p>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>Homologar Inscrição</span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                      Decisão da Direção
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">Validação e enquadramento oficial para {appToApprove.fullName}</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsApproveModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-4">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs">
-                <div className="grid grid-cols-2 gap-2">
+            {/* Modal Body - Scrollable */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Candidate Info Summary Bar */}
+              <div className="bg-gradient-to-r from-slate-50 to-slate-100/60 p-3.5 rounded-xl border border-slate-200/90 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <span className="text-slate-400 block font-semibold">Candidato</span>
-                    <strong className="text-slate-900">{appToApprove.fullName}</strong>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Candidato</span>
+                    <strong className="text-slate-900 truncate block">{appToApprove.fullName}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Tipo / Função</span>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Função Requerida</span>
                     <span className="text-slate-800 font-bold capitalize">{appToApprove.type}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Nº do BI</span>
-                    <span className="font-mono text-slate-800">{appToApprove.biNumber}</span>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Nº do BI</span>
+                    <span className="font-mono text-slate-800 font-medium">{appToApprove.biNumber}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Escola de Destino</span>
-                    <span className="text-slate-800">{schoolName}</span>
+                    <span className="text-slate-400 block font-semibold text-[11px]">Unidade Escolar</span>
+                    <span className="text-slate-800 truncate block">{schoolName}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Assignment Controls */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Atribuir Turma
-                  </label>
-                  <input
-                    type="text"
-                    value={assignedTurma}
-                    onChange={(e) => setAssignedTurma(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
+              {/* SEÇÃO 1: Atribuição Pedagógica Imediata */}
+              <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-[#f75142]" />
+                    Atribuição Pedagógica & Turma
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">Turma, Sala e Turno</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Atribuir Sala
-                  </label>
-                  <input
-                    type="text"
-                    value={assignedRoom}
-                    onChange={(e) => setAssignedRoom(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Atribuir Turma
+                    </label>
+                    <input
+                      type="text"
+                      value={assignedTurma}
+                      onChange={(e) => setAssignedTurma(e.target.value)}
+                      placeholder="Ex: Turma A, 6ª Classe"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Atribuir Sala
+                    </label>
+                    <input
+                      type="text"
+                      value={assignedRoom}
+                      onChange={(e) => setAssignedRoom(e.target.value)}
+                      placeholder="Ex: Sala 03, Sala 12"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Turno de Atuação
+                    </label>
+                    <select
+                      value={assignedShift}
+                      onChange={(e) => setAssignedShift(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                    >
+                      <option value="Manhã">Turno da Manhã</option>
+                      <option value="Tarde">Turno da Tarde</option>
+                      <option value="Noite">Turno da Noite</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Turno de Atuação
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAssignedShift('Manhã')}
-                    className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                      assignedShift === 'Manhã'
-                        ? 'bg-amber-500 text-white border-amber-500'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Turno da Manhã
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAssignedShift('Tarde')}
-                    className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                      assignedShift === 'Tarde'
-                        ? 'bg-amber-500 text-white border-amber-500'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Turno da Tarde
-                  </button>
+              {/* SEÇÃO 2: DADOS COMPLEMENTARES (DOCUMENTOS EM MÃOS) */}
+              <div className="border border-amber-200/90 rounded-xl p-4 bg-gradient-to-b from-amber-50/40 via-white to-white shadow-xs space-y-4">
+                <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-amber-200/60">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                      <GraduationCap className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        Dados Complementares de Enquadramento
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                          Documentos em mãos
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        O Diretor pode preencher nível académico, tempo de serviço e dados contratuais se já tiver os documentos em mãos.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Nível Académico */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Nível Académico / Habilitações</span>
+                      <span className="text-[10px] text-amber-700 font-semibold">Oficial SIGE</span>
+                    </label>
+                    <select
+                      value={nivelAcademico}
+                      onChange={(e) => setNivelAcademico(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                    >
+                      <option value="Licenciado">Licenciado (Ensino Superior)</option>
+                      <option value="Bacharelato">Bacharelato</option>
+                      <option value="Pós-licenciado (mestrado / doutoramento)">Pós-licenciado (Mestrado / Doutoramento)</option>
+                      <option value="11.ª a 12.ª classe">11.ª a 12.ª classe (Técnico Médio / Magistério)</option>
+                      <option value="9.ª a 10.ª classe">9.ª a 10.ª classe (I Ciclo Secundário)</option>
+                      <option value="7.ª a 8.ª classe">7.ª a 8.ª classe</option>
+                      <option value="Até à 6.ª classe">Até à 6.ª classe (Primário Completo)</option>
+                      <option value="Outro">Outro nível (especificar)</option>
+                    </select>
+                    {nivelAcademico === 'Outro' && (
+                      <input
+                        type="text"
+                        value={nivelAcademicoOutro}
+                        onChange={(e) => setNivelAcademicoOutro(e.target.value)}
+                        placeholder="Especifique o nível ou habilitação..."
+                        className="mt-2 w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    )}
+                  </div>
+
+                  {/* Tempo de Serviço */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Tempo de Serviço na Educação</span>
+                      <span className="text-[10px] text-slate-500 font-normal">{anosServico} {anosServico === 1 ? 'ano' : 'anos'}</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={anosServico}
+                          onChange={(e) => setAnosServico(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
+                        />
+                        <span className="absolute right-3 top-2 text-xs text-slate-400 font-medium">anos</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setAnosServico((prev) => Math.max(0, prev - 1))}
+                          className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 text-sm cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAnosServico((prev) => prev + 1)}
+                          className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 text-sm cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    {/* Quick presets */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {[0, 2, 5, 10, 15].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setAnosServico(val)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                            anosServico === val
+                              ? 'bg-amber-500 text-white border-amber-500'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {val === 0 ? '0 (Novo)' : `${val} anos`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Formação Pedagógica */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Classificação / Formação Pedagógica
+                    </label>
+                    <select
+                      value={classificacaoPedagogica}
+                      onChange={(e) => setClassificacaoPedagogica(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="Com magistério e com IMNE completo">Com Magistério e com IMNE completo</option>
+                      <option value="Sem Magistério e com formação Pedagógica">Sem Magistério e com formação Pedagógica</option>
+                      <option value="Sem Magistério e sem Formação pedagógica">Sem Magistério e sem Formação pedagógica</option>
+                    </select>
+                  </div>
+
+                  {/* Regime de Trabalho / Vínculo */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Regime de Trabalho / Vínculo
+                    </label>
+                    <select
+                      value={regimeTrabalho}
+                      onChange={(e) => setRegimeTrabalho(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                    >
+                      <option value="Efectivo">Efectivo (Quadro Definitivo MED)</option>
+                      <option value="Contratado">Contratado / Regime a Termo</option>
+                      <option value="Em comissão de serviço">Em Comissão de Serviço</option>
+                      <option value="Colaborador">Colaborador / Eventual</option>
+                      <option value="Voluntário">Voluntário</option>
+                      <option value="Outro">Outro Regime</option>
+                    </select>
+                  </div>
+
+                  {/* Especialidade / Disciplina */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Especialidade / Curso de Formação
+                    </label>
+                    <input
+                      type="text"
+                      value={especialidadeCurso}
+                      onChange={(e) => setEspecialidadeCurso(e.target.value)}
+                      placeholder="Ex: Língua Portuguesa, Matemática, Primário"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  {/* Nº do Diploma / Certificado de Habilitações */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Nº do Diploma / Certificado</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Se apresentado</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={numeroCertificadoDiploma}
+                      onChange={(e) => setNumeroCertificadoDiploma(e.target.value)}
+                      placeholder="Ex: CERT-MED-74892/2025"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  {/* Nº Mecanográfico / Folha de Salário ou NIF */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Nº Mecanográfico / NIF</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Folha de Salário</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={numeroMecanograficoOuNif}
+                      onChange={(e) => setNumeroMecanograficoOuNif(e.target.value)}
+                      placeholder="Ex: MEC-109283 / NIF"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  {/* Data de Início de Funções */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Data de Início de Funções
+                    </label>
+                    <input
+                      type="date"
+                      value={dataInicioFuncoes}
+                      onChange={(e) => setDataInicioFuncoes(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Validação Documental em mãos */}
+                <div className="bg-white p-3 rounded-xl border border-amber-200/90 flex items-start gap-3">
+                  <input
+                    id="doc-check"
+                    type="checkbox"
+                    checked={documentosConferidosPresencialmente}
+                    onChange={(e) => setDocumentosConferidosPresencialmente(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                  />
+                  <label htmlFor="doc-check" className="text-xs text-slate-700 cursor-pointer select-none">
+                    <strong className="text-slate-900 block font-semibold">
+                      Documentação física em mãos conferida pelo Diretor(a)
+                    </strong>
+                    <span className="text-[11px] text-slate-500 block">
+                      Confirmo que verifiquei os documentos originais / cópias autenticadas (Bilhete de Identidade, Certificado de Habilitações, Atestado Médico ou Registo Criminal).
+                    </span>
+                  </label>
                 </div>
               </div>
 
+              {/* SEÇÃO 3: Despacho / Observações */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Despacho / Observação da Direção
+                  Despacho / Parecer Oficial da Direção
                 </label>
                 <textarea
                   rows={2}
                   value={approvalNotes}
                   onChange={(e) => setApprovalNotes(e.target.value)}
-                  placeholder="Observação oficial sobre a aprovação..."
+                  placeholder="Parecer ou notas para o livro de registos da escola..."
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
                 />
               </div>
@@ -782,34 +1155,40 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
                 <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                 <span>
-                  Ao confirmar, o usuário é ativado imediatamente e poderá fazer login e ter acesso às turmas da sua escola.
+                  Ao confirmar a homologação, os dados complementares são salvos no dossiê oficial, a conta é ativada no uCore e o utilizador é integrado no quadro com acesso imediato.
                 </span>
               </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsApproveModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handleConfirmApprove}
-                className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
-              >
-                {isSubmitting ? (
-                  <span>A processar...</span>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>Confirmar Homologação</span>
-                  </>
-                )}
-              </button>
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/80 rounded-b-2xl flex items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                Homologação vinculada a: <strong className="text-slate-700">{directorName}</strong>
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsApproveModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleConfirmApprove}
+                  className="px-5 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  {isSubmitting ? (
+                    <span>A homologar...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Confirmar Homologação</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -958,15 +1337,83 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 </div>
               </div>
 
+              {/* Complementary data if available */}
+              {(selectedApp.nivelAcademico || typeof selectedApp.anosServico === 'number' || selectedApp.regimeTrabalho) && (
+                <div className="p-3 bg-amber-50/70 rounded-xl space-y-2 border border-amber-200 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                    <GraduationCap className="w-4 h-4 text-amber-700" />
+                    <span>Dados de Enquadramento Oficial (Conferidos pelo Diretor)</span>
+                  </div>
+                  {selectedApp.nivelAcademico && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Nível Académico:</span>
+                      <strong className="text-amber-950">{selectedApp.nivelAcademico}</strong>
+                    </div>
+                  )}
+                  {typeof selectedApp.anosServico === 'number' && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Tempo de Serviço:</span>
+                      <strong className="text-amber-950">{selectedApp.anosServico} anos</strong>
+                    </div>
+                  )}
+                  {selectedApp.regimeTrabalho && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Regime de Trabalho:</span>
+                      <strong className="text-amber-950">{selectedApp.regimeTrabalho}</strong>
+                    </div>
+                  )}
+                  {selectedApp.classificacaoPedagogica && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Classif. Pedagógica:</span>
+                      <span className="text-amber-950 font-medium text-right max-w-[220px]">{selectedApp.classificacaoPedagogica}</span>
+                    </div>
+                  )}
+                  {selectedApp.numeroCertificadoDiploma && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Diploma / Certificado:</span>
+                      <span className="font-mono text-amber-950 font-semibold">{selectedApp.numeroCertificadoDiploma}</span>
+                    </div>
+                  )}
+                  {selectedApp.numeroMecanograficoOuNif && (
+                    <div className="flex justify-between">
+                      <span className="text-amber-800">Mecanográfico / NIF:</span>
+                      <span className="font-mono text-amber-950 font-semibold">{selectedApp.numeroMecanograficoOuNif}</span>
+                    </div>
+                  )}
+                  {selectedApp.documentosConferidosPresencialmente && (
+                    <div className="flex items-center gap-1.5 text-emerald-800 font-semibold pt-1 border-t border-amber-200/60">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Documentação física original em mãos confirmada</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {selectedApp.notes && (
-                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
-                  <span className="font-bold text-amber-900 block mb-1">Notas do Processo:</span>
-                  <p className="text-amber-800">{selectedApp.notes}</p>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="font-bold text-slate-700 block mb-1">Notas do Processo:</span>
+                  <p className="text-slate-800">{selectedApp.notes}</p>
                 </div>
               )}
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex items-center justify-between gap-2">
+              <div>
+                {selectedApp.status === 'pendente' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const app = selectedApp;
+                      setSelectedApp(null);
+                      handleOpenApprove(app);
+                    }}
+                    className="px-4 py-2 bg-[#f75142] hover:bg-[#e04335] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Homologar com Documentos</span>
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedApp(null)}

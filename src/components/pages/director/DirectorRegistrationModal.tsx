@@ -9,6 +9,9 @@ interface DirectorRegistrationModalProps {
   onClose: () => void;
   entityType: 'professores' | 'alunos' | 'salas' | 'classes';
   onSuccess: (newItem: any) => void;
+  initialData?: any;
+  schoolName?: string;
+  directorName?: string;
 }
 
 export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps> = ({
@@ -16,6 +19,9 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
   onClose,
   entityType,
   onSuccess,
+  initialData,
+  schoolName = 'Escola Modelo Central',
+  directorName = 'Diretor de Escola',
 }) => {
   if (!isOpen) return null;
 
@@ -26,11 +32,12 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onSuccess}
+        initialData={initialData}
         defaultGradeClass="4ª Classe"
         defaultTurma="Turma A"
         defaultRoom="Sala 03"
         defaultPeriod="Manhã"
-        schoolName="Escola Modelo Central"
+        schoolName={schoolName}
       />
     );
   }
@@ -41,10 +48,11 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
       <TeacherRegistrationModal
         isOpen={isOpen}
         onClose={onClose}
-        defaultSchoolName="Escola Modelo Central"
+        initialData={initialData}
+        defaultSchoolName={schoolName}
         defaultMunicipality="Quêssua"
         defaultProvince="Malanje"
-        authorName="Diretor de Escola"
+        authorName={directorName}
         onSuccess={(teacherData) => {
           const formattedTeacher = {
             id: teacherData.id,
@@ -73,8 +81,8 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onSuccess}
-        schoolName="Escola Modelo Central"
-        directorName="Fert Horlan"
+        schoolName={schoolName}
+        directorName={directorName}
       />
     );
   }
@@ -86,11 +94,12 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onSuccess}
-        schoolName="Escola Modelo Central"
-        directorName="Fert Horlan"
+        schoolName={schoolName}
+        directorName={directorName}
       />
     );
   }
 
   return null;
 };
+

@@ -727,6 +727,15 @@ export default function App() {
       let targetView = pageId;
       if (pageId === 'perfil-professor' || pageId === 'perfil') targetView = 'professor-perfil';
       if (pageId === 'perfil-aluno') targetView = 'aluno-perfil';
+      if (pageId === 'minha-turma' || pageId === 'turma' || pageId === 'turmas' || (activeRole === 'professor' && pageId === 'alunos')) {
+        targetView = 'professor-turma';
+      }
+      if (activeRole === 'professor' && (pageId === 'chamada' || pageId === 'presenca' || pageId === 'presenca-alunos')) {
+        targetView = 'professor-presenca';
+      }
+      if (activeRole === 'professor' && pageId === 'estatisticas') {
+        targetView = 'professor-estatisticas';
+      }
 
       const accessCheck = canUserAccessView(currentUser, targetView);
       if (!accessCheck.allowed) {
@@ -861,7 +870,7 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    if (pageId === 'minha-turma') {
+    if (pageId === 'minha-turma' || pageId === 'turma' || pageId === 'turmas' || pageId === 'professor-turma') {
       setCurrentView('professor-turma');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -1289,7 +1298,7 @@ export default function App() {
         </div>
       );
     }
-    if (currentView === 'professor-turma') {
+    if (currentView === 'professor-turma' || currentView === 'minha-turma' || currentView === 'turma') {
       return (
         <div className="w-full">
           <Hero

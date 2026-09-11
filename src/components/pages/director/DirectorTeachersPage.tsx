@@ -13,15 +13,25 @@ import {
   Sparkles, 
   RotateCcw,
   BookOpen,
-  ShieldCheck
+  ShieldCheck,
+  Edit3,
+  LayoutGrid,
+  List,
+  GraduationCap,
+  Eye
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
-import type { DirectorTeacher, AdminTeacher, PendingApplication } from '../../../types';
+import { DirectorTeacherEditModal } from '../../modals/DirectorTeacherEditModal';
+import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
+import type { DirectorTeacher, AdminTeacher, PendingApplication, TeacherRegistrationData } from '../../../types';
 import { getPendingApplications, approveApplication, rejectApplication } from '../../../utils/authApprovalStorage';
+import { getRegistrationDataFromDirectorTeacher, saveTeacher } from '../../../utils/teacherStorage';
 import { TeacherApplicationModal } from '../../modals/TeacherApplicationModal';
 import { StatCardItem } from '../../StatCardItem';
+
+const STORAGE_KEY_DIRECTOR_TEACHERS = 'ucore_director_teachers_v1';
 
 interface DirectorTeachersPageProps {
   onOpenGetStarted: () => void;
@@ -42,12 +52,44 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   schoolName = 'Escola Modelo Central',
   directorName = 'Carl Mendes',
 }) => {
-  const [teachers, setTeachers] = useState<DirectorTeacher[]>(initialTeachers);
+  const [teachers, setTeachers] = useState<DirectorTeacher[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_DIRECTOR_TEACHERS);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load stored director teachers', e);
+    }
+    return initialTeachers;
+  });
+
+  const persistTeachers = (updated: DirectorTeacher[]) => {
+    setTeachers(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_DIRECTOR_TEACHERS, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to persist director teachers', e);
+    }
+  };
+
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(teachers[0]?.id || 'prof-1');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterShift, setFilterShift] = useState<string>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Teacher Editing State for School Director
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [teacherToEdit, setTeacherToEdit] = useState<DirectorTeacher | null>(null);
+  const [editModalInitialTab, setEditModalInitialTab] = useState<'alocacao' | 'horario' | 'dossie'>('alocacao');
+  const [isFullDossierModalOpen, setIsFullDossierModalOpen] = useState(false);
+  const [dossierToEdit, setDossierToEdit] = useState<TeacherRegistrationData | null>(null);
+  const [editToast, setEditToast] = useState<string | null>(null);
 
   // Pending teacher applications workflow
   const [activeTab, setActiveTab] = useState<'quadro' | 'candidaturas'>('quadro');
@@ -91,7 +133,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         ],
       };
 
-      setTeachers((prev) => [newTeacher, ...prev]);
+      persistTeachers([newTeacher, ...teachers]);
       setSelectedTeacherId(newTeacher.id);
 
       if (onAddTeacherGlobal) {
@@ -147,17 +189,17 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
       gradeClass: newTeacher.gradeClass,
       room: newTeacher.room,
       turma: newTeacher.turma,
-      directorName: newTeacher.directorName,
-      location: newTeacher.location,
+      directorName: newTeacher.directorName || directorName,
+      location: newTeacher.location || 'Pavilhão 1 - Bloco B',
       subject: newTeacher.subject,
       presenceRate: 100,
-      shift: newTeacher.period === 'Tarde' ? 'Tarde' : 'Manhã',
+      shift: newTeacher.shift || (newTeacher.period === 'Tarde' ? 'Tarde' : 'Manhã'),
       schedule: [
         { day: 'Segunda', period: '07h30 - 09h10', subject: newTeacher.subject, room: newTeacher.room },
         { day: 'Quarta', period: '09h30 - 11h10', subject: newTeacher.subject, room: newTeacher.room },
       ],
     };
-    setTeachers((prev) => [formatted, ...prev]);
+    persistTeachers([formatted, ...teachers]);
     setSelectedTeacherId(formatted.id);
 
     if (onAddTeacherGlobal) {
@@ -168,7 +210,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         subject: formatted.subject,
         gradeClass: formatted.gradeClass,
         room: formatted.room,
-        schoolName: formatted.schoolName || 'Escola Modelo Central',
+        schoolName: formatted.schoolName || schoolName,
         location: formatted.location || 'Pavilhão 1 - Bloco B',
         turma: formatted.turma,
         category: 'Professor Primário Efetivo',
@@ -177,6 +219,81 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
       onAddTeacherGlobal(adminFormatted);
     }
   };
+
+  // Director Teacher Editing Handlers
+  const handleOpenEditModal = (
+    teacher: DirectorTeacher,
+    initialTab: 'alocacao' | 'horario' | 'dossie' = 'alocacao'
+  ) => {
+    setTeacherToEdit(teacher);
+    setEditModalInitialTab(initialTab);
+    setIsEditModalOpen(true);
+  };
+
+  const handleOpenFullDossier = (teacher: DirectorTeacher) => {
+    const regData = getRegistrationDataFromDirectorTeacher(teacher, schoolName, directorName);
+    setDossierToEdit(regData);
+    setIsFullDossierModalOpen(true);
+  };
+
+  const handleSaveEditedTeacher = (updatedTeacher: DirectorTeacher) => {
+    const updatedList = teachers.map((t) => (t.id === updatedTeacher.id ? updatedTeacher : t));
+    persistTeachers(updatedList);
+    setSelectedTeacherId(updatedTeacher.id);
+
+    // Synchronize with ministerial teacherStorage
+    try {
+      const reg = getRegistrationDataFromDirectorTeacher(updatedTeacher, schoolName, directorName);
+      reg.nomeCompleto = updatedTeacher.name;
+      reg.telefone = updatedTeacher.phone || reg.telefone;
+      reg.email = updatedTeacher.email || reg.email;
+      reg.disciplinas = updatedTeacher.subject;
+      reg.nomeEscola = updatedTeacher.schoolName || schoolName;
+      saveTeacher(reg, directorName);
+    } catch (err) {
+      console.error('Error syncing teacher registration', err);
+    }
+
+    if (onAddTeacherGlobal) {
+      onAddTeacherGlobal({
+        id: updatedTeacher.id,
+        name: updatedTeacher.name,
+        phone: updatedTeacher.phone || '+244 923 000 000',
+        subject: updatedTeacher.subject,
+        gradeClass: updatedTeacher.gradeClass,
+        room: updatedTeacher.room,
+        schoolName: updatedTeacher.schoolName || schoolName,
+        location: updatedTeacher.location || 'Pavilhão 1 - Bloco B',
+        turma: updatedTeacher.turma,
+        category: 'Professor Primário Efetivo',
+        presenceRate: updatedTeacher.presenceRate,
+      });
+    }
+
+    setEditToast(`Dados do(a) Professor(a) "${updatedTeacher.name}" atualizados com sucesso pela Direção!`);
+    setTimeout(() => setEditToast(null), 4000);
+  };
+
+  const handleFullDossierSuccess = (savedData: TeacherRegistrationData) => {
+    const updatedList = teachers.map((t) => {
+      if (t.id === savedData.id || t.name.toLowerCase() === savedData.nomeCompleto.toLowerCase()) {
+        return {
+          ...t,
+          name: savedData.nomeCompleto,
+          phone: savedData.telefone,
+          email: savedData.email,
+          gradeClass: savedData.niveisLecciona[0]?.nome || t.gradeClass,
+          subject: savedData.disciplinas || t.subject,
+          registrationData: savedData,
+        };
+      }
+      return t;
+    });
+    persistTeachers(updatedList);
+    setEditToast(`Dossiê ministerial de "${savedData.nomeCompleto}" atualizado com sucesso!`);
+    setTimeout(() => setEditToast(null), 4000);
+  };
+
 
   return (
     <div id="director-teachers-page" className="w-full min-h-screen bg-[#f7f3f3]">
@@ -200,6 +317,22 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
             <button
               onClick={() => setApprovalToast(null)}
               className="text-emerald-700 hover:text-emerald-900 text-xs font-bold px-2 py-1"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
+
+        {/* Notificação Toast de Edição de Docente */}
+        {editToast && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between shadow-xs animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-blue-600 shrink-0" />
+              <p className="text-sm font-semibold text-blue-950">{editToast}</p>
+            </div>
+            <button
+              onClick={() => setEditToast(null)}
+              className="text-blue-700 hover:text-blue-900 text-xs font-bold px-2 py-1"
             >
               Fechar
             </button>
@@ -422,11 +555,43 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                id="btn-view-cards"
+                onClick={() => setViewMode('cards')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'cards'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Visualização Detalhada do Docente"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Detalhes</span>
+              </button>
+              <button
+                type="button"
+                id="btn-view-table"
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Tabela do Quadro Completo"
+              >
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Quadro Completo</span>
+              </button>
+            </div>
+
             <button
               id="btn-cadastrar-professor"
               onClick={() => setIsModalOpen(true)}
-              className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+              className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               <span>Cadastrar</span>
@@ -434,6 +599,118 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
           </div>
         </div>
 
+        {/* MODO 1: TABELA DO QUADRO COMPLETO */}
+        {viewMode === 'table' ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  Quadro Docente da Escola ({filteredTeachers.length} Professores)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Edição direta de dados, alocações de sala, horários e dossiês
+                </p>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">
+                {schoolName}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <th className="py-3 px-4">Professor(a)</th>
+                    <th className="py-3 px-4">Disciplina</th>
+                    <th className="py-3 px-4">Classe & Turma</th>
+                    <th className="py-3 px-4">Sala & Local</th>
+                    <th className="py-3 px-4">Turno</th>
+                    <th className="py-3 px-4">Assiduidade</th>
+                    <th className="py-3 px-4 text-right">Ações da Direção</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredTeachers.map((teacher) => (
+                    <tr key={teacher.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#002133] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                            {teacher.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-900 block">{teacher.name}</span>
+                            <span className="text-[11px] text-slate-400">{teacher.phone || '+244 923 000 000'}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 font-semibold text-slate-800">
+                        {teacher.subject}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-slate-900 block">{teacher.gradeClass}</span>
+                        <span className="text-[11px] text-slate-500">{teacher.turma}</span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-slate-800 block">{teacher.room}</span>
+                        <span className="text-[11px] text-slate-400">{teacher.location}</span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          teacher.shift === 'Manhã'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                        }`}>
+                          {teacher.shift}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5 font-bold text-emerald-700">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>{teacher.presenceRate || 98.5}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTeacherId(teacher.id);
+                              setViewMode('cards');
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Ver Ficha Detalhada"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(teacher, 'alocacao')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition-all cursor-pointer"
+                            title="Editar Alocação e Dados do Professor"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenFullDossier(teacher)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-all cursor-pointer"
+                            title="Dossiê de 8 Etapas (SIGE)"
+                          >
+                            <GraduationCap className="w-3 h-3" />
+                            <span className="hidden sm:inline">Dossiê</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* MODO 2: VISUALIZAÇÃO DETALHADA COM CHIPS E SEÇÃO DO DOCENTE SELECIONADO */
+          <>
         {/* Quick Teacher Selector Chips */}
         <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
@@ -470,9 +747,33 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Docente Regular
-            </span>
+
+            {/* Ações da Direção para o Professor Selecionado */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Docente Regular
+              </span>
+              <button
+                id="btn-editar-docente-selecionado"
+                type="button"
+                onClick={() => currentTeacher && handleOpenEditModal(currentTeacher, 'alocacao')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#002133] hover:bg-black text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Editar Alocação, Sala, Turma e Horários"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Editar Professor</span>
+              </button>
+              <button
+                id="btn-editar-dossie-docente-selecionado"
+                type="button"
+                onClick={() => currentTeacher && handleOpenFullDossier(currentTeacher)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Re-editar Dossiê de 8 Etapas (SIGE/MED) com Habilitações e Documentação"
+              >
+                <GraduationCap className="w-3.5 h-3.5" />
+                <span>Dossiê Ministerial</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-y-4 gap-x-6">
@@ -645,9 +946,20 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                     </p>
                   </div>
                 </div>
-                <span className="text-xs font-bold text-[#f75142] bg-[#fef2f1] border border-[#fee4e2] px-3 py-1 rounded-full">
-                  {currentTeacher?.room}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[#f75142] bg-[#fef2f1] border border-[#fee4e2] px-3 py-1 rounded-full">
+                    {currentTeacher?.room}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => currentTeacher && handleOpenEditModal(currentTeacher, 'horario')}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all cursor-pointer border border-slate-200"
+                    title="Editar Grade Semanal e Tempos Lectivos"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Editar Horário</span>
+                  </button>
+                </div>
               </div>
 
               {/* Schedule Table/Grid - Limpo e com alta legibilidade */}
@@ -687,6 +999,8 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         </div>
         </>
         )}
+        </>
+        )}
       </div>
 
       {/* Modal: Validação de Candidatura Específica do Professor */}
@@ -708,12 +1022,53 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         />
       )}
 
-      {/* Registration Modal */}
+      {/* Modal da Direção: Edição de Alocação, Sala, Turma e Grade de Horários */}
+      <DirectorTeacherEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setTeacherToEdit(null);
+        }}
+        teacher={teacherToEdit}
+        schoolName={schoolName}
+        directorName={directorName}
+        initialTab={editModalInitialTab}
+        onSave={handleSaveEditedTeacher}
+        onOpenFullDossier={(teacher) => {
+          setIsEditModalOpen(false);
+          handleOpenFullDossier(teacher);
+        }}
+      />
+
+      {/* Modal Ministerial de 8 Etapas: Dossiê e Re-edição Completa */}
+      {isFullDossierModalOpen && dossierToEdit && (
+        <TeacherRegistrationModal
+          isOpen={isFullDossierModalOpen}
+          onClose={() => {
+            setIsFullDossierModalOpen(false);
+            setDossierToEdit(null);
+          }}
+          initialData={dossierToEdit}
+          defaultSchoolName={schoolName}
+          defaultMunicipality="Quêssua"
+          defaultProvince="Malanje"
+          authorName={directorName}
+          onSuccess={(savedData) => {
+            handleFullDossierSuccess(savedData);
+            setIsFullDossierModalOpen(false);
+            setDossierToEdit(null);
+          }}
+        />
+      )}
+
+      {/* Registration Modal para Novos Cadastros */}
       <DirectorRegistrationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         entityType="professores"
         onSuccess={handleCreateSuccess}
+        schoolName={schoolName}
+        directorName={directorName}
       />
     </div>
   );

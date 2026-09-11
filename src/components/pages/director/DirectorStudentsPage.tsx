@@ -10,11 +10,13 @@ import {
   ChevronDown,
   GraduationCap,
   FileText,
-  Edit3
+  Edit3,
+  FileDown
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorStudentsData as initialStudents } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
+import { TurmaStudentListPdfModal } from '../../modals/TurmaStudentListPdfModal';
 import type { DirectorStudent, AdminStudent, StudentRegistrationData } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { SchoolAnnouncementsBanner } from '../../announcements/SchoolAnnouncementsBanner';
@@ -41,6 +43,9 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   const [docFilter, setDocFilter] = useState<'all' | 'with-docs' | 'without-docs'>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTurmaPdfModalOpen, setIsTurmaPdfModalOpen] = useState(false);
+  const [turmaPdfClass, setTurmaPdfClass] = useState('4ª Classe');
+  const [turmaPdfTurma, setTurmaPdfTurma] = useState('Turma A');
 
   // New detailed modals state
   const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
@@ -254,6 +259,16 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
+            <button
+              id="btn-baixar-listas-turma-director"
+              onClick={() => setIsTurmaPdfModalOpen(true)}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer border border-slate-200 flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs active:scale-95 whitespace-nowrap"
+              title="Baixar listas de alunos por turma em PDF organizadas de A a Z"
+            >
+              <FileDown className="w-4 h-4 text-[#f75142]" />
+              <span>Baixar Listas por Turma (PDF A-Z)</span>
+            </button>
+
             <button
               id="btn-cadastrar-aluno"
               onClick={() => setIsModalOpen(true)}
@@ -606,6 +621,15 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
           setEditingStudent(null);
         }}
         schoolName="Escola Modelo Central de Quêssua"
+      />
+
+      {/* Turma Student List PDF Modal (A-Z) */}
+      <TurmaStudentListPdfModal
+        isOpen={isTurmaPdfModalOpen}
+        onClose={() => setIsTurmaPdfModalOpen(false)}
+        initialClass={turmaPdfClass}
+        initialTurma={turmaPdfTurma}
+        schoolName="Escola Primária e Iº Ciclo Modelo Central de Quêssua"
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import type { PendingApplication, UserAccount, AdminSchool } from '../types';
+import type { PendingApplication, UserAccount, AdminSchool, PendingApprovalComplementaryData } from '../types';
 import { initialAdminSchools, initialAdminDirectors } from '../data/adminData';
 import { directorTeachersData } from '../data/directorData';
 
@@ -325,7 +325,8 @@ export function searchPreRegisteredDirector(
  */
 export function approveApplication(
   applicationId: string,
-  approverName: string = 'Administrador uCore'
+  approverName: string = 'Administrador uCore',
+  complementaryData?: PendingApprovalComplementaryData
 ): { success: boolean; app?: PendingApplication; activatedUser?: UserAccount } {
   try {
     const applications = getPendingApplications();
@@ -338,6 +339,19 @@ export function approveApplication(
       approvedBy: approverName,
       approvedAt: new Date().toLocaleString('pt-AO'),
       updatedAt: new Date().toLocaleString('pt-AO'),
+      ...(complementaryData ? {
+        complementaryData,
+        nivelAcademico: complementaryData.nivelAcademico || target.nivelAcademico,
+        nivelAcademicoOutro: complementaryData.nivelAcademicoOutro || target.nivelAcademicoOutro,
+        anosServico: typeof complementaryData.anosServico === 'number' ? complementaryData.anosServico : target.anosServico,
+        regimeTrabalho: complementaryData.regimeTrabalho || target.regimeTrabalho,
+        classificacaoPedagogica: complementaryData.classificacaoPedagogica || target.classificacaoPedagogica,
+        especialidadeCurso: complementaryData.especialidadeCurso || target.especialidadeCurso,
+        numeroMecanograficoOuNif: complementaryData.numeroMecanograficoOuNif || target.numeroMecanograficoOuNif,
+        numeroCertificadoDiploma: complementaryData.numeroCertificadoDiploma || target.numeroCertificadoDiploma,
+        documentosConferidosPresencialmente: complementaryData.documentosConferidosPresencialmente ?? target.documentosConferidosPresencialmente,
+        dataInicioFuncoes: complementaryData.dataInicioFuncoes || target.dataInicioFuncoes,
+      } : {}),
     };
 
     const updatedList = applications.map((a) => (a.id === applicationId ? updatedApp : a));
@@ -353,6 +367,16 @@ export function approveApplication(
           activeUser.status = 'ativo';
           activeUser.approvedAt = updatedApp.approvedAt;
           activeUser.approvedBy = approverName;
+          if (complementaryData) {
+            if (complementaryData.nivelAcademico) activeUser.nivelAcademico = complementaryData.nivelAcademico;
+            if (typeof complementaryData.anosServico === 'number') activeUser.anosServico = complementaryData.anosServico;
+            if (complementaryData.regimeTrabalho) activeUser.regimeTrabalho = complementaryData.regimeTrabalho;
+            if (complementaryData.classificacaoPedagogica) activeUser.classificacaoPedagogica = complementaryData.classificacaoPedagogica;
+            if (complementaryData.numeroMecanograficoOuNif) activeUser.numeroMecanograficoOuNif = complementaryData.numeroMecanograficoOuNif;
+            if (typeof complementaryData.documentosConferidosPresencialmente === 'boolean') {
+              activeUser.documentosConferidosPresencialmente = complementaryData.documentosConferidosPresencialmente;
+            }
+          }
           localStorage.setItem('ucore_active_user', JSON.stringify(activeUser));
           activatedUser = activeUser;
         }

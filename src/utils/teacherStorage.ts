@@ -656,3 +656,91 @@ export function generateTeachersCSV(teachers: TeacherRegistrationData[]): string
 
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 }
+
+/**
+ * Converte ou localiza os dados de registro ministerial (TeacherRegistrationData)
+ * a partir de um objeto simplificado de professor da direção (DirectorTeacher).
+ */
+export function getRegistrationDataFromDirectorTeacher(
+  dt: {
+    id: string;
+    name: string;
+    schoolName?: string;
+    gradeClass?: string;
+    room?: string;
+    turma?: string;
+    directorName?: string;
+    location?: string;
+    subject?: string;
+    shift?: 'Manhã' | 'Tarde' | 'Integral';
+    phone?: string;
+    email?: string;
+    registrationData?: TeacherRegistrationData;
+  },
+  defaultSchoolName: string = 'Escola Modelo Central',
+  defaultDirectorName: string = 'Diretor de Escola'
+): TeacherRegistrationData {
+  if (dt.registrationData) {
+    return dt.registrationData;
+  }
+
+  const stored = getStoredTeachers();
+  const found = stored.find(
+    (t) => t.id === dt.id || t.nomeCompleto.toLowerCase() === dt.name.toLowerCase()
+  );
+  if (found) {
+    return found;
+  }
+
+  const shiftToTurno = dt.shift === 'Integral' ? 'Manhã' : (dt.shift || 'Manhã');
+
+  return {
+    id: dt.id,
+    nomeCompleto: dt.name,
+    biNif: '004928172ME041',
+    sexo: 'Masculino',
+    dataNascimento: '1988-05-14',
+    faixaEtaria: '35-39',
+    telefone: dt.phone || '+244 923 000 000',
+    email: dt.email || `${dt.name.toLowerCase().replace(/\s+/g, '.')}@ucore.edu.ao`,
+    morada: 'Bairro Central',
+    provinciaResidencia: 'Malanje',
+    municipioResidencia: 'Quêssua',
+    naturezaEscola: 'Pública',
+    nomeEscola: dt.schoolName || defaultSchoolName,
+    codigoEscola: 'EMC-042',
+    provinciaEscola: 'Malanje',
+    municipioEscola: 'Quêssua',
+    tipoInstituicao: 'Escola com classe de Iniciação',
+    niveisLecciona: [
+      { id: 'primario', nome: dt.gradeClass || 'Ensino Primário (1.ª a 6.ª classe)' },
+    ],
+    funcaoCategoria: 'Docente / Professor',
+    temFormacaoPedagogica: true,
+    temMagisterioCompleto: true,
+    temImneCompleto: false,
+    temOutraFormacaoPedagogica: false,
+    classificacaoPedagogica: 'Com magistério e com IMNE completo',
+    nivelAcademico: 'Licenciado',
+    regimeTrabalho: 'Efectivo',
+    anosServico: 8,
+    disciplinas: dt.subject || 'Língua Portuguesa',
+    possuiValidacaoHabilitacoes: true,
+    observacoes: `Alocado(a) à ${dt.room || 'Sala 01'}, ${dt.turma || 'Turma A'}, Turno ${dt.shift || 'Manhã'}. Direção de ${dt.directorName || defaultDirectorName}.`,
+    numeroTurmas: 1,
+    numeroAlunosAproximado: 45,
+    turnos: [shiftToTurno as 'Manhã' | 'Tarde' | 'Noite'],
+    historicoAlteracoes: [
+      {
+        id: `log-init-${dt.id}`,
+        data: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        autor: dt.directorName || defaultDirectorName,
+        acao: 'Criação',
+        detalhes: 'Dossiê inicial importado do quadro docente da escola.',
+      },
+    ],
+    criadoEm: new Date().toISOString(),
+    atualizadoEm: new Date().toISOString(),
+  };
+}
+

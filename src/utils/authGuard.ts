@@ -64,8 +64,16 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   professor: [
     'home',
     'professor-estatisticas',
+    'estatisticas',
     'professor-turma',
+    'minha-turma',
+    'turma',
+    'turmas',
+    'alunos',
     'professor-presenca',
+    'chamada',
+    'presenca',
+    'presenca-alunos',
     'professor-perfil',
     'perfil-professor',
     'aluno-perfil', // Professor can access pedagogical file of class students
@@ -133,8 +141,15 @@ export function getViewTitle(view: string): string {
     'diretor-classes': 'Classes & Níveis (Direção)',
     'diretor-presenca': 'Livro de Ponto Docente (Direção)',
     'professor-estatisticas': 'Rendimento da Turma (Professor)',
+    'estatisticas': 'Estatísticas & Rendimento (Professor)',
     'professor-turma': 'Minha Turma & Alunos (Professor)',
+    'minha-turma': 'Minha Turma (Professor)',
+    'turma': 'Minha Turma (Professor)',
+    'turmas': 'Minhas Turmas (Professor)',
+    'alunos': 'Alunos da Turma (Professor)',
     'professor-presenca': 'Livro de Chamada (Professor)',
+    'chamada': 'Livro de Chamada (Professor)',
+    'presenca': 'Livro de Presença (Professor)',
     'sobre': 'Sobre a Plataforma uCore',
     'termos': 'Termos de Utilização',
     'privacidade': 'Política de Privacidade',
@@ -200,8 +215,19 @@ export function canUserAccessView(user: UserAccount | null, view: string): ViewA
   }
 
   // Check general view authorization
+  let normalizedView = view;
+  if (role === 'professor') {
+    if (view === 'minha-turma' || view === 'turma' || view === 'turmas' || view === 'alunos') {
+      normalizedView = 'professor-turma';
+    } else if (view === 'estatisticas') {
+      normalizedView = 'professor-estatisticas';
+    } else if (view === 'chamada' || view === 'presenca' || view === 'presenca-alunos') {
+      normalizedView = 'professor-presenca';
+    }
+  }
+
   const allowedViews = ALLOWED_VIEWS_BY_ROLE[role] || [];
-  if (!allowedViews.includes(view)) {
+  if (!allowedViews.includes(view) && !allowedViews.includes(normalizedView)) {
     return {
       allowed: false,
       reason: `Acesso Restrito: A sua função de utilizador (${role.toUpperCase()}) não tem permissão para aceder à secção "${getViewTitle(view)}".`,
