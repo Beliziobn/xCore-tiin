@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Perfil de usuário institucional da plataforma uCore para validação de contas",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ID do usuário do Firebase Authentication",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "Endereço de e-mail institucional do usuário",
+          "maxLength": 120
+        },
+        "firstName": {
+          "type": "string",
+          "description": "Primeiro nome do usuário",
+          "maxLength": 80
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Sobrenome ou apelido do usuário",
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "description": "Perfil base de acesso ao sistema",
+          "enum": ["admin", "diretor", "professor", "custom"],
+          "maxLength": 30
+        },
+        "scope": {
+          "type": "string",
+          "description": "Âmbito de atuação institucional",
+          "enum": ["escola", "administracao"],
+          "maxLength": 30
+        },
+        "schoolRole": {
+          "type": "string",
+          "description": "Cargo específico escolar",
+          "maxLength": 50
+        },
+        "adminRole": {
+          "type": "string",
+          "description": "Cargo específico na administração municipal",
+          "maxLength": 50
+        },
+        "cargoTitle": {
+          "type": "string",
+          "description": "Título por extenso da função",
+          "maxLength": 120
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Nome da unidade escolar vinculada",
+          "maxLength": 150
+        },
+        "municipalityOrDepartment": {
+          "type": "string",
+          "description": "Município ou departamento institucional",
+          "maxLength": 150
+        },
+        "titlePrefix": {
+          "type": "string",
+          "description": "Prefixo de tratamento",
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "description": "Status de validação da conta",
+          "enum": ["ativo", "pendente", "validado", "em_analise"],
+          "maxLength": 30
+        },
+        "accountValidated": {
+          "type": "boolean",
+          "description": "Indica se a conta foi validada institucionalmente pela Direção ou DME"
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "description": "Indica se o e-mail foi verificado via Firebase Auth"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Data ISO de criação da conta",
+          "maxLength": 50
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Data ISO da última atualização",
+          "maxLength": 50
+        }
+      },
+      "required": ["userId", "email", "firstName", "role", "status", "createdAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Registo de administradores do sistema uCore",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ID do usuário administrador",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "E-mail do administrador",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Data de promoção a admin",
+          "maxLength": 50
+        }
+      },
+      "required": ["userId", "email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Contas de usuários institucionais e estado de validação"
+    },
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/Admin"
+      },
+      "description": "Registro de permissões de administrador de sistema"
+    }
+  }
+}
