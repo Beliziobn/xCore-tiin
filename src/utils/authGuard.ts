@@ -39,10 +39,19 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'admin-inscricoes',
     'admin-anuncios',
     'admin-perfil',
+    'reunioes',
+    'reunioes-salas',
     'sobre',
     'termos',
     'privacidade',
     'seguranca',
+    'cases',
+    'casos',
+    'casos-de-sucesso',
+    'obrigado',
+    'thank-you',
+    '404',
+    'not-found',
   ],
   diretor: [
     'home',
@@ -56,10 +65,19 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'diretor-classes',
     'diretor-perfil',
     'diretor-presenca',
+    'reunioes',
+    'reunioes-salas',
     'sobre',
     'termos',
     'privacidade',
     'seguranca',
+    'cases',
+    'casos',
+    'casos-de-sucesso',
+    'obrigado',
+    'thank-you',
+    '404',
+    'not-found',
   ],
   professor: [
     'home',
@@ -78,19 +96,37 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'perfil-professor',
     'aluno-perfil', // Professor can access pedagogical file of class students
     'perfil-aluno',
+    'reunioes',
+    'reunioes-salas',
     'sobre',
     'termos',
     'privacidade',
     'seguranca',
+    'cases',
+    'casos',
+    'casos-de-sucesso',
+    'obrigado',
+    'thank-you',
+    '404',
+    'not-found',
   ],
   aluno: [
     'home',
     'aluno-perfil',
     'perfil-aluno',
+    'reunioes',
+    'reunioes-salas',
     'sobre',
     'termos',
     'privacidade',
     'seguranca',
+    'cases',
+    'casos',
+    'casos-de-sucesso',
+    'obrigado',
+    'thank-you',
+    '404',
+    'not-found',
   ],
 };
 
@@ -154,6 +190,18 @@ export function getViewTitle(view: string): string {
     'termos': 'Termos de Utilização',
     'privacidade': 'Política de Privacidade',
     'seguranca': 'Segurança e Proteção de Dados',
+    'cases': 'Casos de Sucesso Escolar',
+    'casos': 'Casos de Sucesso Escolar',
+    'casos-de-sucesso': 'Casos de Sucesso Escolar',
+    'obrigado': 'Agradecimento & Confirmação',
+    'thank-you': 'Agradecimento & Confirmação',
+    'faq': 'Perguntas Frequentes (FAQ)',
+    'perguntas': 'Perguntas Frequentes (FAQ)',
+    'mapas': 'Mapa de Escolas & Rotas',
+    'rotas': 'Mapa de Escolas & Rotas',
+    'mapa': 'Mapa de Escolas & Rotas',
+    '404': 'Página Não Encontrada (404)',
+    'not-found': 'Página Não Encontrada (404)',
     'home': 'Página Inicial',
   };
   return titles[view] || view;
@@ -173,7 +221,19 @@ export function canUserAccessView(user: UserAccount | null, view: string): ViewA
     view === 'sobre' ||
     view === 'termos' ||
     view === 'privacidade' ||
-    view === 'seguranca'
+    view === 'seguranca' ||
+    view === 'cases' ||
+    view === 'casos' ||
+    view === 'casos-de-sucesso' ||
+    view === 'obrigado' ||
+    view === 'thank-you' ||
+    view === 'faq' ||
+    view === 'perguntas' ||
+    view === 'mapas' ||
+    view === 'rotas' ||
+    view === 'mapa' ||
+    view === '404' ||
+    view === 'not-found'
   ) {
     return { allowed: true, userOwnProfileView: getOwnProfileViewForUser(user) };
   }

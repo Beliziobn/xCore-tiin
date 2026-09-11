@@ -1,0 +1,25 @@
+# robots.txt for Central uCore - Plataforma de Gestão Educacional em Angola
+User-agent: *
+Allow: /
+Allow: /sobre
+Allow: /cases
+Allow: /faq
+Allow: /mapas
+Allow: /rotas
+Allow: /reunioes
+Allow: /termos
+Allow: /privacidade
+Allow: /seguranca
+Allow: /obrigado
+
+# Proteger áreas administrativas e de dados confidenciais de alunos/professores
+Disallow: /api/
+Disallow: /admin
+Disallow: /diretor
+Disallow: /professor
+Disallow: /aluno
+Disallow: /secretaria
+Disallow: /portal-privado
+
+# Sitemap oficial
+Sitemap: https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/sitemap.xml

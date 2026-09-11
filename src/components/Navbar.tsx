@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, Video, MapPin, HelpCircle } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications } from '../utils/authApprovalStorage';
 
@@ -279,25 +279,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>Demandas & Editais</span>
                       <span className="text-[9px] bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded">Oficial</span>
                     </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-aprovacoes');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                        Aprovação de Inscrições
-                      </span>
-                      {pendingAppsCount.admin > 0 ? (
-                        <span className="text-[10px] bg-amber-500 text-white font-black px-1.5 py-0.2 rounded-full animate-pulse">
-                          {pendingAppsCount.admin}
-                        </span>
-                      ) : (
-                        <span className="text-[9px] text-slate-400 font-bold">Admin</span>
-                      )}
-                    </button>
+
                     <button
                       onClick={() => {
                         onSelectPage('admin-perfil');
@@ -319,25 +301,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       Painel do Diretor
                     </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-aprovacoes');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                        Aprovação de Inscrições
-                      </span>
-                      {pendingAppsCount.director > 0 ? (
-                        <span className="text-[10px] bg-amber-500 text-white font-black px-1.5 py-0.2 rounded-full animate-pulse">
-                          {pendingAppsCount.director}
-                        </span>
-                      ) : (
-                        <span className="text-[9px] text-slate-400 font-bold">Escola</span>
-                      )}
-                    </button>
+
                     <button
                       onClick={() => {
                         onSelectPage('diretor-estatisticas');
@@ -484,48 +448,69 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </>
                 )}
 
-                {/* Institutional & Legal Section for all users */}
-                <div className="border-t border-slate-100 my-1 pt-1">
-                  <div className="px-4 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Institucional & Legal
-                  </div>
-                  <button
-                    onClick={() => {
-                      onSelectPage('sobre');
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                  >
-                    Sobre a Plataforma
-                  </button>
-                  <button
-                    onClick={() => {
-                      onSelectPage('termos');
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                  >
-                    Termos de Utilização
-                  </button>
-                  <button
-                    onClick={() => {
-                      onSelectPage('privacidade');
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                  >
-                    Política de Privacidade
-                  </button>
-                  <button
-                    onClick={() => {
-                      onSelectPage('seguranca');
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                  >
-                    Segurança e Proteção
-                  </button>
-                </div>
+                {/* Shared Video Meetings / Zoom for all users */}
+                <button
+                  id="nav-dropdown-meetings"
+                  onClick={() => {
+                    onSelectPage('reunioes');
+                    setShowPagesDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-xs text-blue-600 hover:bg-blue-50 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Video className="w-3.5 h-3.5" />
+                    <span>Salas Virtuais & Zoom</span>
+                  </span>
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">Ao Vivo</span>
+                </button>
+
+                {/* Casos de Sucesso Escolar */}
+                <button
+                  id="nav-dropdown-cases"
+                  onClick={() => {
+                    onSelectPage('cases');
+                    setShowPagesDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Award className="w-3.5 h-3.5 text-[#f75142]" />
+                    <span>Casos de Sucesso Escolar</span>
+                  </span>
+                  <span className="text-[9px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded">Impacto</span>
+                </button>
+
+                {/* Mapas e Rotas */}
+                <button
+                  id="nav-dropdown-maps"
+                  onClick={() => {
+                    onSelectPage('mapas');
+                    setShowPagesDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-red-500" />
+                    <span>Mapa de Escolas & Rotas</span>
+                  </span>
+                  <span className="text-[9px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded">GPS</span>
+                </button>
+
+                {/* Perguntas Frequentes (FAQ) */}
+                <button
+                  id="nav-dropdown-faq"
+                  onClick={() => {
+                    onSelectPage('faq');
+                    setShowPagesDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Perguntas Frequentes (FAQ)</span>
+                  </span>
+                  <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">5 Dúvidas</span>
+                </button>
 
               </div>
             )}
@@ -534,6 +519,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right CTA Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick Meetings & Video Conferences (Zoom Style) */}
+          <button
+            id="navbar-meetings-btn"
+            onClick={() => onSelectPage('reunioes')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+              currentView === 'reunioes' || currentView === 'reunioes-salas'
+                ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+            }`}
+            title="Salas Virtuais & Videoconferência em Tempo Real (Estilo Zoom)"
+          >
+            <Video className="w-3.5 h-3.5 text-blue-300" />
+            <span className="hidden sm:inline">Reuniões</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
+
           {/* Quick Approvals Button for Director */}
           {activeRole === 'diretor' && (
             <button
@@ -816,25 +817,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>Demandas & Editais</span>
                 <span className="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded">Oficial</span>
               </button>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-aprovacoes');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-[#f75142] bg-amber-50/70 hover:bg-amber-100/70 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-amber-600" />
-                  Aprovação de Inscrições
-                </span>
-                {pendingAppsCount.admin > 0 ? (
-                  <span className="text-[10px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-full">
-                    {pendingAppsCount.admin} pendentes
-                  </span>
-                ) : (
-                  <span className="text-[9px] text-slate-400">Admin</span>
-                )}
-              </button>
+
               <button
                 onClick={() => {
                   onSelectPage('admin-perfil');
@@ -856,25 +839,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 Painel do Diretor
               </button>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-aprovacoes');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-[#f75142] bg-amber-50/70 hover:bg-amber-100/70 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-amber-600" />
-                  Aprovação de Inscrições
-                </span>
-                {pendingAppsCount.director > 0 ? (
-                  <span className="text-[10px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-full">
-                    {pendingAppsCount.director} pendentes
-                  </span>
-                ) : (
-                  <span className="text-[9px] text-slate-400">Escola</span>
-                )}
-              </button>
+
               <button
                 onClick={() => {
                   onSelectPage('diretor-estatisticas');
@@ -1011,47 +976,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </>
           )}
-          <div className="border-t border-slate-100 my-1 pt-1 space-y-1">
-            <div className="px-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
-              Institucional & Legal
-            </div>
-            <button
-              onClick={() => {
-                onSelectPage('sobre');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-            >
-              Sobre a Plataforma
-            </button>
-            <button
-              onClick={() => {
-                onSelectPage('termos');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-            >
-              Termos de Utilização
-            </button>
-            <button
-              onClick={() => {
-                onSelectPage('privacidade');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-            >
-              Política de Privacidade
-            </button>
-            <button
-              onClick={() => {
-                onSelectPage('seguranca');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-            >
-              Segurança e Proteção de Dados
-            </button>
-          </div>
+
           <button
             onClick={() => {
               setMobileMenuOpen(false);
@@ -1086,6 +1011,58 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Configurações & Palavra-passe</span>
             </button>
           )}
+          <button
+            onClick={() => {
+              onSelectPage('reunioes');
+              setMobileMenuOpen(false);
+            }}
+            className="text-left py-2 px-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <Video className="w-4 h-4 text-blue-600" />
+              <span>Salas Virtuais & Zoom</span>
+            </div>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          </button>
+          <button
+            onClick={() => {
+              onSelectPage('cases');
+              setMobileMenuOpen(false);
+            }}
+            className="text-left py-2 px-3 bg-purple-50/70 text-purple-800 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 text-[#f75142]" />
+              <span>Casos de Sucesso Escolar</span>
+            </div>
+            <span className="text-[9px] bg-purple-200 text-purple-900 font-black px-1.5 py-0.5 rounded">Angola</span>
+          </button>
+          <button
+            onClick={() => {
+              onSelectPage('mapas');
+              setMobileMenuOpen(false);
+            }}
+            className="text-left py-2 px-3 bg-red-50/70 text-red-800 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-red-600" />
+              <span>Mapa de Escolas & Rotas</span>
+            </div>
+            <span className="text-[9px] bg-red-200 text-red-900 font-black px-1.5 py-0.5 rounded">GPS</span>
+          </button>
+          <button
+            onClick={() => {
+              onSelectPage('faq');
+              setMobileMenuOpen(false);
+            }}
+            className="text-left py-2 px-3 bg-blue-50/70 text-blue-800 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-blue-600" />
+              <span>Perguntas Frequentes (FAQ)</span>
+            </div>
+            <span className="text-[9px] bg-blue-200 text-blue-900 font-black px-1.5 py-0.5 rounded">5 Dúvidas</span>
+          </button>
           {onOpenChat && (
             <button
               onClick={() => {

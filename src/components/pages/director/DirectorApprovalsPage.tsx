@@ -27,7 +27,11 @@ import {
   BookOpen,
   Eye,
   Building2,
-  Printer
+  Printer,
+  LayoutGrid,
+  List,
+  FileCheck,
+  CheckCheck
 } from 'lucide-react';
 import type { 
   PendingApplication, 
@@ -67,6 +71,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'aprovado' | 'rejeitado'>('pendente');
   const [roleFilter, setRoleFilter] = useState<'todos' | 'professor' | 'aluno' | 'funcionario'>('todos');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
 
   // Approval Modal State
@@ -139,11 +144,17 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
 
   // Counts
   const counts = useMemo(() => {
+    const total = applications.length;
+    const pendentes = applications.filter((a) => a.status === 'pendente').length;
+    const aprovados = applications.filter((a) => a.status === 'aprovado').length;
+    const rejeitados = applications.filter((a) => a.status === 'rejeitado').length;
+    const taxaAprovacao = total > 0 ? Math.round((aprovados / total) * 100) : 100;
     return {
-      total: applications.length,
-      pendentes: applications.filter((a) => a.status === 'pendente').length,
-      aprovados: applications.filter((a) => a.status === 'aprovado').length,
-      rejeitados: applications.filter((a) => a.status === 'rejeitado').length,
+      total,
+      pendentes,
+      aprovados,
+      rejeitados,
+      taxaAprovacao,
     };
   }, [applications]);
 
@@ -395,117 +406,140 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
         isLoggedIn={isLoggedIn}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 -mt-6 relative z-10">
-        {/* KPI Cards & Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Pendentes */}
-          <div 
-            onClick={() => setStatusFilter('pendente')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'pendente' 
-                ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-2 ring-amber-500/20' 
-                : 'bg-white border-slate-200/80 hover:border-amber-300'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Pendentes de Análise
-              </span>
-              <span className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
-                <Clock className="w-4 h-4 animate-pulse" />
-              </span>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
+        {/* Executive Summary & School Protocol Strip */}
+        <section className="bg-white rounded-2xl border border-slate-200/90 shadow-xs mb-6 overflow-hidden">
+          <div className="p-5 sm:p-6 bg-linear-to-r from-slate-900 via-[#002133] to-slate-900 text-white">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/10 text-white/90 text-[11px] font-semibold tracking-wide border border-white/15">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{schoolName} • Direção Geral • Ano Letivo 2026</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                  Quadro Oficial de Homologação & Matrículas Escolares
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                  Validação documental presencial, enquadramento de corpo docente e admissão definitiva de alunos e colaboradores no ecossistema uCore SIGE.
+                </p>
+              </div>
+
+              {/* Quick Actions in Header */}
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={loadApplications}
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all border border-white/15 flex items-center gap-1.5 cursor-pointer"
+                  title="Atualizar lista de candidaturas"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sincronizar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSimulateModal(true)}
+                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Simular Inscrição</span>
+                </button>
+              </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900">{counts.pendentes}</span>
-              <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                Requer ação
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Candidaturas que aguardam homologação</p>
           </div>
 
-          {/* Aprovados */}
-          <div 
-            onClick={() => setStatusFilter('aprovado')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'aprovado' 
-                ? 'bg-emerald-500/10 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
-                : 'bg-white border-slate-200/80 hover:border-emerald-300'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Homologados
-              </span>
-              <span className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
-                <CheckCircle2 className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900">{counts.aprovados}</span>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                No quadro escolar
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Usuários integrados na escola</p>
-          </div>
+          {/* Segmented Status Tab Navigation */}
+          <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Status Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("pendente")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === "pendente"
+                    ? "bg-amber-500 text-slate-950 shadow-xs ring-2 ring-amber-500/20"
+                    : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80"
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-slate-950" />
+                <span>Pendentes de Homologação</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === "pendente" ? "bg-slate-950 text-amber-400" : "bg-amber-100 text-amber-900"
+                }`}>
+                  {counts.pendentes}
+                </span>
+              </button>
 
-          {/* Rejeitados */}
-          <div 
-            onClick={() => setStatusFilter('rejeitado')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'rejeitado' 
-                ? 'bg-rose-500/10 border-rose-500 shadow-sm ring-2 ring-rose-500/20' 
-                : 'bg-white border-slate-200/80 hover:border-rose-300'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Indeferidos
-              </span>
-              <span className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-700">
-                <XCircle className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900">{counts.rejeitados}</span>
-              <span className="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">
-                Recusados
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Inscrições devolvidas com justificativa</p>
-          </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("aprovado")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === "aprovado"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80"
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Homologados & Integrados</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === "aprovado" ? "bg-white text-emerald-800" : "bg-emerald-50 text-emerald-800"
+                }`}>
+                  {counts.aprovados}
+                </span>
+              </button>
 
-          {/* Total Geral */}
-          <div 
-            onClick={() => setStatusFilter('todos')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'todos' 
-                ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
-                : 'bg-white border-slate-200/80 hover:border-slate-400'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold uppercase tracking-wider ${statusFilter === 'todos' ? 'text-slate-300' : 'text-slate-500'}`}>
-                Total de Registos
-              </span>
-              <span className={`w-8 h-8 rounded-full flex items-center justify-center ${statusFilter === 'todos' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                <ShieldCheck className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className={`text-3xl font-black ${statusFilter === 'todos' ? 'text-white' : 'text-slate-900'}`}>{counts.total}</span>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusFilter === 'todos' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
-                Histórico
-              </span>
-            </div>
-            <p className={`text-xs mt-1 ${statusFilter === 'todos' ? 'text-slate-400' : 'text-slate-500'}`}>Inscrições recebidas nesta escola</p>
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("rejeitado")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === "rejeitado"
+                    ? "bg-rose-600 text-white shadow-xs"
+                    : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80"
+                }`}
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Indeferidos</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === "rejeitado" ? "bg-white text-rose-800" : "bg-rose-50 text-rose-800"
+                }`}>
+                  {counts.rejeitados}
+                </span>
+              </button>
 
-        {/* Controls & Filter Bar */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("todos")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === "todos"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80"
+                }`}
+              >
+                <span>Todos os Registos</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === "todos" ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"
+                }`}>
+                  {counts.total}
+                </span>
+              </button>
+            </div>
+
+            {/* Quick KPI stats inline */}
+            <div className="hidden lg:flex items-center gap-4 text-xs font-medium text-slate-600 border-l border-slate-200/80 pl-4">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Taxa de Homologação:</span>
+                <span className="font-bold text-emerald-700">{counts.taxaAprovacao}%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Direção:</span>
+                <span className="font-bold text-slate-800">{directorName}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Filter & View Switcher Bar */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs mb-6">
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -514,12 +548,14 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Pesquisar por nome, nº do BI, email, disciplina ou turma..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]/30 focus:border-[#f75142] transition-all"
+                className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#002133]/20 focus:border-[#002133] transition-all placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Limpar pesquisa"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -527,128 +563,307 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
             </div>
 
             {/* Role Filter Chips */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1 overflow-x-auto py-0.5 scrollbar-none">
               <button
                 type="button"
-                onClick={() => setRoleFilter('todos')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all ${
-                  roleFilter === 'todos'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                onClick={() => setRoleFilter("todos")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                  roleFilter === "todos"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 Todos ({applications.length})
               </button>
               <button
                 type="button"
-                onClick={() => setRoleFilter('professor')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                  roleFilter === 'professor'
-                    ? 'bg-[#f75142] text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                onClick={() => setRoleFilter("professor")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+                  roleFilter === "professor"
+                    ? "bg-[#002133] text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                <GraduationCap className="w-3.5 h-3.5" />
-                Professores ({applications.filter((a) => a.type === 'professor').length})
+                <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Professores ({applications.filter((a) => a.type === "professor").length})</span>
               </button>
               <button
                 type="button"
-                onClick={() => setRoleFilter('aluno')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                  roleFilter === 'aluno'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                onClick={() => setRoleFilter("aluno")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+                  roleFilter === "aluno"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
-                Alunos ({applications.filter((a) => a.type === 'aluno').length})
+                <span>Alunos ({applications.filter((a) => a.type === "aluno").length})</span>
               </button>
               <button
                 type="button"
-                onClick={() => setRoleFilter('funcionario')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                  roleFilter === 'funcionario'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                onClick={() => setRoleFilter("funcionario")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+                  roleFilter === "funcionario"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 <Briefcase className="w-3.5 h-3.5" />
-                Colaboradores ({applications.filter((a) => a.type === 'funcionario').length})
+                <span>Colaboradores ({applications.filter((a) => a.type === "funcionario").length})</span>
               </button>
             </div>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 border border-slate-200 bg-slate-50 p-1 rounded-xl shrink-0">
               <button
                 type="button"
-                onClick={loadApplications}
-                className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
-                title="Atualizar lista"
+                onClick={() => setViewMode("cards")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "cards"
+                    ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+                title="Modo Dossiês (Cartões Detalhados)"
               >
-                <RefreshCw className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Dossiês</span>
               </button>
               <button
                 type="button"
-                onClick={() => setShowSimulateModal(true)}
-                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                onClick={() => setViewMode("table")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "table"
+                    ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+                title="Modo Pauta / Tabela (Visão Administrativa)"
               >
-                <Plus className="w-4 h-4" />
-                <span>Simular Inscrição</span>
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Pauta</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Applications List */}
-        <div className="space-y-4">
-          {filteredApps.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/80">
-              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-4">
-                <CheckCircle2 className="w-7 h-7" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 mb-1">Nenhuma inscrição encontrada</h3>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                Não existem pedidos com os filtros selecionados no momento. Todas as inscrições para esta escola estão atualizadas.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('todos');
-                  setRoleFilter('todos');
-                  setSearchQuery('');
-                }}
-                className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                Limpar Filtros
-              </button>
+        {/* Empty State */}
+        {filteredApps.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/90 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-4">
+              <CheckCircle2 className="w-7 h-7 text-slate-400" />
             </div>
-          ) : (
-            filteredApps.map((app) => {
-              const isPending = app.status === 'pendente';
-              const isApproved = app.status === 'aprovado';
-              const isRejected = app.status === 'rejeitado';
+            <h3 className="text-base font-bold text-slate-900 mb-1">Nenhuma inscrição encontrada</h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+              Não existem pedidos com os filtros selecionados no momento. Todas as inscrições para esta escola estão atualizadas.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter("todos");
+                setRoleFilter("todos");
+                setSearchQuery("");
+              }}
+              className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        ) : viewMode === "table" ? (
+          /* TABLE VIEW / PAUTA OFICIAL DE HOMOLOGAÇÕES */
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Candidato(a) / Perfil</th>
+                    <th className="py-3 px-4">Categoria & Área</th>
+                    <th className="py-3 px-4">Nº do BI / Doc</th>
+                    <th className="py-3 px-4">Turma / Sala / Turno</th>
+                    <th className="py-3 px-4">Data Registo</th>
+                    <th className="py-3 px-4 text-center">Situação Oficial</th>
+                    <th className="py-3 px-4 text-right">Ações Rápidas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredApps.map((app) => {
+                    const isPending = app.status === "pendente";
+                    const isApproved = app.status === "aprovado";
+                    const isRejected = app.status === "rejeitado";
+
+                    return (
+                      <tr key={app.id} className="hover:bg-slate-50/80 transition-colors group">
+                        {/* Candidato */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-xs ${
+                                app.type === "professor"
+                                  ? "bg-[#002133]"
+                                  : app.type === "aluno"
+                                  ? "bg-blue-600"
+                                  : "bg-indigo-600"
+                              }`}
+                            >
+                              {app.fullName.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-900 block truncate group-hover:text-slate-950">
+                                {app.fullName}
+                              </span>
+                              <span className="text-[11px] text-slate-400 truncate block">
+                                {app.email} • {app.phone}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Categoria */}
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                            app.type === "professor"
+                              ? "bg-amber-50 text-amber-900 border border-amber-200"
+                              : app.type === "aluno"
+                              ? "bg-blue-50 text-blue-800 border border-blue-200"
+                              : "bg-indigo-50 text-indigo-800 border border-indigo-200"
+                          }`}>
+                            {app.roleRequested || (app.type === "professor" ? "Docente" : app.type === "aluno" ? "Aluno" : "Colaborador")}
+                          </span>
+                          {app.subject && (
+                            <span className="block text-[11px] text-slate-500 font-medium mt-0.5">
+                              {app.subject}
+                            </span>
+                          )}
+                          {app.gradeClass && !app.subject && (
+                            <span className="block text-[11px] text-slate-500 font-medium mt-0.5">
+                              {app.gradeClass}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* BI */}
+                        <td className="py-3.5 px-4">
+                          <span className="font-mono text-slate-700 font-semibold block text-xs">
+                            {app.biNumber}
+                          </span>
+                          {app.documentosConferidosPresencialmente ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold mt-0.5">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              Docs conferidos
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                              A conferir físico
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Turma / Sala / Turno */}
+                        <td className="py-3.5 px-4">
+                          <span className="font-semibold text-slate-800 text-xs block">
+                            {app.assignedTurma || app.gradeClass || "A atribuir"}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            {app.assignedRoom ? `${app.assignedRoom} • ` : ""}{app.assignedShift || "Manhã"}
+                          </span>
+                        </td>
+
+                        {/* Data */}
+                        <td className="py-3.5 px-4 text-slate-500 text-[11px] whitespace-nowrap">
+                          {app.createdAt ? app.createdAt.split(",")[0] : "Hoje"}
+                        </td>
+
+                        {/* Situação */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          {isPending && (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Pendente
+                            </span>
+                          )}
+                          {isApproved && (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              Homologado
+                            </span>
+                          )}
+                          {isRejected && (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-800 border border-rose-200">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              Indeferido
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Ações */}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedApp(app)}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 cursor-pointer transition-colors"
+                              title="Ver Dossiê Completo"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+
+                            {isPending && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenReject(app)}
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 cursor-pointer transition-colors"
+                                  title="Indeferir Homologação"
+                                >
+                                  <UserX className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenApprove(app)}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#002133] hover:bg-slate-800 text-white cursor-pointer shadow-xs transition-colors flex items-center gap-1"
+                                  title="Homologar com Documentos"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>Homologar</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* CARDS VIEW / DOSSIÊS DETALHADOS */
+          <div className="space-y-4">
+            {filteredApps.map((app) => {
+              const isPending = app.status === "pendente";
+              const isApproved = app.status === "aprovado";
+              const isRejected = app.status === "rejeitado";
 
               return (
                 <div
                   key={app.id}
                   className={`bg-white rounded-2xl p-5 sm:p-6 border transition-all shadow-xs ${
                     isPending
-                      ? 'border-amber-200/90 hover:border-amber-400 hover:shadow-md'
+                      ? "border-amber-200/90 hover:border-amber-400 hover:shadow-md"
                       : isApproved
-                      ? 'border-slate-200/80 hover:border-emerald-300'
-                      : 'border-slate-200/80 opacity-75'
+                      ? "border-slate-200/90 hover:border-emerald-300"
+                      : "border-slate-200/90 opacity-75"
                   }`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
                     {/* Left: Avatar & Candidate Info */}
                     <div className="flex items-start gap-4">
                       <div
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-sm shrink-0 ${
-                          app.type === 'professor'
-                            ? 'bg-[#f75142]'
-                            : app.type === 'aluno'
-                            ? 'bg-blue-600'
-                            : 'bg-indigo-600'
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-xs ${
+                          app.type === "professor"
+                            ? "bg-[#002133]"
+                            : app.type === "aluno"
+                            ? "bg-blue-600"
+                            : "bg-indigo-600"
                         }`}
                       >
                         {app.fullName.charAt(0)}
@@ -660,13 +875,13 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                           
                           {/* Role Tag */}
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                            app.type === 'professor'
-                              ? 'bg-rose-50 text-[#f75142] border border-rose-200/60'
-                              : app.type === 'aluno'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                              : 'bg-indigo-50 text-indigo-700 border border-indigo-200/60'
+                            app.type === "professor"
+                              ? "bg-amber-50 text-amber-900 border border-amber-200"
+                              : app.type === "aluno"
+                              ? "bg-blue-50 text-blue-700 border border-blue-200/60"
+                              : "bg-indigo-50 text-indigo-700 border border-indigo-200/60"
                           }`}>
-                            {app.roleRequested || (app.type === 'professor' ? 'Docente' : app.type === 'aluno' ? 'Aluno' : 'Funcionário')}
+                            {app.roleRequested || (app.type === "professor" ? "Docente" : app.type === "aluno" ? "Aluno" : "Funcionário")}
                           </span>
 
                           {/* Status Tag */}
@@ -679,7 +894,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                           {isApproved && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              Homologado
+                              Homologado & Integrado
                             </span>
                           )}
                           {isRejected && (
@@ -703,12 +918,12 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                           </span>
                           {app.subject && (
                             <span className="flex items-center gap-1 font-semibold text-slate-800">
-                              <BookOpen className="w-3 h-3 text-amber-500" /> {app.subject}
+                              <BookOpen className="w-3 h-3 text-amber-600" /> {app.subject}
                             </span>
                           )}
-                          {app.gradeClass && (
+                          {(app.assignedTurma || app.gradeClass) && (
                             <span className="flex items-center gap-1 text-slate-700">
-                              <span className="text-slate-400 font-semibold">Classe/Nível:</span> {app.gradeClass}
+                              <span className="text-slate-400 font-semibold">Turma/Classe:</span> {app.assignedTurma || app.gradeClass}
                             </span>
                           )}
                         </div>
@@ -718,7 +933,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                           {app.isPreRegistered ? (
                             <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-200/70">
                               <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>{app.preRegisteredDetails || 'Pré-cadastro localizado no livro docente da escola.'}</span>
+                              <span>{app.preRegisteredDetails || "Pré-cadastro localizado no livro docente da escola."}</span>
                             </div>
                           ) : (
                             <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
@@ -729,7 +944,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                         </div>
 
                         {/* Complementary data badge if present */}
-                        {(app.nivelAcademico || typeof app.anosServico === 'number' || app.documentosConferidosPresencialmente) && (
+                        {(app.nivelAcademico || typeof app.anosServico === "number" || app.documentosConferidosPresencialmente) && (
                           <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]">
                             {app.nivelAcademico && (
                               <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200/80 px-2.5 py-0.5 rounded-lg font-medium">
@@ -737,10 +952,10 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                                 <span>{app.nivelAcademico}</span>
                               </span>
                             )}
-                            {typeof app.anosServico === 'number' && (
+                            {typeof app.anosServico === "number" && (
                               <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-900 border border-blue-200/80 px-2.5 py-0.5 rounded-lg font-medium">
                                 <Briefcase className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                <span>{app.anosServico} {app.anosServico === 1 ? 'ano' : 'anos'} de serviço</span>
+                                <span>{app.anosServico} {app.anosServico === 1 ? "ano" : "anos"} de serviço</span>
                               </span>
                             )}
                             {app.regimeTrabalho && (
@@ -749,38 +964,25 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                               </span>
                             )}
                             {app.documentosConferidosPresencialmente && (
-                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-lg font-medium">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span>Docs em mãos conferidos</span>
+                                <span>Documentos em mãos</span>
                               </span>
                             )}
-                          </div>
-                        )}
-
-                        {/* Approval or Rejection details */}
-                        {isApproved && (
-                          <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
-                            <span>Aprovado por <strong className="text-slate-800">{app.approvedBy}</strong> em {app.approvedAt || '11/09/2026'}</span>
-                          </div>
-                        )}
-                        {isRejected && app.rejectionReason && (
-                          <div className="text-[11px] text-rose-700 bg-rose-50 p-2 rounded-lg mt-2 border border-rose-200">
-                            <strong>Motivo da recusa:</strong> {app.rejectionReason}
                           </div>
                         )}
                       </div>
                     </div>
 
                     {/* Right: Actions */}
-                    <div className="flex flex-wrap items-center gap-2 self-end lg:self-center shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 lg:self-center shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0 border-slate-100">
                       <button
                         type="button"
                         onClick={() => setSelectedApp(app)}
-                        className="px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                        title="Ver dados completos"
+                        className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        <span>Ver Ficha</span>
+                        <span>Ver Dossiê</span>
                       </button>
 
                       {isPending && (
@@ -788,19 +990,19 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenReject(app)}
-                            className="px-3 py-2 rounded-xl text-xs font-bold border border-rose-200 text-rose-700 hover:bg-rose-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/70 transition-all cursor-pointer flex items-center gap-1.5"
                           >
                             <UserX className="w-3.5 h-3.5" />
-                            <span>Recusar</span>
+                            <span>Indeferir</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => handleOpenApprove(app)}
-                            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#f75142] hover:bg-[#e04335] text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#002133] hover:bg-slate-800 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                           >
-                            <UserCheck className="w-3.5 h-3.5" />
-                            <span>Homologar Inscrição</span>
+                            <UserCheck className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Homologar com Documentos</span>
                           </button>
                         </>
                       )}
@@ -808,9 +1010,9 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </main>
 
       {/* APPROVAL MODAL WITH COMPLEMENTARY FIELDS (DOCS IN HAND) */}

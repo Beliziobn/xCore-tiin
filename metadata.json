@@ -1,6 +1,10 @@
 {
   "name": "Central uCore",
   "description": "Plataforma de gestão educacional uCore - Priorizamos a melhor organização da Educação para escolas, professores e alunos.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "display-capture"
+  ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -80,6 +80,15 @@ import { TermsOfUsePage } from './components/pages/legal/TermsOfUsePage';
 import { PrivacyPolicyPage } from './components/pages/legal/PrivacyPolicyPage';
 import { SecurityDataProtectionPage } from './components/pages/legal/SecurityDataProtectionPage';
 
+// Real-Time Meetings & Video Calls (Zoom-style)
+import { ZoomMeetingModal } from './components/meetings/ZoomMeetingModal';
+import { MeetingsHubPage } from './components/pages/MeetingsHubPage';
+
+// Public Institutional Pages: 404, Thank You, and Cases of Success
+import { NotFoundPage } from './components/pages/NotFoundPage';
+import { ThankYouPage } from './components/pages/ThankYouPage';
+import { CasesPage } from './components/pages/CasesPage';
+
 import type { 
   EducationalModule, 
   UserAccount, 
@@ -116,6 +125,19 @@ export default function App() {
   const [infoModalType, setInfoModalType] = useState<InfoModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [thankYouConfig, setThankYouConfig] = useState<{
+    type?: 'enrollment' | 'school-registration' | 'contact' | 'support' | 'general';
+    title?: string;
+    subtitle?: string;
+    referenceCode?: string;
+    recipientName?: string;
+    userEmail?: string;
+    schoolName?: string;
+  }>({
+    type: 'general',
+    title: 'Ação Concluída com Sucesso!',
+    subtitle: 'A sua solicitação foi recebida e registada na plataforma uCore.',
+  });
 
   // Admin dynamic state
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
@@ -355,6 +377,59 @@ export default function App() {
 
   // Chat System Dynamic State
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Real-Time Zoom-style Video Meeting State
+  const [activeMeeting, setActiveMeeting] = useState<{
+    isOpen: boolean;
+    roomId: string;
+    roomTitle: string;
+    initialVideo: boolean;
+    initialAudio: boolean;
+  }>({
+    isOpen: false,
+    roomId: '',
+    roomTitle: '',
+    initialVideo: true,
+    initialAudio: true,
+  });
+
+  const handleOpenMeeting = (roomId: string, roomTitle?: string, initialVideo = true, initialAudio = true) => {
+    setActiveMeeting({
+      isOpen: true,
+      roomId,
+      roomTitle: roomTitle || `Reunião ${roomId.toUpperCase()}`,
+      initialVideo,
+      initialAudio,
+    });
+  };
+
+  const handleCloseMeeting = () => {
+    setActiveMeeting((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  // Check URL query parameters for direct meeting joins (?meet=id or ?room=id) and direct routing
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const meetCode = params.get('meet') || params.get('room');
+      if (meetCode) {
+        handleOpenMeeting(meetCode, `Reunião ${meetCode.toUpperCase()}`, true);
+      }
+
+      const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+      const pageParam = (params.get('view') || params.get('page') || path).toLowerCase();
+
+      if (pageParam === 'cases' || pageParam === 'casos' || pageParam === 'casos-de-sucesso') {
+        setCurrentView('cases');
+      } else if (pageParam === 'obrigado' || pageParam === 'thank-you' || pageParam === 'agradecimento') {
+        setCurrentView('obrigado');
+      } else if (pageParam === '404' || pageParam === 'not-found') {
+        setCurrentView('404');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
   const [chatChannels, setChatChannels] = useState<ChatChannel[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_chat_channels_v3');
@@ -698,6 +773,17 @@ export default function App() {
 
     // Public Legal & Institutional Pages
     if (
+      pageId === 'reunioes' ||
+      pageId === 'reunioes-salas' ||
+      pageId === 'zoom' ||
+      pageId === 'meet'
+    ) {
+      setCurrentView('reunioes');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (
       pageId === 'sobre' ||
       pageId === 'about' ||
       pageId === 'termos' ||
@@ -718,6 +804,35 @@ export default function App() {
           ? 'seguranca'
           : pageId;
       setCurrentView(normalizedView);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Success Cases, Thank You & 404 Pages
+    if (
+      pageId === 'cases' ||
+      pageId === 'casos' ||
+      pageId === 'casos-de-sucesso' ||
+      pageId === 'sucesso'
+    ) {
+      setCurrentView('cases');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (
+      pageId === 'obrigado' ||
+      pageId === 'thank-you' ||
+      pageId === 'agradecimento' ||
+      pageId === 'confirmacao'
+    ) {
+      setCurrentView('obrigado');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (pageId === '404' || pageId === 'not-found' || pageId === 'erro-404') {
+      setCurrentView('404');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -922,15 +1037,33 @@ export default function App() {
     // 0.1 Public Pre-contact / Pre-session Landing Page
     // "antes do usario entrar contacto com o nosso sistema devemos exibir uma pagina, assim que ele iniciar a sessão poderá ver"
     if (!currentUser) {
-      return (
-        <PublicLandingPage
-          onAcessarPlataforma={() => handleOpenAuth('login')}
-          onOpenDemoModal={() => setIsDemoModalOpen(true)}
-          onDirectLogin={(role) => handleDirectDemoLogin(role)}
-          onOpenAbout={() => setInfoModalType('about')}
-          onOpenSupport={() => setInfoModalType('support')}
-        />
-      );
+      const isPublicView =
+        currentView === 'sobre' ||
+        currentView === 'termos' ||
+        currentView === 'privacidade' ||
+        currentView === 'seguranca' ||
+        currentView === 'reunioes' ||
+        currentView === 'reunioes-salas' ||
+        currentView === 'cases' ||
+        currentView === 'casos' ||
+        currentView === 'casos-de-sucesso' ||
+        currentView === 'obrigado' ||
+        currentView === 'thank-you' ||
+        currentView === 'agradecimento' ||
+        currentView === '404' ||
+        currentView === 'not-found';
+
+      if (!isPublicView) {
+        return (
+          <PublicLandingPage
+            onAcessarPlataforma={() => handleOpenAuth('login')}
+            onOpenDemoModal={() => setIsDemoModalOpen(true)}
+            onDirectLogin={(role) => handleDirectDemoLogin(role)}
+            onOpenAbout={() => setInfoModalType('about')}
+            onOpenSupport={() => setInfoModalType('support')}
+          />
+        );
+      }
     }
 
     // 0.2 Pending Approval Waiting Screen
@@ -1496,7 +1629,19 @@ export default function App() {
       );
     }
 
-    // 3. Dedicated Legal & Institutional Pages
+    // 3. Real-Time Virtual Meetings & Video Conferences (Zoom Style)
+    if (currentView === 'reunioes' || currentView === 'reunioes-salas') {
+      return (
+        <MeetingsHubPage
+          currentUser={currentUser}
+          onJoinMeeting={(roomId, title, initialVideo) => {
+            handleOpenMeeting(roomId, title, initialVideo);
+          }}
+        />
+      );
+    }
+
+    // 4. Dedicated Legal & Institutional Pages
     if (currentView === 'sobre') {
       return (
         <div className="w-full">
@@ -1597,6 +1742,105 @@ export default function App() {
             currentUserRole={currentUser?.role || 'convidado'}
           />
         </div>
+      );
+    }
+
+    // 5. Success Cases Page (Casos de Sucesso Escolar)
+    if (
+      currentView === 'cases' ||
+      currentView === 'casos' ||
+      currentView === 'casos-de-sucesso' ||
+      currentView === 'sucesso'
+    ) {
+      return (
+        <CasesPage
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateThankYou={(name) => {
+            setThankYouConfig({
+              type: 'school-registration',
+              title: 'Candidatura de Adesão Submetida!',
+              subtitle: 'A manifestação de interesse da sua instituição foi acolhida no portal uCore Angola. Em breve a equipa técnica entrará em contacto.',
+              schoolName: name || 'Complexo Escolar Solicitante',
+              referenceCode: `CASO-${Math.floor(100000 + Math.random() * 900000)}`,
+            });
+            setCurrentView('obrigado');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateMeetings={() => {
+            setCurrentView('reunioes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenGetStarted={() => handleOpenAuth('login')}
+        />
+      );
+    }
+
+    // 6. Thank You / Confirmation Page (Página de Obrigado)
+    if (
+      currentView === 'obrigado' ||
+      currentView === 'thank-you' ||
+      currentView === 'agradecimento' ||
+      currentView === 'confirmacao'
+    ) {
+      return (
+        <ThankYouPage
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateCases={() => {
+            setCurrentView('cases');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateMeetings={() => {
+            setCurrentView('reunioes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          type={thankYouConfig.type}
+          title={thankYouConfig.title}
+          subtitle={thankYouConfig.subtitle}
+          referenceCode={thankYouConfig.referenceCode}
+          recipientName={thankYouConfig.recipientName || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : undefined)}
+          userEmail={thankYouConfig.userEmail || currentUser?.email}
+          schoolName={thankYouConfig.schoolName}
+        />
+      );
+    }
+
+    // 7. Not Found 404 Page (Página Não Encontrada)
+    if (
+      currentView === '404' ||
+      currentView === 'not-found' ||
+      currentView === 'erro-404'
+    ) {
+      return (
+        <NotFoundPage
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateMeetings={() => {
+            setCurrentView('reunioes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateAbout={() => {
+            setCurrentView('sobre');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateCases={() => {
+            setCurrentView('cases');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateSupport={() => setInfoModalType('support')}
+          requestedPath={window.location.pathname !== '/' ? window.location.pathname : undefined}
+          isLoggedIn={isSessionStarted}
+        />
       );
     }
 
@@ -1904,6 +2148,10 @@ export default function App() {
           setCurrentView('seguranca');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
+        onOpenCases={() => {
+          setCurrentView('cases');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         onOpenCookieSettings={() => window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'))}
         onOpenSupport={() => setInfoModalType('support')}
       />
@@ -1935,6 +2183,19 @@ export default function App() {
         isOpen={isDemoModalOpen}
         onClose={() => setIsDemoModalOpen(false)}
         onStartDemoSession={(role) => handleDirectDemoLogin(role || 'diretor')}
+        onOpenThankYouPage={(details) => {
+          setThankYouConfig({
+            type: 'school-registration',
+            title: 'Solicitação de Demonstração Recebida!',
+            subtitle: `Agradecemos o interesse, ${details.recipientName}. A equipa uCore entrará em contacto para o agendamento da sessão experimental.`,
+            recipientName: details.recipientName,
+            schoolName: details.schoolName,
+            userEmail: details.userEmail,
+            referenceCode: details.referenceCode,
+          });
+          setCurrentView('obrigado');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       {/* Card Detail Modal */}
@@ -2028,6 +2289,20 @@ export default function App() {
         channels={chatChannels}
         messages={chatMessages}
         onSendMessage={handleSendMessage}
+        onStartCall={(roomId, title, isVideo) => {
+          handleOpenMeeting(roomId, title, isVideo);
+        }}
+      />
+
+      {/* Real-time Video/Voice Meetings & Zoom Conference Modal */}
+      <ZoomMeetingModal
+        isOpen={activeMeeting.isOpen}
+        onClose={handleCloseMeeting}
+        roomId={activeMeeting.roomId}
+        roomTitle={activeMeeting.roomTitle}
+        currentUser={currentUser}
+        initialVideo={activeMeeting.initialVideo}
+        initialAudio={activeMeeting.initialAudio}
       />
     </div>
   );

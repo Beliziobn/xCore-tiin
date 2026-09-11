@@ -243,14 +243,14 @@ export default function SchoolTeamSection({
         </div>
       </div>
 
-      {/* Interactive Modal View */}
+      {/* Interactive Modal View - Clean Centered Card Design */}
       <AnimatePresence>
         {selected && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.button
               type="button"
               aria-label="Fechar perfil"
-              className="absolute inset-0 cursor-default bg-slate-950/40 backdrop-blur-md border-0"
+              className="absolute inset-0 cursor-default bg-slate-950/40 backdrop-blur-xs border-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -261,127 +261,131 @@ export default function SchoolTeamSection({
               role="dialog"
               aria-modal="true"
               aria-label={`Perfil de ${selected.name}`}
-              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              initial={{ opacity: 0, scale: 0.94, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+              className="profile-modal relative z-10 w-full max-w-[380px] bg-white rounded-[24px] p-8 pb-7 text-center shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12)] border border-slate-100"
             >
+              {/* Botão fechar */}
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="absolute right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 backdrop-blur transition hover:bg-slate-100 hover:text-slate-950 cursor-pointer shadow-xs"
-                title="Fechar"
+                className="close-btn absolute top-4 right-4 w-9 h-9 rounded-full border-0 bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB] hover:text-[#111827] flex items-center justify-center cursor-pointer transition-all duration-200"
+                aria-label="Fechar"
               >
-                <X className="h-5 w-5" />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
               </button>
 
-              <div className="h-28 bg-gradient-to-r from-slate-950 via-slate-900 to-[#f75142] relative flex items-end px-6 pb-2">
-                <div className="inline-flex items-center gap-1.5 text-white/40 text-[10px] uppercase font-black tracking-widest">
-                  <Sparkles className="w-3 h-3 text-[#f75142]" />
-                  <span>Quadro Docente Oficial</span>
-                </div>
-              </div>
-
-              <div className="-mt-14 px-6 pb-7 sm:px-8">
-                <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-slate-100 shadow-lg">
+              {/* Foto */}
+              <div className="avatar-wrapper mb-[18px] flex justify-center">
+                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-[0_8px_20px_rgba(0,0,0,0.1)] bg-slate-100">
                   <MemberImage
                     src={selected.photo}
                     alt={selected.name}
                     name={selected.name}
-                    className="h-full w-full object-cover object-top"
+                    className="avatar w-full h-full object-cover object-top"
                   />
                 </div>
+              </div>
 
-                <div className="mt-5">
-                  <h3 className="text-2xl font-black tracking-tight text-slate-950">
-                    {selected.name}
-                  </h3>
+              {/* Nome + cargo */}
+              <h2 className="name text-[1.375rem] font-bold text-[#111827] m-0 mb-1 flex items-center justify-center gap-1.5 tracking-tight">
+                <span>{selected.name}</span>
+                <svg className="verified shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="#3B82F6">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                </svg>
+              </h2>
+              <p className="role text-[0.9rem] text-[#6B7280] m-0 mb-4 font-normal">
+                {selected.role}
+              </p>
 
-                  <p className="mt-1 text-sm font-bold text-[#f75142]">
-                    {selected.role}
-                  </p>
+              {/* Badges */}
+              <div className="badges flex flex-wrap gap-2 justify-center mb-[22px]">
+                <span className="badge school inline-flex items-center gap-1.5 text-[0.75rem] font-medium py-1 px-2.5 rounded-full bg-[#FEF2F2] text-[#B91C1C]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
+                    <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L23 9l-11-6z" />
+                  </svg>
+                  <span>{selected.schoolName || "Complexo Escolar Quêssua"}</span>
+                </span>
+                {(selected.subject || selected.department) && (
+                  <span className="badge subject inline-flex items-center gap-1 text-[0.75rem] font-medium py-1 px-2.5 rounded-full bg-[#F0FDF4] text-[#15803D]">
+                    {selected.subject || selected.department}
+                  </span>
+                )}
+              </div>
 
-                  {(selected.department || selected.subject || selected.schoolName) && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {selected.schoolName && (
-                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 px-3 py-1 rounded-lg">
-                          🏫 {selected.schoolName}
-                        </span>
-                      )}
-                      {selected.subject && (
-                        <span className="text-xs font-semibold text-[#f75142] bg-[#f75142]/10 px-3 py-1 rounded-lg">
-                          📚 {selected.subject}
-                        </span>
-                      )}
-                      {selected.presenceRate !== undefined && (
-                        <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg">
-                          ✓ {selected.presenceRate}% Assiduidade
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {(selected.gradeClass || selected.room || selected.location) && (
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Turma & Nível</span>
-                        <span className="font-semibold text-slate-800">
-                          {[selected.gradeClass, selected.turma].filter(Boolean).join(' • ') || 'Ensino Regular'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Sala & Espaço</span>
-                        <span className="font-semibold text-slate-800">
-                          {[selected.room, selected.location].filter(Boolean).join(' - ') || 'Sala Central'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {selected.bio && (
-                    <p className="mt-4 text-sm leading-6 text-slate-600">
-                      {selected.bio}
-                    </p>
-                  )}
-
-                  {(selected.email || selected.phone) && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
-                      {selected.email && (
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{selected.email}</span>
-                        </div>
-                      )}
-                      {selected.phone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{selected.phone}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-6 flex items-center justify-between gap-3">
-                    {selected.profileUrl && (
-                      <a
-                        href={selected.profileUrl}
-                        className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-xs font-bold text-white transition hover:translate-y-[-1px] hover:bg-slate-800 cursor-pointer"
-                      >
-                        Ver perfil completo
-                        <ArrowUpRight className="h-4 w-4" />
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setSelected(null)}
-                      className="ml-auto rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                    >
-                      Fechar
-                    </button>
-                  </div>
+              {/* Stats (estilo imagem 2) */}
+              <div className="stats flex items-center justify-center gap-4 bg-[#F9FAFB] rounded-[16px] py-3.5 px-3 mb-5 border border-slate-100/60">
+                <div className="stat flex flex-col items-center min-w-[70px]">
+                  <span className="stat-value text-[1.05rem] font-bold text-[#111827] leading-tight">
+                    {selected.presenceRate !== undefined ? `${selected.presenceRate}%` : "98%"}
+                  </span>
+                  <span className="stat-label text-[0.7rem] text-[#6B7280] mt-0.5 font-medium">
+                    Assiduidade
+                  </span>
+                </div>
+                <div className="stat-divider w-px h-7 bg-[#E5E7EB]" />
+                <div className="stat flex flex-col items-center min-w-[70px]">
+                  <span className="stat-value text-[1.05rem] font-bold text-[#111827] leading-tight">
+                    {selected.gradeClass || "6ª"}
+                  </span>
+                  <span className="stat-label text-[0.7rem] text-[#6B7280] mt-0.5 font-medium">
+                    {selected.turma ? `Classe • Turma ${selected.turma}` : "Classe • Turma A"}
+                  </span>
+                </div>
+                <div className="stat-divider w-px h-7 bg-[#E5E7EB]" />
+                <div className="stat flex flex-col items-center min-w-[70px]">
+                  <span className="stat-value text-[1.05rem] font-bold text-[#111827] leading-tight">
+                    {selected.room || "Sala 05"}
+                  </span>
+                  <span className="stat-label text-[0.7rem] text-[#6B7280] mt-0.5 font-medium">
+                    {selected.location || "Pavilhão 2"}
+                  </span>
                 </div>
               </div>
+
+              {/* Descrição curta */}
+              <p className="description text-[0.875rem] text-[#4B5563] leading-relaxed m-0 mb-5 text-center">
+                {selected.bio || `Professora com registro oficial ativo. Leciona ${selected.subject || "aulas curriculares"} na 6ª Classe – Turma A.`}
+              </p>
+
+              {/* Contactos */}
+              <div className="contacts flex flex-col gap-2.5 mb-6">
+                <a
+                  href={`mailto:${selected.email || "ana.paula.lourenco@educacao.gov.ao"}`}
+                  className="contact-item flex items-center justify-center gap-2 text-[0.85rem] text-[#374151] hover:text-[#111827] transition-colors no-underline"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-500">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                  <span>{selected.email || "ana.paula.lourenco@educacao.gov.ao"}</span>
+                </a>
+                <a
+                  href={`tel:${(selected.phone || "+244 927 334 550").replace(/\s+/g, "")}`}
+                  className="contact-item flex items-center justify-center gap-2 text-[0.85rem] text-[#374151] hover:text-[#111827] transition-colors no-underline"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-500">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <span>{selected.phone || "+244 927 334 550"}</span>
+                </a>
+              </div>
+
+              {/* CTA */}
+              <button
+                type="button"
+                onClick={() => {
+                  const email = selected.email || "ana.paula.lourenco@educacao.gov.ao";
+                  window.location.href = `mailto:${email}`;
+                }}
+                className="cta-btn w-full bg-[#111827] hover:bg-[#1F2937] active:scale-[0.99] text-white border-0 rounded-[14px] p-3.5 text-[0.95rem] font-semibold cursor-pointer transition-all duration-200 shadow-xs"
+              >
+                Contactar
+              </button>
             </motion.div>
           </div>
         )}

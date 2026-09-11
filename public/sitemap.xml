@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+  <!-- Página Inicial / Landing Page -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- Perguntas Frequentes (FAQ) -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=faq</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Rede Escolar, Mapas e Rotas -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=mapas</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Casos de Sucesso Escolar -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=cases</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Salas Virtuais e Reuniões Zoom/WebRTC -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=reunioes</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Sobre a Plataforma uCore -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=sobre</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Termos de Utilização -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=termos</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <!-- Política de Privacidade -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=privacidade</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <!-- Segurança e Proteção de Dados -->
+  <url>
+    <loc>https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/?page=seguranca</loc>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>

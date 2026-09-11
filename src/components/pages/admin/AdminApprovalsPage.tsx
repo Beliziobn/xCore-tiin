@@ -25,7 +25,12 @@ import {
   AlertCircle,
   GraduationCap,
   Briefcase,
-  BookOpen
+  BookOpen,
+  LayoutGrid,
+  List,
+  FileCheck,
+  Filter,
+  CheckCheck
 } from 'lucide-react';
 import type { 
   PendingApplication, 
@@ -65,6 +70,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'aprovado' | 'rejeitado'>('pendente');
   const [selectedSchoolFilter, setSelectedSchoolFilter] = useState<string>('todas');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
 
   // Approval Modal State
@@ -136,11 +142,17 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
 
   // Metric counts
   const counts = useMemo(() => {
+    const total = applications.length;
+    const pendentes = applications.filter((a) => a.status === 'pendente').length;
+    const aprovados = applications.filter((a) => a.status === 'aprovado').length;
+    const rejeitados = applications.filter((a) => a.status === 'rejeitado').length;
+    const taxaAprovacao = total > 0 ? Math.round((aprovados / total) * 100) : 100;
     return {
-      total: applications.length,
-      pendentes: applications.filter((a) => a.status === 'pendente').length,
-      aprovados: applications.filter((a) => a.status === 'aprovado').length,
-      rejeitados: applications.filter((a) => a.status === 'rejeitado').length,
+      total,
+      pendentes,
+      aprovados,
+      rejeitados,
+      taxaAprovacao,
     };
   }, [applications]);
 
@@ -332,131 +344,155 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
 
   return (
     <div id="admin-approvals-page" className="w-full min-h-screen bg-[#f8f9fb]">
-      {/* Hero Header */}
+      {/* Hero Header with refined typography */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
-        customTitle="Central de Homologação & Inscrições"
-        customSubtitle="Validação central de Diretores de Escola, aprovação de novas contas institucionais e permissões de acesso ao uCore."
-        badge="Administração Municipal"
+        customTitle="Central de Homologações & Credenciação"
+        customSubtitle="Validação de despachos, homologação formal de Diretores de Escola e credenciação de acesso ao ecossistema uCore SIGE."
+        badge="Administração Municipal da Educação"
         breadcrumbs={[
           { label: 'Início', onClick: () => window.location.reload() },
-          { label: 'Administração' },
-          { label: 'Homologação de Inscrições' },
+          { label: 'Administração Municipal' },
+          { label: 'Homologações & Despachos' },
         ]}
         isLoggedIn={isLoggedIn}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 -mt-6 relative z-10">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Pendentes */}
-          <div 
-            onClick={() => setStatusFilter('pendente')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'pendente' 
-                ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-2 ring-amber-500/20' 
-                : 'bg-white border-slate-200/80 hover:border-amber-300'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Diretores Pendentes
-              </span>
-              <span className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
-                <Clock className="w-4 h-4 animate-pulse" />
-              </span>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
+        
+        {/* Executive Summary & Protocol Strip */}
+        <section className="bg-white rounded-2xl border border-slate-200/90 shadow-xs mb-6 overflow-hidden">
+          <div className="p-5 sm:p-6 bg-transparent text-slate-900">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Malanje • Município do Quêssua • Repartição de Quadros</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                  Quadro Oficial de Homologação de Diretores
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
+                  Conforme o Estatuto da Carreira Docente e Dirigente de Angola. Todos os despachos conferem permissão imediata de gestão escolar no SIGE uCore.
+                </p>
+              </div>
+
+              {/* Quick Actions in Header */}
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={loadApplications}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
+                  title="Atualizar lista"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sincronizar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSimModal(true)}
+                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nova Inscrição de Teste</span>
+                </button>
+              </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900">{counts.pendentes}</span>
-              <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                Aguardam Admin
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Candidatos a Diretor em análise</p>
           </div>
 
-          {/* Homologados */}
-          <div 
-            onClick={() => setStatusFilter('aprovado')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'aprovado' 
-                ? 'bg-emerald-500/10 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
-                : 'bg-white border-slate-200/80 hover:border-emerald-300'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Homologados Ativos
-              </span>
-              <span className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
-                <CheckCircle2 className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900">{counts.aprovados}</span>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                Acesso liberado
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Diretores com login e escola ativa</p>
-          </div>
+          {/* Segmented Status Tab Navigation */}
+          <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Status Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('pendente')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === 'pendente'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs ring-2 ring-amber-500/20'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-slate-950" />
+                <span>Pendentes de Homologação</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === 'pendente' ? 'bg-slate-950 text-amber-400' : 'bg-amber-100 text-amber-900'
+                }`}>
+                  {counts.pendentes}
+                </span>
+              </button>
 
-          {/* Indeferidos */}
-          <div 
-            onClick={() => setStatusFilter('rejeitado')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'rejeitado' 
-                ? 'bg-rose-500/10 border-rose-500 shadow-sm ring-2 ring-rose-500/20' 
-                : 'bg-white border-slate-200/80 hover:border-rose-300'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Indeferidos
-              </span>
-              <span className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-700">
-                <XCircle className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900">{counts.rejeitados}</span>
-              <span className="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">
-                Recusados
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Registos não aprovados pelo Admin</p>
-          </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('aprovado')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === 'aprovado'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Homologados & Em Exercício</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === 'aprovado' ? 'bg-white text-emerald-800' : 'bg-emerald-50 text-emerald-800'
+                }`}>
+                  {counts.aprovados}
+                </span>
+              </button>
 
-          {/* Total Histórico */}
-          <div 
-            onClick={() => setStatusFilter('todos')}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'todos' 
-                ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
-                : 'bg-white border-slate-200/80 hover:border-slate-400'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold uppercase tracking-wider ${statusFilter === 'todos' ? 'text-slate-300' : 'text-slate-500'}`}>
-                Total de Solicitações
-              </span>
-              <span className={`w-8 h-8 rounded-full flex items-center justify-center ${statusFilter === 'todos' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                <ShieldCheck className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className={`text-3xl font-black ${statusFilter === 'todos' ? 'text-white' : 'text-slate-900'}`}>{counts.total}</span>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusFilter === 'todos' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
-                Geral
-              </span>
-            </div>
-            <p className={`text-xs mt-1 ${statusFilter === 'todos' ? 'text-slate-400' : 'text-slate-500'}`}>Volume total processado pelo Admin</p>
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('rejeitado')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === 'rejeitado'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Indeferidos</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === 'rejeitado' ? 'bg-white text-rose-800' : 'bg-rose-50 text-rose-800'
+                }`}>
+                  {counts.rejeitados}
+                </span>
+              </button>
 
-        {/* Filter Bar */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('todos')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  statusFilter === 'todos'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                <span>Todos os Registos</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  statusFilter === 'todos' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {counts.total}
+                </span>
+              </button>
+            </div>
+
+            {/* Quick KPI stats inline */}
+            <div className="hidden lg:flex items-center gap-4 text-xs font-medium text-slate-600 border-l border-slate-200/80 pl-4">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Taxa de Conformidade:</span>
+                <span className="font-bold text-emerald-700">{counts.taxaAprovacao}%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Sessão:</span>
+                <span className="font-bold text-slate-800">DME 2026</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Filter & View Switcher Bar */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs mb-6">
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -464,13 +500,15 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Pesquisar por Diretor(a), escola, BI, email ou telefone..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]/30 focus:border-[#f75142] transition-all"
+                placeholder="Pesquisar por Diretor, escola, BI/NIF, e-mail ou contacto..."
+                className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#002133]/20 focus:border-[#002133] transition-all placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Limpar pesquisa"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -478,204 +516,237 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
             </div>
 
             {/* School Filter Dropdown */}
-            <div className="min-w-[200px]">
-              <select
-                value={selectedSchoolFilter}
-                onChange={(e) => setSelectedSchoolFilter(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-              >
-                <option value="todas">Todas as Escolas</option>
-                {schools.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+            <div className="min-w-[220px]">
+              <div className="relative">
+                <select
+                  value={selectedSchoolFilter}
+                  onChange={(e) => setSelectedSchoolFilter(e.target.value)}
+                  className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002133]/20 cursor-pointer appearance-none"
+                >
+                  <option value="todas">Todas as Escolas ({schools.length})</option>
+                  {schools.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <Building2 className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 border border-slate-200 bg-slate-50 p-1 rounded-xl shrink-0">
               <button
                 type="button"
-                onClick={loadApplications}
-                className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
-                title="Atualizar lista"
+                onClick={() => setViewMode('cards')}
+                className={`p-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'cards'
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Modo Dossiê Detalhado"
               >
-                <RefreshCw className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Dossiês</span>
               </button>
               <button
                 type="button"
-                onClick={() => setShowSimModal(true)}
-                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Modo Atas & Despachos"
               >
-                <Plus className="w-4 h-4" />
-                <span>Simular Registo de Diretor</span>
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Atas</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Applications List */}
-        <div className="space-y-4">
-          {filteredApps.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/80">
-              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-4">
-                <CheckCircle2 className="w-7 h-7" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 mb-1">Nenhum pedido de homologação encontrado</h3>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                Não existem candidaturas de Diretor pendentes com os filtros atuais.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('todos');
-                  setSelectedSchoolFilter('todas');
-                  setSearchQuery('');
-                }}
-                className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                Limpar Filtros
-              </button>
+        {/* Empty State */}
+        {filteredApps.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/90 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-4">
+              <CheckCircle2 className="w-7 h-7" />
             </div>
-          ) : (
-            filteredApps.map((app) => {
+            <h3 className="text-base font-bold text-slate-900 mb-1">Nenhum registo de homologação encontrado</h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+              Não existem pedidos com os filtros ativos. Tente selecionar outro estado ou limpar o campo de busca.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('todos');
+                setSelectedSchoolFilter('todas');
+                setSearchQuery('');
+              }}
+              className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+            >
+              Limpar Filtros de Busca
+            </button>
+          </div>
+        ) : viewMode === 'cards' ? (
+          /* Cards View - Clean, High Scannability */
+          <div className="space-y-4">
+            {filteredApps.map((app) => {
               const isPending = app.status === 'pendente';
               const isApproved = app.status === 'aprovado';
               const isRejected = app.status === 'rejeitado';
 
               return (
-                <div
+                <article
                   key={app.id}
-                  className={`bg-white rounded-2xl p-5 sm:p-6 border transition-all shadow-xs ${
+                  className={`bg-white rounded-2xl p-5 sm:p-6 border transition-all duration-200 shadow-xs ${
                     isPending
-                      ? 'border-amber-200/90 hover:border-amber-400 hover:shadow-md'
+                      ? 'border-amber-200/80 hover:border-amber-400 hover:shadow-md'
                       : isApproved
-                      ? 'border-slate-200/80 hover:border-emerald-300'
-                      : 'border-slate-200/80 opacity-75'
+                      ? 'border-slate-200 hover:border-emerald-300 hover:shadow-xs'
+                      : 'border-slate-200/70 opacity-80'
                   }`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                    {/* Left: Avatar & Candidate Info */}
+                    
+                    {/* Candidate Identity Column */}
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-[#002133] flex items-center justify-center text-white font-black text-sm shrink-0">
-                        {app.fullName.charAt(0)}
+                      {/* Avatar with Status Pin */}
+                      <div className="relative shrink-0">
+                        <div className="w-13 h-13 rounded-2xl bg-[#002133] text-white font-bold text-base flex items-center justify-center shadow-xs">
+                          {app.fullName.charAt(0)}
+                        </div>
+                        {isPending && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 border-2 border-white ring-1 ring-amber-300 animate-pulse" />
+                        )}
+                        {isApproved && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" />
+                        )}
+                        {isRejected && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white" />
+                        )}
                       </div>
 
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <h4 className="text-base font-bold text-slate-950">{app.fullName}</h4>
-                          
-                          {/* Role Tag */}
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-slate-100 text-slate-800 border border-slate-200">
-                            {app.roleRequested || 'Diretor de Escola'}
+                      <div className="space-y-1">
+                        {/* Name, Role & Status Chips */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                            {app.fullName}
+                          </h3>
+
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200/80">
+                            {app.roleRequested || 'Diretor Geral'}
                           </span>
 
-                          {/* Status Tag */}
                           {isPending && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                              Aguardando Homologação do Admin
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              Aguardando Despacho
                             </span>
                           )}
+
                           {isApproved && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               Homologado Oficialmente
                             </span>
                           )}
+
                           {isRejected && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200">
                               <XCircle className="w-3 h-3 text-rose-600" />
                               Indeferido
                             </span>
                           )}
                         </div>
 
-                        {/* Details grid */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1.5">
-                          <span className="flex items-center gap-1 font-mono text-slate-700">
-                            <span className="font-sans text-slate-400 font-semibold">BI:</span> {app.biNumber}
+                        {/* Institution, BI & Contacts Grid */}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 pt-1">
+                          <span className="flex items-center gap-1.5 font-bold text-slate-900">
+                            <Building2 className="w-3.5 h-3.5 text-[#f75142]" />
+                            {app.schoolName}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Mail className="w-3 h-3 text-slate-400" /> {app.email}
+                          <span className="font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-[11px]">
+                            BI: {app.biNumber}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="w-3 h-3 text-slate-400" /> {app.phone}
+                          <span className="flex items-center gap-1 text-slate-500">
+                            <Mail className="w-3 h-3 text-slate-400" />
+                            {app.email}
                           </span>
-                          <span className="flex items-center gap-1 font-bold text-slate-800">
-                            <Building2 className="w-3.5 h-3.5 text-[#f75142]" /> {app.schoolName}
+                          <span className="flex items-center gap-1 text-slate-500">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            {app.phone}
                           </span>
                         </div>
 
-                        {/* Pre-registration validation note */}
-                        <div className="mt-2.5 flex items-center gap-2">
+                        {/* Origin of Candidate */}
+                        <div className="pt-2 flex items-center gap-2">
                           {app.isPreRegistered ? (
-                            <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-200/70">
-                              <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>{app.preRegisteredDetails || 'Pré-cadastro de Direção localizado nos registros municipais.'}</span>
+                            <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200/80">
+                              <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+                              <span>{app.preRegisteredDetails || 'Consta na portaria prévia da Direção Municipal da Educação.'}</span>
                             </div>
                           ) : (
-                            <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
-                              <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                              <span>Candidatura externa. Requer validação de portaria/despacho ministerial.</span>
+                            <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200">
+                              <FileText className="w-3 h-3 text-slate-500 shrink-0" />
+                              <span>Candidatura externa. Requer conferência do despacho físico de nomeação.</span>
                             </div>
                           )}
                         </div>
 
-                        {/* Complementary Data Badges if available */}
+                        {/* Complementary Qualifications Stats (if available) */}
                         {(app.nivelAcademico || typeof app.anosServico === 'number' || app.regimeTrabalho || app.documentosConferidosPresencialmente) && (
-                          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]">
+                          <div className="pt-2 flex flex-wrap items-center gap-2 text-[11px]">
                             {app.nivelAcademico && (
-                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200/80 px-2.5 py-0.5 rounded-lg font-medium">
-                                <GraduationCap className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span className="inline-flex items-center gap-1 bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-md font-medium">
+                                <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
                                 <span>{app.nivelAcademico}</span>
                               </span>
                             )}
                             {typeof app.anosServico === 'number' && (
-                              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-900 border border-blue-200/80 px-2.5 py-0.5 rounded-lg font-medium">
-                                <Briefcase className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                <span>{app.anosServico} {app.anosServico === 1 ? 'ano' : 'anos'} de serviço</span>
+                              <span className="inline-flex items-center gap-1 bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-md font-medium">
+                                <Briefcase className="w-3.5 h-3.5 text-slate-500" />
+                                <span>{app.anosServico} {app.anosServico === 1 ? 'ano' : 'anos'} serviço</span>
                               </span>
                             )}
                             {app.regimeTrabalho && (
-                              <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-900 border border-purple-200/80 px-2.5 py-0.5 rounded-lg font-medium">
+                              <span className="inline-flex items-center gap-1 bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-md font-medium">
                                 <span>Regime: {app.regimeTrabalho}</span>
                               </span>
                             )}
                             {app.documentosConferidosPresencialmente && (
-                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-0.5 rounded-lg font-medium">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span>Docs em mãos conferidos</span>
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-md font-medium">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Docs conferidos</span>
                               </span>
                             )}
                           </div>
                         )}
 
-                        {/* Approval or Rejection details */}
+                        {/* Approval signature details */}
                         {isApproved && (
-                          <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
-                            <span>Homologado por <strong className="text-slate-800">{app.approvedBy}</strong> em {app.approvedAt || '11/09/2026'}</span>
+                          <div className="text-[11px] text-slate-500 pt-1 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span>Despacho assinado por <strong>{app.approvedBy}</strong> em {app.approvedAt || '11/09/2026'}</span>
                           </div>
                         )}
                         {isRejected && app.rejectionReason && (
-                          <div className="text-[11px] text-rose-700 bg-rose-50 p-2 rounded-lg mt-2 border border-rose-200">
+                          <div className="text-[11px] text-rose-800 bg-rose-50/90 p-2 rounded-lg border border-rose-200 mt-2">
                             <strong>Motivo do indeferimento:</strong> {app.rejectionReason}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex flex-wrap items-center gap-2 self-end lg:self-center shrink-0">
+                    {/* Action Group */}
+                    <div className="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0 pt-2 lg:pt-0">
                       <button
                         type="button"
                         onClick={() => setSelectedApp(app)}
-                        className="px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                        title="Ver dados institucionais"
+                        className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Ver Ficha</span>
+                        <Eye className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Ver Dossiê</span>
                       </button>
 
                       {isPending && (
@@ -683,7 +754,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenReject(app)}
-                            className="px-3 py-2 rounded-xl text-xs font-bold border border-rose-200 text-rose-700 hover:bg-rose-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold border border-rose-200 text-rose-700 hover:bg-rose-50 transition-colors flex items-center gap-1.5 cursor-pointer"
                           >
                             <UserX className="w-3.5 h-3.5" />
                             <span>Indeferir</span>
@@ -700,15 +771,112 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                         </>
                       )}
                     </div>
+
                   </div>
-                </div>
+                </article>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        ) : (
+          /* Table View - Clean Municipal Ledger / Livro de Atas */
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th scope="col" className="px-4 py-3.5">Candidato / Cargo</th>
+                    <th scope="col" className="px-4 py-3.5">Escola Afeta</th>
+                    <th scope="col" className="px-4 py-3.5">Identificação</th>
+                    <th scope="col" className="px-4 py-3.5">Habilitações</th>
+                    <th scope="col" className="px-4 py-3.5">Estado do Pedido</th>
+                    <th scope="col" className="px-4 py-3.5 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredApps.map((app) => {
+                    const isPending = app.status === 'pendente';
+                    const isApproved = app.status === 'aprovado';
+                    const isRejected = app.status === 'rejeitado';
+
+                    return (
+                      <tr key={app.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-[#002133] text-white font-bold flex items-center justify-center shrink-0">
+                              {app.fullName.charAt(0)}
+                            </div>
+                            <div>
+                              <strong className="block text-slate-900 font-bold">{app.fullName}</strong>
+                              <span className="text-[10px] text-slate-500">{app.roleRequested || 'Diretor(a) Geral'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 font-semibold text-slate-800">
+                          {app.schoolName}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className="font-mono text-slate-700 font-medium">{app.biNumber}</span>
+                          <span className="block text-[10px] text-slate-400">{app.phone}</span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className="text-slate-800 font-medium">{app.nivelAcademico || 'Licenciado'}</span>
+                          <span className="block text-[10px] text-slate-500">{app.regimeTrabalho || 'Efectivo'}</span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {isPending && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
+                              <Clock className="w-2.5 h-2.5 text-amber-600" />
+                              Pendente
+                            </span>
+                          )}
+                          {isApproved && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                              Homologado
+                            </span>
+                          )}
+                          {isRejected && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200">
+                              <XCircle className="w-2.5 h-2.5 text-rose-600" />
+                              Indeferido
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedApp(app)}
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Ver Ficha"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            {isPending && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprove(app)}
+                                className="px-2.5 py-1.5 rounded-lg bg-[#002133] hover:bg-slate-900 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                                title="Homologar"
+                              >
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span>Homologar</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </main>
 
-      {/* APPROVE MODAL */}
+      {/* APPROVE MODAL - Refined Structure */}
       {isApproveModalOpen && appToApprove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
@@ -731,6 +899,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsApproveModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
               >
@@ -763,7 +932,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               </div>
 
               {/* SECTION 1: Nomeação Institucional & Escola */}
-              <div className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3">
+              <div className="p-3.5 bg-blue-50/40 rounded-xl border border-blue-100 space-y-3">
                 <div className="flex items-center gap-2 font-bold text-blue-900 text-xs">
                   <Building2 className="w-4 h-4 text-blue-700" />
                   <span>1. Nomeação Institucional e Afetação Escolar</span>
@@ -776,7 +945,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   <select
                     value={targetSchoolName}
                     onChange={(e) => setTargetSchoolName(e.target.value)}
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#002133]"
                   >
                     {schools.map((s) => (
                       <option key={s.id} value={s.name}>
@@ -796,7 +965,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       value={dispatchNumber}
                       onChange={(e) => setDispatchNumber(e.target.value)}
                       placeholder="Ex.: Despacho nº 104/DME/2026"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     />
                   </div>
                   <div>
@@ -807,14 +976,14 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       type="number"
                       value={appointmentYear}
                       onChange={(e) => setAppointmentYear(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* SECTION 2: Dados Complementares de Enquadramento com Documentos em Mãos */}
-              <div className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200/90 space-y-3">
+              {/* SECTION 2: Dados Complementares de Enquadramento */}
+              <div className="p-3.5 bg-amber-50/50 rounded-xl border border-amber-200/90 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 font-bold text-amber-950 text-xs">
                     <GraduationCap className="w-4 h-4 text-amber-700" />
@@ -826,7 +995,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </div>
 
                 <p className="text-[11px] text-amber-900/80">
-                  Preencha os campos abaixo com os documentos físicos originais apresentados pelo candidato para registo cadastral imediato e emissão de credenciais no SIGE.
+                  Preencha os campos com os documentos físicos originais apresentados pelo candidato para registo cadastral imediato e emissão de credenciais no SIGE.
                 </p>
 
                 {/* Nível Académico & Outro */}
@@ -838,7 +1007,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                     <select
                       value={nivelAcademico}
                       onChange={(e) => setNivelAcademico(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     >
                       <option value="Licenciado">Licenciado</option>
                       <option value="Bacharelato">Bacharelato</option>
@@ -861,7 +1030,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                         value={nivelAcademicoOutro}
                         onChange={(e) => setNivelAcademicoOutro(e.target.value)}
                         placeholder="Ex.: Especialização Internacional"
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#002133]"
                       />
                     </div>
                   ) : (
@@ -872,7 +1041,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       <select
                         value={regimeTrabalho}
                         onChange={(e) => setRegimeTrabalho(e.target.value)}
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#002133]"
                       >
                         <option value="Efectivo">Efectivo (Quadro Definitivo MED)</option>
                         <option value="Em comissão de serviço">Em comissão de serviço</option>
@@ -921,7 +1090,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       max={50}
                       value={anosServico}
                       onChange={(e) => setAnosServico(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-center text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-center text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     />
                     <button
                       type="button"
@@ -942,7 +1111,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                     <select
                       value={classificacaoPedagogica}
                       onChange={(e) => setClassificacaoPedagogica(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     >
                       <option value="Com magistério e com IMNE completo">Com magistério e com IMNE completo</option>
                       <option value="Com magistério e sem IMNE">Com magistério e sem IMNE</option>
@@ -960,7 +1129,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       value={especialidadeCurso}
                       onChange={(e) => setEspecialidadeCurso(e.target.value)}
                       placeholder="Ex.: Gestão e Administração Escolar"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     />
                   </div>
                 </div>
@@ -976,7 +1145,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       value={numeroCertificadoDiploma}
                       onChange={(e) => setNumeroCertificadoDiploma(e.target.value)}
                       placeholder="Ex.: DIP-MED-2018/88921"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     />
                   </div>
                   <div>
@@ -988,7 +1157,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       value={numeroMecanograficoOuNif}
                       onChange={(e) => setNumeroMecanograficoOuNif(e.target.value)}
                       placeholder="Ex.: MEC-008921 ou NIF oficial"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     />
                   </div>
                 </div>
@@ -1003,7 +1172,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                       type="date"
                       value={dataInicioFuncoes}
                       onChange={(e) => setDataInicioFuncoes(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#002133]"
                     />
                   </div>
 
@@ -1033,7 +1202,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   value={approvalNotes}
                   onChange={(e) => setApprovalNotes(e.target.value)}
                   placeholder="Ex.: Processo conferido de acordo com o estatuto dos agentes da Educação. Apto para início de exercício funcional."
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#002133]"
                 />
               </div>
 
@@ -1090,8 +1259,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsRejectModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1115,7 +1285,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               <button
                 type="button"
                 onClick={() => setIsRejectModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
               >
                 Voltar
               </button>
@@ -1123,7 +1293,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 type="button"
                 disabled={!rejectReason.trim() || isSubmitting}
                 onClick={handleConfirmReject}
-                className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl shadow-xs"
+                className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl shadow-xs cursor-pointer"
               >
                 {isSubmitting ? 'A registar...' : 'Confirmar Indeferimento'}
               </button>
@@ -1132,110 +1302,119 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
         </div>
       )}
 
-      {/* DETAIL MODAL */}
+      {/* DETAIL MODAL (Dossiê Institucional) */}
       {selectedApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                  <FileText className="w-5 h-5" />
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+                  <FileCheck className="w-5 h-5 text-amber-300" />
                 </span>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Ficha Institucional do Candidato</h3>
-                  <p className="text-xs text-slate-500">ID: {selectedApp.id}</p>
+                  <h3 className="text-base font-bold text-slate-900">Dossiê Institucional do Candidato</h3>
+                  <p className="text-xs text-slate-500">Registo Oficial nº {selectedApp.id}</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedApp(null)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-3 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl space-y-2 border border-slate-200">
+            <div className="mt-4 space-y-3 text-xs max-h-[70vh] overflow-y-auto pr-1">
+              <div className="p-3.5 bg-slate-50 rounded-xl space-y-2.5 border border-slate-200">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Nome:</span>
-                  <span className="font-bold text-slate-900">{selectedApp.fullName}</span>
+                  <span className="text-slate-500 font-medium">Nome Completo:</span>
+                  <span className="font-bold text-slate-900 text-right">{selectedApp.fullName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Cargo Pretendido:</span>
-                  <span className="font-bold text-slate-900">{selectedApp.roleRequested || 'Diretor Geral'}</span>
+                  <span className="text-slate-500 font-medium">Cargo Pretendido:</span>
+                  <span className="font-bold text-slate-900 text-right">{selectedApp.roleRequested || 'Diretor Geral'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Nº do BI:</span>
-                  <span className="font-mono font-bold text-slate-900">{selectedApp.biNumber}</span>
+                  <span className="text-slate-500 font-medium">Nº do BI / NIF:</span>
+                  <span className="font-mono font-bold text-slate-900 text-right">{selectedApp.biNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Escola Destinada:</span>
-                  <span className="text-slate-900">{selectedApp.schoolName}</span>
+                  <span className="text-slate-500 font-medium">Escola Afeta:</span>
+                  <span className="font-bold text-slate-900 text-right">{selectedApp.schoolName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">E-mail:</span>
-                  <span className="text-slate-900">{selectedApp.email}</span>
+                  <span className="text-slate-500 font-medium">E-mail:</span>
+                  <span className="text-slate-900 text-right">{selectedApp.email}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Telefone:</span>
-                  <span className="text-slate-900">{selectedApp.phone}</span>
+                  <span className="text-slate-500 font-medium">Telefone:</span>
+                  <span className="text-slate-900 text-right">{selectedApp.phone}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Data do Pedido:</span>
-                  <span className="text-slate-900">{selectedApp.createdAt}</span>
+                  <span className="text-slate-500 font-medium">Data de Submissão:</span>
+                  <span className="text-slate-900 text-right">{selectedApp.createdAt}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Situação:</span>
-                  <span className="font-bold capitalize text-slate-900">{selectedApp.status}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Situação Atual:</span>
+                  <span className={`px-2.5 py-0.5 rounded-full font-bold capitalize text-[11px] ${
+                    selectedApp.status === 'aprovado'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : selectedApp.status === 'pendente'
+                      ? 'bg-amber-50 text-amber-900 border border-amber-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}>
+                    {selectedApp.status === 'aprovado' ? 'Homologado' : selectedApp.status}
+                  </span>
                 </div>
               </div>
 
               {/* Complementary data if available */}
               {(selectedApp.nivelAcademico || typeof selectedApp.anosServico === 'number' || selectedApp.regimeTrabalho) && (
-                <div className="p-3 bg-amber-50/70 rounded-xl space-y-2 border border-amber-200 text-xs">
+                <div className="p-3.5 bg-amber-50/70 rounded-xl space-y-2 border border-amber-200 text-xs">
                   <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
                     <GraduationCap className="w-4 h-4 text-amber-700" />
                     <span>Dados de Enquadramento Oficial (Conferidos pelo Administrador)</span>
                   </div>
                   {selectedApp.nivelAcademico && (
                     <div className="flex justify-between">
-                      <span className="text-amber-800">Nível Académico:</span>
+                      <span className="text-amber-800 font-medium">Nível Académico:</span>
                       <strong className="text-amber-950">{selectedApp.nivelAcademico}</strong>
                     </div>
                   )}
                   {typeof selectedApp.anosServico === 'number' && (
                     <div className="flex justify-between">
-                      <span className="text-amber-800">Tempo de Serviço:</span>
+                      <span className="text-amber-800 font-medium">Tempo de Serviço:</span>
                       <strong className="text-amber-950">{selectedApp.anosServico} anos</strong>
                     </div>
                   )}
                   {selectedApp.regimeTrabalho && (
                     <div className="flex justify-between">
-                      <span className="text-amber-800">Regime de Trabalho:</span>
+                      <span className="text-amber-800 font-medium">Regime de Trabalho:</span>
                       <strong className="text-amber-950">{selectedApp.regimeTrabalho}</strong>
                     </div>
                   )}
                   {selectedApp.classificacaoPedagogica && (
                     <div className="flex justify-between">
-                      <span className="text-amber-800">Classif. Pedagógica:</span>
+                      <span className="text-amber-800 font-medium">Classif. Pedagógica:</span>
                       <span className="text-amber-950 font-medium text-right max-w-[220px]">{selectedApp.classificacaoPedagogica}</span>
                     </div>
                   )}
                   {selectedApp.especialidadeCurso && (
                     <div className="flex justify-between">
-                      <span className="text-amber-800">Especialidade / Curso:</span>
+                      <span className="text-amber-800 font-medium">Especialidade / Curso:</span>
                       <span className="text-amber-950 font-medium text-right max-w-[220px]">{selectedApp.especialidadeCurso}</span>
                     </div>
                   )}
                   {selectedApp.numeroCertificadoDiploma && (
                     <div className="flex justify-between">
-                      <span className="text-amber-800">Diploma / Certificado:</span>
+                      <span className="text-amber-800 font-medium">Diploma / Certificado:</span>
                       <span className="font-mono text-amber-950 font-semibold">{selectedApp.numeroCertificadoDiploma}</span>
                     </div>
                   )}
                   {selectedApp.numeroMecanograficoOuNif && (
                     <div className="flex justify-between">
-                      <span className="text-amber-800">Mecanográfico / NIF:</span>
+                      <span className="text-amber-800 font-medium">Mecanográfico / NIF:</span>
                       <span className="font-mono text-amber-950 font-semibold">{selectedApp.numeroMecanograficoOuNif}</span>
                     </div>
                   )}
@@ -1249,14 +1428,14 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               )}
 
               {selectedApp.notes && (
-                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
-                  <span className="font-bold text-amber-900 block mb-1">Notas e Despacho:</span>
-                  <p className="text-amber-800">{selectedApp.notes}</p>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="font-bold text-slate-800 block mb-1">Notas e Despacho:</span>
+                  <p className="text-slate-600 leading-relaxed">{selectedApp.notes}</p>
                 </div>
               )}
             </div>
 
-            <div className="mt-6 flex items-center justify-between gap-2">
+            <div className="mt-6 flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
               <div>
                 {selectedApp.status === 'pendente' && (
                   <button
@@ -1300,8 +1479,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowSimModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1317,7 +1497,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   value={simName}
                   onChange={(e) => setSimName(e.target.value)}
                   placeholder="Ex: Dr. Bernardo Catumbela"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#002133]"
                 />
               </div>
 
@@ -1357,7 +1537,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               <button
                 type="button"
                 onClick={() => setShowSimModal(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
               >
                 Cancelar
               </button>
@@ -1365,7 +1545,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 type="button"
                 disabled={!simName.trim()}
                 onClick={handleSimulateDirector}
-                className="px-5 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl shadow-xs"
+                className="px-5 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl shadow-xs cursor-pointer"
               >
                 Criar Inscrição
               </button>

@@ -52,6 +52,7 @@ interface SupportChatModalProps {
       url: string;
     }
   ) => void;
+  onStartCall?: (roomId: string, title: string, isVideo: boolean) => void;
 }
 
 // Gentle Web Audio synthesizers for iconic Messenger sounds
@@ -101,6 +102,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
   channels,
   messages,
   onSendMessage,
+  onStartCall,
 }) => {
   // 1. DETERMINE CURRENT USER'S SCHOOL (SCHOOL ISOLATION)
   // The user can ONLY see people from their school. No interaction with other schools.
@@ -638,16 +640,38 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               {/* Action Buttons */}
               <div className="flex items-center gap-1 text-[#f75142]">
                 <button
-                  onClick={() => setActiveCallType('audio')}
+                  type="button"
+                  onClick={() => {
+                    if (onStartCall) {
+                      onStartCall(
+                        `call-${activeChannel.id}`,
+                        `Chamada de Voz • ${activeChannel.name}`,
+                        false
+                      );
+                    } else {
+                      setActiveCallType('audio');
+                    }
+                  }}
                   className="p-2 hover:bg-[#F0F2F5] rounded-full transition-colors cursor-pointer"
-                  title="Chamada de voz da escola"
+                  title="Iniciar chamada de voz funcional em tempo real"
                 >
                   <Phone className="w-5 h-5 fill-current" />
                 </button>
                 <button
-                  onClick={() => setActiveCallType('video')}
+                  type="button"
+                  onClick={() => {
+                    if (onStartCall) {
+                      onStartCall(
+                        `call-${activeChannel.id}`,
+                        `Chamada de Vídeo • ${activeChannel.name}`,
+                        true
+                      );
+                    } else {
+                      setActiveCallType('video');
+                    }
+                  }}
                   className="p-2 hover:bg-[#F0F2F5] rounded-full transition-colors cursor-pointer"
-                  title="Chamada de vídeo da escola"
+                  title="Iniciar chamada de vídeo funcional em tempo real"
                 >
                   <Video className="w-5 h-5 fill-current" />
                 </button>
@@ -663,28 +687,48 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               </div>
             </div>
 
-            {/* Audio/Video Call Mock */}
+            {/* Audio/Video Active Call Strip */}
             {activeCallType && (
               <div className="bg-gradient-to-r from-[#002133] to-[#0a354f] text-white p-3 px-4 flex items-center justify-between gap-3 animate-in slide-in-from-top-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center animate-pulse">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-pulse border border-emerald-500/30">
                     {activeCallType === 'audio' ? <Phone className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold">
-                      {activeCallType === 'audio' ? 'Chamada de Voz da Escola' : 'Chamada de Vídeo Escolar'}
+                    <h4 className="text-xs font-bold flex items-center gap-2">
+                      <span>{activeCallType === 'audio' ? 'Chamada de Voz em Tempo Real' : 'Chamada de Vídeo ao Vivo'}</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                     </h4>
                     <p className="text-[11px] text-[#fee4e2]">
-                      Conectando aos docentes de {userSchoolName}...
+                      Transmissão WebRTC ativa com docentes de {userSchoolName}...
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setActiveCallType(null)}
-                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold cursor-pointer transition-all"
-                >
-                  Desligar
-                </button>
+                <div className="flex items-center gap-2">
+                  {onStartCall && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onStartCall(
+                          `call-${activeChannel.id}`,
+                          `Chamada de ${activeCallType === 'video' ? 'Vídeo' : 'Voz'} • ${activeChannel.name}`,
+                          activeCallType === 'video'
+                        );
+                        setActiveCallType(null);
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-bold cursor-pointer transition-all shadow-xs"
+                    >
+                      Ecrã Zoom
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveCallType(null)}
+                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold cursor-pointer transition-all"
+                  >
+                    Desligar
+                  </button>
+                </div>
               </div>
             )}
 

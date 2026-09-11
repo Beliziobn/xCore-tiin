@@ -1,7 +1,9 @@
 import express from "express";
+import http from "http";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import { setupSignalingServer, getRoomsList, createOrGetRoom } from "./server/signaling";
 
 dotenv.config();
 
@@ -15,6 +17,45 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
+
+  // Active Real-time Video/Audio Meeting Rooms
+  app.get("/api/meetings/rooms", (req, res) => {
+    res.json({ success: true, rooms: getRoomsList() });
+  });
+
+  app.post("/api/meetings/rooms", (req, res) => {
+    const { id, title, hostName, schoolName } = req.body;
+    const roomId = id || `ucore-meet-${Math.random().toString(36).substring(2, 8)}`;
+    const room = createOrGetRoom(roomId, title, hostName, schoolName);
+    res.json({
+      success: true,
+      room: {
+        id: room.id,
+        title: room.title,
+        hostName: room.hostName,
+        schoolName: room.schoolName,
+        createdAt: room.createdAt,
+        participantCount: room.participants.size,
+      },
+    });
+  });
+
+  // SEO files: robots.txt and sitemap.xml
+  app.get("/robots.txt", (req, res) => {
+    res.type("text/plain");
+    res.sendFile(path.join(process.cwd(), "public", "robots.txt"));
+  });
+
+  app.get("/sitemap.xml", (req, res) => {
+    res.type("application/xml");
+    res.sendFile(path.join(process.cwd(), "public", "sitemap.xml"));
+  });
+
+  // Create HTTP server for both Express and WebSocket upgrades
+  const httpServer = http.createServer(app);
+
+  // Setup WebSocket signaling server for WebRTC Video & Audio calls
+  setupSignalingServer(httpServer);
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {
@@ -31,8 +72,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server with WebRTC signaling running on http://0.0.0.0:${PORT}`);
   });
 }
 

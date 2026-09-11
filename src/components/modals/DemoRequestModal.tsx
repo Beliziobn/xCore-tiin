@@ -19,12 +19,14 @@ interface DemoRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStartDemoSession: (role?: 'diretor' | 'admin' | 'professor') => void;
+  onOpenThankYouPage?: (details: { recipientName: string; schoolName: string; userEmail: string; referenceCode: string }) => void;
 }
 
 export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({
   isOpen,
   onClose,
   onStartDemoSession,
+  onOpenThankYouPage,
 }) => {
   const [submitted, setSubmitted] = useState(false);
   const [formData, setFormData] = useState({
@@ -294,12 +296,35 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({
                   handleReset();
                   onStartDemoSession('diretor');
                 }}
-                className="w-full py-3 px-4 rounded-xl bg-[#002133] hover:bg-[#001726] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+                className="w-full py-3 px-4 rounded-xl bg-[#002133] hover:bg-[#001726] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mb-2.5"
               >
                 <GraduationCap className="w-4 h-4 text-[#f75142]" />
                 <span>Entrar no Sistema como Diretor(a) (Demo)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+
+              {onOpenThankYouPage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const recipient = formData.nome || 'Gestor Escolar';
+                    const school = formData.escola || 'Instituição de Ensino';
+                    const email = formData.email || 'contato@escola.ao';
+                    const ref = `DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
+                    handleReset();
+                    onOpenThankYouPage({
+                      recipientName: recipient,
+                      schoolName: school,
+                      userEmail: email,
+                      referenceCode: ref,
+                    });
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Ver Comprovativo Oficial (Página de Obrigado)</span>
+                </button>
+              )}
             </div>
 
             <div className="mt-6">

@@ -7,6 +7,9 @@ interface CloudFooterProps {
   onOpenPrivacy?: () => void;
   onOpenSecurity?: () => void;
   onOpenCookieSettings?: () => void;
+  onOpenCases?: () => void;
+  onOpenFAQ?: () => void;
+  onOpenMaps?: () => void;
   onOpenSupport: () => void;
   onSupport?: () => void;
 }
@@ -17,12 +20,18 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
   onOpenPrivacy,
   onOpenSecurity,
   onOpenCookieSettings,
+  onOpenCases,
+  onOpenFAQ,
+  onOpenMaps,
   onSupport,
   onOpenSupport,
 }) => {
   const handleSupport = onOpenSupport || onSupport;
   const handlePrivacy = onOpenPrivacy || onOpenTerms;
   const handleSecurity = onOpenSecurity || onOpenAbout;
+  const handleCases = onOpenCases || onOpenAbout;
+  const handleFAQ = onOpenFAQ || onOpenAbout;
+  const handleMaps = onOpenMaps || onOpenAbout;
   const handleCookies = () => {
     if (onOpenCookieSettings) {
       onOpenCookieSettings();
@@ -119,6 +128,36 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
                   >
                     <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
                     <span className="font-medium">Sobre a Plataforma</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    id="footer-link-casos-sucesso"
+                    onClick={handleCases}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-[#002133] group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium text-white">Casos de Sucesso Escolar</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    id="footer-link-mapas-rotas"
+                    onClick={handleMaps}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-white/70 group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium text-white">Mapa de Escolas & Rotas</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    id="footer-link-faq"
+                    onClick={handleFAQ}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-white/70 group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium text-white">Perguntas Frequentes (FAQ)</span>
                   </button>
                 </li>
                 <li>

@@ -650,5 +650,197 @@ html.lenis.lenis-stopped {
   opacity: 8%;
 }
 
+/* ---------- Profile Modal Card (School Team Profile) ---------- */
+.profile-modal {
+  width: 100%;
+  max-width: 380px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 32px 28px 28px;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.12);
+  position: relative;
+  text-align: center;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Botão fechar */
+.profile-modal .close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #F3F4F6;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-modal .close-btn:hover {
+  background: #E5E7EB;
+  color: #111827;
+}
+
+/* Avatar */
+.profile-modal .avatar-wrapper {
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.profile-modal .avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Nome */
+.profile-modal .name {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.profile-modal .verified {
+  flex-shrink: 0;
+}
+
+.profile-modal .role {
+  font-size: 0.9rem;
+  color: #6B7280;
+  margin: 0 0 16px;
+}
+
+/* Badges */
+.profile-modal .badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.profile-modal .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 999px;
+}
+
+.profile-modal .badge.school {
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.profile-modal .badge.subject {
+  background: #F0FDF4;
+  color: #15803D;
+}
+
+/* Stats (estilo da imagem 2) */
+.profile-modal .stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #F9FAFB;
+  border-radius: 16px;
+  padding: 14px 12px;
+  margin-bottom: 20px;
+}
+
+.profile-modal .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 70px;
+}
+
+.profile-modal .stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.profile-modal .stat-label {
+  font-size: 0.7rem;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+.profile-modal .stat-divider {
+  width: 1px;
+  height: 28px;
+  background: #E5E7EB;
+}
+
+/* Descrição */
+.profile-modal .description {
+  font-size: 0.875rem;
+  color: #4B5563;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+/* Contactos */
+.profile-modal .contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.profile-modal .contact-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #374151;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.profile-modal .contact-item:hover {
+  color: #111827;
+}
+
+/* CTA */
+.profile-modal .cta-btn {
+  width: 100%;
+  background: #111827;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-modal .cta-btn:hover {
+  background: #1F2937;
+  transform: translateY(-1px);
+}
+
+
 
 
