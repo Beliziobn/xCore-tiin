@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 
 interface SectionShaderProps {
-  variant?: 'coral' | 'subtle';
+  id?: string;
+  variant?: 'coral' | 'subtle' | 'amber';
   className?: string;
 }
 
 export const SectionShader: React.FC<SectionShaderProps> = ({
+  id = 'headerShader',
   variant = 'coral',
   className = '',
 }) => {
@@ -205,6 +207,8 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
           ctx.strokeStyle =
             variant === 'coral'
               ? `rgba(255, 255, 255, ${rip.alpha * 0.45})`
+              : variant === 'amber'
+              ? `rgba(245, 158, 11, ${rip.alpha * 0.45})`
               : `rgba(247, 81, 66, ${rip.alpha * 0.35})`;
           ctx.lineWidth = 1.5;
           ctx.stroke();
@@ -263,6 +267,8 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
               ctx.fillStyle =
                 variant === 'coral'
                   ? `rgba(255, 217, 196, ${trailInfluence * 0.5})`
+                  : variant === 'amber'
+                  ? `rgba(253, 230, 138, ${trailInfluence * 0.55})`
                   : `rgba(247, 81, 66, ${trailInfluence * 0.35})`;
               ctx.fill();
 
@@ -272,6 +278,8 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
               ctx.fillStyle =
                 variant === 'coral'
                   ? `rgba(255, 255, 255, ${glowAlpha})`
+                  : variant === 'amber'
+                  ? `rgba(245, 158, 11, ${Math.min(0.95, glowAlpha * 1.35)})`
                   : `rgba(247, 81, 66, ${Math.min(0.9, glowAlpha)})`;
               ctx.fill();
             } else {
@@ -294,6 +302,10 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
             auraGrad.addColorStop(0, 'rgba(255, 225, 205, 0.18)');
             auraGrad.addColorStop(0.5, 'rgba(255, 180, 150, 0.08)');
             auraGrad.addColorStop(1, 'rgba(242, 89, 60, 0)');
+          } else if (variant === 'amber') {
+            auraGrad.addColorStop(0, 'rgba(245, 158, 11, 0.13)');
+            auraGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.04)');
+            auraGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
           } else {
             auraGrad.addColorStop(0, 'rgba(247, 81, 66, 0.09)');
             auraGrad.addColorStop(0.6, 'rgba(247, 81, 66, 0.02)');
@@ -335,7 +347,7 @@ export const SectionShader: React.FC<SectionShaderProps> = ({
 
   return (
     <div
-      id="headerShader"
+      id={id}
       ref={mountRef}
       className={`header-shader ${className}`}
       aria-hidden="true"

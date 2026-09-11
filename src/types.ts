@@ -1,4 +1,4 @@
-export type RoleType = 'admin' | 'diretor' | 'professor' | 'custom';
+export type RoleType = 'admin' | 'diretor' | 'professor' | 'aluno' | 'custom';
 
 // Flexão de Funções no Âmbito Escolar (School Scope)
 export type SchoolStaffRole = 
@@ -101,6 +101,11 @@ export interface UserAccount {
   greeting?: string;
   avatar?: string;
   rememberMe?: boolean;
+  accountValidated?: boolean;
+  emailVerified?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  fullName?: string;
   // Authorization & Pending Approval Workflow
   status?: 'ativo' | 'pendente' | 'rejeitado';
   biNumber?: string;
@@ -120,7 +125,7 @@ export interface UserAccount {
 export interface PendingApplication {
   id: string;
   userId: string;
-  type: 'diretor' | 'professor';
+  type: 'diretor' | 'professor' | 'aluno' | 'funcionario' | string;
   fullName: string;
   email: string;
   phone: string;
@@ -132,6 +137,7 @@ export interface PendingApplication {
   approverDirectorName?: string;
   subject?: string;
   gradeClass?: string;
+  roleRequested?: string;
   status: 'pendente' | 'aprovado' | 'rejeitado';
   isPreRegistered: boolean;
   preRegisteredDetails?: string;

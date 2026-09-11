@@ -1,9 +1,12 @@
 import React from 'react';
-import { ArrowUp, GraduationCap, Shield, HelpCircle, FileText, Heart } from 'lucide-react';
+import { ArrowUp, GraduationCap, Shield, HelpCircle, FileText, Heart, Cookie, Lock } from 'lucide-react';
 
 interface CloudFooterProps {
   onOpenAbout: () => void;
   onOpenTerms: () => void;
+  onOpenPrivacy?: () => void;
+  onOpenSecurity?: () => void;
+  onOpenCookieSettings?: () => void;
   onOpenSupport: () => void;
   onSupport?: () => void;
 }
@@ -11,10 +14,22 @@ interface CloudFooterProps {
 export const CloudFooter: React.FC<CloudFooterProps> = ({
   onOpenAbout,
   onOpenTerms,
+  onOpenPrivacy,
+  onOpenSecurity,
+  onOpenCookieSettings,
   onSupport,
   onOpenSupport,
 }) => {
   const handleSupport = onOpenSupport || onSupport;
+  const handlePrivacy = onOpenPrivacy || onOpenTerms;
+  const handleSecurity = onOpenSecurity || onOpenAbout;
+  const handleCookies = () => {
+    if (onOpenCookieSettings) {
+      onOpenCookieSettings();
+    } else {
+      window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'));
+    }
+  };
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -119,7 +134,7 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
                 <li>
                   <button
                     id="footer-link-privacidade"
-                    onClick={onOpenTerms}
+                    onClick={handlePrivacy}
                     className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
                   >
                     <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
@@ -129,11 +144,21 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
                 <li>
                   <button
                     id="footer-link-seguranca"
-                    onClick={onOpenAbout}
+                    onClick={handleSecurity}
                     className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
                   >
                     <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
                     <span className="font-medium">Segurança e Proteção de Dados</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    id="footer-link-cookies"
+                    onClick={handleCookies}
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
+                  >
+                    <Cookie className="w-3.5 h-3.5 text-white/70 group-hover:text-white transition-colors" />
+                    <span className="font-medium">Preferências de Cookies</span>
                   </button>
                 </li>
               </ul>
@@ -183,19 +208,34 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 font-medium">
               <button
                 onClick={onOpenTerms}
                 className="hover:text-white transition-colors cursor-pointer text-white/85"
               >
-                Termos & Condições
+                Termos
               </button>
               <span className="text-white/30 hidden sm:inline">•</span>
               <button
-                onClick={onOpenAbout}
+                onClick={handlePrivacy}
+                className="hover:text-white transition-colors cursor-pointer text-white/85"
+              >
+                Privacidade
+              </button>
+              <span className="text-white/30 hidden sm:inline">•</span>
+              <button
+                onClick={handleSecurity}
                 className="hover:text-white transition-colors cursor-pointer text-white/85"
               >
                 Segurança
+              </button>
+              <span className="text-white/30 hidden sm:inline">•</span>
+              <button
+                onClick={handleCookies}
+                className="hover:text-white transition-colors cursor-pointer text-white/85 flex items-center gap-1"
+              >
+                <Cookie className="w-3 h-3 text-white/70" />
+                <span>Cookies</span>
               </button>
               <span className="text-white/30 hidden sm:inline">•</span>
               <button

@@ -7,8 +7,10 @@ import firebaseConfig from '../firebase-applet-config.json';
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Export Firebase services
-// CRITICAL: The app will break without databaseId specified
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore using optional custom databaseId if configured
+export const db = (firebaseConfig as Record<string, any>).firestoreDatabaseId
+  ? getFirestore(app, (firebaseConfig as Record<string, any>).firestoreDatabaseId)
+  : getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 

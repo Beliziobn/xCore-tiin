@@ -51,6 +51,7 @@ export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [
     id: 'app-dir-001',
     userId: 'usr-pending-mateus',
     type: 'diretor',
+    roleRequested: 'Diretor Geral',
     fullName: 'Dr. Mateus Ndalamba',
     email: 'mateus.diretor@ucore.edu.ao',
     phone: '+244 921 345 890',
@@ -66,9 +67,29 @@ export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [
     notes: 'Nomeado pelo despacho nº 412/DME/2025. Aguarda homologação formal de acesso ao sistema uCore.',
   },
   {
+    id: 'app-dir-002',
+    userId: 'usr-pending-teresa',
+    type: 'diretor',
+    roleRequested: 'Subdiretora Pedagógica',
+    fullName: 'Dra. Teresa Van-Dúnem Santos',
+    email: 'teresa.santos@ucore.edu.ao',
+    phone: '+244 924 887 902',
+    biNumber: '003291882LA091',
+    schoolName: 'Escola Primária 1º de Junho',
+    schoolId: 'esc-02',
+    municipality: 'Quêssua (Malanje)',
+    targetApproverRole: 'admin',
+    status: 'pendente',
+    isPreRegistered: true,
+    preRegisteredDetails: 'Cadastro de Subdireção homologado pela Repartição Municipal de Educação.',
+    createdAt: '11/09/2026, 09:00',
+    notes: 'Solicitação de acesso administrativo com perfil de Subdiretora Pedagógica.',
+  },
+  {
     id: 'app-prof-001',
     userId: 'usr-pending-maria',
     type: 'professor',
+    roleRequested: 'Professor Primário / Iº Ciclo',
     fullName: 'Profª. Maria António Kiala',
     email: 'maria.kiala@ucore.edu.ao',
     phone: '+244 928 112 334',
@@ -90,6 +111,7 @@ export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [
     id: 'app-prof-002',
     userId: 'usr-pending-alberto',
     type: 'professor',
+    roleRequested: 'Professor de Matemática',
     fullName: 'Prof. Alberto Domingos João',
     email: 'alberto.joao@ucore.edu.ao',
     phone: '+244 931 445 778',
@@ -106,28 +128,96 @@ export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [
     preRegisteredDetails: 'Candidatura externa direta. Requer análise de certificados e admissão pelo Diretor.',
     createdAt: '11/09/2026, 10:45',
     notes: 'Licenciado pelo ISCED em Ensino da Matemática. Anexou cédula profissional.',
+  },
+  {
+    id: 'app-aluno-001',
+    userId: 'usr-pending-manuel',
+    type: 'aluno',
+    roleRequested: 'Aluno Regular',
+    fullName: 'Manuel Domingos Kwanza',
+    email: 'manuel.kwanza@ucore.edu.ao',
+    phone: '+244 945 220 119',
+    biNumber: '009182341LA019',
+    schoolName: 'Escola Modelo Central do Quêssua',
+    schoolId: 'esc-01',
+    municipality: 'Quêssua (Malanje)',
+    targetApproverRole: 'diretor',
+    approverDirectorName: 'Fert Horlan',
+    gradeClass: '7ª Classe (Turma A - Manhã)',
+    status: 'pendente',
+    isPreRegistered: true,
+    preRegisteredDetails: 'Histórico escolar e processo individual transferido da Escola 402 com aproveitamento positivo.',
+    createdAt: '11/09/2026, 11:20',
+    notes: 'Inscrição de transferência escolar para o ano letivo 2026. Apresentou certidão com notas da 6ª classe.',
+  },
+  {
+    id: 'app-func-001',
+    userId: 'usr-pending-baptista',
+    type: 'funcionario',
+    roleRequested: 'Secretário Escolar / Apoio Pedagógico',
+    fullName: 'Sr. João Baptista Mukonda',
+    email: 'joao.baptista@ucore.edu.ao',
+    phone: '+244 912 334 556',
+    biNumber: '001928374LA033',
+    schoolName: 'Escola Modelo Central do Quêssua',
+    schoolId: 'esc-01',
+    municipality: 'Quêssua (Malanje)',
+    targetApproverRole: 'diretor',
+    approverDirectorName: 'Fert Horlan',
+    status: 'pendente',
+    isPreRegistered: false,
+    preRegisteredDetails: 'Solicitação de credencial de Secretário Escolar para gestão de pautas e matrículas.',
+    createdAt: '11/09/2026, 11:45',
+    notes: 'Contratado para a secretaria pedagógica. Aguarda validação da Direção Geral.',
   }
 ];
 
-export function getPendingApplications(): PendingApplication[] {
+export function getPendingApplications(type?: string): PendingApplication[] {
+  let list: PendingApplication[] = [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        list = parsed;
       }
     }
   } catch {
     // ignore
   }
-  // Initialize with seed
-  try {
-    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(SEED_PENDING_APPLICATIONS));
-  } catch {
-    // ignore
+  if (list.length === 0) {
+    // Initialize with seed
+    try {
+      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(SEED_PENDING_APPLICATIONS));
+    } catch {
+      // ignore
+    }
+    list = SEED_PENDING_APPLICATIONS;
   }
-  return SEED_PENDING_APPLICATIONS;
+  return type ? list.filter((a) => a.type === type) : list;
+}
+
+/**
+ * Returns applications targeted for the school director, optionally filtered by school name.
+ */
+export function getApplicationsForDirector(schoolName?: string): PendingApplication[] {
+  const all = getPendingApplications();
+  return all.filter((a) => {
+    const isTarget = a.targetApproverRole === 'diretor';
+    if (!isTarget) return false;
+    if (!schoolName) return true;
+    const normA = a.schoolName?.trim().toLowerCase() || '';
+    const normS = schoolName.trim().toLowerCase();
+    return normA.includes(normS) || normS.includes(normA);
+  });
+}
+
+/**
+ * Returns applications targeted for the central administrator (e.g. school directors, institutional staff).
+ */
+export function getApplicationsForAdmin(): PendingApplication[] {
+  const all = getPendingApplications();
+  return all.filter((a) => a.targetApproverRole === 'admin');
 }
 
 export function savePendingApplication(app: PendingApplication): void {
@@ -337,7 +427,9 @@ export function checkUserApprovalStatus(
   );
 
   if (match) {
-    return { status: match.status, app: match };
+    const userStatus: 'ativo' | 'pendente' | 'rejeitado' =
+      match.status === 'aprovado' ? 'ativo' : match.status;
+    return { status: userStatus, app: match };
   }
   return { status: 'ativo' };
 }

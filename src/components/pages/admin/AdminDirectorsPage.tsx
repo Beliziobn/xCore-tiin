@@ -35,6 +35,7 @@ interface AdminDirectorsPageProps {
   onOpenRegisterModal: () => void;
   onUpdateDirector?: (director: AdminDirector) => void;
   onAddDirector?: (director: AdminDirector) => void;
+  onNavigateToApprovals?: () => void;
   isLoggedIn?: boolean;
 }
 
@@ -45,6 +46,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
   onOpenRegisterModal,
   onUpdateDirector,
   onAddDirector,
+  onNavigateToApprovals,
   isLoggedIn,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,8 +88,9 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
   }, []);
 
   const handleApproveApplication = (appId: string) => {
-    const updated = approveApplication(appId, 'Administrador Central (DME)');
-    if (updated) {
+    const res = approveApplication(appId, 'Administrador Central (DME)');
+    if (res.success && res.app) {
+      const updated = res.app;
       refreshPending();
       setApprovalToast(`Candidatura de ${updated.fullName} homologada com sucesso! Diretor(a) credenciado(a).`);
       setTimeout(() => setApprovalToast(null), 4500);
@@ -112,8 +115,8 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
   };
 
   const handleRejectApplication = (appId: string, reason: string) => {
-    const updated = rejectApplication(appId, reason, 'Administrador Central (DME)');
-    if (updated) {
+    const res = rejectApplication(appId, reason, 'Administrador Central (DME)');
+    if (res.success) {
       refreshPending();
       setApprovalToast(`Candidatura recusada. Notificação emitida para o candidato.`);
       setTimeout(() => setApprovalToast(null), 4500);
@@ -321,6 +324,17 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
               </span>
             )}
           </button>
+
+          {onNavigateToApprovals && (
+            <button
+              id="btn-goto-full-admin-approvals"
+              onClick={onNavigateToApprovals}
+              className="sm:ml-auto px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xs"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-200" />
+              <span>Central de Homologação de Inscrições</span>
+            </button>
+          )}
         </div>
 
         {/* Seção de Candidaturas Pendentes */}

@@ -22,6 +22,7 @@ import { DirectorRoomsPage } from './components/pages/director/DirectorRoomsPage
 import { DirectorClassesPage } from './components/pages/director/DirectorClassesPage';
 import { DirectorProfilePage } from './components/pages/director/DirectorProfilePage';
 import { DirectorAttendancePage } from './components/pages/director/DirectorAttendancePage';
+import { DirectorApprovalsPage } from './components/pages/director/DirectorApprovalsPage';
 
 // Admin Pages & Components
 import { AdminStatisticsPage } from './components/pages/admin/AdminStatisticsPage';
@@ -31,6 +32,7 @@ import { AdminStudentsPage } from './components/pages/admin/AdminStudentsPage';
 import { AdminDirectorsPage } from './components/pages/admin/AdminDirectorsPage';
 import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
 import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
+import { AdminApprovalsPage } from './components/pages/admin/AdminApprovalsPage';
 import { AdminRegistrationModal, AdminModalType } from './components/pages/admin/AdminRegistrationModal';
 import { ExcelExportModal } from './components/modals/ExcelExportModal';
 import { GoogleSheetsModal } from './components/modals/GoogleSheetsModal';
@@ -70,6 +72,13 @@ import { PendingApprovalPage } from './components/pages/PendingApprovalPage';
 import { DemoRequestModal } from './components/modals/DemoRequestModal';
 import { AccessDeniedGuard } from './components/common/AccessDeniedGuard';
 import { canUserAccessView, getOwnProfileViewForUser } from './utils/authGuard';
+
+// Cookie Consent & Legal Pages
+import { CookieConsentBanner } from './components/cookies/CookieConsentBanner';
+import { AboutPlatformPage } from './components/pages/legal/AboutPlatformPage';
+import { TermsOfUsePage } from './components/pages/legal/TermsOfUsePage';
+import { PrivacyPolicyPage } from './components/pages/legal/PrivacyPolicyPage';
+import { SecurityDataProtectionPage } from './components/pages/legal/SecurityDataProtectionPage';
 
 import type { 
   EducationalModule, 
@@ -687,6 +696,32 @@ export default function App() {
       return;
     }
 
+    // Public Legal & Institutional Pages
+    if (
+      pageId === 'sobre' ||
+      pageId === 'about' ||
+      pageId === 'termos' ||
+      pageId === 'terms' ||
+      pageId === 'privacidade' ||
+      pageId === 'privacy' ||
+      pageId === 'seguranca' ||
+      pageId === 'security'
+    ) {
+      const normalizedView =
+        pageId === 'about'
+          ? 'sobre'
+          : pageId === 'terms'
+          ? 'termos'
+          : pageId === 'privacy'
+          ? 'privacidade'
+          : pageId === 'security'
+          ? 'seguranca'
+          : pageId;
+      setCurrentView(normalizedView);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     // 1. Strict Authorization Guard: A user can never and must never enter or tamper with someone else's profile
     if (currentUser) {
       let targetView = pageId;
@@ -711,6 +746,8 @@ export default function App() {
       pageId === 'admin-professores' ||
       pageId === 'admin-alunos' ||
       pageId === 'admin-anuncios' ||
+      pageId === 'admin-aprovacoes' ||
+      pageId === 'admin-inscricoes' ||
       pageId === 'admin-perfil'
     ) {
       setCurrentView(pageId);
@@ -719,6 +756,11 @@ export default function App() {
     }
 
     if (activeRole === 'admin') {
+      if (pageId === 'aprovacoes' || pageId === 'inscricoes' || pageId === 'homologacao' || pageId === 'homologacoes') {
+        setCurrentView('admin-aprovacoes');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       if (pageId === 'anuncios' || pageId === 'editais' || pageId === 'demandas') {
         setCurrentView('admin-anuncios');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -781,10 +823,17 @@ export default function App() {
       pageId === 'diretor-alunos' ||
       pageId === 'diretor-salas' ||
       pageId === 'diretor-classes' ||
+      pageId === 'diretor-aprovacoes' ||
+      pageId === 'diretor-inscricoes' ||
       pageId === 'diretor-perfil' ||
       pageId === 'diretor-presenca'
     ) {
       setCurrentView(pageId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (activeRole === 'diretor' && (pageId === 'aprovacoes' || pageId === 'inscricoes' || pageId === 'homologacao' || pageId === 'homologacoes')) {
+      setCurrentView('diretor-aprovacoes');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -977,6 +1026,10 @@ export default function App() {
             setAdminDirectors((prev) => [newDir, ...prev]);
             showToast(`Diretor(a) "${newDir.name}" homologado(a) com sucesso!`);
           }}
+          onNavigateToApprovals={() => {
+            setCurrentView('admin-aprovacoes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           isLoggedIn={isSessionStarted}
         />
       );
@@ -1052,8 +1105,43 @@ export default function App() {
         />
       );
     }
+    if (currentView === 'admin-aprovacoes' || currentView === 'admin-inscricoes') {
+      return (
+        <AdminApprovalsPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          adminName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Administrador Municipal uCore'}
+          directors={adminDirectors}
+          schools={adminSchools}
+          onAddDirectorGlobal={(director) => {
+            setAdminDirectors((prev) => [director, ...prev]);
+            showToast(`Diretor(a) "${director.name}" homologado(a) no uCore!`);
+          }}
+          showToast={showToast}
+        />
+      );
+    }
 
     // 1. Director Pages
+    if (currentView === 'diretor-aprovacoes' || currentView === 'diretor-inscricoes') {
+      return (
+        <DirectorApprovalsPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          directorName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Fert Horlan (Diretor Geral)'}
+          schoolName={currentUser?.schoolName || 'Escola Modelo Central do Quêssua'}
+          onAddTeacherGlobal={(teacher) => {
+            setAdminTeachers((prev) => [teacher, ...prev]);
+            showToast(`Professor(a) "${teacher.name}" integrado(a) no quadro docente!`);
+          }}
+          onAddStudentGlobal={(student) => {
+            setAdminStudents((prev) => [student, ...prev]);
+            showToast(`Aluno(a) "${student.name}" matriculado(a) na escola com sucesso!`);
+          }}
+          showToast={showToast}
+        />
+      );
+    }
     if (currentView === 'diretor-estatisticas') {
       return (
         <DirectorStatisticsPage
@@ -1069,6 +1157,10 @@ export default function App() {
           isLoggedIn={isSessionStarted}
           onNavigateToAttendance={() => {
             setCurrentView('diretor-presenca');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToApprovals={() => {
+            setCurrentView('diretor-aprovacoes');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           onAddTeacherGlobal={(teacher) => {
@@ -1395,6 +1487,110 @@ export default function App() {
       );
     }
 
+    // 3. Dedicated Legal & Institutional Pages
+    if (currentView === 'sobre') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Sobre a Plataforma uCore"
+            customSubtitle="Inovação e modernização da gestão escolar em Angola, unificando directores, docentes e alunos."
+            badge="Institucional"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Sobre a Plataforma' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <AboutPlatformPage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateTerms={() => { setCurrentView('termos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigatePrivacy={() => { setCurrentView('privacidade'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateSecurity={() => { setCurrentView('seguranca'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            isLoggedIn={isSessionStarted}
+          />
+        </div>
+      );
+    }
+
+    if (currentView === 'termos') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Termos de Utilização"
+            customSubtitle="Normas legais de uso institucional, sigilo de credenciais e validade do Livro de Ponto eletrónico."
+            badge="Regulamentar"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Termos de Utilização' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <TermsOfUsePage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateAbout={() => { setCurrentView('sobre'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigatePrivacy={() => { setCurrentView('privacidade'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateSecurity={() => { setCurrentView('seguranca'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+          />
+        </div>
+      );
+    }
+
+    if (currentView === 'privacidade') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Política de Privacidade"
+            customSubtitle="Proteção integral dos dados pessoais e académicos de menores e docentes conforme a Lei 22/11 da APD Angola."
+            badge="Privacidade"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Política de Privacidade' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <PrivacyPolicyPage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateAbout={() => { setCurrentView('sobre'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateTerms={() => { setCurrentView('termos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateSecurity={() => { setCurrentView('seguranca'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+          />
+        </div>
+      );
+    }
+
+    if (currentView === 'seguranca') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Segurança e Proteção de Dados"
+            customSubtitle="Criptografia militar AES-256, isolamento de permissões (RBAC) e auditoria digital forense."
+            badge="Cibersegurança"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Segurança & Proteção' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <SecurityDataProtectionPage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateAbout={() => { setCurrentView('sobre'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateTerms={() => { setCurrentView('termos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigatePrivacy={() => { setCurrentView('privacidade'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+            currentUserRole={currentUser?.role || 'convidado'}
+          />
+        </div>
+      );
+    }
+
     // Default: Dashboard / Home View matching 4.png for Director or 8.png / 6.png
     return (
       <>
@@ -1683,9 +1879,40 @@ export default function App() {
 
       {/* Organic Cloud Wave Footer */}
       <CloudFooter
-        onOpenAbout={() => setInfoModalType('about')}
-        onOpenTerms={() => setInfoModalType('terms')}
+        onOpenAbout={() => {
+          setCurrentView('sobre');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenTerms={() => {
+          setCurrentView('termos');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenPrivacy={() => {
+          setCurrentView('privacidade');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenSecurity={() => {
+          setCurrentView('seguranca');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenCookieSettings={() => window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'))}
         onOpenSupport={() => setInfoModalType('support')}
+      />
+
+      {/* Cookie Consent Banner & Preferences Modal */}
+      <CookieConsentBanner
+        onNavigateToPrivacy={() => {
+          setCurrentView('privacidade');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateToTerms={() => {
+          setCurrentView('termos');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateToSecurity={() => {
+          setCurrentView('seguranca');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       {/* Floating Support Chat Button */}

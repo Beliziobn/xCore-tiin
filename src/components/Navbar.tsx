@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
+import { getPendingApplications } from '../utils/authApprovalStorage';
 
 interface NavbarProps {
   onOpenGetStarted: () => void;
@@ -83,6 +84,23 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [navLoadingAction, setNavLoadingAction] = useState<'login' | 'register' | null>(null);
+  const [pendingAppsCount, setPendingAppsCount] = useState({ director: 0, admin: 0 });
+
+  useEffect(() => {
+    const updateCounts = () => {
+      try {
+        const all = getPendingApplications();
+        const dirPending = all.filter((a) => a.targetApproverRole === 'diretor' && a.status === 'pendente').length;
+        const admPending = all.filter((a) => (a.targetApproverRole === 'admin' || a.type === 'diretor') && a.status === 'pendente').length;
+        setPendingAppsCount({ director: dirPending, admin: admPending });
+      } catch {
+        // ignore
+      }
+    };
+    updateCounts();
+    const interval = setInterval(updateCounts, 2500);
+    return () => clearInterval(interval);
+  }, []);
 
   const isLoginLoading = (isAuthLoading && authLoadingAction === 'login') || navLoadingAction === 'login';
   const isRegisterLoading = (isAuthLoading && authLoadingAction === 'register') || navLoadingAction === 'register';
@@ -263,6 +281,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                     <button
                       onClick={() => {
+                        onSelectPage('admin-aprovacoes');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                        Aprovação de Inscrições
+                      </span>
+                      {pendingAppsCount.admin > 0 ? (
+                        <span className="text-[10px] bg-amber-500 text-white font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                          {pendingAppsCount.admin}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-slate-400 font-bold">Admin</span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
                         onSelectPage('admin-perfil');
                         setShowPagesDropdown(false);
                       }}
@@ -281,6 +318,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                       className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
                     >
                       Painel do Diretor
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSelectPage('diretor-aprovacoes');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                        Aprovação de Inscrições
+                      </span>
+                      {pendingAppsCount.director > 0 ? (
+                        <span className="text-[10px] bg-amber-500 text-white font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                          {pendingAppsCount.director}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-slate-400 font-bold">Escola</span>
+                      )}
                     </button>
                     <button
                       onClick={() => {
@@ -428,13 +484,100 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </>
                 )}
 
+                {/* Institutional & Legal Section for all users */}
+                <div className="border-t border-slate-100 my-1 pt-1">
+                  <div className="px-4 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    Institucional & Legal
+                  </div>
+                  <button
+                    onClick={() => {
+                      onSelectPage('sobre');
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                  >
+                    Sobre a Plataforma
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSelectPage('termos');
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                  >
+                    Termos de Utilização
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSelectPage('privacidade');
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                  >
+                    Política de Privacidade
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSelectPage('seguranca');
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                  >
+                    Segurança e Proteção
+                  </button>
+                </div>
+
               </div>
             )}
           </div>
         </div>
 
         {/* Right CTA Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick Approvals Button for Director */}
+          {activeRole === 'diretor' && (
+            <button
+              id="navbar-director-quick-approvals-btn"
+              onClick={() => onSelectPage('diretor-aprovacoes')}
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                currentView === 'diretor-aprovacoes' || currentView === 'diretor-inscricoes'
+                  ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                  : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+              }`}
+              title="Aprovação de Inscrições da Escola"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+              <span>Inscrições</span>
+              {pendingAppsCount.director > 0 && (
+                <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                  {pendingAppsCount.director}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Quick Approvals Button for Admin */}
+          {activeRole === 'admin' && (
+            <button
+              id="navbar-admin-quick-approvals-btn"
+              onClick={() => onSelectPage('admin-aprovacoes')}
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                currentView === 'admin-aprovacoes' || currentView === 'admin-inscricoes'
+                  ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                  : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+              }`}
+              title="Central de Homologação de Diretores e Inscrições"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+              <span>Homologações</span>
+              {pendingAppsCount.admin > 0 && (
+                <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                  {pendingAppsCount.admin}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Notification Bell */}
           <div className="relative">
             <button
@@ -675,6 +818,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => {
+                  onSelectPage('admin-aprovacoes');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-[#f75142] bg-amber-50/70 hover:bg-amber-100/70 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  Aprovação de Inscrições
+                </span>
+                {pendingAppsCount.admin > 0 ? (
+                  <span className="text-[10px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-full">
+                    {pendingAppsCount.admin} pendentes
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-slate-400">Admin</span>
+                )}
+              </button>
+              <button
+                onClick={() => {
                   onSelectPage('admin-perfil');
                   setMobileMenuOpen(false);
                 }}
@@ -693,6 +855,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
               >
                 Painel do Diretor
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPage('diretor-aprovacoes');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-2 px-3 text-[#f75142] bg-amber-50/70 hover:bg-amber-100/70 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  Aprovação de Inscrições
+                </span>
+                {pendingAppsCount.director > 0 ? (
+                  <span className="text-[10px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-full">
+                    {pendingAppsCount.director} pendentes
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-slate-400">Escola</span>
+                )}
               </button>
               <button
                 onClick={() => {
@@ -830,15 +1011,47 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </>
           )}
-          <button
-            onClick={() => {
-              onOpenAbout();
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-          >
-            Sobre a Central uCore
-          </button>
+          <div className="border-t border-slate-100 my-1 pt-1 space-y-1">
+            <div className="px-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Institucional & Legal
+            </div>
+            <button
+              onClick={() => {
+                onSelectPage('sobre');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+            >
+              Sobre a Plataforma
+            </button>
+            <button
+              onClick={() => {
+                onSelectPage('termos');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+            >
+              Termos de Utilização
+            </button>
+            <button
+              onClick={() => {
+                onSelectPage('privacidade');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+            >
+              Política de Privacidade
+            </button>
+            <button
+              onClick={() => {
+                onSelectPage('seguranca');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+            >
+              Segurança e Proteção de Dados
+            </button>
+          </div>
           <button
             onClick={() => {
               setMobileMenuOpen(false);

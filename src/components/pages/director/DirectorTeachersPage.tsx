@@ -12,7 +12,8 @@ import {
   Users, 
   Sparkles, 
   RotateCcw,
-  BookOpen
+  BookOpen,
+  ShieldCheck
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
@@ -27,6 +28,7 @@ interface DirectorTeachersPageProps {
   isLoggedIn?: boolean;
   onAddTeacherGlobal?: (teacher: AdminTeacher) => void;
   onNavigateToAttendance?: () => void;
+  onNavigateToApprovals?: () => void;
   schoolName?: string;
   directorName?: string;
 }
@@ -36,6 +38,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   isLoggedIn,
   onAddTeacherGlobal,
   onNavigateToAttendance,
+  onNavigateToApprovals,
   schoolName = 'Escola Modelo Central',
   directorName = 'Carl Mendes',
 }) => {
@@ -63,8 +66,9 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   }, []);
 
   const handleApproveTeacherApplication = (appId: string, assignedData: { room: string; turma: string; shift: 'Manhã' | 'Tarde' }) => {
-    const updated = approveApplication(appId, directorName);
-    if (updated) {
+    const res = approveApplication(appId, directorName);
+    if (res.success && res.app) {
+      const updated = res.app;
       refreshPending();
       setApprovalToast(`Candidatura de ${updated.fullName} validada e homologada com sucesso! Professor(a) inserido(a) no quadro.`);
       setTimeout(() => setApprovalToast(null), 4500);
@@ -109,8 +113,8 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   };
 
   const handleRejectTeacherApplication = (appId: string, reason: string) => {
-    const updated = rejectApplication(appId, reason, directorName);
-    if (updated) {
+    const res = rejectApplication(appId, reason, directorName);
+    if (res.success) {
       refreshPending();
       setApprovalToast(`Candidatura docente indeferida. A notificação foi registrada.`);
       setTimeout(() => setApprovalToast(null), 4500);
@@ -237,6 +241,17 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
               </span>
             )}
           </button>
+
+          {onNavigateToApprovals && (
+            <button
+              id="btn-goto-full-approvals"
+              onClick={onNavigateToApprovals}
+              className="sm:ml-auto px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xs"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-200" />
+              <span>Central de Inscrições da Escola</span>
+            </button>
+          )}
         </div>
 
         {/* 1. SEÇÃO DE CANDIDATURAS DOCENTES PENDENTES */}

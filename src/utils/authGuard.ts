@@ -35,8 +35,14 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'admin-directores',
     'admin-professores',
     'admin-alunos',
+    'admin-aprovacoes',
+    'admin-inscricoes',
     'admin-anuncios',
     'admin-perfil',
+    'sobre',
+    'termos',
+    'privacidade',
+    'seguranca',
   ],
   diretor: [
     'home',
@@ -44,10 +50,16 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'diretor-estatisticas',
     'diretor-professores',
     'diretor-alunos',
+    'diretor-aprovacoes',
+    'diretor-inscricoes',
     'diretor-salas',
     'diretor-classes',
     'diretor-perfil',
     'diretor-presenca',
+    'sobre',
+    'termos',
+    'privacidade',
+    'seguranca',
   ],
   professor: [
     'home',
@@ -58,11 +70,19 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'perfil-professor',
     'aluno-perfil', // Professor can access pedagogical file of class students
     'perfil-aluno',
+    'sobre',
+    'termos',
+    'privacidade',
+    'seguranca',
   ],
   aluno: [
     'home',
     'aluno-perfil',
     'perfil-aluno',
+    'sobre',
+    'termos',
+    'privacidade',
+    'seguranca',
   ],
 };
 
@@ -101,16 +121,24 @@ export function getViewTitle(view: string): string {
     'admin-directores': 'Quadro de Diretores (Admin)',
     'admin-professores': 'Quadro Geral Docente (Admin)',
     'admin-alunos': 'Censo e Alunos da Rede (Admin)',
+    'admin-aprovacoes': 'Central de Homologação & Inscrições (Admin)',
+    'admin-inscricoes': 'Central de Homologação & Inscrições (Admin)',
     'admin-anuncios': 'Demandas & Editais Oficiais (Admin)',
     'diretor-estatisticas': 'Estatísticas Escolares (Direção)',
     'diretor-professores': 'Corpo Docente da Escola (Direção)',
     'diretor-alunos': 'Matrículas & Alunos (Direção)',
+    'diretor-aprovacoes': 'Aprovação de Inscrições Escolares (Direção)',
+    'diretor-inscricoes': 'Aprovação de Inscrições Escolares (Direção)',
     'diretor-salas': 'Salas de Aula (Direção)',
     'diretor-classes': 'Classes & Níveis (Direção)',
     'diretor-presenca': 'Livro de Ponto Docente (Direção)',
     'professor-estatisticas': 'Rendimento da Turma (Professor)',
     'professor-turma': 'Minha Turma & Alunos (Professor)',
     'professor-presenca': 'Livro de Chamada (Professor)',
+    'sobre': 'Sobre a Plataforma uCore',
+    'termos': 'Termos de Utilização',
+    'privacidade': 'Política de Privacidade',
+    'seguranca': 'Segurança e Proteção de Dados',
     'home': 'Página Inicial',
   };
   return titles[view] || view;
@@ -122,7 +150,16 @@ export function getViewTitle(view: string): string {
  */
 export function canUserAccessView(user: UserAccount | null, view: string): ViewAccessCheck {
   // Public views
-  if (view === 'home' || view === 'public-landing' || view === 'login' || view === 'register') {
+  if (
+    view === 'home' ||
+    view === 'public-landing' ||
+    view === 'login' ||
+    view === 'register' ||
+    view === 'sobre' ||
+    view === 'termos' ||
+    view === 'privacidade' ||
+    view === 'seguranca'
+  ) {
     return { allowed: true, userOwnProfileView: getOwnProfileViewForUser(user) };
   }
 
