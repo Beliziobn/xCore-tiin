@@ -57,15 +57,13 @@ export async function exportTurmaStudentListToPDF(
   const COLOR_ROW_ALT = [248, 250, 252]; // #f8fafc slate-50
   const COLOR_HEADER_BG = [241, 245, 249]; // #f1f5f9 slate-100
 
-  // Column definitions (Sum = 186mm)
-  const columns = [
-    { key: 'ordem', title: 'Nº', width: 9, align: 'center' as const },
-    { key: 'matricula', title: 'Nº Processo', width: 25, align: 'center' as const },
-    { key: 'nome', title: 'Nome Completo do Aluno (A-Z)', width: 63, align: 'left' as const },
-    { key: 'genero', title: 'Sexo', width: 11, align: 'center' as const },
-    { key: 'idade', title: 'Idade', width: 11, align: 'center' as const },
-    { key: 'documento', title: 'Doc. Identificação', width: 27, align: 'left' as const },
-    { key: 'encarregado', title: 'Encarregado / Telefone', width: 40, align: 'left' as const },
+  // Column definitions (Sum = 186mm) - Estritamente: Nome, Sexo, Idade, Situação (+ Nº)
+  const columns: { key: string; title: string; width: number; align: 'left' | 'center' | 'right' }[] = [
+    { key: 'ordem', title: 'Nº', width: 12, align: 'center' },
+    { key: 'nome', title: 'Nome do Aluno (Ordem A-Z)', width: 92, align: 'left' },
+    { key: 'genero', title: 'Sexo', width: 26, align: 'center' },
+    { key: 'idade', title: 'Idade', width: 24, align: 'center' },
+    { key: 'situacao', title: 'Situação', width: 32, align: 'center' },
   ];
 
   const students = data.students;
@@ -261,26 +259,25 @@ export async function exportTurmaStudentListToPDF(
         val = String(student.numeroOrdem);
         isBold = true;
         textColor = COLOR_PRIMARY;
-      } else if (col.key === 'matricula') {
-        val = student.codigoMatricula;
-        textColor = COLOR_MUTED;
       } else if (col.key === 'nome') {
         val = student.nomeCompleto;
         isBold = true;
         textColor = COLOR_TEXT;
       } else if (col.key === 'genero') {
-        val = student.genero;
+        val = student.genero === 'F' ? 'Feminino' : 'Masculino';
         textColor = student.genero === 'F' ? [190, 24, 93] : [3, 105, 161];
         isBold = true;
       } else if (col.key === 'idade') {
-        val = `${student.idade} a`;
+        val = `${student.idade} anos`;
         textColor = COLOR_TEXT;
-      } else if (col.key === 'documento') {
-        val = student.temDocumento ? `${student.tipoDocumento} (${student.numeroDocumento.slice(-6)})` : 'Pendente';
-        textColor = student.temDocumento ? COLOR_TEXT : COLOR_ACCENT;
-      } else if (col.key === 'encarregado') {
-        val = `${student.encarregado.split('&')[0].trim()} • ${student.telefone.slice(-7)}`;
-        textColor = COLOR_MUTED;
+      } else if (col.key === 'situacao') {
+        val = student.condicaoMatricula;
+        textColor = student.condicaoMatricula === 'Repetente'
+          ? [180, 83, 9]
+          : student.condicaoMatricula === 'Transferido'
+          ? [109, 40, 217]
+          : [4, 120, 87];
+        isBold = true;
       }
 
       pdf.setFont('helvetica', isBold ? 'bold' : 'normal');

@@ -55,24 +55,15 @@ export const VideoTile: React.FC<VideoTileProps> = ({
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  const getRoleColor = (r: string) => {
-    const lower = r.toLowerCase();
-    if (lower.includes('admin') || lower.includes('sistema')) return 'bg-purple-600/90 text-white';
-    if (lower.includes('diretor') || lower.includes('direção')) return 'bg-blue-600/90 text-white';
-    if (lower.includes('prof') || lower.includes('docente')) return 'bg-emerald-600/90 text-white';
-    if (lower.includes('aluno') || lower.includes('estudante')) return 'bg-amber-500/90 text-slate-950';
-    return 'bg-slate-700/90 text-white';
-  };
-
   return (
     <div
       id={`video-tile-${id}`}
-      className={`group relative bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center border transition-all duration-300 shadow-md ${
+      className={`group relative bg-white rounded-[18px] overflow-hidden flex items-center justify-center border transition-all duration-200 shadow-xs ${
         isSpeaking
-          ? 'ring-2 ring-emerald-400 shadow-[0_0_25px_rgba(52,211,153,0.3)] border-emerald-400/50'
+          ? 'ring-2 ring-emerald-500 border-emerald-500/60 shadow-md'
           : isPinned
-          ? 'ring-2 ring-amber-400 border-amber-400/50'
-          : 'border-slate-800 hover:border-slate-700'
+          ? 'ring-2 ring-blue-500 border-blue-500/60'
+          : 'border-[#E2E8F0] hover:border-slate-300'
       } ${className}`}
     >
       {/* Video Stream */}
@@ -91,10 +82,10 @@ export const VideoTile: React.FC<VideoTileProps> = ({
         <div className="flex flex-col items-center justify-center p-6 text-center select-none z-10">
           <div className="relative mb-3">
             <div
-              className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-black shadow-lg transition-transform ${
+              className={`w-20 h-20 sm:w-22 sm:h-22 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-bold text-white shadow-lg transition-transform ${
                 isSpeaking
-                  ? 'scale-105 bg-gradient-to-tr from-emerald-500 to-teal-400 text-white ring-4 ring-emerald-400/40 animate-pulse'
-                  : 'bg-gradient-to-tr from-[#002133] via-slate-800 to-slate-700 text-white border border-white/10'
+                  ? 'scale-105 bg-gradient-to-br from-emerald-500 to-teal-600 ring-4 ring-emerald-400/40 shadow-emerald-500/25'
+                  : 'bg-gradient-to-br from-[#3B82F6] to-[#1D4ED8] shadow-blue-500/25'
               }`}
             >
               {getInitials(name)}
@@ -104,16 +95,16 @@ export const VideoTile: React.FC<VideoTileProps> = ({
             {isSpeaking && (
               <span className="absolute -bottom-1 -right-1 flex h-5 w-5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 border-2 border-slate-900"></span>
+                <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 border-2 border-white"></span>
               </span>
             )}
           </div>
 
-          <h4 className="text-white font-bold text-sm sm:text-base max-w-[200px] truncate">
+          <h4 className="text-base sm:text-lg font-semibold text-slate-900 max-w-[240px] truncate mb-0.5">
             {name}
           </h4>
           {schoolName && (
-            <p className="text-xs text-slate-400 max-w-[220px] truncate mt-0.5">
+            <p className="text-xs text-slate-500 max-w-[260px] truncate">
               {schoolName}
             </p>
           )}
@@ -124,15 +115,11 @@ export const VideoTile: React.FC<VideoTileProps> = ({
       <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20 pointer-events-none">
         {/* Role badge */}
         <div className="flex items-center gap-1.5">
-          <span
-            className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shadow-xs ${getRoleColor(
-              role
-            )}`}
-          >
+          <span className="bg-[#EFF6FF] text-[#2563EB] text-[11px] font-semibold px-2.5 py-1 rounded-md border border-blue-100 tracking-wide uppercase">
             {role}
           </span>
           {isScreenSharing && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-600/90 text-white shadow-xs animate-pulse">
+            <span className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-semibold px-2.5 py-1 rounded-md">
               <Monitor className="w-3 h-3" />
               <span>Apresentação</span>
             </span>
@@ -141,8 +128,8 @@ export const VideoTile: React.FC<VideoTileProps> = ({
 
         {/* Hand Raised Banner */}
         {isHandRaised && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black shadow-lg animate-bounce">
-            <Hand className="w-3.5 h-3.5 fill-slate-950" />
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold shadow-xs animate-bounce">
+            <Hand className="w-3.5 h-3.5 fill-blue-600 text-blue-600" />
             <span>Mão Levantada</span>
           </div>
         )}
@@ -150,40 +137,43 @@ export const VideoTile: React.FC<VideoTileProps> = ({
 
       {/* Bottom Information Strip */}
       <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-20">
-        {/* Participant Name & Mic Status */}
-        <div className="flex items-center gap-1.5 bg-slate-950/75 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-white text-xs font-medium max-w-[80%]">
-          <div
-            className={`p-0.5 rounded-full ${
-              isAudioMuted ? 'text-red-400' : 'text-emerald-400'
-            }`}
-          >
-            {isAudioMuted ? (
-              <MicOff className="w-3.5 h-3.5" />
-            ) : (
-              <Mic className="w-3.5 h-3.5" />
-            )}
-          </div>
+        {/* Participant Name */}
+        <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs font-medium max-w-[75%] shadow-xs">
           <span className="truncate">
-            {name} {isLocal && <span className="text-slate-400 font-normal">(Você)</span>}
+            {name} {isLocal && <span className="text-slate-300 font-normal">(Você)</span>}
           </span>
         </div>
 
-        {/* Pin / Spotlight button */}
-        {onTogglePin && (
-          <button
-            type="button"
-            onClick={onTogglePin}
-            className={`p-1.5 rounded-lg backdrop-blur-md transition-all cursor-pointer opacity-0 group-hover:opacity-100 ${
-              isPinned
-                ? 'opacity-100 bg-amber-400 text-slate-950'
-                : 'bg-slate-950/75 text-white hover:bg-slate-800'
+        {/* Right Indicators: Mic & Pin */}
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs shadow-xs ${
+              isAudioMuted
+                ? 'bg-[#FEF3C7] text-[#B45309] border border-amber-200'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
             }`}
-            title={isPinned ? 'Desafixar vídeo' : 'Fixar orador em destaque'}
+            title={isAudioMuted ? 'Microfone desativado' : 'Microfone ativo'}
           >
-            <Pin className="w-3.5 h-3.5" />
-          </button>
-        )}
+            {isAudioMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+          </div>
+
+          {onTogglePin && (
+            <button
+              type="button"
+              onClick={onTogglePin}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+                isPinned
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 opacity-0 group-hover:opacity-100'
+              }`}
+              title={isPinned ? 'Desafixar vídeo' : 'Fixar orador em destaque'}
+            >
+              <Pin className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 };
+

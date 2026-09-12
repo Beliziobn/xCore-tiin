@@ -673,7 +673,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Pesquisar por nome do aluno, encarregado, telefone ou nº de chamada..."
+              placeholder="Pesquisar por nome do aluno ou nº de chamada..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -826,21 +826,16 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200 shadow-2xs">
                 <tr className="text-[11px] font-black uppercase tracking-wider text-slate-600">
-                  <th className="py-3 px-3 text-center w-12 bg-slate-50">Nº</th>
-                  <th className="py-3 px-4 bg-slate-50">Aluno</th>
-                  <th className="py-3 px-4 bg-slate-50">Encarregado</th>
-                  <th className="py-3 px-4 bg-slate-50">Documentação</th>
-                  <th className="py-3 px-3 text-center bg-slate-50">Assiduidade</th>
-                  <th className="py-3 px-3 text-center bg-slate-50">Média</th>
-                  <th className="py-3 px-3 text-center bg-slate-50">Situação</th>
-                  <th className="py-3 px-4 text-right bg-slate-50">Ação</th>
+                  <th className="py-3 px-3 text-center w-14 bg-slate-50">Nº</th>
+                  <th className="py-3 px-4 bg-slate-50">Nome do Aluno</th>
+                  <th className="py-3 px-4 text-center bg-slate-50 w-32">Sexo</th>
+                  <th className="py-3 px-4 text-center bg-slate-50 w-28">Idade</th>
+                  <th className="py-3 px-4 text-center bg-slate-50 w-36">Situação</th>
+                  <th className="py-3 px-4 text-right bg-slate-50 w-28">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredAndSortedStudents.map((student) => {
-                  const media = getStudentMedia(student);
-                  const mediaFormatted = media.replace('.', ',');
-                  const mediaNum = parseFloat(media);
                   const statusInfo = getStudentStatusInfo(student);
                   const StatusIcon = statusInfo.icon;
 
@@ -857,7 +852,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                         </span>
                       </td>
 
-                      {/* Aluno */}
+                      {/* Nome do Aluno */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           {student.foto ? (
@@ -871,98 +866,42 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                               {student.name.charAt(0)}
                             </div>
                           )}
-                          <div>
-                            <div className="text-sm font-bold text-slate-900 group-hover:text-[#f75142] transition-colors">
-                              {student.name}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-0.5">
-                              <span>
-                                {student.genero === 'F' ? 'Feminino' : 'Masculino'}
-                              </span>
-                              {student.idade && (
-                                <>
-                                  <span>·</span>
-                                  <span>{student.idade} anos</span>
-                                </>
-                              )}
-                            </div>
+                          <div className="text-sm font-bold text-slate-900 group-hover:text-[#f75142] transition-colors">
+                            {student.name}
                           </div>
                         </div>
                       </td>
 
-                      {/* Encarregado & Contacto */}
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-800 truncate max-w-[200px]">
-                          {student.encarregado || 'Não atribuído'}
-                        </div>
-                        <div className="text-[11px] font-mono text-slate-500 mt-0.5">
-                          {student.telefone || 'Sem contacto'}
-                        </div>
-                      </td>
-
-                      {/* Documentação */}
-                      <td className="py-3 px-4">
-                        {student.temDocumentos ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2.5 py-1 rounded-lg">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>Regular</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-lg">
-                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span>Pendente</span>
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Assiduidade */}
-                      <td className="py-3 px-3 text-center">
-                        <div className="inline-flex flex-col items-center">
-                          <span className="font-bold text-slate-800 text-xs">
-                            {student.presencaPercent ?? 100}%
-                          </span>
-                          <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
-                            <div
-                              className={`h-full rounded-full ${
-                                (student.presencaPercent ?? 100) >= 90
-                                   ? 'bg-emerald-500'
-                                   : (student.presencaPercent ?? 100) >= 75
-                                   ? 'bg-amber-500'
-                                   : 'bg-rose-500'
-                              }`}
-                              style={{ width: `${student.presencaPercent ?? 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Média */}
-                      <td className="py-3 px-3 text-center">
+                      {/* Sexo */}
+                      <td className="py-3 px-4 text-center">
                         <span
-                          className={`inline-flex items-center justify-center font-black text-xs px-2.5 py-1 rounded-lg border ${
-                            mediaNum >= 14
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : mediaNum >= 10
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                            student.genero === 'F'
+                              ? 'bg-pink-50 text-pink-700 border border-pink-200/70'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200/70'
                           }`}
                         >
-                          {mediaFormatted}
+                          {student.genero === 'F' ? 'Feminino' : 'Masculino'}
                         </span>
                       </td>
 
-                      {/* Situação de Aprovação */}
-                      <td className="py-3 px-3 text-center">
+                      {/* Idade */}
+                      <td className="py-3 px-4 text-center font-semibold text-slate-700 text-xs">
+                        {student.idade || 9} anos
+                      </td>
+
+                      {/* Situação */}
+                      <td className="py-3 px-4 text-center">
                         <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border ${statusInfo.badgeClass}`}
+                          className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${statusInfo.badgeClass}`}
                           title={statusInfo.label}
                         >
-                          <StatusIcon className="w-3 h-3 shrink-0" />
+                          <StatusIcon className="w-3.5 h-3.5 shrink-0" />
                           <span>{statusInfo.shortLabel}</span>
                         </span>
                       </td>
 
-                      {/* Ação explícita: Ver ficha */}
+                      {/* Ação: Ver ficha */}
                       <td className="py-3 px-4 text-right">
                         <button
                           onClick={(e) => {
@@ -1024,92 +963,44 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                           <h4 className="text-sm font-bold text-slate-900 group-hover:text-[#f75142] transition-colors leading-snug line-clamp-1">
                             {student.name}
                           </h4>
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-0.5">
-                            <span>{student.genero === 'F' ? 'Feminino' : 'Masculino'}</span>
-                            {student.idade && (
-                              <>
-                                <span>·</span>
-                                <span>{student.idade} anos</span>
-                              </>
-                            )}
-                          </div>
+                          <span className="text-[11px] font-semibold text-slate-500 block mt-0.5">
+                            {student.idade || 9} anos
+                          </span>
                         </div>
                       </div>
 
-                      <div>
-                        {student.temDocumentos ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Regular</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                            <AlertCircle className="w-3 h-3 text-amber-600" />
-                            <span>Pendente</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Dados Chave */}
-                    <div className="py-2.5 space-y-1.5 text-xs text-slate-600">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">Encarregado:</span>
-                        <span className="font-semibold text-slate-800 truncate max-w-[170px]">
-                          {student.encarregado || 'Não registado'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">Contacto:</span>
-                        <span className="font-mono text-slate-700">
-                          {student.telefone || 'S/N'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">Assiduidade:</span>
-                        <span className={`font-semibold ${
-                          (student.presencaPercent ?? 100) >= 90
-                            ? 'text-emerald-600'
-                            : (student.presencaPercent ?? 100) >= 75
-                            ? 'text-amber-600'
-                            : 'text-rose-600'
-                        }`}>
-                          {student.presencaPercent ?? 100}% presente
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Rodapé com Média, Situação e Botão */}
-                  <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-semibold text-slate-500">Média:</span>
                       <span
-                        className={`text-xs font-black px-1.5 py-0.5 rounded ${
-                          mediaNum >= 14
-                            ? 'text-emerald-700 bg-emerald-50'
-                            : mediaNum >= 10
-                            ? 'text-blue-700 bg-blue-50'
-                            : 'text-rose-700 bg-rose-50'
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
+                          student.genero === 'F'
+                            ? 'bg-pink-50 text-pink-700 border border-pink-200/70'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200/70'
                         }`}
                       >
-                        {mediaFormatted}
+                        {student.genero === 'F' ? 'Feminino' : 'Masculino'}
                       </span>
+                    </div>
+
+                    {/* Dados Chave: Apenas Situação */}
+                    <div className="py-2.5 flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-bold text-[11px] uppercase">Situação:</span>
                       <span
-                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusInfo.badgeClass}`}
+                        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border ${statusInfo.badgeClass}`}
                         title={statusInfo.label}
                       >
-                        <StatusIcon className="w-2.5 h-2.5 shrink-0" />
+                        <StatusIcon className="w-3 h-3 shrink-0" />
                         <span>{statusInfo.shortLabel}</span>
                       </span>
                     </div>
+                  </div>
 
+                  {/* Rodapé com Botão */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onSelectStudent(student);
                       }}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-[#002133] group-hover:underline cursor-pointer ml-auto"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-[#002133] group-hover:underline cursor-pointer"
                     >
                       <span>Ver ficha</span>
                       <ChevronRight className="w-3.5 h-3.5" />

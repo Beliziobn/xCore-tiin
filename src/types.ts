@@ -565,8 +565,11 @@ export interface AdminTeacher {
   category: string; // e.g. "Professor Efetivo", "Licenciado", "Coordenador"
   location: string;
   schoolName: string;
+  schoolId?: string;
   presenceRate: number;
   subject: string;
+  gender?: 'F' | 'M' | string;
+  qualification?: string;
   registrationData?: TeacherRegistrationData;
 }
 
@@ -575,6 +578,7 @@ export interface AdminStudent {
   name: string;
   gender: 'F' | 'M';
   gradeClass: string;
+  grade?: string;
   room: string;
   turma: string;
   guardianName: string;
@@ -585,11 +589,14 @@ export interface AdminStudent {
   numeroDocumento?: string;
   dataNascimento?: string;
   idade?: number;
+  age?: number;
   condicaoMatricula?: 'primeira_vez' | 'repetente';
   foto?: string;
   anexoDocumentoNome?: string;
   performanceScore: number; // 0 to 10 or 0 to 100
   schoolName: string;
+  schoolId?: string;
+  schoolType?: string;
   registrationData?: StudentRegistrationData;
 }
 
@@ -931,6 +938,59 @@ export interface TeacherRegistrationData {
   historicoAlteracoes: TeacherAuditLog[];
   criadoEm: string;
   atualizadoEm: string;
+}
+
+// ============================================================================
+// RAG INTELIGENTE: ESTRUTURA DE DADOS VETORIAIS E GERAÇÃO AUMENTADA
+// ============================================================================
+export type RagCategory =
+  | 'normativo_med'
+  | 'pedagogico'
+  | 'secretaria_matriculas'
+  | 'calendario_letivo'
+  | 'sistema_ucore'
+  | 'institucional';
+
+export interface RagChunkClient {
+  id: string;
+  documentId: string;
+  documentTitle: string;
+  category: RagCategory;
+  sectionTitle: string;
+  content: string;
+  legalReference?: string;
+  keywords: string[];
+  createdAt: string;
+  similarityScore?: number;
+}
+
+export interface RagDocumentClient {
+  id: string;
+  title: string;
+  category: RagCategory;
+  summary: string;
+  author: string;
+  legalReference?: string;
+  chunkCount: number;
+  createdAt: string;
+  isCustom?: boolean;
+}
+
+export interface RagQueryResultClient {
+  query: string;
+  answer: string;
+  retrievedChunks: RagChunkClient[];
+  modelUsed: string;
+  durationMs: number;
+  isAugmentedByGemini: boolean;
+  timestamp: string;
+}
+
+export interface RagStatsClient {
+  totalDocuments: number;
+  totalChunks: number;
+  categories: RagCategory[];
+  geminiConfigured: boolean;
 }
 
 

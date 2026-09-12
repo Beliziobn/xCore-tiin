@@ -5,11 +5,17 @@
  * 2. Bloqueio de arraste, cópia e download de imagens e ativos institucionais
  */
 
-import React, { useEffect, useState } from 'react';
-import { Shield, Lock, AlertTriangle, ImageOff } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Shield, Lock, AlertTriangle, ImageOff, Clipboard } from 'lucide-react';
 
 interface ClientProtectionProviderProps {
   children: React.ReactNode;
+}
+
+interface PasteMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
 }
 
 export const ClientProtectionProvider: React.FC<ClientProtectionProviderProps> = ({ children }) => {
@@ -19,6 +25,11 @@ export const ClientProtectionProvider: React.FC<ClientProtectionProviderProps> =
     message: string;
     type: 'inspection' | 'image';
   } | null>(null);
+
+  const [pasteMenu, setPasteMenu] = useState<PasteMenuState | null>(null);
+  const activeInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLElement | null>(null);
+  const selectionRef = useRef<{ start: number; end: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const showNotice = (title: string, message: string, type: 'inspection' | 'image') => {
     setSecurityNotice({ visible: true, title, message, type });
@@ -32,43 +43,225 @@ export const ClientProtectionProvider: React.FC<ClientProtectionProviderProps> =
     return () => clearTimeout(timer);
   }, [securityNotice]);
 
+  // Auxiliar seguro para extrair um HTMLElement mesmo se o alvo for Text node, SVG ou Document
+  const getNearestElement = (target: EventTarget | null | undefined): HTMLElement | null => {
+    if (!target) return null;
+    if (target instanceof HTMLElement) return target;
+    if (target instanceof SVGElement && target.parentElement instanceof HTMLElement) {
+      return target.parentElement;
+    }
+    if (target instanceof Node && target.parentElement instanceof HTMLElement) {
+      return target.parentElement;
+    }
+    return null;
+  };
+
+  // Auxiliar para identificar elemento de entrada de texto editável
+  const getTextBoxElement = (
+    target: EventTarget | null | undefined
+  ): HTMLInputElement | HTMLTextAreaElement | HTMLElement | null => {
+    const el = getNearestElement(target);
+    if (!el) return null;
+
+    if (el instanceof HTMLTextAreaElement) {
+      return !el.disabled && !el.readOnly ? el : null;
+    }
+
+    if (el instanceof HTMLInputElement) {
+      const textTypes = ['text', 'search', 'email', 'password', 'tel', 'url', 'number', ''];
+      const type = (el.type || 'text').toLowerCase();
+      if (textTypes.includes(type) && !el.disabled && !el.readOnly) {
+        return el;
+      }
+      return null;
+    }
+
+    if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') {
+      return el;
+    }
+
+    if (typeof el.closest === 'function') {
+      const closest = el.closest('input, textarea, [contenteditable="true"]') as HTMLElement | null;
+      if (closest && closest !== el) {
+        return getTextBoxElement(closest);
+      }
+    }
+
+    return null;
+  };
+
+  // Inserir texto colado no elemento ativo com suporte completo a histórico e React
+  const insertTextIntoElement = (target: HTMLElement, text: string) => {
+    if (!text) return;
+
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      target.focus();
+      const start = selectionRef.current?.start ?? target.selectionStart ?? target.value.length;
+      const end = selectionRef.current?.end ?? target.selectionEnd ?? target.value.length;
+
+      target.setSelectionRange(start, end);
+
+      let success = false;
+      try {
+        success = document.execCommand('insertText', false, text);
+      } catch {
+        success = false;
+      }
+
+      if (!success) {
+        const currentVal = target.value;
+        const nextVal = currentVal.substring(0, start) + text + currentVal.substring(end);
+
+        const proto =
+          target instanceof HTMLInputElement
+            ? window.HTMLInputElement.prototype
+            : window.HTMLTextAreaElement.prototype;
+        const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+
+        if (nativeSetter) {
+          nativeSetter.call(target, nextVal);
+        } else {
+          target.value = nextVal;
+        }
+
+        const newPos = start + text.length;
+        target.setSelectionRange(newPos, newPos);
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    } else if (target.isContentEditable) {
+      target.focus();
+      try {
+        document.execCommand('insertText', false, text);
+      } catch {
+        target.innerText += text;
+      }
+    }
+  };
+
+  // Executar a ação de colar a partir da área de transferência
+  const handlePasteAction = async () => {
+    const target = activeInputRef.current;
+    setPasteMenu(null);
+    if (!target) return;
+
+    try {
+      target.focus();
+      if (
+        (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) &&
+        selectionRef.current
+      ) {
+        target.setSelectionRange(selectionRef.current.start, selectionRef.current.end);
+      }
+
+      let text = '';
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        text = await navigator.clipboard.readText();
+      }
+
+      if (text) {
+        insertTextIntoElement(target, text);
+      } else {
+        try {
+          document.execCommand('paste');
+        } catch {
+          // Fallback silencioso
+        }
+      }
+    } catch (err) {
+      console.warn('Área de transferência inacessível ou sem permissão:', err);
+      try {
+        target.focus();
+        document.execCommand('paste');
+      } catch {
+        // Fallback silencioso
+      }
+    }
+  };
+
+  // Fechar o menu de colar ao clicar fora, ao rolar a página ou ao pressionar Escape
   useEffect(() => {
-    // 1. Bloqueio de Menu de Contexto (Botão Direito do Cursor)
+    if (!pasteMenu?.visible) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setPasteMenu(null);
+      }
+    };
+
+    const handleClose = () => {
+      setPasteMenu(null);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPasteMenu(null);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside, { capture: true });
+    window.addEventListener('scroll', handleClose, { capture: true, passive: true });
+    window.addEventListener('resize', handleClose);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside, { capture: true });
+      window.removeEventListener('scroll', handleClose, { capture: true });
+      window.removeEventListener('resize', handleClose);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [pasteMenu?.visible]);
+
+  useEffect(() => {
+    // 1. Botão Direito do Cursor:
+    // - Em caixa de texto: abre menu contextual exclusivo com apenas 1 opção ("Colar")
+    // - Fora de caixa de texto: previne o menu nativo sem disparar notificação de "Ação Protegida"
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
       const target = e.target as HTMLElement | null;
-      const isImage =
-        target?.tagName === 'IMG' ||
-        target?.tagName === 'PICTURE' ||
-        target?.closest('img') !== null ||
-        target?.closest('picture') !== null ||
-        (target?.getAttribute('style') || '').includes('background-image');
+      const textBox = getTextBoxElement(target);
 
-      if (isImage) {
-        showNotice(
-          'Ativo Protegido',
-          'Não é permitido extrair, copiar ou descarregar imagens e documentos visuais da plataforma.',
-          'image'
-        );
+      if (textBox) {
+        activeInputRef.current = textBox;
+        if (textBox instanceof HTMLInputElement || textBox instanceof HTMLTextAreaElement) {
+          selectionRef.current = {
+            start: textBox.selectionStart ?? textBox.value.length,
+            end: textBox.selectionEnd ?? textBox.value.length,
+          };
+        } else {
+          selectionRef.current = null;
+        }
+
+        // Posicionar menu dentro dos limites da janela visível
+        const menuWidth = 140;
+        const menuHeight = 42;
+        const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
+        const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
+
+        setPasteMenu({
+          visible: true,
+          x: Math.max(8, x),
+          y: Math.max(8, y),
+        });
       } else {
-        showNotice(
-          'Ação Protegida',
-          'A inspeção do código-fonte e elementos da página está restrita por diretivas de segurança uCore.',
-          'inspection'
-        );
+        // Fora de caixa de texto: fechar menu e não exibir nenhuma notificação
+        setPasteMenu(null);
       }
+
       return false;
     };
 
     // 2. Bloqueio de Arraste de Imagens (Drag & Drop para área de trabalho)
     const handleDragStart = (e: DragEvent) => {
-      const target = e.target as HTMLElement | null;
+      const el = getNearestElement(e.target);
+      if (!el) return;
+
       const isImage =
-        target?.tagName === 'IMG' ||
-        target?.tagName === 'PICTURE' ||
-        target?.closest('img') !== null;
+        el.tagName === 'IMG' ||
+        el.tagName === 'PICTURE' ||
+        (typeof el.closest === 'function' && Boolean(el.closest('img, picture')));
 
       if (isImage) {
         e.preventDefault();
@@ -140,8 +333,14 @@ export const ClientProtectionProvider: React.FC<ClientProtectionProviderProps> =
     // 4. Bloqueio de Cópia Direta de Imagens
     const handleCopy = (e: ClipboardEvent) => {
       const selection = window.getSelection();
-      const node = selection?.anchorNode?.parentElement;
-      if (node?.tagName === 'IMG' || node?.querySelector('img')) {
+      const el = getNearestElement(selection?.anchorNode);
+      if (
+        el &&
+        (el.tagName === 'IMG' ||
+          el.tagName === 'PICTURE' ||
+          (typeof el.closest === 'function' && Boolean(el.closest('img, picture'))) ||
+          Boolean(el.querySelector?.('img')))
+      ) {
         e.preventDefault();
         showNotice(
           'Cópia Não Autorizada',
@@ -167,6 +366,40 @@ export const ClientProtectionProvider: React.FC<ClientProtectionProviderProps> =
   return (
     <>
       {children}
+
+      {/* Menu de Contexto Exclusivo para Caixas de Texto (Apenas Opção Colar) */}
+      {pasteMenu?.visible && (
+        <div
+          id="custom-text-context-menu"
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            left: `${pasteMenu.x}px`,
+            top: `${pasteMenu.y}px`,
+            zIndex: 999999,
+          }}
+          className="bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200/90 p-1 min-w-[136px] animate-in fade-in zoom-in-95 duration-100 select-none"
+        >
+          <button
+            id="btn-context-menu-paste"
+            type="button"
+            onMouseDown={(e) => {
+              // Evitar perda de foco e seleção no campo de texto antes de colar
+              e.preventDefault();
+            }}
+            onClick={handlePasteAction}
+            className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Clipboard className="w-3.5 h-3.5 text-blue-600" />
+              <span>Colar</span>
+            </span>
+            <kbd className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+              Ctrl+V
+            </kbd>
+          </button>
+        </div>
+      )}
 
       {/* Alerta Discreto de Segurança e Bloqueio */}
       {securityNotice?.visible && (

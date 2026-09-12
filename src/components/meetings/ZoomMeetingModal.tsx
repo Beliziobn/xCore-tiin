@@ -59,6 +59,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [participantSearch, setParticipantSearch] = useState('');
+  const [dismissPermissionAlert, setDismissPermissionAlert] = useState(false);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -187,42 +188,40 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
     <div
       ref={containerRef}
       id="zoom-meeting-modal-container"
-      className="fixed inset-0 z-50 bg-[#0b0f17] text-white flex flex-col select-none overflow-hidden font-sans"
+      className="fixed inset-0 z-50 bg-[#F8FAFC] text-slate-900 flex flex-col select-none overflow-hidden font-sans"
     >
-      {/* TOP HEADER (Zoom Style) */}
-      <header className="h-14 px-4 sm:px-6 bg-slate-950/80 backdrop-blur-md border-b border-white/10 flex items-center justify-between shrink-0 z-30">
+      {/* TOP HEADER (Clean, Professional SaaS uCore Meet) */}
+      <header className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 py-2.5 flex items-center justify-between shrink-0 z-30 gap-4">
         {/* Left: Meeting Info */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-sm shrink-0">
             uM
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-white truncate">{roomTitle}</h2>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <h1 className="text-sm font-semibold text-slate-900 truncate">
+                {roomTitle}
+              </h1>
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] text-[11px] font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse"></span>
                 <span>WebRTC Direto</span>
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-400">
-              <span className="font-mono text-slate-300">ID: {roomId}</span>
-              <span>•</span>
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+              <span className="font-mono">ID: {cleanRoomId}</span>
+              <span>·</span>
               <button
                 type="button"
                 onClick={handleCopyInvite}
-                className="hover:text-white inline-flex items-center gap-1 cursor-pointer transition-colors"
+                className="hover:text-blue-600 underline cursor-pointer transition-colors inline-flex items-center gap-1"
                 title="Copiar convite da reunião"
               >
                 {copiedLink ? (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span className="text-emerald-400 font-bold">Copiado!</span>
-                  </>
+                  <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Copiado!
+                  </span>
                 ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copiar Convite</span>
-                  </>
+                  <span>Copiar Convite</span>
                 )}
               </button>
             </div>
@@ -231,14 +230,13 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
 
         {/* Center: Timer & Recording status */}
         <div className="hidden md:flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-slate-200">
-            <span>Duração:</span>
-            <span className="font-bold text-white">{formatDuration(durationSeconds)}</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-xs font-medium text-slate-600">
+            <span>Duração: {formatDuration(durationSeconds)}</span>
           </div>
 
           {isRecording && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold animate-pulse">
-              <Circle className="w-2.5 h-2.5 fill-red-500 text-red-500" />
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-600 text-xs font-semibold animate-pulse">
+              <Circle className="w-2.5 h-2.5 fill-red-600 text-red-600" />
               <span>GRAVANDO</span>
             </div>
           )}
@@ -246,35 +244,37 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
 
         {/* Right: Layout Toggle & Fullscreen */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden sm:flex items-center bg-white/5 rounded-lg p-0.5 border border-white/10">
+          <div className="hidden sm:flex items-center gap-1">
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors flex items-center gap-1 ${
-                viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-slate-400 hover:text-white'
+              className={`w-9 h-9 border rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-blue-50 border-blue-200 text-blue-600'
+                  : 'border-[#E2E8F0] text-slate-500 hover:bg-[#F8FAFC] hover:text-slate-800'
               }`}
               title="Visualização em Grelha"
             >
               <Grid className="w-4 h-4" />
-              <span className="hidden lg:inline text-[11px]">Grelha</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('speaker')}
-              className={`p-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors flex items-center gap-1 ${
-                viewMode === 'speaker' ? 'bg-white/20 text-white' : 'text-slate-400 hover:text-white'
+              className={`w-9 h-9 border rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                viewMode === 'speaker'
+                  ? 'bg-blue-50 border-blue-200 text-blue-600'
+                  : 'border-[#E2E8F0] text-slate-500 hover:bg-[#F8FAFC] hover:text-slate-800'
               }`}
               title="Visualização em Orador"
             >
               <UserCheck className="w-4 h-4" />
-              <span className="hidden lg:inline text-[11px]">Orador</span>
             </button>
           </div>
 
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="w-9 h-9 border border-[#E2E8F0] rounded-lg flex items-center justify-center text-slate-500 hover:bg-[#F8FAFC] hover:text-slate-800 transition-colors cursor-pointer"
             title={isFullscreen ? 'Sair do ecrã inteiro' : 'Ecrã inteiro'}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -283,64 +283,72 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
       </header>
 
       {/* NOTIFICATIONS & WARNINGS STRIP */}
-      {permissionError && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-amber-300 text-xs shrink-0">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
-            <span>{permissionError}</span>
+      {permissionError && !dismissPermissionAlert && (
+        <div className="bg-[#FEF3C7] text-[#92400E] border-b border-[#FDE68A] px-4 sm:px-6 py-2.5 text-xs sm:text-sm flex items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-[#B45309]" />
+            <span className="truncate">Microfone e câmara inacessíveis ou permissão negada. A aceder em modo ouvinte.</span>
           </div>
-          <span className="text-[11px] opacity-80">Permita o acesso à câmera/microfone para transmitir áudio e vídeo</span>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="text-xs hidden md:inline text-[#92400E]">Pode participar e ouvir a reunião normalmente</span>
+            <button
+              type="button"
+              onClick={() => setDismissPermissionAlert(true)}
+              className="p-1 rounded-md hover:bg-amber-200/50 text-[#92400E] cursor-pointer transition-colors"
+              title="Dispensar aviso"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* MAIN BODY (Video Grid + Optional Side Drawer) */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* VIDEO STAGE */}
-        <main className="flex-1 p-3 sm:p-5 flex flex-col justify-center overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 flex flex-col justify-center overflow-y-auto max-w-[1240px] mx-auto w-full">
           {/* Quick empty room banner if only 1 user */}
           {participants.length === 0 && (
-            <div className="mb-4 bg-slate-900/90 border border-blue-500/30 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-300 shadow-xl backdrop-blur-sm animate-in fade-in">
-              <div className="flex items-start gap-3 text-left">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
-                  <Share2 className="w-4 h-4" />
+            <div className="mb-5 bg-white border border-[#E2E8F0] rounded-[14px] p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs animate-in fade-in">
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
+                  <Share2 className="w-5 h-5" />
                 </div>
-                <div>
-                  <h4 className="text-white font-bold text-sm">Aguardando participantes nesta sala</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-semibold text-slate-900 mb-0.5">
+                    Aguardando participantes nesta sala
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 mb-2 leading-relaxed">
                     Você já está conectado! Partilhe o link direto com os participantes convidados para que eles entrem automaticamente.
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-[11px] text-blue-300 select-all">
-                      {`${window.location.origin}/?meet=${cleanRoomId}`}
-                    </span>
+                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-slate-600 font-mono max-w-xl overflow-hidden text-ellipsis whitespace-nowrap select-all">
+                    {`${window.location.origin}/?meet=${cleanRoomId}`}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
-                <button
-                  type="button"
-                  onClick={handleCopyDirectLink}
-                  className="flex-1 md:flex-none px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md"
-                >
-                  {copiedLink ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-white" />
-                      <span>Link Copiado!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copiar Link Direto</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleCopyDirectLink}
+                className="w-full md:w-auto bg-[#2563EB] hover:bg-[#1D4ED8] text-white border-none px-4 py-2.5 rounded-lg font-semibold text-xs sm:text-sm cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap transition-colors shadow-xs"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="w-4 h-4 text-white" />
+                    <span>Link Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Copiar Link Direto</span>
+                  </>
+                )}
+              </button>
             </div>
           )}
 
           {/* GRID OF VIDEOS */}
           <div
-            className={`grid gap-3 sm:gap-4 flex-1 items-center justify-center w-full ${getGridColsClass(
+            className={`grid gap-4 flex-1 items-center justify-center w-full ${getGridColsClass(
               totalParticipantsCount
             )}`}
           >
@@ -361,7 +369,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
               onTogglePin={() =>
                 setPinnedParticipantId((prev) => (prev === 'local' ? null : 'local'))
               }
-              className={totalParticipantsCount === 1 ? 'aspect-video max-h-[75vh]' : 'aspect-video min-h-[220px]'}
+              className={totalParticipantsCount === 1 ? 'aspect-[16/10] max-h-[72vh] w-full max-w-[780px] mx-auto' : 'aspect-video min-h-[220px]'}
             />
 
             {/* REMOTE PARTICIPANTS TILES */}
@@ -398,33 +406,33 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
 
         {/* SIDE DRAWER (Participants or Chat) */}
         {activeSideDrawer && (
-          <aside className="w-80 sm:w-96 bg-slate-900 border-l border-white/10 flex flex-col z-30 shrink-0 animate-in slide-in-from-right-5 duration-200">
+          <aside className="w-80 sm:w-96 bg-white border-l border-[#E2E8F0] flex flex-col z-30 shrink-0 shadow-lg text-slate-900 animate-in slide-in-from-right-5 duration-200">
             {/* Drawer Header */}
-            <div className="h-14 px-4 border-b border-white/10 flex items-center justify-between">
+            <div className="h-14 px-4 border-b border-[#E2E8F0] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {activeSideDrawer === 'participants' ? (
                   <>
-                    <Users className="w-5 h-5 text-blue-400" />
-                    <h3 className="font-bold text-sm text-white">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    <h3 className="font-semibold text-sm text-slate-900">
                       Participantes ({totalParticipantsCount})
                     </h3>
                   </>
                 ) : activeSideDrawer === 'chat' ? (
                   <>
-                    <MessageSquare className="w-5 h-5 text-emerald-400" />
-                    <h3 className="font-bold text-sm text-white">Bate-papo da Reunião</h3>
+                    <MessageSquare className="w-5 h-5 text-emerald-600" />
+                    <h3 className="font-semibold text-sm text-slate-900">Bate-papo da Reunião</h3>
                   </>
                 ) : (
                   <>
-                    <Settings className="w-5 h-5 text-purple-400" />
-                    <h3 className="font-bold text-sm text-white">Configurações de Áudio & Vídeo</h3>
+                    <Settings className="w-5 h-5 text-purple-600" />
+                    <h3 className="font-semibold text-sm text-slate-900">Ajustes de Áudio & Vídeo</h3>
                   </>
                 )}
               </div>
               <button
                 type="button"
                 onClick={() => setActiveSideDrawer(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -439,7 +447,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                   placeholder="Buscar participante..."
                   value={participantSearch}
                   onChange={(e) => setParticipantSearch(e.target.value)}
-                  className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 mb-3 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 mb-3 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white"
                 />
 
                 {/* Host actions */}
@@ -447,7 +455,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                   <button
                     type="button"
                     onClick={hostMuteAll}
-                    className="flex-1 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-bold border border-red-500/30 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    className="flex-1 px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold border border-red-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <MicOff className="w-3.5 h-3.5" />
                     <span>Silenciar Todos</span>
@@ -455,7 +463,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCopyInvite}
-                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
                     title="Copiar convite"
                   >
                     Convidar
@@ -465,32 +473,32 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                 {/* Participant List */}
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                   {/* Local user entry */}
-                  <div className="p-2.5 rounded-xl bg-slate-800/80 border border-white/10 flex items-center justify-between">
+                  <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
                         {userPayload.name.charAt(0)}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-white truncate flex items-center gap-1">
+                        <div className="text-xs font-semibold text-slate-900 truncate flex items-center gap-1">
                           <span>{userPayload.name}</span>
-                          <span className="text-[10px] text-blue-400 font-normal">(Você)</span>
+                          <span className="text-[10px] text-blue-600 font-normal">(Você)</span>
                         </div>
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block truncate">
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block truncate">
                           {userPayload.role}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                      {isHandRaised && <Hand className="w-4 h-4 text-amber-400 fill-amber-400 animate-bounce" />}
+                    <div className="flex items-center gap-2 text-slate-500">
+                      {isHandRaised && <Hand className="w-4 h-4 text-blue-600 fill-blue-600 animate-bounce" />}
                       {isAudioMuted ? (
-                        <MicOff className="w-4 h-4 text-red-400" />
+                        <MicOff className="w-4 h-4 text-red-500" />
                       ) : (
-                        <Mic className="w-4 h-4 text-emerald-400" />
+                        <Mic className="w-4 h-4 text-emerald-600" />
                       )}
                       {isVideoOff ? (
-                        <VideoOff className="w-4 h-4 text-red-400" />
+                        <VideoOff className="w-4 h-4 text-red-500" />
                       ) : (
-                        <Video className="w-4 h-4 text-emerald-400" />
+                        <Video className="w-4 h-4 text-blue-600" />
                       )}
                     </div>
                   </div>
@@ -499,32 +507,32 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                   {filteredParticipants.map((p) => (
                     <div
                       key={p.socketId}
-                      className="p-2.5 rounded-xl bg-slate-800/50 border border-white/5 hover:border-white/10 flex items-center justify-between transition-colors"
+                      className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 hover:bg-slate-100/80 flex items-center justify-between transition-colors"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
                           {p.name.charAt(0)}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-white truncate">{p.name}</h4>
-                          <span className="text-[10px] text-slate-400 uppercase tracking-wider block truncate">
+                          <h4 className="text-xs font-semibold text-slate-900 truncate">{p.name}</h4>
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block truncate">
                             {p.role}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-slate-400">
+                      <div className="flex items-center gap-2 text-slate-500">
                         {p.handRaised && (
-                          <Hand className="w-4 h-4 text-amber-400 fill-amber-400 animate-bounce" />
+                          <Hand className="w-4 h-4 text-blue-600 fill-blue-600 animate-bounce" />
                         )}
                         {p.audioMuted ? (
-                          <MicOff className="w-4 h-4 text-red-400" />
+                          <MicOff className="w-4 h-4 text-red-500" />
                         ) : (
-                          <Mic className="w-4 h-4 text-emerald-400" />
+                          <Mic className="w-4 h-4 text-emerald-600" />
                         )}
                         {p.videoOff ? (
-                          <VideoOff className="w-4 h-4 text-red-400" />
+                          <VideoOff className="w-4 h-4 text-red-500" />
                         ) : (
-                          <Video className="w-4 h-4 text-emerald-400" />
+                          <Video className="w-4 h-4 text-blue-600" />
                         )}
                       </div>
                     </div>
@@ -539,7 +547,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                 {/* Messages Feed */}
                 <div ref={chatScrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3">
                   {chatMessages.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 text-xs">
+                    <div className="text-center py-12 text-slate-400 text-xs">
                       Nenhuma mensagem enviada nesta reunião ainda.
                     </div>
                   ) : (
@@ -551,14 +559,14 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                           className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                         >
                           <div className="flex items-center gap-1.5 mb-0.5 text-[10px] text-slate-400 px-1">
-                            {!isMine && <span className="font-bold text-slate-200">{msg.senderName}</span>}
+                            {!isMine && <span className="font-semibold text-slate-700">{msg.senderName}</span>}
                             <span>{msg.timestamp}</span>
                           </div>
                           <div
                             className={`p-2.5 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
                               isMine
                                 ? 'bg-blue-600 text-white rounded-br-none'
-                                : 'bg-slate-800 text-slate-100 rounded-bl-none border border-white/10'
+                                : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200'
                             }`}
                           >
                             {msg.text}
@@ -576,12 +584,12 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
                     placeholder="Digite uma mensagem para todos..."
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    className="flex-1 bg-slate-800 border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white"
                   />
                   <button
                     type="submit"
                     disabled={!chatInput.trim()}
-                    className="p-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white transition-colors cursor-pointer"
+                    className="p-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition-colors cursor-pointer"
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -591,33 +599,33 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
 
             {/* SETTINGS DRAWER */}
             {activeSideDrawer === 'settings' && (
-              <div className="flex-1 p-4 space-y-5 overflow-y-auto">
+              <div className="flex-1 p-4 space-y-5 overflow-y-auto text-slate-700">
                 <div>
-                  <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 text-emerald-400" />
+                  <h4 className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-emerald-600" />
                     <span>Microfone & Altifalantes</span>
                   </h4>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <p className="text-xs text-slate-500 leading-relaxed">
                     O cancelamento de eco acústico, redução de ruído e ganho automático uCore estão ativos em tempo real no fluxo de áudio WebRTC.
                   </p>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
-                    <Video className="w-4 h-4 text-blue-400" />
+                  <h4 className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-2">
+                    <Video className="w-4 h-4 text-blue-600" />
                     <span>Resolução de Câmera</span>
                   </h4>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Qualidade otimizada: HD 720p a 30 FPS com compressão adaptativa para conexões móveis ou escolares de Angola.
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Qualidade otimizada: HD 720p a 30 FPS com compressão adaptativa para conexões escolares.
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-white/10">
-                  <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <div className="pt-3 border-t border-slate-200">
+                  <h4 className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-600" />
                     <span>Segurança da Chamada</span>
                   </h4>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <p className="text-xs text-slate-500 leading-relaxed">
                     Comunicação ponto-a-ponto com encriptação DTLS/SRTP nativa. Nenhuma gravação externa é armazenada sem o consentimento dos docentes.
                   </p>
                 </div>
@@ -627,24 +635,30 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
         )}
       </div>
 
-      {/* BOTTOM CONTROL TOOLBAR (Classic Zoom Style) */}
-      <footer className="h-20 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30">
-        {/* Left: Audio & Video controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+      {/* BOTTOM CONTROLS (Clean, Light Theme) */}
+      <footer className="bg-white border-t border-[#E2E8F0] px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-30 flex-wrap sm:flex-nowrap gap-3">
+        {/* Controls Left: Mic & Camera */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* MUTE / UNMUTE MIC */}
           <button
             id="btn-zoom-toggle-audio"
             type="button"
             onClick={toggleAudio}
-            className={`flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              isAudioMuted
-                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                : 'hover:bg-white/10 text-white'
-            }`}
-            title={isAudioMuted ? 'Ativar microfone (Unmute)' : 'Desativar microfone (Mute)'}
+            className="flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[58px]"
+            title={isAudioMuted ? 'Ativar microfone' : 'Desativar microfone'}
           >
-            {isAudioMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5 text-emerald-400" />}
-            <span className="text-[10px] mt-1 font-semibold">{isAudioMuted ? 'Mudo' : 'Microfone'}</span>
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                isAudioMuted
+                  ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {isAudioMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${isAudioMuted ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
+              {isAudioMuted ? 'Mudo' : 'Microfone'}
+            </span>
           </button>
 
           {/* START / STOP VIDEO */}
@@ -652,34 +666,44 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
             id="btn-zoom-toggle-video"
             type="button"
             onClick={toggleVideo}
-            className={`flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              isVideoOff
-                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                : 'hover:bg-white/10 text-white'
-            }`}
+            className="flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[58px]"
             title={isVideoOff ? 'Ligar câmara' : 'Desligar câmara'}
           >
-            {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5 text-blue-400" />}
-            <span className="text-[10px] mt-1 font-semibold">{isVideoOff ? 'Sem Vídeo' : 'Câmara'}</span>
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                isVideoOff
+                  ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${isVideoOff ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
+              {isVideoOff ? 'Sem Vídeo' : 'Câmara'}
+            </span>
           </button>
         </div>
 
-        {/* Center: Interactive Meeting Tools */}
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* SCREEN SHARING */}
+        {/* Controls Center: Interactive Tools */}
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+          {/* SCREEN SHARE */}
           <button
             id="btn-zoom-share-screen"
             type="button"
             onClick={toggleScreenShare}
-            className={`flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              isScreenSharing
-                ? 'bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 animate-pulse'
-                : 'hover:bg-white/10 text-white'
-            }`}
-            title={isScreenSharing ? 'Parar partilha de ecrã' : 'Apresentar ecrã aos participantes'}
+            className="flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[56px]"
+            title={isScreenSharing ? 'Parar partilha de ecrã' : 'Apresentar ecrã'}
           >
-            <Monitor className="w-5 h-5" />
-            <span className="text-[10px] mt-1 font-semibold">
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                isScreenSharing
+                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              <Monitor className="w-4 h-4" />
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${isScreenSharing ? 'text-blue-600 font-semibold' : 'text-slate-600'}`}>
               {isScreenSharing ? 'Partilhando' : 'Ecrã'}
             </span>
           </button>
@@ -689,95 +713,127 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
             id="btn-zoom-raise-hand"
             type="button"
             onClick={toggleHand}
-            className={`flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              isHandRaised
-                ? 'bg-amber-400 text-slate-950 font-bold shadow-md'
-                : 'hover:bg-white/10 text-white'
-            }`}
+            className="flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[56px]"
             title={isHandRaised ? 'Abaixar a mão' : 'Levantar a mão'}
           >
-            <Hand className={`w-5 h-5 ${isHandRaised ? 'fill-slate-950' : ''}`} />
-            <span className="text-[10px] mt-1 font-semibold">
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                isHandRaised
+                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              <Hand className={`w-4 h-4 ${isHandRaised ? 'fill-blue-600 text-blue-600' : ''}`} />
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${isHandRaised ? 'text-blue-600 font-semibold' : 'text-slate-600'}`}>
               {isHandRaised ? 'Levantada' : 'Mão'}
             </span>
           </button>
 
-          {/* PARTICIPANTS DRAWER BUTTON */}
+          {/* MEMBERS / PARTICIPANTS */}
           <button
             id="btn-zoom-participants"
             type="button"
             onClick={() =>
               setActiveSideDrawer((prev) => (prev === 'participants' ? null : 'participants'))
             }
-            className={`relative flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              activeSideDrawer === 'participants' ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white'
-            }`}
+            className="relative flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[56px]"
             title="Lista de participantes"
           >
-            <Users className="w-5 h-5" />
-            <span className="text-[10px] mt-1 font-semibold">Membros</span>
-            <span className="absolute top-1.5 right-2 sm:right-3 px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[9px] font-black">
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                activeSideDrawer === 'participants'
+                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${activeSideDrawer === 'participants' ? 'text-blue-600 font-semibold' : 'text-slate-600'}`}>
+              Membros
+            </span>
+            <span className="absolute top-1 right-2 px-1.5 py-0.2 rounded-full bg-[#2563EB] text-white text-[9px] font-bold">
               {totalParticipantsCount}
             </span>
           </button>
 
-          {/* CHAT DRAWER BUTTON */}
+          {/* CHAT */}
           <button
             id="btn-zoom-chat"
             type="button"
             onClick={() => setActiveSideDrawer((prev) => (prev === 'chat' ? null : 'chat'))}
-            className={`relative flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              activeSideDrawer === 'chat' ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white'
-            }`}
+            className="relative flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[56px]"
             title="Bate-papo da reunião"
           >
-            <MessageSquare className="w-5 h-5" />
-            <span className="text-[10px] mt-1 font-semibold">Bate-papo</span>
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                activeSideDrawer === 'chat'
+                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${activeSideDrawer === 'chat' ? 'text-blue-600 font-semibold' : 'text-slate-600'}`}>
+              Bate-papo
+            </span>
             {chatMessages.length > 0 && (
-              <span className="absolute top-1.5 right-2 sm:right-3 w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-[#16A34A]" />
             )}
           </button>
 
-          {/* RECORDING BUTTON */}
+          {/* RECORDING */}
           <button
             id="btn-zoom-record"
             type="button"
             onClick={toggleRecording}
-            className={`hidden md:flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              isRecording
-                ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                : 'hover:bg-white/10 text-white'
-            }`}
-            title={isRecording ? 'Parar gravação e descarregar vídeo' : 'Gravar esta reunião em vídeo'}
+            className="hidden md:flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[56px]"
+            title={isRecording ? 'Parar gravação' : 'Gravar reunião'}
           >
-            <Circle className={`w-5 h-5 ${isRecording ? 'fill-red-500 text-red-500' : ''}`} />
-            <span className="text-[10px] mt-1 font-semibold">
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                isRecording
+                  ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              <Circle className={`w-4 h-4 ${isRecording ? 'fill-red-600 text-red-600' : ''}`} />
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${isRecording ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
               {isRecording ? 'A Gravar' : 'Gravar'}
             </span>
           </button>
 
-          {/* SETTINGS BUTTON */}
+          {/* SETTINGS */}
           <button
             id="btn-zoom-settings"
             type="button"
             onClick={() => setActiveSideDrawer((prev) => (prev === 'settings' ? null : 'settings'))}
-            className={`hidden sm:flex flex-col items-center justify-center w-14 sm:w-16 h-14 rounded-xl transition-all cursor-pointer ${
-              activeSideDrawer === 'settings' ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white'
-            }`}
-            title="Configurações de Áudio & Vídeo"
+            className="hidden sm:flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[56px]"
+            title="Ajustes de Áudio & Vídeo"
           >
-            <Settings className="w-5 h-5" />
-            <span className="text-[10px] mt-1 font-semibold">Ajustes</span>
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
+                activeSideDrawer === 'settings'
+                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+            </div>
+            <span className={`text-[11px] font-medium leading-none ${activeSideDrawer === 'settings' ? 'text-blue-600 font-semibold' : 'text-slate-600'}`}>
+              Ajustes
+            </span>
           </button>
         </div>
 
-        {/* Right: Leave / End Meeting Button */}
+        {/* Controls Right: Sair da Reunião */}
         <div className="flex items-center gap-2">
           <button
             id="btn-zoom-leave-meeting"
             type="button"
             onClick={onClose}
-            className="px-4 sm:px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer shadow-lg hover:shadow-red-600/30 active:scale-95 whitespace-nowrap"
+            className="bg-[#DC2626] hover:bg-[#B91C1C] text-white border-none px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm cursor-pointer flex items-center gap-2 transition-colors active:scale-95 shadow-xs whitespace-nowrap"
             title="Sair da Reunião"
           >
             <PhoneOff className="w-4 h-4" />

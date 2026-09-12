@@ -85,6 +85,10 @@ import { SecurityDataProtectionPage } from './components/pages/legal/SecurityDat
 import { ZoomMeetingModal } from './components/meetings/ZoomMeetingModal';
 import { MeetingsHubPage } from './components/pages/MeetingsHubPage';
 
+// Intelligent RAG Vector Engine & Academic Opinions
+import { RagIntelligenceModal } from './components/rag/RagIntelligenceModal';
+import { Sparkles } from 'lucide-react';
+
 // Public Institutional Pages: 404, Thank You, and Cases of Success
 import { NotFoundPage } from './components/pages/NotFoundPage';
 import { ThankYouPage } from './components/pages/ThankYouPage';
@@ -181,6 +185,8 @@ export default function App() {
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
   const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
   const [isAuditLogsModalOpen, setIsAuditLogsModalOpen] = useState(false);
+  const [isRagModalOpen, setIsRagModalOpen] = useState(false);
+  const [ragInitialQuery, setRagInitialQuery] = useState('');
   const [homeAIResponse, setHomeAIResponse] = useState<string | null>(null);
 
   const handleHomeAICommand = (prompt: string) => {
@@ -839,6 +845,12 @@ export default function App() {
     if (pageId === '404' || pageId === 'not-found' || pageId === 'erro-404') {
       setCurrentView('404');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (pageId === 'rag' || pageId === 'rag-inteligente' || pageId === 'pareceres') {
+      setRagInitialQuery('');
+      setIsRagModalOpen(true);
       return;
     }
 
@@ -1980,6 +1992,17 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
+                    setRagInitialQuery('Como é calculada a nota trimestral (MT) e qual o peso da MAC no Ensino Geral?');
+                    setIsRagModalOpen(true);
+                  }}
+                  className="text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>🧠 Pareceres & RAG Inteligente MED</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     setCurrentView('diretor-presenca');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
@@ -2005,9 +2028,22 @@ export default function App() {
 
               {homeAIResponse && (
                 <div className="mt-6 text-left p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span>Resposta do Assistente uCore:</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>Resposta do Assistente uCore:</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRagInitialQuery('Consultar base normativa e regulamentar oficial');
+                        setIsRagModalOpen(true);
+                      }}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Abrir Parecer RAG →</span>
+                    </button>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
                     {homeAIResponse}
@@ -2068,6 +2104,10 @@ export default function App() {
         }}
         onOpenSupport={() => setInfoModalType('support')}
         onOpenChat={() => setIsChatOpen(true)}
+        onOpenRag={() => {
+          setRagInitialQuery('');
+          setIsRagModalOpen(true);
+        }}
         unreadChatCount={unreadChatCount}
         onSelectPage={handleSelectPage}
         currentUser={currentUser}
@@ -2315,6 +2355,15 @@ export default function App() {
         currentUser={currentUser}
         initialVideo={activeMeeting.initialVideo}
         initialAudio={activeMeeting.initialAudio}
+      />
+
+      {/* Intelligent RAG Vector Knowledge Center Modal (MED Angola & uCore) */}
+      <RagIntelligenceModal
+        isOpen={isRagModalOpen}
+        onClose={() => setIsRagModalOpen(false)}
+        currentUser={currentUser}
+        activeRole={activeRole}
+        initialQuery={ragInitialQuery}
       />
     </div>
   );

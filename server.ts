@@ -6,6 +6,14 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { setupSignalingServer, getRoomsList, createOrGetRoom, getRoomPresence, dispatchHttpSignal } from "./server/signaling";
 import {
+  executeRagQuery,
+  retrieveRelevantChunks,
+  ingestCustomDocument,
+  getAllDocuments,
+  getKnowledgeBaseStats,
+  deleteCustomDocument,
+} from "./server/rag";
+import {
   validateAngolaBI,
   validateAngolaPhone,
   validateEmail,
@@ -458,6 +466,120 @@ async function startServer() {
         participantCount: room.participants.size,
       },
     });
+  });
+
+  // ============================================================================
+  // RAG INTELIGENTE: ROTAS DE RECUPERAÇÃO E GERAÇÃO AUMENTADA (GEMINI + VETORES)
+  // ============================================================================
+  app.get("/api/rag/stats", (req, res) => {
+    res.json({
+      success: true,
+      stats: getKnowledgeBaseStats(),
+    });
+  });
+
+  app.get("/api/rag/documents", (req, res) => {
+    res.json({
+      success: true,
+      documents: getAllDocuments(),
+    });
+  });
+
+  app.post("/api/rag/search", (req, res) => {
+    const { query, category, maxChunks, threshold } = req.body;
+    if (!query || typeof query !== "string") {
+      return res.status(400).json({ error: "Termo de pesquisa 'query' obrigatório." });
+    }
+    const chunks = retrieveRelevantChunks(query, {
+      category,
+      maxChunks: maxChunks ? Number(maxChunks) : 5,
+      threshold: threshold ? Number(threshold) : 0.1,
+    });
+    res.json({
+      success: true,
+      query,
+      count: chunks.length,
+      chunks,
+    });
+  });
+
+  app.post("/api/rag/query", standardApiLimiter, async (req, res) => {
+    try {
+      const { query, category, userRole, userName, maxChunks } = req.body;
+      if (!query || typeof query !== "string" || !query.trim()) {
+        return res.status(400).json({ error: "A pergunta (query) não pode estar vazia." });
+      }
+
+      const result = await executeRagQuery({
+        query: query.trim(),
+        category,
+        userRole,
+        userName,
+        maxChunks: maxChunks ? Number(maxChunks) : 4,
+      });
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (err: any) {
+      console.error("[RAG] Erro ao processar consulta:", err);
+      res.status(500).json({
+        error: "Falha interna no motor RAG",
+        message: err?.message || "Ocorreu um erro ao processar a consulta.",
+      });
+    }
+  });
+
+  app.post("/api/rag/ingest", sensitiveApiLimiter, (req, res) => {
+    try {
+      const { title, category, summary, author, legalReference, content } = req.body;
+      if (!title || !content || !author) {
+        return res.status(400).json({ error: "Título, autor e conteúdo textual são obrigatórios para ingestão RAG." });
+      }
+
+      const ingested = ingestCustomDocument({
+        title: String(title).substring(0, 150),
+        category: category || "institucional",
+        summary: summary ? String(summary).substring(0, 300) : undefined,
+        author: String(author).substring(0, 100),
+        legalReference: legalReference ? String(legalReference).substring(0, 120) : undefined,
+        content: String(content),
+      });
+
+      // Audit log registration
+      auditLogsStore.push({
+        id: `rag-ingest-${Date.now()}`,
+        action: "RAG_DOCUMENT_INGESTED",
+        severity: "INFO",
+        actorId: author,
+        actorRole: "administrador",
+        targetId: ingested.document.id,
+        targetType: "rag_document",
+        details: `[RAG INGESTÃO] Documento "${ingested.document.title}" indexado com ${ingested.newChunks.length} chunks vetoriais.`,
+        timestamp: new Date().toISOString(),
+        ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Documento indexado com sucesso na base vetorial RAG.",
+        document: ingested.document,
+        chunksCreated: ingested.newChunks.length,
+      });
+    } catch (err: any) {
+      console.error("[RAG] Erro na ingestão:", err);
+      res.status(500).json({ error: "Falha na ingestão do documento RAG." });
+    }
+  });
+
+  app.delete("/api/rag/documents/:id", sensitiveApiLimiter, (req, res) => {
+    const docId = req.params.id;
+    const deleted = deleteCustomDocument(docId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Documento não encontrado ou não permitido para remoção." });
+    }
+    res.json({ success: true, message: "Documento removido da base vetorial RAG." });
   });
 
   // SEO files: robots.txt and sitemap.xml

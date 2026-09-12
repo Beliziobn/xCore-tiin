@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, Award, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, Video, MapPin, HelpCircle } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, Video, Sparkles } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications } from '../utils/authApprovalStorage';
 
@@ -12,6 +12,7 @@ interface NavbarProps {
   onOpenProfile: () => void;
   onOpenSupport: () => void;
   onOpenChat?: () => void;
+  onOpenRag?: () => void;
   unreadChatCount?: number;
   onSelectPage: (page: string) => void;
   currentUser?: UserAccount | null;
@@ -63,6 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenProfile,
   onOpenSupport,
   onOpenChat,
+  onOpenRag,
   unreadChatCount = 0,
   onSelectPage,
   currentUser,
@@ -464,54 +466,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">Ao Vivo</span>
                 </button>
 
-                {/* Casos de Sucesso Escolar */}
+                {/* uCore RAG Inteligente */}
                 <button
-                  id="nav-dropdown-cases"
+                  id="nav-dropdown-rag"
                   onClick={() => {
-                    onSelectPage('cases');
+                    if (onOpenRag) {
+                      onOpenRag();
+                    } else {
+                      onSelectPage('rag');
+                    }
                     setShowPagesDropdown(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
+                  className="w-full text-left px-4 py-2.5 text-xs text-indigo-700 hover:bg-indigo-50 transition-colors border-t border-slate-100 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
                 >
                   <span className="flex items-center gap-2">
-                    <Award className="w-3.5 h-3.5 text-[#f75142]" />
-                    <span>Casos de Sucesso Escolar</span>
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>uCore RAG Inteligente</span>
                   </span>
-                  <span className="text-[9px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded">Impacto</span>
+                  <span className="text-[9px] bg-indigo-100 text-indigo-800 font-black px-1.5 py-0.5 rounded">IA / MED</span>
                 </button>
-
-                {/* Mapas e Rotas */}
-                <button
-                  id="nav-dropdown-maps"
-                  onClick={() => {
-                    onSelectPage('mapas');
-                    setShowPagesDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-red-500" />
-                    <span>Mapa de Escolas & Rotas</span>
-                  </span>
-                  <span className="text-[9px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded">GPS</span>
-                </button>
-
-                {/* Perguntas Frequentes (FAQ) */}
-                <button
-                  id="nav-dropdown-faq"
-                  onClick={() => {
-                    onSelectPage('faq');
-                    setShowPagesDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Perguntas Frequentes (FAQ)</span>
-                  </span>
-                  <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">5 Dúvidas</span>
-                </button>
-
               </div>
             )}
           </div>
@@ -519,22 +492,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right CTA Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick Meetings & Video Conferences (Zoom Style) */}
-          <button
-            id="navbar-meetings-btn"
-            onClick={() => onSelectPage('reunioes')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
-              currentView === 'reunioes' || currentView === 'reunioes-salas'
-                ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
-                : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
-            }`}
-            title="Salas Virtuais & Videoconferência em Tempo Real (Estilo Zoom)"
-          >
-            <Video className="w-3.5 h-3.5 text-blue-300" />
-            <span className="hidden sm:inline">Reuniões</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          </button>
-
           {/* Quick Approvals Button for Director */}
           {activeRole === 'diretor' && (
             <button
@@ -1013,6 +970,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
           <button
             onClick={() => {
+              if (onOpenRag) {
+                onOpenRag();
+              } else {
+                onSelectPage('rag');
+              }
+              setMobileMenuOpen(false);
+            }}
+            className="text-left py-2 px-3 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span>uCore RAG Inteligente</span>
+            </div>
+            <span className="text-[9px] bg-indigo-200 text-indigo-900 font-black px-1.5 py-0.5 rounded">IA / MED</span>
+          </button>
+          <button
+            onClick={() => {
               onSelectPage('reunioes');
               setMobileMenuOpen(false);
             }}
@@ -1023,45 +997,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Salas Virtuais & Zoom</span>
             </div>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          </button>
-          <button
-            onClick={() => {
-              onSelectPage('cases');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 bg-purple-50/70 text-purple-800 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-[#f75142]" />
-              <span>Casos de Sucesso Escolar</span>
-            </div>
-            <span className="text-[9px] bg-purple-200 text-purple-900 font-black px-1.5 py-0.5 rounded">Angola</span>
-          </button>
-          <button
-            onClick={() => {
-              onSelectPage('mapas');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 bg-red-50/70 text-red-800 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-red-600" />
-              <span>Mapa de Escolas & Rotas</span>
-            </div>
-            <span className="text-[9px] bg-red-200 text-red-900 font-black px-1.5 py-0.5 rounded">GPS</span>
-          </button>
-          <button
-            onClick={() => {
-              onSelectPage('faq');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 bg-blue-50/70 text-blue-800 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-blue-600" />
-              <span>Perguntas Frequentes (FAQ)</span>
-            </div>
-            <span className="text-[9px] bg-blue-200 text-blue-900 font-black px-1.5 py-0.5 rounded">5 Dúvidas</span>
           </button>
           {onOpenChat && (
             <button

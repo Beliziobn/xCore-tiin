@@ -78,9 +78,7 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
       list = list.filter(
         (s) =>
           s.nomeCompleto.toLowerCase().includes(q) ||
-          s.codigoMatricula.toLowerCase().includes(q) ||
-          s.encarregado.toLowerCase().includes(q) ||
-          s.numeroDocumento.toLowerCase().includes(q)
+          s.condicaoMatricula.toLowerCase().includes(q)
       );
     }
 
@@ -289,7 +287,7 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Localizar aluno nesta turma..."
+                  placeholder="Pesquisar por nome do aluno..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#f75142]"
@@ -315,7 +313,7 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
                 {stats.meninas}
               </div>
               <div>
-                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Feminino</span>
+                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Sexo Feminino</span>
                 <span className="text-xs font-black text-slate-900 leading-tight">{stats.percentualF} alunas</span>
               </div>
             </div>
@@ -325,28 +323,28 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
                 {stats.meninos}
               </div>
               <div>
-                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Masculino</span>
+                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Sexo Masculino</span>
                 <span className="text-xs font-black text-slate-900 leading-tight">{stats.percentualM} alunos</span>
               </div>
             </div>
 
             <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0">
-                {stats.comDocumentos}
+                {stats.idadeMedia}
               </div>
               <div>
-                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Documentação</span>
-                <span className="text-xs font-black text-emerald-700 leading-tight">BI / Cédula Ok</span>
+                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Idade Média</span>
+                <span className="text-xs font-black text-emerald-700 leading-tight">Faixa etária</span>
               </div>
             </div>
 
             <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center gap-2.5 col-span-2 sm:col-span-1">
               <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-black text-xs shrink-0">
-                {stats.semDocumentos}
+                {turmaData.students.length - stats.repetentes}
               </div>
               <div>
-                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Pendências</span>
-                <span className="text-xs font-black text-amber-700 leading-tight">Processo BUIF</span>
+                <span className="text-[10px] font-bold uppercase text-slate-400 block leading-tight">Situação</span>
+                <span className="text-xs font-black text-amber-700 leading-tight">Novos / {stats.repetentes} Repet.</span>
               </div>
             </div>
           </div>
@@ -397,22 +395,19 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#002133] text-white text-[11px] font-black uppercase tracking-wider">
-                    <th className="py-2.5 px-3 text-center w-12 border-r border-white/10">Nº</th>
-                    <th className="py-2.5 px-3 w-28 border-r border-white/10">Nº Processo</th>
-                    <th className="py-2.5 px-3 min-w-[220px] border-r border-white/10">
-                      Nome Completo do Aluno (Ordem A-Z)
+                    <th className="py-3 px-3 text-center w-14 border-r border-white/10">Nº</th>
+                    <th className="py-3 px-4 border-r border-white/10">
+                      Nome do Aluno
                     </th>
-                    <th className="py-2.5 px-2.5 text-center w-14 border-r border-white/10">Sexo</th>
-                    <th className="py-2.5 px-2.5 text-center w-14 border-r border-white/10">Idade</th>
-                    <th className="py-2.5 px-3 min-w-[160px] border-r border-white/10">Identificação</th>
-                    <th className="py-2.5 px-3 min-w-[180px] border-r border-white/10">Encarregado</th>
-                    <th className="py-2.5 px-3 w-24 text-center">Situação</th>
+                    <th className="py-3 px-4 text-center w-32 border-r border-white/10">Sexo</th>
+                    <th className="py-3 px-4 text-center w-28 border-r border-white/10">Idade</th>
+                    <th className="py-3 px-4 text-center w-36">Situação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {displayedStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-slate-500">
+                      <td colSpan={5} className="text-center py-8 text-slate-500">
                         Nenhum aluno encontrado para os critérios selecionados.
                       </td>
                     </tr>
@@ -424,15 +419,12 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
                           idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'
                         }`}
                       >
-                        <td className="py-2.5 px-3 text-center font-black text-slate-900 border-r border-slate-100">
+                        <td className="py-3 px-3 text-center font-black text-slate-900 border-r border-slate-100">
                           {student.numeroOrdem}
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 border-r border-slate-100">
-                          {student.codigoMatricula}
-                        </td>
-                        <td className="py-2.5 px-3 font-bold text-slate-900 border-r border-slate-100">
-                          <div className="flex items-center gap-1.5">
-                            <span>{student.nomeCompleto}</span>
+                        <td className="py-3 px-4 font-bold text-slate-900 border-r border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-900">{student.nomeCompleto}</span>
                             {idx === 0 && (
                               <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
                                 1º de A-Z
@@ -440,48 +432,28 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
                             )}
                           </div>
                         </td>
-                        <td className="py-2.5 px-2.5 text-center font-black border-r border-slate-100">
+                        <td className="py-3 px-4 text-center border-r border-slate-100">
                           <span
-                            className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                               student.genero === 'F'
-                                ? 'bg-pink-50 text-pink-700'
-                                : 'bg-blue-50 text-blue-700'
+                                ? 'bg-pink-50 text-pink-700 border border-pink-200/70'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200/70'
                             }`}
                           >
-                            {student.genero}
+                            {student.genero === 'F' ? 'Feminino' : 'Masculino'}
                           </span>
                         </td>
-                        <td className="py-2.5 px-2.5 text-center text-slate-700 border-r border-slate-100">
+                        <td className="py-3 px-4 text-center text-slate-700 font-semibold border-r border-slate-100">
                           {student.idade} anos
                         </td>
-                        <td className="py-2.5 px-3 border-r border-slate-100">
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-slate-800 text-[11px]">
-                              {student.tipoDocumento}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {student.numeroDocumento}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-600 border-r border-slate-100">
-                          <div className="flex flex-col">
-                            <span className="font-medium text-slate-800 truncate max-w-[170px]">
-                              {student.encarregado}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {student.telefone}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-3 px-4 text-center">
                           <span
-                            className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                            className={`inline-flex items-center px-3 py-1 text-xs font-black uppercase rounded-full ${
                               student.condicaoMatricula === 'Repetente'
-                                ? 'bg-amber-100 text-amber-800'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                 : student.condicaoMatricula === 'Transferido'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                             }`}
                           >
                             {student.condicaoMatricula}

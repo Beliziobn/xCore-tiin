@@ -1,3 +1,4 @@
+import { Server as SocketIOServer, Socket } from 'socket.io';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server as HttpServer } from 'http';
 
@@ -24,6 +25,14 @@ export interface MeetingChatMessage {
   timestamp: string;
 }
 
+export interface ConnectedClient {
+  socketId: string;
+  socketIo?: Socket;
+  ws?: WebSocket;
+  info: ParticipantInfo;
+  lastActive: number;
+}
+
 export interface MeetingRoom {
   id: string;
   title: string;
@@ -31,7 +40,7 @@ export interface MeetingRoom {
   hostName: string;
   schoolName: string;
   createdAt: string;
-  participants: Map<string, { ws: WebSocket; info: ParticipantInfo; lastActive?: number }>;
+  participants: Map<string, ConnectedClient>;
   chatHistory: MeetingChatMessage[];
 }
 
@@ -158,26 +167,377 @@ export function dispatchHttpSignal(rawRoomId: string, fromSocketId: string, targ
   if (!room) return false;
 
   const targetClient = room.participants.get(targetSocketId);
-  if (targetClient && targetClient.ws.readyState === WebSocket.OPEN) {
-    targetClient.ws.send(
-      JSON.stringify({
-        type: 'signal',
+  if (targetClient) {
+    if (targetClient.socketIo) {
+      targetClient.socketIo.emit('signal', {
         fromSocketId,
         fromUser,
         signalData,
-      })
-    );
-    return true;
+      });
+      return true;
+    }
+    if (targetClient.ws && targetClient.ws.readyState === WebSocket.OPEN) {
+      targetClient.ws.send(
+        JSON.stringify({
+          type: 'signal',
+          fromSocketId,
+          fromUser,
+          signalData,
+        })
+      );
+      return true;
+    }
   }
   return false;
 }
 
+let ioInstance: SocketIOServer | null = null;
+export function getSocketIOServer(): SocketIOServer | null {
+  return ioInstance;
+}
+
 export function setupSignalingServer(httpServer: HttpServer) {
+  // 1. SETUP SOCKET.IO SIGNALING SERVER (Industry standard, robust through proxies)
+  const io = new SocketIOServer(httpServer, {
+    path: '/socket.io',
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST'],
+    },
+    transports: ['polling', 'websocket'],
+    pingTimeout: 25000,
+    pingInterval: 10000,
+  });
+  ioInstance = io;
+
+  console.log('[Socket.io] Real-time WebRTC Signaling Server mounted on /socket.io');
+
+  io.on('connection', (socket: Socket) => {
+    let currentRoomId: string | null = null;
+    let currentParticipant: ParticipantInfo | null = null;
+
+    socket.on('join-room', (data: { roomId: string; title?: string; user?: any }) => {
+      try {
+        const rawRoomId = data?.roomId;
+        const normalizedId = normalizeRoomId(rawRoomId) || `ucore-${Math.random().toString(36).substring(2, 8)}`;
+        currentRoomId = normalizedId;
+
+        const room = createOrGetRoom(normalizedId, data?.title, data?.user?.name, data?.user?.schoolName);
+
+        currentParticipant = {
+          id: data?.user?.id || socket.id,
+          socketId: socket.id,
+          name: data?.user?.name || 'Participante',
+          role: data?.user?.role || 'convidado',
+          schoolName: data?.user?.schoolName || 'Escola',
+          avatar: data?.user?.avatar || '',
+          joinedAt: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+          audioMuted: !!data?.user?.audioMuted,
+          videoOff: !!data?.user?.videoOff,
+          handRaised: false,
+          isScreenSharing: false,
+        };
+
+        // Join Socket.io room channel
+        socket.join(normalizedId);
+
+        // Register in centralized room state
+        room.participants.set(socket.id, {
+          socketId: socket.id,
+          socketIo: socket,
+          info: currentParticipant,
+          lastActive: Date.now(),
+        });
+
+        // Cancel deletion timer if active
+        if (roomDeleteTimers.has(normalizedId)) {
+          clearTimeout(roomDeleteTimers.get(normalizedId)!);
+          roomDeleteTimers.delete(normalizedId);
+        }
+
+        // Get list of existing peers in the room
+        const existingParticipants = Array.from(room.participants.values())
+          .filter((p) => p.info.socketId !== socket.id)
+          .map((p) => p.info);
+
+        // Acknowledge to newly connected socket
+        socket.emit('room-joined', {
+          roomId: normalizedId,
+          socketId: socket.id,
+          roomTitle: room.title,
+          self: currentParticipant,
+          participants: existingParticipants,
+          chatHistory: room.chatHistory,
+        });
+
+        // Broadcast to all other peers in the room (Socket.io)
+        socket.to(normalizedId).emit('user-joined', {
+          roomId: normalizedId,
+          participant: currentParticipant,
+        });
+
+        // Also broadcast to any raw WS peers in the room
+        for (const [otherSocketId, client] of room.participants.entries()) {
+          if (otherSocketId !== socket.id && client.ws && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(
+              JSON.stringify({
+                type: 'user-joined',
+                participant: currentParticipant,
+              })
+            );
+          }
+        }
+
+        console.log(`[Socket.io] ${currentParticipant.name} (${socket.id}) joined room: "${normalizedId}". Room size: ${room.participants.size}`);
+      } catch (err) {
+        console.error('[Socket.io] Error in join-room:', err);
+      }
+    });
+
+    // WEBRTC SIGNAL RELAY (Offer, Answer, ICE Candidate)
+    socket.on('signal', (data: { targetSocketId: string; signalData: any }) => {
+      try {
+        const { targetSocketId, signalData } = data;
+        if (!targetSocketId || !signalData) return;
+
+        if (currentRoomId && rooms.has(currentRoomId)) {
+          const room = rooms.get(currentRoomId)!;
+          const targetClient = room.participants.get(targetSocketId);
+
+          if (targetClient) {
+            if (targetClient.socketIo) {
+              targetClient.socketIo.emit('signal', {
+                fromSocketId: socket.id,
+                fromUser: currentParticipant,
+                signalData,
+              });
+              return;
+            }
+            if (targetClient.ws && targetClient.ws.readyState === WebSocket.OPEN) {
+              targetClient.ws.send(
+                JSON.stringify({
+                  type: 'signal',
+                  fromSocketId: socket.id,
+                  fromUser: currentParticipant,
+                  signalData,
+                })
+              );
+              return;
+            }
+          }
+        }
+
+        // Fallback direct broadcast to target socket ID
+        io.to(targetSocketId).emit('signal', {
+          fromSocketId: socket.id,
+          fromUser: currentParticipant,
+          signalData,
+        });
+      } catch (err) {
+        console.error('[Socket.io] Error relaying signal:', err);
+      }
+    });
+
+    // MEDIA TOGGLE (Audio mute, Video off, Screen share)
+    socket.on('media-toggle', (data: { roomId?: string; audioMuted?: boolean; videoOff?: boolean; isScreenSharing?: boolean }) => {
+      try {
+        const targetRoomId = normalizeRoomId(data?.roomId || '') || currentRoomId;
+        if (!targetRoomId || !currentParticipant) return;
+        const room = rooms.get(targetRoomId);
+        if (!room) return;
+
+        if (typeof data.audioMuted === 'boolean') currentParticipant.audioMuted = data.audioMuted;
+        if (typeof data.videoOff === 'boolean') currentParticipant.videoOff = data.videoOff;
+        if (typeof data.isScreenSharing === 'boolean') currentParticipant.isScreenSharing = data.isScreenSharing;
+
+        const updatePayload = {
+          socketId: socket.id,
+          audioMuted: currentParticipant.audioMuted,
+          videoOff: currentParticipant.videoOff,
+          isScreenSharing: currentParticipant.isScreenSharing,
+        };
+
+        socket.to(targetRoomId).emit('user-media-toggled', updatePayload);
+
+        // Also notify raw WS clients
+        for (const client of room.participants.values()) {
+          if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(JSON.stringify({ type: 'user-media-toggled', ...updatePayload }));
+          }
+        }
+      } catch (err) {
+        console.error('[Socket.io] Error in media-toggle:', err);
+      }
+    });
+
+    // RAISE / LOWER HAND
+    socket.on('raise-hand', (data: { roomId?: string; raised: boolean }) => {
+      try {
+        const targetRoomId = normalizeRoomId(data?.roomId || '') || currentRoomId;
+        if (!targetRoomId || !currentParticipant) return;
+        const room = rooms.get(targetRoomId);
+        if (!room) return;
+
+        currentParticipant.handRaised = !!data.raised;
+        const payload = {
+          socketId: socket.id,
+          raised: currentParticipant.handRaised,
+          userName: currentParticipant.name,
+        };
+
+        socket.to(targetRoomId).emit('user-hand-raised', payload);
+
+        for (const client of room.participants.values()) {
+          if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(JSON.stringify({ type: 'user-hand-raised', ...payload }));
+          }
+        }
+      } catch (err) {
+        console.error('[Socket.io] Error in raise-hand:', err);
+      }
+    });
+
+    // IN-MEETING CHAT
+    socket.on('meeting-chat-send', (data: { roomId?: string; message: MeetingChatMessage }) => {
+      try {
+        const targetRoomId = normalizeRoomId(data?.roomId || '') || currentRoomId;
+        if (!targetRoomId || !currentParticipant || !data?.message) return;
+        const room = rooms.get(targetRoomId);
+        if (!room) return;
+
+        const chatMsg: MeetingChatMessage = {
+          id: data.message.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          senderId: currentParticipant.id,
+          senderName: currentParticipant.name,
+          senderRole: currentParticipant.role,
+          text: (data.message.text || '').trim(),
+          timestamp: data.message.timestamp || new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+        };
+
+        if (!chatMsg.text) return;
+
+        room.chatHistory.push(chatMsg);
+        if (room.chatHistory.length > 150) {
+          room.chatHistory.shift();
+        }
+
+        io.to(targetRoomId).emit('meeting-chat-broadcast', { message: chatMsg });
+
+        for (const client of room.participants.values()) {
+          if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(JSON.stringify({ type: 'meeting-chat-broadcast', message: chatMsg }));
+          }
+        }
+      } catch (err) {
+        console.error('[Socket.io] Error in meeting-chat-send:', err);
+      }
+    });
+
+    // HOST ACTIONS (Mute All, End Meeting, Kick)
+    socket.on('host-action', (data: { action: string; targetSocketId?: string; roomId?: string }) => {
+      try {
+        const targetRoomId = normalizeRoomId(data?.roomId || '') || currentRoomId;
+        if (!targetRoomId) return;
+        const room = rooms.get(targetRoomId);
+        if (!room) return;
+
+        const { action, targetSocketId } = data;
+
+        if (action === 'mute-all') {
+          for (const [sId, client] of room.participants.entries()) {
+            if (sId !== socket.id) {
+              client.info.audioMuted = true;
+              if (client.socketIo) {
+                client.socketIo.emit('force-mute', { byHost: currentParticipant?.name || 'Anfitrião' });
+              }
+              if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+                client.ws.send(JSON.stringify({ type: 'force-mute', byHost: currentParticipant?.name || 'Anfitrião' }));
+              }
+            }
+          }
+        } else if (action === 'end-meeting') {
+          io.to(targetRoomId).emit('meeting-ended', { byHost: currentParticipant?.name || 'Anfitrião' });
+          for (const client of room.participants.values()) {
+            if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+              client.ws.send(JSON.stringify({ type: 'meeting-ended', byHost: currentParticipant?.name || 'Anfitrião' }));
+            }
+          }
+          room.participants.clear();
+        } else if (action === 'kick' && targetSocketId) {
+          const target = room.participants.get(targetSocketId);
+          if (target) {
+            if (target.socketIo) {
+              target.socketIo.emit('kicked-from-meeting', { byHost: currentParticipant?.name || 'Anfitrião' });
+              target.socketIo.disconnect(true);
+            }
+            if (target.ws && target.ws.readyState === WebSocket.OPEN) {
+              target.ws.send(JSON.stringify({ type: 'kicked-from-meeting', byHost: currentParticipant?.name || 'Anfitrião' }));
+              target.ws.close();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Socket.io] Error in host-action:', err);
+      }
+    });
+
+    const cleanupSocket = () => {
+      if (currentRoomId && rooms.has(currentRoomId)) {
+        const room = rooms.get(currentRoomId)!;
+        room.participants.delete(socket.id);
+
+        const leftPayload = {
+          socketId: socket.id,
+          userName: currentParticipant?.name || 'Participante',
+        };
+
+        socket.to(currentRoomId).emit('user-left', leftPayload);
+
+        for (const client of room.participants.values()) {
+          if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(JSON.stringify({ type: 'user-left', ...leftPayload }));
+          }
+        }
+
+        console.log(`[Socket.io] ${currentParticipant?.name || socket.id} left room "${currentRoomId}". Remaining: ${room.participants.size}`);
+
+        // Grace period for dynamic rooms
+        if (room.participants.size === 0 && !defaultRooms.some((d) => d.id === currentRoomId)) {
+          if (roomDeleteTimers.has(currentRoomId)) {
+            clearTimeout(roomDeleteTimers.get(currentRoomId)!);
+          }
+          const timer = setTimeout(() => {
+            const r = rooms.get(currentRoomId!);
+            if (r && r.participants.size === 0) {
+              rooms.delete(currentRoomId!);
+              console.log(`[MeetingRoom] Empty room "${currentRoomId}" deleted after 10-minute grace period.`);
+            }
+            roomDeleteTimers.delete(currentRoomId!);
+          }, 10 * 60 * 1000);
+          roomDeleteTimers.set(currentRoomId, timer);
+        }
+      }
+      currentRoomId = null;
+      currentParticipant = null;
+    };
+
+    socket.on('disconnecting', () => {
+      cleanupSocket();
+    });
+
+    socket.on('disconnect', () => {
+      cleanupSocket();
+    });
+
+    socket.on('leave-room', () => {
+      cleanupSocket();
+    });
+  });
+
+  // 2. SETUP RAW WEBSOCKET SIGNALING SERVER (/ws) AS A PARALLEL RUNTIME
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  console.log('[WebSocket] Raw WebRTC Signaling Server mounted on /ws (dual mode active)');
 
-  console.log('[WebSocket] Real-time WebRTC Signaling Server mounted on /ws');
-
-  // Ping-pong heartbeat to keep connections alive across proxies (Cloud Run, Nginx)
   const heartbeatInterval = setInterval(() => {
     wss.clients.forEach((client: any) => {
       if (client.isAlive === false) {
@@ -203,7 +563,7 @@ export function setupSignalingServer(httpServer: HttpServer) {
       (ws as any).isAlive = true;
     });
 
-    const socketId = `sock_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
+    const socketId = `ws_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
     let currentRoomId: string | null = null;
     let currentParticipant: ParticipantInfo | null = null;
 
@@ -213,7 +573,6 @@ export function setupSignalingServer(httpServer: HttpServer) {
         (ws as any).isAlive = true;
 
         switch (data.type) {
-          // PING / PONG HEARTBEAT
           case 'ping': {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
@@ -221,7 +580,6 @@ export function setupSignalingServer(httpServer: HttpServer) {
             break;
           }
 
-          // JOIN ROOM
           case 'join-room': {
             const rawRoomId = data.roomId;
             const normalizedId = normalizeRoomId(rawRoomId) || `ucore-${Math.random().toString(36).substring(2, 8)}`;
@@ -243,10 +601,18 @@ export function setupSignalingServer(httpServer: HttpServer) {
               isScreenSharing: false,
             };
 
-            // Register in room
-            room.participants.set(socketId, { ws, info: currentParticipant, lastActive: Date.now() });
+            room.participants.set(socketId, {
+              socketId,
+              ws,
+              info: currentParticipant,
+              lastActive: Date.now(),
+            });
 
-            // Send full room state to the newly joined participant
+            if (roomDeleteTimers.has(normalizedId)) {
+              clearTimeout(roomDeleteTimers.get(normalizedId)!);
+              roomDeleteTimers.delete(normalizedId);
+            }
+
             const existingParticipants = Array.from(room.participants.values())
               .filter((p) => p.info.socketId !== socketId)
               .map((p) => p.info);
@@ -263,9 +629,15 @@ export function setupSignalingServer(httpServer: HttpServer) {
               })
             );
 
-            // Broadcast to other peers in the room that someone joined
+            // Notify Socket.io room members
+            io.to(normalizedId).emit('user-joined', {
+              roomId: normalizedId,
+              participant: currentParticipant,
+            });
+
+            // Notify other raw WS members
             for (const [otherSocketId, client] of room.participants.entries()) {
-              if (otherSocketId !== socketId && client.ws.readyState === WebSocket.OPEN) {
+              if (otherSocketId !== socketId && client.ws && client.ws.readyState === WebSocket.OPEN) {
                 client.ws.send(
                   JSON.stringify({
                     type: 'user-joined',
@@ -274,12 +646,9 @@ export function setupSignalingServer(httpServer: HttpServer) {
                 );
               }
             }
-
-            console.log(`[WebSocket] ${currentParticipant.name} (${socketId}) joined room: ${normalizedId}. Total: ${room.participants.size}`);
             break;
           }
 
-          // WebRTC SIGNALING (offer, answer, candidate)
           case 'signal': {
             if (!currentRoomId) return;
             const { targetSocketId, signalData } = data;
@@ -287,45 +656,20 @@ export function setupSignalingServer(httpServer: HttpServer) {
             if (!room) return;
 
             const targetClient = room.participants.get(targetSocketId);
-            if (targetClient && targetClient.ws.readyState === WebSocket.OPEN) {
-              targetClient.ws.send(
-                JSON.stringify({
-                  type: 'signal',
+            if (targetClient) {
+              if (targetClient.socketIo) {
+                targetClient.socketIo.emit('signal', {
                   fromSocketId: socketId,
                   fromUser: currentParticipant,
                   signalData,
-                })
-              );
-            }
-            break;
-          }
-
-          // MEDIA TOGGLES (mic, camera, screenshare)
-          case 'media-toggle': {
-            if (!currentRoomId || !currentParticipant) return;
-            const room = rooms.get(currentRoomId);
-            if (!room) return;
-
-            if (typeof data.audioMuted === 'boolean') {
-              currentParticipant.audioMuted = data.audioMuted;
-            }
-            if (typeof data.videoOff === 'boolean') {
-              currentParticipant.videoOff = data.videoOff;
-            }
-            if (typeof data.isScreenSharing === 'boolean') {
-              currentParticipant.isScreenSharing = data.isScreenSharing;
-            }
-
-            // Broadcast updated state to all participants in room
-            for (const client of room.participants.values()) {
-              if (client.ws.readyState === WebSocket.OPEN) {
-                client.ws.send(
+                });
+              } else if (targetClient.ws && targetClient.ws.readyState === WebSocket.OPEN) {
+                targetClient.ws.send(
                   JSON.stringify({
-                    type: 'user-media-toggled',
-                    socketId,
-                    audioMuted: currentParticipant.audioMuted,
-                    videoOff: currentParticipant.videoOff,
-                    isScreenSharing: currentParticipant.isScreenSharing,
+                    type: 'signal',
+                    fromSocketId: socketId,
+                    fromUser: currentParticipant,
+                    signalData,
                   })
                 );
               }
@@ -333,115 +677,8 @@ export function setupSignalingServer(httpServer: HttpServer) {
             break;
           }
 
-          // RAISE / LOWER HAND
-          case 'raise-hand': {
-            if (!currentRoomId || !currentParticipant) return;
-            const room = rooms.get(currentRoomId);
-            if (!room) return;
-
-            currentParticipant.handRaised = !!data.raised;
-
-            for (const client of room.participants.values()) {
-              if (client.ws.readyState === WebSocket.OPEN) {
-                client.ws.send(
-                  JSON.stringify({
-                    type: 'user-hand-raised',
-                    socketId,
-                    raised: currentParticipant.handRaised,
-                    userName: currentParticipant.name,
-                  })
-                );
-              }
-            }
-            break;
-          }
-
-          // IN-MEETING CHAT
-          case 'meeting-chat': {
-            if (!currentRoomId || !currentParticipant) return;
-            const room = rooms.get(currentRoomId);
-            if (!room) return;
-
-            const chatMsg: MeetingChatMessage = {
-              id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-              senderId: currentParticipant.id,
-              senderName: currentParticipant.name,
-              senderRole: currentParticipant.role,
-              text: (data.text || '').trim(),
-              timestamp: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-            };
-
-            if (!chatMsg.text) return;
-
-            room.chatHistory.push(chatMsg);
-            if (room.chatHistory.length > 150) {
-              room.chatHistory.shift();
-            }
-
-            // Broadcast to everyone in the room
-            for (const client of room.participants.values()) {
-              if (client.ws.readyState === WebSocket.OPEN) {
-                client.ws.send(
-                  JSON.stringify({
-                    type: 'meeting-chat-broadcast',
-                    message: chatMsg,
-                  })
-                );
-              }
-            }
-            break;
-          }
-
-          // HOST COMMANDS (e.g., mute all, kick, end meeting)
-          case 'host-action': {
-            if (!currentRoomId) return;
-            const room = rooms.get(currentRoomId);
-            if (!room) return;
-
-            const { action, targetSocketId } = data;
-
-            if (action === 'mute-all') {
-              for (const [sId, client] of room.participants.entries()) {
-                if (sId !== socketId && client.ws.readyState === WebSocket.OPEN) {
-                  client.info.audioMuted = true;
-                  client.ws.send(
-                    JSON.stringify({
-                      type: 'force-mute',
-                      byHost: currentParticipant?.name || 'Anfitrião',
-                    })
-                  );
-                }
-              }
-            } else if (action === 'end-meeting') {
-              for (const client of room.participants.values()) {
-                if (client.ws.readyState === WebSocket.OPEN) {
-                  client.ws.send(
-                    JSON.stringify({
-                      type: 'meeting-ended',
-                      byHost: currentParticipant?.name || 'Anfitrião',
-                    })
-                  );
-                }
-              }
-              room.participants.clear();
-            } else if (action === 'kick' && targetSocketId) {
-              const target = room.participants.get(targetSocketId);
-              if (target && target.ws.readyState === WebSocket.OPEN) {
-                target.ws.send(
-                  JSON.stringify({
-                    type: 'kicked-from-meeting',
-                    byHost: currentParticipant?.name || 'Anfitrião',
-                  })
-                );
-                target.ws.close();
-              }
-            }
-            break;
-          }
-
-          // LEAVE ROOM
           case 'leave-room': {
-            cleanupClient();
+            cleanupWsClient();
             break;
           }
 
@@ -453,54 +690,29 @@ export function setupSignalingServer(httpServer: HttpServer) {
       }
     });
 
-    const cleanupClient = () => {
+    const cleanupWsClient = () => {
       if (currentRoomId && rooms.has(currentRoomId)) {
         const room = rooms.get(currentRoomId)!;
         room.participants.delete(socketId);
 
-        // Notify others
+        const leftPayload = {
+          socketId,
+          userName: currentParticipant?.name || 'Participante',
+        };
+
+        io.to(currentRoomId).emit('user-left', leftPayload);
+
         for (const client of room.participants.values()) {
-          if (client.ws.readyState === WebSocket.OPEN) {
-            client.ws.send(
-              JSON.stringify({
-                type: 'user-left',
-                socketId,
-                userName: currentParticipant?.name || 'Participante',
-              })
-            );
+          if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(JSON.stringify({ type: 'user-left', ...leftPayload }));
           }
-        }
-
-        console.log(`[WebSocket] ${currentParticipant?.name || socketId} left room ${currentRoomId}. Remaining: ${room.participants.size}`);
-
-        // If it's a dynamic room and empty, keep it alive for a 10-minute grace period
-        // so guests or hosts that reload or switch tabs can rejoin seamlessly.
-        if (room.participants.size === 0 && !defaultRooms.some((d) => d.id === currentRoomId)) {
-          if (roomDeleteTimers.has(currentRoomId)) {
-            clearTimeout(roomDeleteTimers.get(currentRoomId)!);
-          }
-          const timer = setTimeout(() => {
-            const r = rooms.get(currentRoomId!);
-            if (r && r.participants.size === 0) {
-              rooms.delete(currentRoomId!);
-              console.log(`[MeetingRoom] Empty room ${currentRoomId} deleted after 10-minute grace period.`);
-            }
-            roomDeleteTimers.delete(currentRoomId!);
-          }, 10 * 60 * 1000); // 10 minutes grace period
-          roomDeleteTimers.set(currentRoomId, timer);
         }
       }
       currentRoomId = null;
       currentParticipant = null;
     };
 
-    ws.on('close', () => {
-      cleanupClient();
-    });
-
-    ws.on('error', (err) => {
-      console.error(`[WebSocket] Socket error on ${socketId}:`, err);
-      cleanupClient();
-    });
+    ws.on('close', cleanupWsClient);
+    ws.on('error', cleanupWsClient);
   });
 }

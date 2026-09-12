@@ -178,9 +178,9 @@ export function getStudentsForTurma(options: GetTurmaStudentsOptions = {}): Turm
 
   // Helper to add student to map
   const addStudentCandidate = (candidate: {
-    id: string;
+    id?: string;
     name: string;
-    genero?: 'M' | 'F';
+    genero?: 'M' | 'F' | string;
     classe?: string;
     gradeClass?: string;
     turma?: string;
@@ -210,11 +210,11 @@ export function getStudentsForTurma(options: GetTurmaStudentsOptions = {}): Turm
       const numDoc = candidate.numeroDocumento || (hasDocs ? `00${Math.floor(10000000 + Math.random() * 89999999)}ME042` : 'Em emissão');
 
       collectedMap.set(nomeCompleto.toLowerCase(), {
-        id: candidate.id,
+        id: candidate.id || `st_${Math.random().toString(36).substring(2, 9)}`,
         numeroOrdem: 0,
         codigoMatricula: `MAT-2026/${String(collectedMap.size + 1).padStart(3, '0')}`,
         nomeCompleto,
-        genero: candidate.genero || (['a', 'e', 'ia'].some((end) => nomeCompleto.split(' ')[0].toLowerCase().endsWith(end)) ? 'F' : 'M'),
+        genero: (candidate.genero === 'F' || candidate.genero === 'M') ? candidate.genero : (['a', 'e', 'ia'].some((end) => nomeCompleto.split(' ')[0].toLowerCase().endsWith(end)) ? 'F' : 'M'),
         dataNascimento: candidate.dataNascimento || '2016-04-12',
         idade: candidate.idade || 9,
         tipoDocumento: tipoDoc,

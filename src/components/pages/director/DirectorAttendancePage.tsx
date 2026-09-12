@@ -658,50 +658,8 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
         </div>
       </div>
 
-      {/* Caixa de Observação e Parecer Institucional com IA */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#002133] text-white flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-[#f75142]" />
-            </div>
-            <div>
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                Parecer Institucional & Anotações do Livro de Ponto
-              </h3>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Registe despachos diários, ocorrências pedagógicas ou consulte a IA institucional:
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full flex justify-center">
-          <AIInputWithLoading
-            placeholder="Digite uma observação do livro de ponto ou peça à IA para gerar relatório..."
-            onSubmit={handleAddDiaryNote}
-          />
-        </div>
-
-        {diaryNotes.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Despachos & Ocorrências Registadas:
-            </span>
-            <div className="flex flex-col gap-1.5">
-              {diaryNotes.slice(0, 3).map((note, idx) => (
-                <div key={idx} className="bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2 text-xs text-slate-700 flex items-start gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#f75142] shrink-0 mt-1" />
-                  <span className="font-medium">{note}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Teacher Attendance List */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden mb-6">
         <div className="divide-y divide-slate-100">
           {filteredTeachers.length === 0 ? (
             <div className="p-12 text-center">
@@ -856,6 +814,48 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
             })
           )}
         </div>
+      </div>
+
+      {/* Caixa de Observação e Parecer Institucional com IA (posicionado antes do footer) */}
+      <div id="director-attendance-ai-notes" className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#002133] text-white flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-[#f75142]" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Parecer Institucional & Anotações do Livro de Ponto
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Registe despachos diários, ocorrências pedagógicas ou consulte a IA institucional:
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full flex justify-center">
+          <AIInputWithLoading
+            placeholder="Digite uma observação do livro de ponto ou peça à IA para gerar relatório..."
+            onSubmit={handleAddDiaryNote}
+          />
+        </div>
+
+        {diaryNotes.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Despachos & Ocorrências Registadas:
+            </span>
+            <div className="flex flex-col gap-1.5">
+              {diaryNotes.slice(0, 3).map((note, idx) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2 text-xs text-slate-700 flex items-start gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#f75142] shrink-0 mt-1" />
+                  <span className="font-medium">{note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Confirmation Modal to permanently seal the teacher attendance sheet */}

@@ -409,17 +409,17 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
         {/* Executive Summary & School Protocol Strip */}
         <section className="bg-white rounded-2xl border border-slate-200/90 shadow-xs mb-6 overflow-hidden">
-          <div className="p-5 sm:p-6 bg-linear-to-r from-slate-900 via-[#002133] to-slate-900 text-white">
+          <div className="p-5 sm:p-6 bg-transparent text-slate-900 border-b border-slate-100">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
               <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/10 text-white/90 text-[11px] font-semibold tracking-wide border border-white/15">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
                   <span>{schoolName} • Direção Geral • Ano Letivo 2026</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                   Quadro Oficial de Homologação & Matrículas Escolares
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
                   Validação documental presencial, enquadramento de corpo docente e admissão definitiva de alunos e colaboradores no ecossistema uCore SIGE.
                 </p>
               </div>
@@ -429,10 +429,10 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 <button
                   type="button"
                   onClick={loadApplications}
-                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all border border-white/15 flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
                   title="Atualizar lista de candidaturas"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
                   <span>Sincronizar</span>
                 </button>
                 <button
