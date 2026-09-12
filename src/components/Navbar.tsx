@@ -195,300 +195,302 @@ export const Navbar: React.FC<NavbarProps> = ({
           style={{ width: `${scrollProgress}%` }}
         />
 
-        {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 lg:gap-11 text-[15px] font-bold text-[#002133] ml-auto mr-6 lg:mr-8">
-          {/* Páginas dropdown */}
-          <div className="relative">
-            <button
-              id="nav-paginas-dropdown"
-              onClick={() => setShowPagesDropdown((prev) => !prev)}
-              onBlur={() => setTimeout(() => setShowPagesDropdown(false), 200)}
-              className="flex items-center gap-1.5 text-[#002133] hover:text-white transition-colors cursor-pointer py-1"
-            >
-              <span>Paginas</span>
-              <ChevronDown
-                className={`w-4 h-4 text-[#002133]/80 transition-transform duration-200 ${
-                  showPagesDropdown ? 'rotate-180 text-white' : ''
-                }`}
-              />
-            </button>
+        {/* Desktop Navigation Links - Shown only after user session starts */}
+        {currentUser && (
+          <div className="hidden md:flex items-center gap-8 lg:gap-11 text-[15px] font-bold text-[#002133] ml-auto mr-6 lg:mr-8">
+            {/* Páginas dropdown */}
+            <div className="relative">
+              <button
+                id="nav-paginas-dropdown"
+                onClick={() => setShowPagesDropdown((prev) => !prev)}
+                onBlur={() => setTimeout(() => setShowPagesDropdown(false), 200)}
+                className="flex items-center gap-1.5 text-[#002133] hover:text-white transition-colors cursor-pointer py-1"
+              >
+                <span>Paginas</span>
+                <ChevronDown
+                  className={`w-4 h-4 text-[#002133]/80 transition-transform duration-200 ${
+                    showPagesDropdown ? 'rotate-180 text-white' : ''
+                  }`}
+                />
+              </button>
 
-            {showPagesDropdown && (
-              <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                {activeRole === 'admin' ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-dashboard');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Painel Central Admin
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-estatisticas');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Estatísticas da Rede
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-escolas');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Minhas Escolas
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-directores');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Meus Directores
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-professores');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Meus Professores
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-alunos');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Meus Alunos
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-anuncios');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
-                    >
-                      <span>Demandas & Editais</span>
-                      <span className="text-[9px] bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded">Oficial</span>
-                    </button>
+              {showPagesDropdown && (
+                <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  {activeRole === 'admin' ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-dashboard');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Painel Central Admin
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-estatisticas');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Estatísticas da Rede
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-escolas');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Minhas Escolas
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-directores');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Meus Directores
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-professores');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Meus Professores
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-alunos');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Meus Alunos
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-anuncios');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
+                      >
+                        <span>Demandas & Editais</span>
+                        <span className="text-[9px] bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded">Oficial</span>
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        onSelectPage('admin-perfil');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Perfil do Administrador
-                    </button>
-                  </>
-                ) : activeRole === 'diretor' ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-dashboard');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Painel do Diretor
-                    </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-perfil');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Perfil do Administrador
+                      </button>
+                    </>
+                  ) : activeRole === 'diretor' ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-dashboard');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Painel do Diretor
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-estatisticas');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Analisa suas estatísticas
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-professores');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Meus Professores
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-presenca');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                    >
-                      <span>Presença Professores (Ponto)</span>
-                      <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-alunos');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Meus Alunos
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-salas');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Minhas Salas
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-classes');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Minhas Classes
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('diretor-perfil');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Perfil do Director
-                    </button>
-                  </>
-                ) : activeRole === 'professor' ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        onSelectPage('estatisticas');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Analisa suas estatísticas
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('minha-turma');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Minha Turma (4ª Classe)
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('professor-presenca');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                    >
-                      <span>Presença dos Alunos (Chamada)</span>
-                      <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('perfil-professor');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Meu Perfil de Docente
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => {
-                        onSelectPage('escolas');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Rede de Escolas
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('professores');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Portal dos Professores
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('alunos');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Ambiente do Aluno
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSelectPage('calendario');
-                        setShowPagesDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
-                    >
-                      Calendário Letivo 2026
-                    </button>
-                  </>
-                )}
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-estatisticas');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Analisa suas estatísticas
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-professores');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Meus Professores
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-presenca');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                      >
+                        <span>Presença Professores (Ponto)</span>
+                        <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-alunos');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Meus Alunos
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-salas');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Minhas Salas
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-classes');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Minhas Classes
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-perfil');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Perfil do Director
+                      </button>
+                    </>
+                  ) : activeRole === 'professor' ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          onSelectPage('estatisticas');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Analisa suas estatísticas
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('minha-turma');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Minha Turma (4ª Classe)
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('professor-presenca');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                      >
+                        <span>Presença dos Alunos (Chamada)</span>
+                        <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('perfil-professor');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Meu Perfil de Docente
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          onSelectPage('escolas');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Rede de Escolas
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('professores');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Portal dos Professores
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('alunos');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Ambiente do Aluno
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('calendario');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                      >
+                        Calendário Letivo 2026
+                      </button>
+                    </>
+                  )}
 
-                {/* Shared Video Meetings / Zoom for all users */}
-                <button
-                  id="nav-dropdown-meetings"
-                  onClick={() => {
-                    onSelectPage('reunioes');
-                    setShowPagesDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-xs text-blue-600 hover:bg-blue-50 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    <Video className="w-3.5 h-3.5" />
-                    <span>Salas Virtuais & Zoom</span>
-                  </span>
-                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">Ao Vivo</span>
-                </button>
+                  {/* Shared Video Meetings / Zoom for all users */}
+                  <button
+                    id="nav-dropdown-meetings"
+                    onClick={() => {
+                      onSelectPage('reunioes');
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-blue-600 hover:bg-blue-50 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Video className="w-3.5 h-3.5" />
+                      <span>Salas Virtuais & Zoom</span>
+                    </span>
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">Ao Vivo</span>
+                  </button>
 
-                {/* uCore RAG Inteligente */}
-                <button
-                  id="nav-dropdown-rag"
-                  onClick={() => {
-                    if (onOpenRag) {
-                      onOpenRag();
-                    } else {
-                      onSelectPage('rag');
-                    }
-                    setShowPagesDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-xs text-indigo-700 hover:bg-indigo-50 transition-colors border-t border-slate-100 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>uCore RAG Inteligente</span>
-                  </span>
-                  <span className="text-[9px] bg-indigo-100 text-indigo-800 font-black px-1.5 py-0.5 rounded">IA / MED</span>
-                </button>
-              </div>
-            )}
+                  {/* uCore RAG Inteligente */}
+                  <button
+                    id="nav-dropdown-rag"
+                    onClick={() => {
+                      if (onOpenRag) {
+                        onOpenRag();
+                      } else {
+                        onSelectPage('rag');
+                      }
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-indigo-700 hover:bg-indigo-50 transition-colors border-t border-slate-100 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>uCore RAG Inteligente</span>
+                    </span>
+                    <span className="text-[9px] bg-indigo-100 text-indigo-800 font-black px-1.5 py-0.5 rounded">IA / MED</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Right CTA Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
@@ -712,230 +714,233 @@ export const Navbar: React.FC<NavbarProps> = ({
               <X className="w-4 h-4" />
             </button>
           </div>
-          {activeRole === 'admin' ? (
-            <>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-dashboard');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Painel Central Admin
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-estatisticas');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Estatísticas da Rede
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-escolas');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Minhas Escolas
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-directores');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Meus Directores
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-professores');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Meus Professores
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-alunos');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Meus Alunos
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('admin-anuncios');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-              >
-                <span>Demandas & Editais</span>
-                <span className="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded">Oficial</span>
-              </button>
+          {/* Role Page Links in Mobile Menu - Shown only when session is active */}
+          {currentUser && (
+            activeRole === 'admin' ? (
+              <>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-dashboard');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Painel Central Admin
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-estatisticas');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Estatísticas da Rede
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-escolas');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Minhas Escolas
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-directores');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Meus Directores
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-professores');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Meus Professores
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-alunos');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Meus Alunos
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-anuncios');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+                >
+                  <span>Demandas & Editais</span>
+                  <span className="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded">Oficial</span>
+                </button>
 
-              <button
-                onClick={() => {
-                  onSelectPage('admin-perfil');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Perfil do Administrador
-              </button>
-            </>
-          ) : activeRole === 'diretor' ? (
-            <>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-dashboard');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Painel do Diretor
-              </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('admin-perfil');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Perfil do Administrador
+                </button>
+              </>
+            ) : activeRole === 'diretor' ? (
+              <>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-dashboard');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Painel do Diretor
+                </button>
 
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-estatisticas');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Analisa suas estatísticas
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-professores');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Meus Professores
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-presenca');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-[#f75142] bg-rose-50/50 hover:bg-rose-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-              >
-                <span>Presença Professores (Ponto)</span>
-                <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-alunos');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Meus Alunos
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-salas');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Minhas Salas
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-classes');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Minhas Classes
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('diretor-perfil');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Perfil do Director
-              </button>
-            </>
-          ) : activeRole === 'professor' ? (
-            <>
-              <button
-                onClick={() => {
-                  onSelectPage('estatisticas');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Analisa suas estatísticas
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('minha-turma');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Minha Turma (4ª Classe)
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('professor-presenca');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-[#f75142] bg-rose-50/50 hover:bg-rose-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-              >
-                <span>Presença dos Alunos (Chamada)</span>
-                <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('perfil-professor');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Meu Perfil de Docente
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  onSelectPage('escolas');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Páginas: Gestão de Escolas
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('professores');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Páginas: Gestão de Professores
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPage('alunos');
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Páginas: Gestão de Alunos
-              </button>
-            </>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-estatisticas');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Analisa suas estatísticas
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-professores');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Meus Professores
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-presenca');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-[#f75142] bg-rose-50/50 hover:bg-rose-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+                >
+                  <span>Presença Professores (Ponto)</span>
+                  <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-alunos');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Meus Alunos
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-salas');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Minhas Salas
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-classes');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Minhas Classes
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-perfil');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Perfil do Director
+                </button>
+              </>
+            ) : activeRole === 'professor' ? (
+              <>
+                <button
+                  onClick={() => {
+                    onSelectPage('estatisticas');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Analisa suas estatísticas
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('minha-turma');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Minha Turma (4ª Classe)
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('professor-presenca');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-[#f75142] bg-rose-50/50 hover:bg-rose-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+                >
+                  <span>Presença dos Alunos (Chamada)</span>
+                  <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('perfil-professor');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Meu Perfil de Docente
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    onSelectPage('escolas');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Páginas: Gestão de Escolas
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('professores');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Páginas: Gestão de Professores
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('alunos');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Páginas: Gestão de Alunos
+                </button>
+              </>
+            )
           )}
 
           <button
@@ -951,16 +956,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <GraduationCap className="w-4 h-4 text-[#f75142]" />
             <span>Nossa Equipa Escolar</span>
           </button>
-          <button
-            onClick={() => {
-              onOpenProfile();
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
-          >
-            Meu Perfil
-          </button>
-          {onOpenSettings && (
+          {currentUser && (
+            <button
+              onClick={() => {
+                onOpenProfile();
+                setMobileMenuOpen(false);
+              }}
+              className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+            >
+              Meu Perfil
+            </button>
+          )}
+          {currentUser && onOpenSettings && (
             <button
               onClick={() => {
                 onOpenSettings();

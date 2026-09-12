@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -87,7 +87,7 @@ import { MeetingsHubPage } from './components/pages/MeetingsHubPage';
 
 // Intelligent RAG Vector Engine & Academic Opinions
 import { RagIntelligenceModal } from './components/rag/RagIntelligenceModal';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 
 // Public Institutional Pages: 404, Thank You, and Cases of Success
 import { NotFoundPage } from './components/pages/NotFoundPage';
@@ -670,11 +670,17 @@ export default function App() {
     return computedBase;
   }, [allSessions, activeRole, currentUser, adminSchools, teacherStudents]);
 
+  const toastTimerRef = useRef<any>(null);
+
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(msg);
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
-    }, 4000);
+      toastTimerRef.current = null;
+    }, 3500);
   };
 
   const handleOpenAuth = (mode: 'login' | 'register' = 'login') => {
@@ -2071,11 +2077,24 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f7f3f3] text-[#002133] flex flex-col font-sans selection:bg-[#f75142] selection:text-white relative">
-      {/* Toast Alert Notification */}
+      {/* Toast Alert Notification (Posicionado no canto inferior direito para nunca cobrir o cabeçalho) */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-[#002133]/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-[#f75142] animate-ping" />
-          <span>{toastMessage}</span>
+        <div 
+          id="system-toast-notification"
+          className="fixed bottom-6 right-6 z-50 max-w-sm bg-[#002133]/95 backdrop-blur-md text-white pl-4 pr-3 py-3 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.3)] border border-white/20 text-xs font-medium tracking-wide animate-in fade-in slide-in-from-bottom-5 flex items-center justify-between gap-3 pointer-events-auto"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-[#f75142] animate-ping shrink-0" />
+            <span className="leading-snug">{toastMessage}</span>
+          </div>
+          <button
+            id="btn-dismiss-toast"
+            onClick={() => setToastMessage(null)}
+            className="p-1 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+            title="Fechar notificação"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

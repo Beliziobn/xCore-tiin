@@ -132,7 +132,7 @@ export function useWebRTCMeeting({
 
   // Replace or add track to all active peer connections
   const replaceTrackOnPeers = useCallback((newTrack: MediaStreamTrack) => {
-    Object.values(peerConnectionsRef.current).forEach((pc) => {
+    Object.values(peerConnectionsRef.current).forEach((pc: RTCPeerConnection) => {
       const senders = pc.getSenders();
       const existingSender = senders.find((s) => s.track && s.track.kind === newTrack.kind);
       if (existingSender) {
