@@ -142,8 +142,6 @@ export function getOwnProfileViewForUser(user: UserAccount | null): string {
       return 'diretor-perfil';
     case 'professor':
       return 'professor-perfil';
-    case 'aluno':
-      return 'aluno-perfil';
     default:
       return 'home';
   }
