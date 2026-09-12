@@ -32,7 +32,7 @@ A **Central uCore** é uma solução completa de gestão escolar desenvolvida es
 
 O sistema responde aos desafios reais das escolas angolanas (Ensino Primário, Iº Ciclo, IIº Ciclo e Magistério/Institutos Técnicos), fornecendo:
 - **Automatização de Pautas Trimestrais e Finais**: Cálculo automático de MAC (Média das Avaliações Contínuas), NPP (Nota da Prova do Professor), NPT (Nota da Prova Trimestral) e MT (Média Trimestral).
-- **Exportação Fiel ao Modelo SIGE**: Compatível com o *Instrumento Complementar SIGE (2024/2025 e 2026/2027)*, gerando ficheiros Excel `.xlsx` formatados e boletins em PDF prontos para homologação.
+- **Exportação Fiel ao Modelo SIGE**: Compatível com o *Instrumento Complementar SIGE (Ano Lectivo 2026/2027)*, gerando ficheiros Excel `.xlsx` formatados e boletins em PDF prontos para homologação.
 - **Diário de Ponto & Gestão Docente**: Controlo de assiduidade de professores e alunos por turma e turno.
 - **Gestão de Espaços e Infraestruturas**: Monitorização de salas de aula, capacidade discente, laboratórios e condições físicas.
 - **Ambiente de Videoconferência Próprio**: Salas virtuais integradas com partilha de ecrã para Conselhos Pedagógicos e plantão de dúvidas com pais e alunos.

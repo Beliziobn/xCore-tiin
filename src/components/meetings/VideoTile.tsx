@@ -14,6 +14,7 @@ interface VideoTileProps {
   isHandRaised?: boolean;
   isScreenSharing?: boolean;
   isPinned?: boolean;
+  isMirrored?: boolean;
   onTogglePin?: () => void;
   className?: string;
 }
@@ -31,6 +32,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
   isHandRaised = false,
   isScreenSharing = false,
   isPinned = false,
+  isMirrored = true,
   onTogglePin,
   className = '',
 }) => {
@@ -72,9 +74,12 @@ export const VideoTile: React.FC<VideoTileProps> = ({
         autoPlay
         playsInline
         muted={isLocal} // Avoid feedback echo for local user
+        onLoadedMetadata={() => {
+          videoRef.current?.play().catch(() => {});
+        }}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           showVideo ? 'opacity-100' : 'opacity-0 absolute'
-        } ${isLocal && !isScreenSharing ? '-scale-x-100' : ''}`} // Mirror local camera view
+        } ${isLocal && !isScreenSharing && isMirrored ? '-scale-x-100' : ''}`}
       />
 
       {/* Fallback Avatar when Camera is Off */}

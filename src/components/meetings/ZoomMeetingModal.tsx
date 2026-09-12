@@ -23,8 +23,15 @@ import {
   X,
   Share2,
   AlertTriangle,
+  ChevronUp,
+  RefreshCw,
+  ExternalLink,
+  Sliders,
+  CheckCircle2,
 } from 'lucide-react';
 import { useWebRTCMeeting } from '../../hooks/useWebRTCMeeting';
+import { playSpeakerTestSound } from '../../utils/meetingAudioUtils';
+import type { VideoQualityResolution } from '../../types/meeting';
 import { VideoTile } from './VideoTile';
 
 interface ZoomMeetingModalProps {
@@ -60,6 +67,9 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
   const [chatInput, setChatInput] = useState('');
   const [participantSearch, setParticipantSearch] = useState('');
   const [dismissPermissionAlert, setDismissPermissionAlert] = useState(false);
+  const [speakerTesting, setSpeakerTesting] = useState(false);
+  const [showMicQuickMenu, setShowMicQuickMenu] = useState(false);
+  const [showCamQuickMenu, setShowCamQuickMenu] = useState(false);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +109,31 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
     hostMuteAll,
     hostEndMeeting,
     toggleRecording,
+
+    // Hardware devices and controls
+    audioInputDevices,
+    videoInputDevices,
+    audioOutputDevices,
+    selectedAudioDeviceId,
+    selectedVideoDeviceId,
+    selectedAudioOutputDeviceId,
+    switchAudioDevice,
+    switchVideoDevice,
+    switchAudioOutputDevice,
+    retryMediaPermissions,
+    refreshDeviceList,
+
+    // Audio VU Meter & Quality
+    audioLevel,
+    speakingWhileMuted,
+    audioEnhancements,
+    toggleAudioEnhancement,
+
+    // Video Quality & Display
+    videoQuality,
+    changeVideoQuality,
+    isMirrored,
+    toggleMirrorVideo,
   } = useWebRTCMeeting({
     roomId: cleanRoomId,
     roomTitle,
@@ -284,22 +319,66 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
 
       {/* NOTIFICATIONS & WARNINGS STRIP */}
       {permissionError && !dismissPermissionAlert && (
-        <div className="bg-[#FEF3C7] text-[#92400E] border-b border-[#FDE68A] px-4 sm:px-6 py-2.5 text-xs sm:text-sm flex items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-[#B45309]" />
-            <span className="truncate">Microfone e câmara inacessíveis ou permissão negada. A aceder em modo ouvinte.</span>
+        <div className="bg-amber-50 text-amber-900 border-b border-amber-200 px-4 sm:px-6 py-2.5 text-xs sm:text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0 shadow-xs">
+          <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-700 mt-0.5 sm:mt-0" />
+            <div className="min-w-0">
+              <span className="font-semibold block sm:inline mr-1.5">Aviso de Dispositivos:</span>
+              <span className="text-amber-800">{permissionError}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-xs hidden md:inline text-[#92400E]">Pode participar e ouvir a reunião normalmente</span>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={retryMediaPermissions}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+              title="Tentar ativar microfone e câmara novamente"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Autorizar / Tentar de Novo</span>
+            </button>
+            <a
+              href={`${window.location.origin}/?meet=${cleanRoomId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white hover:bg-slate-100 text-amber-900 border border-amber-300 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 no-underline transition-colors shadow-xs"
+              title="Abrir a sala em nova aba para contornar bloqueios do iframe"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Abrir em Nova Aba</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setActiveSideDrawer('settings')}
+              className="text-amber-800 hover:text-amber-950 p-1.5 rounded-md hover:bg-amber-100 cursor-pointer transition-colors text-xs font-medium"
+              title="Abrir configurações de dispositivos"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+            </button>
             <button
               type="button"
               onClick={() => setDismissPermissionAlert(true)}
-              className="p-1 rounded-md hover:bg-amber-200/50 text-[#92400E] cursor-pointer transition-colors"
+              className="p-1.5 rounded-md hover:bg-amber-200/60 text-amber-800 cursor-pointer transition-colors"
               title="Dispensar aviso"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* SPEAKING WHILE MUTED FLOATING TOAST */}
+      {speakingWhileMuted && (
+        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 text-white px-4 py-2.5 rounded-full shadow-xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-2 duration-150">
+          <MicOff className="w-4 h-4 text-red-400 shrink-0" />
+          <span className="text-xs font-medium">O seu microfone está desligado. Você está a falar?</span>
+          <button
+            type="button"
+            onClick={toggleAudio}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1 rounded-full cursor-pointer transition-colors"
+          >
+            Ativar Microfone
+          </button>
         </div>
       )}
 
@@ -366,6 +445,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
               isHandRaised={isHandRaised}
               isScreenSharing={isScreenSharing}
               isPinned={pinnedParticipantId === 'local'}
+              isMirrored={isMirrored}
               onTogglePin={() =>
                 setPinnedParticipantId((prev) => (prev === 'local' ? null : 'local'))
               }
@@ -599,35 +679,222 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
 
             {/* SETTINGS DRAWER */}
             {activeSideDrawer === 'settings' && (
-              <div className="flex-1 p-4 space-y-5 overflow-y-auto text-slate-700">
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 text-emerald-600" />
-                    <span>Microfone & Altifalantes</span>
-                  </h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    O cancelamento de eco acústico, redução de ruído e ganho automático uCore estão ativos em tempo real no fluxo de áudio WebRTC.
-                  </p>
+              <div className="flex-1 p-4 space-y-6 overflow-y-auto text-slate-700 text-xs">
+                {/* Header with refresh button */}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <span className="font-semibold text-slate-900 text-sm">Dispositivos & Qualidade</span>
+                  <button
+                    type="button"
+                    onClick={refreshDeviceList}
+                    className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded-md cursor-pointer transition-colors"
+                    title="Procurar novos dispositivos conectados"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Redetectar</span>
+                  </button>
                 </div>
 
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-2">
-                    <Video className="w-4 h-4 text-blue-600" />
-                    <span>Resolução de Câmera</span>
-                  </h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Qualidade otimizada: HD 720p a 30 FPS com compressão adaptativa para conexões escolares.
-                  </p>
+                {/* SECTION 1: MICROPHONE */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-xs">
+                      <Mic className="w-4 h-4 text-emerald-600" />
+                      <span>Microfone (Entrada de Áudio)</span>
+                    </h4>
+                    <span className="text-[11px] font-mono text-slate-500">
+                      {audioLevel > 0 ? `${audioLevel}%` : 'Inativo'}
+                    </span>
+                  </div>
+
+                  {audioInputDevices.length > 0 ? (
+                    <select
+                      value={selectedAudioDeviceId}
+                      onChange={(e) => switchAudioDevice(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                    >
+                      {audioInputDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="p-2.5 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-[11px]">
+                      Nenhum microfone identificado. Conecte um microfone ou autorize no navegador.
+                    </div>
+                  )}
+
+                  {/* Real-time VU Meter */}
+                  <div className="space-y-1 bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>Nível de captação de voz:</span>
+                      <span className={audioLevel > 15 ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                        {audioLevel > 15 ? 'Voz Detectada' : isAudioMuted ? 'Mudo' : 'Silêncio'}
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-75 rounded-full ${
+                          audioLevel > 70
+                            ? 'bg-amber-500'
+                            : audioLevel > 15
+                            ? 'bg-emerald-500'
+                            : 'bg-slate-300'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, audioLevel))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Audio Enhancements DSP toggles */}
+                  <div className="space-y-2 pt-1">
+                    <span className="text-[11px] font-semibold text-slate-800 block">Melhorias de Áudio WebRTC:</span>
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100/70 cursor-pointer">
+                      <span className="text-slate-700 text-xs">Cancelamento de Eco Acústico</span>
+                      <input
+                        type="checkbox"
+                        checked={audioEnhancements.echoCancellation}
+                        onChange={() => toggleAudioEnhancement('echoCancellation')}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100/70 cursor-pointer">
+                      <span className="text-slate-700 text-xs">Supressão de Ruído de Fundo</span>
+                      <input
+                        type="checkbox"
+                        checked={audioEnhancements.noiseSuppression}
+                        onChange={() => toggleAudioEnhancement('noiseSuppression')}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100/70 cursor-pointer">
+                      <span className="text-slate-700 text-xs">Controlo Automático de Ganho (Volume)</span>
+                      <input
+                        type="checkbox"
+                        checked={audioEnhancements.autoGainControl}
+                        onChange={() => toggleAudioEnhancement('autoGainControl')}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </label>
+                  </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200">
-                  <h4 className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-2">
+                {/* SECTION 2: SPEAKERS */}
+                <div className="space-y-3 pt-3 border-t border-slate-200">
+                  <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-xs">
+                    <Volume2 className="w-4 h-4 text-blue-600" />
+                    <span>Altifalantes / Auscultadores (Saída)</span>
+                  </h4>
+
+                  {audioOutputDevices.length > 0 && (
+                    <select
+                      value={selectedAudioOutputDeviceId}
+                      onChange={(e) => switchAudioOutputDevice(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                    >
+                      {audioOutputDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSpeakerTesting(true);
+                      playSpeakerTestSound();
+                      setTimeout(() => setSpeakerTesting(false), 2200);
+                    }}
+                    className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Volume2 className={`w-4 h-4 ${speakerTesting ? 'text-emerald-600 animate-pulse' : 'text-slate-600'}`} />
+                    <span>{speakerTesting ? 'A reproduzir melodia de teste...' : 'Testar Saída de Som'}</span>
+                  </button>
+                </div>
+
+                {/* SECTION 3: CAMERA */}
+                <div className="space-y-3 pt-3 border-t border-slate-200">
+                  <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-xs">
+                    <Video className="w-4 h-4 text-purple-600" />
+                    <span>Câmara de Vídeo</span>
+                  </h4>
+
+                  {videoInputDevices.length > 0 ? (
+                    <select
+                      value={selectedVideoDeviceId}
+                      onChange={(e) => switchVideoDevice(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                    >
+                      {videoInputDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="p-2.5 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-[11px]">
+                      Nenhuma câmara identificada. Conecte uma webcam ou autorize no navegador.
+                    </div>
+                  )}
+
+                  {/* Resolution Quality Selector */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold text-slate-800 block">Qualidade / Resolução de Envio:</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['720p', '480p', '360p'] as VideoQualityResolution[]).map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          onClick={() => changeVideoQuality(q)}
+                          className={`py-1.5 px-2 rounded-lg font-medium text-xs border transition-colors cursor-pointer ${
+                            videoQuality === q
+                              ? 'bg-blue-50 border-blue-500 text-blue-700 font-semibold'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {q === '720p' ? 'HD (720p)' : q === '480p' ? 'Médio (480p)' : 'Leve (360p)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Mirror toggle */}
+                  <label className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100/70 cursor-pointer">
+                    <span className="text-slate-700 text-xs">Espelhar a minha visualização própria</span>
+                    <input
+                      type="checkbox"
+                      checked={isMirrored}
+                      onChange={toggleMirrorVideo}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </label>
+                </div>
+
+                {/* DIAGNOSTIC ACTIONS */}
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-xs">
                     <ShieldAlert className="w-4 h-4 text-amber-600" />
-                    <span>Segurança da Chamada</span>
+                    <span>Diagnóstico e Resolução</span>
                   </h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Comunicação ponto-a-ponto com encriptação DTLS/SRTP nativa. Nenhuma gravação externa é armazenada sem o consentimento dos docentes.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={retryMediaPermissions}
+                    className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Reconectar Microfone e Câmara</span>
+                  </button>
+                  <a
+                    href={`${window.location.origin}/?meet=${cleanRoomId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors no-underline text-xs"
+                  >
+                    <ExternalLink className="w-4 h-4 text-slate-600" />
+                    <span>Abrir Sala em Nova Aba</span>
+                  </a>
                 </div>
               </div>
             )}
@@ -636,52 +903,222 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
       </div>
 
       {/* BOTTOM CONTROLS (Clean, Light Theme) */}
-      <footer className="bg-white border-t border-[#E2E8F0] px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-30 flex-wrap sm:flex-nowrap gap-3">
-        {/* Controls Left: Mic & Camera */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* MUTE / UNMUTE MIC */}
-          <button
-            id="btn-zoom-toggle-audio"
-            type="button"
-            onClick={toggleAudio}
-            className="flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[58px]"
-            title={isAudioMuted ? 'Ativar microfone' : 'Desativar microfone'}
-          >
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
-                isAudioMuted
-                  ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
-                  : 'bg-slate-100 text-slate-700'
-              }`}
+      <footer className="bg-white border-t border-[#E2E8F0] px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-30 flex-wrap sm:flex-nowrap gap-3 relative">
+        {/* Controls Left: Mic & Camera with quick device pickers */}
+        <div className="flex items-center gap-2">
+          {/* MUTE / UNMUTE MIC + QUICK MENU */}
+          <div className="relative flex items-center bg-slate-50 border border-slate-200 rounded-xl p-0.5">
+            <button
+              id="btn-zoom-toggle-audio"
+              type="button"
+              onClick={toggleAudio}
+              className="flex items-center gap-2 bg-transparent border-none cursor-pointer px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all"
+              title={isAudioMuted ? 'Ativar microfone' : 'Desativar microfone'}
             >
-              {isAudioMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </div>
-            <span className={`text-[11px] font-medium leading-none ${isAudioMuted ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
-              {isAudioMuted ? 'Mudo' : 'Microfone'}
-            </span>
-          </button>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors relative ${
+                  isAudioMuted
+                    ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
+                    : 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200'
+                }`}
+              >
+                {isAudioMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {/* Visual Audio Activity Dot */}
+                {!isAudioMuted && audioLevel > 15 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white animate-pulse" />
+                )}
+              </div>
+              <div className="flex flex-col items-start text-left">
+                <span className={`text-[11px] font-semibold leading-tight ${isAudioMuted ? 'text-red-600' : 'text-slate-800'}`}>
+                  {isAudioMuted ? 'Mudo' : 'Microfone'}
+                </span>
+                <span className="text-[9px] text-slate-500 leading-none">
+                  {isAudioMuted ? 'Desativado' : audioLevel > 15 ? 'A captar som' : 'Pronto'}
+                </span>
+              </div>
+            </button>
 
-          {/* START / STOP VIDEO */}
-          <button
-            id="btn-zoom-toggle-video"
-            type="button"
-            onClick={toggleVideo}
-            className="flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-[#F8FAFC] transition-all min-w-[58px]"
-            title={isVideoOff ? 'Ligar câmara' : 'Desligar câmara'}
-          >
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm transition-colors ${
-                isVideoOff
-                  ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
-                  : 'bg-slate-100 text-slate-700'
-              }`}
+            {/* Quick Mic Selection Chevron */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowMicQuickMenu((prev) => !prev);
+                setShowCamQuickMenu(false);
+              }}
+              className="p-1.5 hover:bg-slate-200/70 text-slate-500 rounded-md transition-colors cursor-pointer"
+              title="Opções de Microfone"
             >
-              {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-            </div>
-            <span className={`text-[11px] font-medium leading-none ${isVideoOff ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
-              {isVideoOff ? 'Sem Vídeo' : 'Câmara'}
-            </span>
-          </button>
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Quick Mic Popup */}
+            {showMicQuickMenu && (
+              <div className="absolute bottom-full left-0 mb-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-50 text-xs animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                  <span className="font-semibold text-slate-800 text-xs">Selecionar Microfone</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMicQuickMenu(false)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {audioInputDevices.length > 0 ? (
+                  <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+                    {audioInputDevices.map((d) => (
+                      <button
+                        key={d.deviceId}
+                        type="button"
+                        onClick={() => {
+                          switchAudioDevice(d.deviceId);
+                          setShowMicQuickMenu(false);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs cursor-pointer transition-colors ${
+                          selectedAudioDeviceId === d.deviceId
+                            ? 'bg-blue-50 text-blue-700 font-semibold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span className="truncate">{d.label}</span>
+                        {selectedAudioDeviceId === d.deviceId && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0 ml-1" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-[11px] py-1">Nenhum outro microfone detectado.</p>
+                )}
+                <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMicQuickMenu(false);
+                      setActiveSideDrawer('settings');
+                    }}
+                    className="text-blue-600 hover:text-blue-700 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sliders className="w-3 h-3" />
+                    <span>Ajustes avançados</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={refreshDeviceList}
+                    className="text-slate-500 hover:text-slate-700 text-[11px] flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Atualizar</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* START / STOP VIDEO + QUICK MENU */}
+          <div className="relative flex items-center bg-slate-50 border border-slate-200 rounded-xl p-0.5">
+            <button
+              id="btn-zoom-toggle-video"
+              type="button"
+              onClick={toggleVideo}
+              className="flex items-center gap-2 bg-transparent border-none cursor-pointer px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all"
+              title={isVideoOff ? 'Ligar câmara' : 'Desligar câmara'}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors ${
+                  isVideoOff
+                    ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
+                    : 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                }`}
+              >
+                {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+              </div>
+              <div className="flex flex-col items-start text-left">
+                <span className={`text-[11px] font-semibold leading-tight ${isVideoOff ? 'text-red-600' : 'text-slate-800'}`}>
+                  {isVideoOff ? 'Sem Vídeo' : 'Câmara'}
+                </span>
+                <span className="text-[9px] text-slate-500 leading-none">
+                  {isVideoOff ? 'Desligada' : videoQuality}
+                </span>
+              </div>
+            </button>
+
+            {/* Quick Cam Selection Chevron */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCamQuickMenu((prev) => !prev);
+                setShowMicQuickMenu(false);
+              }}
+              className="p-1.5 hover:bg-slate-200/70 text-slate-500 rounded-md transition-colors cursor-pointer"
+              title="Opções de Câmara"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Quick Cam Popup */}
+            {showCamQuickMenu && (
+              <div className="absolute bottom-full left-0 mb-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-50 text-xs animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                  <span className="font-semibold text-slate-800 text-xs">Selecionar Câmara</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCamQuickMenu(false)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {videoInputDevices.length > 0 ? (
+                  <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+                    {videoInputDevices.map((d) => (
+                      <button
+                        key={d.deviceId}
+                        type="button"
+                        onClick={() => {
+                          switchVideoDevice(d.deviceId);
+                          setShowCamQuickMenu(false);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs cursor-pointer transition-colors ${
+                          selectedVideoDeviceId === d.deviceId
+                            ? 'bg-blue-50 text-blue-700 font-semibold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span className="truncate">{d.label}</span>
+                        {selectedVideoDeviceId === d.deviceId && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0 ml-1" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-[11px] py-1">Nenhuma outra câmara detectada.</p>
+                )}
+                <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCamQuickMenu(false);
+                      setActiveSideDrawer('settings');
+                    }}
+                    className="text-blue-600 hover:text-blue-700 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sliders className="w-3 h-3" />
+                    <span>Ajustes avançados</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={refreshDeviceList}
+                    className="text-slate-500 hover:text-slate-700 text-[11px] flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Atualizar</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Controls Center: Interactive Tools */}

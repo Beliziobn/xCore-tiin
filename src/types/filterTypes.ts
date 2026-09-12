@@ -1,7 +1,7 @@
 export interface AdvancedFilterCriteria {
   // Filtros principais visíveis
   schools: string[]; // ['all'] ou array com IDs de escolas
-  academicYear: string; // '2026', '2025', '2024', etc.
+  academicYear: string; // '2026/2027', '2025/2026', '2024/2025', etc.
   periodType: 'anual' | 'semestre' | 'trimestre' | 'intervalo';
   periodDetail: string; // '1º Trimestre', '2º Trimestre', '3º Trimestre', '1º Semestre', '2º Semestre', 'Ano Completo'
   dateRangeStart?: string;
@@ -23,7 +23,7 @@ export interface AdvancedFilterCriteria {
 
 export const defaultFilterCriteria: AdvancedFilterCriteria = {
   schools: ['all'],
-  academicYear: '2026',
+  academicYear: '2026/2027',
   periodType: 'anual',
   periodDetail: 'Ano Completo',
   gradeClass: 'all',

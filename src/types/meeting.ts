@@ -36,3 +36,12 @@ export interface MediaDeviceOption {
   deviceId: string;
   label: string;
 }
+
+export interface AudioEnhancementSettings {
+  echoCancellation: boolean;
+  noiseSuppression: boolean;
+  autoGainControl: boolean;
+}
+
+export type VideoQualityResolution = '720p' | '480p' | '360p';
+

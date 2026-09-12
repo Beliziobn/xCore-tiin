@@ -202,7 +202,7 @@ export default function App() {
       );
     } else {
       setHomeAIResponse(
-        `✨ Parecer Institucional Inteligente uCore:\nRecebido: "${prompt}".\nOs dados da Direção e da Secretaria Escolar de Quêssua encontram-se homologados e em total conformidade para o ano letivo de 2026.`
+        `✨ Parecer Institucional Inteligente uCore:\nRecebido: "${prompt}".\nOs dados da Direção e da Secretaria Escolar de Quêssua encontram-se homologados e em total conformidade para o ano lectivo 2026/2027.`
       );
     }
   };

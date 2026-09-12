@@ -39,6 +39,8 @@ async function startServer() {
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     // Allow embedding in AI Studio preview iframe while securing other surfaces
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    // Explicitly grant camera, microphone and display-capture permissions
+    res.setHeader("Permissions-Policy", "camera=(self *), microphone=(self *), display-capture=(self *)");
     next();
   });
 

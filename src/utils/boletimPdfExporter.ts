@@ -1,6 +1,22 @@
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
 
+/**
+ * Helper to safely obtain the jsPDF constructor across different ESM/CJS bundlers
+ */
+function getJsPDFConstructor(): any {
+  if (typeof (jsPDF as any)?.jsPDF === 'function') {
+    return (jsPDF as any).jsPDF;
+  }
+  if (typeof jsPDF === 'function') {
+    return jsPDF;
+  }
+  if (typeof (jsPDF as any)?.default?.jsPDF === 'function') {
+    return (jsPDF as any).default.jsPDF;
+  }
+  return (jsPDF as any).default || jsPDF;
+}
+
 export interface ExportPdfOptions {
   studentName?: string;
   matriculaCode?: string;
@@ -24,7 +40,7 @@ export async function exportBoletimToPDF(
     onProgress?.('Renderizando elementos gráficos...');
     const dataUrl = await toPng(element, {
       quality: 0.98,
-      pixelRatio: 2.5,
+      pixelRatio: 2.2,
       backgroundColor: '#ffffff',
       cacheBust: true,
       filter: (node) => {
@@ -36,8 +52,9 @@ export async function exportBoletimToPDF(
       },
     });
 
-    onProgress?.('Gerando ficheiro PDF...');
-    const pdf = new jsPDF({
+    onProgress?.('Gerando ficheiro PDF oficial...');
+    const Ctor = getJsPDFConstructor();
+    const pdf = new Ctor({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
@@ -55,13 +72,9 @@ export async function exportBoletimToPDF(
     const fileName = `Boletim_Matricula_${safeMatricula}_${safeName}.pdf`;
 
     pdf.save(fileName);
-    onProgress?.('Download concluído com sucesso!');
+    onProgress?.('Download do PDF concluído!');
   } catch (error) {
     console.error('Erro ao gerar PDF do boletim:', error);
-    // Fallback gracioso para a janela de impressão se a captura canvas falhar
-    if (typeof window !== 'undefined') {
-      window.print();
-    }
     throw error;
   }
 }

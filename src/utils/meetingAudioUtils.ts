@@ -124,3 +124,37 @@ export function playMessageSound() {
     // ignore
   }
 }
+
+export function playSpeakerTestSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const notes = [
+      { freq: 440.0, time: 0.0, duration: 0.18 }, // A4
+      { freq: 554.37, time: 0.18, duration: 0.18 }, // C#5
+      { freq: 659.25, time: 0.36, duration: 0.28 }, // E5
+    ];
+
+    notes.forEach((note) => {
+      const now = ctx.currentTime + note.time;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note.freq, now);
+
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + note.duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + note.duration);
+    });
+  } catch (e) {
+    // ignore
+  }
+}
+

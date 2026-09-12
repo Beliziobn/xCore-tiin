@@ -39,11 +39,11 @@ export const PRESET_COVER_IMAGES = [
 export const initialAnnouncements: SchoolAnnouncement[] = [
   {
     id: 'ad-notas-trimestre-1',
-    title: 'Lançamento de Notas - 1º Trimestre 2026',
+    title: 'Lançamento de Notas - 1º Trimestre 2026/2027',
     demandType: 'notas',
     headline: 'Período Regulamentar de Inserção de Notas e Médias no Sistema uCore',
-    description: 'Aviso urgente a todos os docentes e direções pedagógicas: o prazo para lançamento das pautas de P1, P2 e Trabalhos práticos encerra rigorosamente no prazo estipulado. Após a expiração, o sistema bloqueará novas inserções.',
-    displayUrl: 'ucore.edu.ao > gestao-academica > lancamento-notas-2026',
+    description: 'Aviso urgente a todos os docentes e direções pedagógicas: o prazo para lançamento das pautas de P1, P2 e Trabalhos práticos do Ano Lectivo 2026/2027 encerra rigorosamente no prazo estipulado. Após a expiração, o sistema bloqueará novas inserções.',
+    displayUrl: 'ucore.edu.ao > gestao-academica > lancamento-notas-2026-2027',
     targetSchools: 'Todas as 31 Escolas Municipais do Quêssua',
     coverImage: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&auto=format&fit=crop&q=80',
     coverImageName: 'pauta-notas-1trim.jpg',
@@ -59,10 +59,10 @@ export const initialAnnouncements: SchoolAnnouncement[] = [
   },
   {
     id: 'ad-matriculas-2026',
-    title: 'Campanha Geral de Matrículas e Confirmações',
+    title: 'Campanha Geral de Matrículas e Confirmações (2026/2027)',
     demandType: 'matriculas',
     headline: 'Inscrição e Validação de Novos Alunos nas Unidades da Rede Municipal',
-    description: 'Diretores escolares: realize o cadastro presencial e validação documental de novos estudantes para o ano letivo. Fique atento à data limite para garantia de vagas nas salas de aula.',
+    description: 'Diretores escolares: realize o cadastro presencial e validação documental de novos estudantes para o ano lectivo 2026/2027. Fique atento à data limite para garantia de vagas nas salas de aula.',
     displayUrl: 'ucore.edu.ao > secretarias > matriculas-e-vagas',
     targetSchools: 'Todas as 31 Escolas Municipais do Quêssua',
     coverImage: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&auto=format&fit=crop&q=80',
@@ -79,7 +79,7 @@ export const initialAnnouncements: SchoolAnnouncement[] = [
   },
   {
     id: 'ad-censo-expirado',
-    title: 'Recadastramento do Censo Docente 2026',
+    title: 'Recadastramento do Censo Docente 2026/2027',
     demandType: 'geral',
     headline: 'Atualização de Cadastro e Diplomas do Corpo Docente Municipal',
     description: 'Prazo especial concedido pelo Governo Provincial para validação de certificados de habilitação dos professores das escolas públicas do município.',

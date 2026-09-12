@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Printer,
@@ -39,6 +39,7 @@ interface BoletimMatriculaModalProps {
   onClose: () => void;
   student: StudentRegistrationData | null;
   isJustRegistered?: boolean;
+  autoExportPdf?: boolean;
 }
 
 export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
@@ -46,11 +47,13 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
   onClose,
   student,
   isJustRegistered = false,
+  autoExportPdf = false,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfStatusMessage, setPdfStatusMessage] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const hasAutoExportedRef = useRef(false);
 
   const printableRef = useRef<HTMLDivElement>(null);
 
@@ -85,8 +88,8 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
         matriculaCode: student.codigoMatricula || 'MAT-2025',
         onProgress: (status) => setPdfStatusMessage(status),
       });
-      setPdfStatusMessage('PDF descarregado!');
-      setTimeout(() => setPdfStatusMessage(null), 3000);
+      setPdfStatusMessage('PDF descarregado com sucesso!');
+      setTimeout(() => setPdfStatusMessage(null), 4000);
     } catch (err) {
       console.error('Falha ao exportar PDF:', err);
       setExportError('Não foi possível gerar o PDF directo. Utilize o botão Imprimir e escolha "Guardar como PDF".');
@@ -95,6 +98,20 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
       setIsExportingPdf(false);
     }
   };
+
+  // Efeito para acionar a exportação automática do PDF assim que o aluno for cadastrado
+  useEffect(() => {
+    if ((isJustRegistered || autoExportPdf) && !hasAutoExportedRef.current) {
+      hasAutoExportedRef.current = true;
+      // Pequeno timeout de 600ms para garantir renderização estável dos elementos visuais e fontes
+      const timer = setTimeout(() => {
+        if (printableRef.current) {
+          handleExportPDF();
+        }
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [isJustRegistered, autoExportPdf]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200 print:p-0 print:bg-white print:static">
@@ -202,16 +219,24 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
 
         {/* ALERTA DE SUCESSO DO CADASTRO */}
         {isJustRegistered && (
-          <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-2 flex items-center justify-between text-emerald-900 text-xs font-medium print:hidden">
+          <div className="bg-emerald-50 border-b border-emerald-200 px-4 sm:px-6 py-2.5 flex items-center justify-between text-emerald-900 text-xs font-medium print:hidden flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
-                <strong>Matrícula Registada com Sucesso!</strong> O documento oficial abaixo está homologado com a assinatura digital do Director e pronto para emissão em PDF ou impressão.
+                <strong>Matrícula Registada com Sucesso!</strong> O Boletim Oficial foi gerado e o descarregamento do PDF inicia automaticamente.
               </span>
             </div>
-            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
-              Ano 2026 / 2027
-            </span>
+            <div className="flex items-center gap-2">
+              {isExportingPdf && (
+                <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100 px-2.5 py-1 rounded-md font-semibold animate-pulse">
+                  <div className="w-2.5 h-2.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                  {pdfStatusMessage || 'A transferir PDF...'}
+                </span>
+              )}
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
+                Ano Lectivo 2026 / 2027
+              </span>
+            </div>
           </div>
         )}
 

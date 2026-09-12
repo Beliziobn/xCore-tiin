@@ -89,7 +89,7 @@ function normalizeClasse(raw?: string): string {
 
 /**
  * Core Integration Service: Reads the live system database (students, teachers, schools)
- * and aggregates it into the exact JSON schema required by the SIGE 2024/2025 engine.
+ * and aggregates it into the exact JSON schema required by the SIGE 2026/2027 engine.
  */
 export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOptions = {}): any {
   const dataset = getUnifiedSystemDataset();

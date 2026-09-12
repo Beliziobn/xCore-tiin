@@ -225,7 +225,7 @@ export function applyAdvancedFilters(
     });
   }
 
-  if (filters.academicYear && filters.academicYear !== '2026') {
+  if (filters.academicYear && filters.academicYear !== '2026/2027' && filters.academicYear !== '2026') {
     activeChips.push({ key: 'academicYear', label: 'Ano Letivo', value: filters.academicYear });
   }
 

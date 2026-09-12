@@ -364,6 +364,9 @@ export const initialTeachersList: TeacherRegistrationData[] = [
 
 // LocalStorage Management
 export function getStoredTeachers(): TeacherRegistrationData[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return initialTeachersList;
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY_TEACHERS);
     if (!raw) {
@@ -441,10 +444,12 @@ export function saveTeacher(
     updatedList = [newTeacher, ...current];
   }
 
-  try {
-    localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updatedList));
-  } catch (e) {
-    console.error('Failed to persist teachers to localStorage', e);
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updatedList));
+    } catch (e) {
+      console.error('Failed to persist teachers to localStorage', e);
+    }
   }
 
   return updatedList;
@@ -453,10 +458,12 @@ export function saveTeacher(
 export function deleteTeacher(id: string): TeacherRegistrationData[] {
   const current = getStoredTeachers();
   const updated = current.filter((t) => t.id !== id);
-  try {
-    localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updated));
-  } catch (e) {
-    console.error('Failed to delete teacher from localStorage', e);
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to delete teacher from localStorage', e);
+    }
   }
   return updated;
 }

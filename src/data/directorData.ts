@@ -17,7 +17,7 @@ export const directorProfileData: DirectorProfileInfo = {
   studentsCount: '1.025 Alunos',
   teachersCount: '28 Professores',
   email: 'diretor.ferthorlan@ucore.edu.br',
-  status: 'Em Exercício • Gestão 2026',
+  status: 'Em Exercício • Ano Lectivo 2026/2027',
 };
 
 export const directorTeachersData: DirectorTeacher[] = [

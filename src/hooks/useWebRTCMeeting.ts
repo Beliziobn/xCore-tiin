@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io as ioClient, Socket } from 'socket.io-client';
-import type { MeetingParticipant, MeetingChatMessage } from '../types/meeting';
+import type {
+  MeetingParticipant,
+  MeetingChatMessage,
+  MediaDeviceOption,
+  AudioEnhancementSettings,
+  VideoQualityResolution,
+} from '../types/meeting';
 import {
   playJoinSound,
   playLeaveSound,
@@ -56,6 +62,30 @@ export function useWebRTCMeeting({
   const [isHandRaised, setIsHandRaised] = useState<boolean>(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
+  // Hardware device lists & active selections
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceOption[]>([]);
+  const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceOption[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceOption[]>([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string>('');
+  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string>('');
+  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string>('');
+
+  // Audio level VU meter (0 - 100) and speaking indicators
+  const [audioLevel, setAudioLevel] = useState<number>(0);
+  const [speakingWhileMuted, setSpeakingWhileMuted] = useState<boolean>(false);
+  const speakingWhileMutedCounterRef = useRef<number>(0);
+
+  // Audio enhancements
+  const [audioEnhancements, setAudioEnhancements] = useState<AudioEnhancementSettings>({
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  });
+
+  // Video quality and mirroring
+  const [videoQuality, setVideoQuality] = useState<VideoQualityResolution>('720p');
+  const [isMirrored, setIsMirrored] = useState<boolean>(true);
+
   // Participants & Streams
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
@@ -100,140 +130,326 @@ export function useWebRTCMeeting({
     }
   };
 
+  // Replace or add track to all active peer connections
+  const replaceTrackOnPeers = useCallback((newTrack: MediaStreamTrack) => {
+    Object.values(peerConnectionsRef.current).forEach((pc) => {
+      const senders = pc.getSenders();
+      const existingSender = senders.find((s) => s.track && s.track.kind === newTrack.kind);
+      if (existingSender) {
+        existingSender.replaceTrack(newTrack).catch((err) => {
+          console.warn('[WebRTC] replaceTrack error:', err);
+        });
+      } else if (localStreamRef.current) {
+        try {
+          pc.addTrack(newTrack, localStreamRef.current);
+        } catch (err) {
+          console.warn('[WebRTC] addTrack error:', err);
+        }
+      }
+    });
+  }, []);
+
+  // Refresh physical devices list
+  const refreshDeviceList = useCallback(async () => {
+    if (!navigator?.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioIns: MediaDeviceOption[] = devices
+        .filter((d) => d.kind === 'audioinput')
+        .map((d, index) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Microfone ${index + 1}`,
+        }));
+      const videoIns: MediaDeviceOption[] = devices
+        .filter((d) => d.kind === 'videoinput')
+        .map((d, index) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Câmara ${index + 1}`,
+        }));
+      const audioOuts: MediaDeviceOption[] = devices
+        .filter((d) => d.kind === 'audiooutput')
+        .map((d, index) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Altifalante ${index + 1}`,
+        }));
+
+      setAudioInputDevices(audioIns);
+      setVideoInputDevices(videoIns);
+      setAudioOutputDevices(audioOuts);
+
+      setSelectedAudioDeviceId((prev) => prev || (audioIns[0]?.deviceId ?? ''));
+      setSelectedVideoDeviceId((prev) => prev || (videoIns[0]?.deviceId ?? ''));
+      setSelectedAudioOutputDeviceId((prev) => prev || (audioOuts[0]?.deviceId ?? ''));
+    } catch (err) {
+      console.warn('[WebRTC] enumerateDevices failed:', err);
+    }
+  }, []);
+
+  // Setup Audio Analyser for VU Meter and Speaking Pulse
+  const setupAudioAnalyser = useCallback((stream: MediaStream) => {
+    try {
+      if (!stream || stream.getAudioTracks().length === 0) return;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        audioContextRef.current = new AudioCtx();
+      } else if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+
+      const audioCtx = audioContextRef.current;
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.5;
+      audioAnalyserRef.current = analyser;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      let lastSpeaking = false;
+      const checkAudio = () => {
+        if (!audioAnalyserRef.current) return;
+        audioAnalyserRef.current.getByteFrequencyData(dataArray);
+
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+        // Smooth 0-100 normalized level
+        const normalized = Math.min(100, Math.round((average / 110) * 100));
+        setAudioLevel(normalized);
+
+        const isSpeaking = average > 18 && !isAudioMuted;
+        if (isSpeaking !== lastSpeaking) {
+          lastSpeaking = isSpeaking;
+          setSpeakingParticipants((prev) => ({
+            ...prev,
+            local: isSpeaking,
+          }));
+        }
+
+        // Speaking while muted alert detection
+        if (isAudioMuted && average > 22) {
+          speakingWhileMutedCounterRef.current += 1;
+          if (speakingWhileMutedCounterRef.current > 14) {
+            setSpeakingWhileMuted(true);
+          }
+        } else {
+          speakingWhileMutedCounterRef.current = 0;
+          setSpeakingWhileMuted(false);
+        }
+
+        animationFrameRef.current = requestAnimationFrame(checkAudio);
+      };
+
+      animationFrameRef.current = requestAnimationFrame(checkAudio);
+    } catch (e) {
+      console.warn('[WebRTC] Audio analyser setup warning:', e);
+    }
+  }, [isAudioMuted]);
+
+  // Multi-stage getUserMedia Cascade ensuring robust device acquisition
+  const acquireMediaWithCascade = useCallback(async (
+    wantAudio: boolean,
+    wantVideo: boolean,
+    audioId?: string,
+    videoId?: string,
+    quality: VideoQualityResolution = '720p',
+    enhancements: AudioEnhancementSettings = { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  ): Promise<{ stream: MediaStream | null; error: string | null }> => {
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      return {
+        stream: null,
+        error: 'O seu navegador não suporta captura de microfone ou câmara.',
+      };
+    }
+
+    let stream: MediaStream | null = null;
+    let lastError: any = null;
+
+    // Build constraints helper
+    let videoConstraint: MediaTrackConstraints | boolean = false;
+    if (wantVideo) {
+      let width = { ideal: 1280 };
+      let height = { ideal: 720 };
+      if (quality === '480p') {
+        width = { ideal: 854 };
+        height = { ideal: 480 };
+      } else if (quality === '360p') {
+        width = { ideal: 640 };
+        height = { ideal: 360 };
+      }
+      videoConstraint = {
+        width,
+        height,
+        frameRate: { ideal: 30, max: 30 },
+        ...(videoId ? { deviceId: { exact: videoId } } : { facingMode: 'user' }),
+      };
+    }
+
+    let audioConstraint: MediaTrackConstraints | boolean = false;
+    if (wantAudio) {
+      audioConstraint = {
+        echoCancellation: enhancements.echoCancellation,
+        noiseSuppression: enhancements.noiseSuppression,
+        autoGainControl: enhancements.autoGainControl,
+        ...(audioId ? { deviceId: { exact: audioId } } : {}),
+      };
+    }
+
+    // Stage 1: Ideal parameters
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraint,
+        video: videoConstraint,
+      });
+    } catch (err: any) {
+      lastError = err;
+      console.warn('[WebRTC] Stage 1 getUserMedia failed:', err?.name, err?.message);
+    }
+
+    // Stage 2: Standard constraints without rigid facingMode or deviceId
+    if (!stream && (wantAudio || wantVideo)) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: wantAudio ? { echoCancellation: true } : false,
+          video: wantVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false,
+        });
+      } catch (err: any) {
+        lastError = err;
+        console.warn('[WebRTC] Stage 2 getUserMedia failed:', err?.name, err?.message);
+      }
+    }
+
+    // Stage 3: Pure boolean constraints
+    if (!stream && (wantAudio || wantVideo)) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: wantAudio,
+          video: wantVideo,
+        });
+      } catch (err: any) {
+        lastError = err;
+        console.warn('[WebRTC] Stage 3 getUserMedia failed:', err?.name, err?.message);
+      }
+    }
+
+    // Stage 4: Single track fallback if dual track failed
+    if (!stream && wantAudio && wantVideo) {
+      try {
+        // Try audio first
+        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream = audioOnly;
+        setIsVideoOff(true);
+      } catch (audioErr) {
+        // Audio failed, try video only
+        try {
+          const videoOnly = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+          stream = videoOnly;
+          setIsAudioMuted(true);
+        } catch (videoErr) {
+          lastError = videoErr;
+        }
+      }
+    }
+
+    if (stream) {
+      return { stream, error: null };
+    }
+
+    // Clear and helpful error diagnostics in Portuguese
+    let friendlyError = 'Não foi possível aceder ao microfone ou câmara. Você está em modo ouvinte.';
+    const errName = lastError?.name || '';
+    if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+      friendlyError = 'Permissão de câmara ou microfone recusada pelo navegador. Autorize no ícone de cadeado da barra de endereços ou abra a sala em nova aba.';
+    } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+      friendlyError = 'Nenhum microfone ou câmara foi encontrado conectado a este computador ou telemóvel.';
+    } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
+      friendlyError = 'A câmara ou microfone já está em uso por outro programa (Zoom, Teams, Google Meet). Feche outras aplicações e tente novamente.';
+    } else if (errName === 'SecurityError') {
+      friendlyError = 'O contexto do iframe bloqueou o acesso aos dispositivos. Clique no botão "Abrir em Nova Aba" para usar a câmara.';
+    } else if (errName === 'OverconstrainedError') {
+      friendlyError = 'As definições de resolução ou dispositivo não são suportadas pela câmara.';
+    }
+
+    return { stream: null, error: friendlyError };
+  }, []);
+
   // 1. Initialize Local Media (Camera & Mic)
   useEffect(() => {
     let active = true;
 
     async function initMedia() {
-      try {
-        if (!navigator?.mediaDevices?.getUserMedia) {
-          console.info('[WebRTC] Navegador sem suporte para captura de mídia ou contexto seguro.');
-          setIsAudioMuted(true);
-          setIsVideoOff(true);
-          setPermissionError('Navegador sem suporte direto a microfone/câmara. Modo ouvinte ativo.');
-          return;
-        }
+      const { stream, error } = await acquireMediaWithCascade(
+        initialAudio,
+        initialVideo,
+        undefined,
+        undefined,
+        videoQuality,
+        audioEnhancements
+      );
 
-        // Check if audio or video input devices actually exist
-        let hasAudioDevice = true;
-        let hasVideoDevice = true;
-        try {
-          if (navigator.mediaDevices.enumerateDevices) {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const audioInputs = devices.filter((d) => d.kind === 'audioinput');
-            const videoInputs = devices.filter((d) => d.kind === 'videoinput');
-            if (devices.length > 0) {
-              hasAudioDevice = audioInputs.length > 0;
-              hasVideoDevice = videoInputs.length > 0;
-            }
-          }
-        } catch {
-          // Device enumeration not permitted or supported; continue with optimistic check
-        }
+      if (!active) {
+        stream?.getTracks().forEach((t) => t.stop());
+        return;
+      }
 
-        if (!hasAudioDevice && !hasVideoDevice) {
-          console.info('[WebRTC] Nenhum dispositivo de captura de áudio ou vídeo detectado. Modo ouvinte ativado.');
-          setIsAudioMuted(true);
-          setIsVideoOff(true);
-          setPermissionError('Nenhum microfone ou câmara detectado. Você entrou na reunião em modo ouvinte.');
-          return;
-        }
-
-        let stream: MediaStream | null = null;
-
-        // Try ideal audio + video first if requested and hardware is present
-        if (initialVideo && hasVideoDevice) {
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              audio: hasAudioDevice
-                ? {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                  }
-                : false,
-              video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user',
-              },
-            });
-          } catch (err: any) {
-            console.warn('[WebRTC] Tentativa de alta definição falhou, tentando modo padrão:', err?.message || err);
-          }
-        }
-
-        // If high-def failed or video was not requested, try standard audio or video
-        if (!stream) {
-          try {
-            const wantAudio = hasAudioDevice;
-            const wantVideo = initialVideo && hasVideoDevice;
-
-            if (wantAudio || wantVideo) {
-              stream = await navigator.mediaDevices.getUserMedia({
-                audio: wantAudio,
-                video: wantVideo,
-              });
-            }
-          } catch (basicErr: any) {
-            console.warn('[WebRTC] Tentativa padrão de mídia falhou, tentando fallback para apenas áudio:', basicErr?.message || basicErr);
-            if (hasAudioDevice) {
-              try {
-                stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                setIsVideoOff(true);
-              } catch (audioErr: any) {
-                console.info('[WebRTC] Dispositivo de áudio inacessível. Entrando em modo ouvinte:', audioErr?.message || audioErr);
-                setPermissionError('Nenhum microfone ou câmara acessível no momento. Você está em modo ouvinte.');
-              }
-            } else {
-              setPermissionError('Nenhum dispositivo de entrada encontrado. Você está em modo ouvinte.');
-            }
-          }
-        }
-
-        if (!active) {
-          stream?.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        if (stream) {
-          localStreamRef.current = stream;
-          setLocalStream(stream);
-
-          const audioTrack = stream.getAudioTracks()[0];
-          if (audioTrack) {
-            audioTrack.enabled = initialAudio;
-            setIsAudioMuted(!initialAudio);
-          } else {
-            setIsAudioMuted(true);
-          }
-
-          const videoTrack = stream.getVideoTracks()[0];
-          if (videoTrack) {
-            cameraTrackRef.current = videoTrack;
-            videoTrack.enabled = initialVideo;
-            setIsVideoOff(!initialVideo);
-          } else {
-            setIsVideoOff(true);
-          }
-
-          // Setup Audio Activity Detector for Speaking Pulse
-          setupAudioAnalyser(stream);
-        } else {
-          setIsAudioMuted(true);
-          setIsVideoOff(true);
-        }
-      } catch (err: any) {
-        console.warn('[WebRTC] Inicialização de mídia em modo ouvinte:', err?.message || err);
+      if (error) {
+        console.info('[WebRTC] Modo ouvinte ativo:', error);
         setIsAudioMuted(true);
         setIsVideoOff(true);
+        setPermissionError(error);
+        await refreshDeviceList();
+        return;
+      }
+
+      if (stream) {
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+
+        const audioTrack = stream.getAudioTracks()[0];
+        if (audioTrack) {
+          audioTrack.enabled = initialAudio;
+          setIsAudioMuted(!initialAudio);
+        } else {
+          setIsAudioMuted(true);
+        }
+
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) {
+          cameraTrackRef.current = videoTrack;
+          videoTrack.enabled = initialVideo;
+          setIsVideoOff(!initialVideo);
+        } else {
+          setIsVideoOff(true);
+        }
+
+        setupAudioAnalyser(stream);
+        await refreshDeviceList();
       }
     }
 
     initMedia();
 
+    // Listen for plugged/unplugged devices
+    if (navigator?.mediaDevices?.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', refreshDeviceList);
+    }
+
     return () => {
       active = false;
+      if (navigator?.mediaDevices?.removeEventListener) {
+        navigator.mediaDevices.removeEventListener('devicechange', refreshDeviceList);
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
@@ -266,54 +482,6 @@ export function useWebRTCMeeting({
       });
     }
   }, [localStream]);
-
-  // Speaking indicator setup via Web Audio Analyser
-  const setupAudioAnalyser = (stream: MediaStream) => {
-    try {
-      if (!stream || stream.getAudioTracks().length === 0) return;
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const audioCtx = new AudioCtx();
-      audioContextRef.current = audioCtx;
-
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      audioAnalyserRef.current = analyser;
-
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      let lastSpeaking = false;
-      const checkAudio = () => {
-        if (!audioAnalyserRef.current) return;
-        audioAnalyserRef.current.getByteFrequencyData(dataArray);
-
-        let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i];
-        }
-        const average = sum / bufferLength;
-        const isSpeaking = average > 25 && !isAudioMuted;
-
-        if (isSpeaking !== lastSpeaking) {
-          lastSpeaking = isSpeaking;
-          setSpeakingParticipants((prev) => ({
-            ...prev,
-            local: isSpeaking,
-          }));
-        }
-
-        animationFrameRef.current = requestAnimationFrame(checkAudio);
-      };
-
-      animationFrameRef.current = requestAnimationFrame(checkAudio);
-    } catch (e) {
-      console.warn('[WebRTC] Audio analyser setup warning:', e);
-    }
-  };
 
   // Helper: Send signaling message to remote peer via Socket.io with HTTP fallback
   const sendSignalMessage = (targetSocketId: string, signalData: any) => {
@@ -670,31 +838,230 @@ export function useWebRTCMeeting({
     return () => clearInterval(timer);
   }, []);
 
+  // Retry requesting media permissions and re-activating camera and microphone
+  const retryMediaPermissions = async () => {
+    setPermissionError(null);
+    const { stream, error } = await acquireMediaWithCascade(
+      true,
+      true,
+      selectedAudioDeviceId,
+      selectedVideoDeviceId,
+      videoQuality,
+      audioEnhancements
+    );
+
+    if (error) {
+      setPermissionError(error);
+      return;
+    }
+
+    if (stream) {
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = true;
+        setIsAudioMuted(false);
+        replaceTrackOnPeers(audioTrack);
+      }
+
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        cameraTrackRef.current = videoTrack;
+        videoTrack.enabled = true;
+        setIsVideoOff(false);
+        replaceTrackOnPeers(videoTrack);
+      }
+
+      setupAudioAnalyser(stream);
+      await refreshDeviceList();
+
+      socketRef.current?.emit('media-toggle', {
+        roomId: cleanRoomId,
+        audioMuted: false,
+        videoOff: false,
+        isScreenSharing,
+      });
+    }
+  };
+
+  // Switch physical microphone input
+  const switchAudioDevice = async (deviceId: string) => {
+    setSelectedAudioDeviceId(deviceId);
+    try {
+      const constraints: MediaTrackConstraints = {
+        deviceId: { exact: deviceId },
+        echoCancellation: audioEnhancements.echoCancellation,
+        noiseSuppression: audioEnhancements.noiseSuppression,
+        autoGainControl: audioEnhancements.autoGainControl,
+      };
+      const freshStream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+      const newTrack = freshStream.getAudioTracks()[0];
+      if (newTrack) {
+        const oldTrack = localStreamRef.current?.getAudioTracks()[0];
+        if (oldTrack) {
+          oldTrack.stop();
+          localStreamRef.current?.removeTrack(oldTrack);
+        }
+        if (!localStreamRef.current) {
+          localStreamRef.current = new MediaStream();
+        }
+        newTrack.enabled = !isAudioMuted;
+        localStreamRef.current.addTrack(newTrack);
+
+        replaceTrackOnPeers(newTrack);
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+        setupAudioAnalyser(localStreamRef.current);
+        setPermissionError(null);
+      }
+    } catch (err: any) {
+      console.warn('[WebRTC] Erro ao trocar microfone:', err);
+    }
+  };
+
+  // Switch physical camera input
+  const switchVideoDevice = async (deviceId: string) => {
+    setSelectedVideoDeviceId(deviceId);
+    try {
+      let width = { ideal: 1280 };
+      let height = { ideal: 720 };
+      if (videoQuality === '480p') {
+        width = { ideal: 854 };
+        height = { ideal: 480 };
+      } else if (videoQuality === '360p') {
+        width = { ideal: 640 };
+        height = { ideal: 360 };
+      }
+
+      const freshStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: deviceId },
+          width,
+          height,
+        },
+      });
+      const newTrack = freshStream.getVideoTracks()[0];
+      if (newTrack) {
+        const oldTrack = localStreamRef.current?.getVideoTracks()[0];
+        if (oldTrack) {
+          oldTrack.stop();
+          localStreamRef.current?.removeTrack(oldTrack);
+        }
+        if (!localStreamRef.current) {
+          localStreamRef.current = new MediaStream();
+        }
+        newTrack.enabled = !isVideoOff;
+        cameraTrackRef.current = newTrack;
+        localStreamRef.current.addTrack(newTrack);
+
+        replaceTrackOnPeers(newTrack);
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+        setPermissionError(null);
+      }
+    } catch (err: any) {
+      console.warn('[WebRTC] Erro ao trocar câmara:', err);
+    }
+  };
+
+  // Switch audio output device (speaker)
+  const switchAudioOutputDevice = async (deviceId: string) => {
+    setSelectedAudioOutputDeviceId(deviceId);
+    if (typeof (HTMLMediaElement.prototype as any).setSinkId === 'function') {
+      const mediaElements = document.querySelectorAll('video, audio');
+      mediaElements.forEach((el) => {
+        try {
+          (el as any).setSinkId(deviceId);
+        } catch (e) {
+          console.warn('[WebRTC] setSinkId warning:', e);
+        }
+      });
+    }
+  };
+
+  // Toggle DSP audio enhancement features
+  const toggleAudioEnhancement = async (key: keyof AudioEnhancementSettings) => {
+    const nextEnhancements = {
+      ...audioEnhancements,
+      [key]: !audioEnhancements[key],
+    };
+    setAudioEnhancements(nextEnhancements);
+    if (!isAudioMuted && localStreamRef.current?.getAudioTracks().length) {
+      const track = localStreamRef.current.getAudioTracks()[0];
+      try {
+        await track.applyConstraints({
+          echoCancellation: nextEnhancements.echoCancellation,
+          noiseSuppression: nextEnhancements.noiseSuppression,
+          autoGainControl: nextEnhancements.autoGainControl,
+        });
+      } catch {
+        if (selectedAudioDeviceId) {
+          await switchAudioDevice(selectedAudioDeviceId);
+        }
+      }
+    }
+  };
+
+  // Change video resolution quality
+  const changeVideoQuality = async (quality: VideoQualityResolution) => {
+    setVideoQuality(quality);
+    if (!isVideoOff && localStreamRef.current?.getVideoTracks().length) {
+      let width = { ideal: 1280 };
+      let height = { ideal: 720 };
+      if (quality === '480p') {
+        width = { ideal: 854 };
+        height = { ideal: 480 };
+      } else if (quality === '360p') {
+        width = { ideal: 640 };
+        height = { ideal: 360 };
+      }
+      const track = localStreamRef.current.getVideoTracks()[0];
+      try {
+        await track.applyConstraints({ width, height });
+      } catch {
+        if (selectedVideoDeviceId) {
+          await switchVideoDevice(selectedVideoDeviceId);
+        }
+      }
+    }
+  };
+
+  // Toggle mirror self camera view
+  const toggleMirrorVideo = () => {
+    setIsMirrored((prev) => !prev);
+  };
+
   // Audio Toggle
   const muteAudioTrack = async (forceMute?: boolean) => {
     const nextState = typeof forceMute === 'boolean' ? forceMute : !isAudioMuted;
 
     // If user wants to unmute but had no audio track initialized
     if (!nextState && (!localStreamRef.current || localStreamRef.current.getAudioTracks().length === 0)) {
-      try {
-        const freshStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const newTrack = freshStream.getAudioTracks()[0];
+      const { stream, error } = await acquireMediaWithCascade(
+        true,
+        false,
+        selectedAudioDeviceId,
+        undefined,
+        videoQuality,
+        audioEnhancements
+      );
+
+      if (stream) {
+        const newTrack = stream.getAudioTracks()[0];
         if (newTrack) {
           if (!localStreamRef.current) {
             localStreamRef.current = new MediaStream();
           }
           localStreamRef.current.addTrack(newTrack);
-          (Object.values(peerConnectionsRef.current) as RTCPeerConnection[]).forEach((pc) => {
-            pc.addTrack(newTrack, localStreamRef.current!);
-          });
+          replaceTrackOnPeers(newTrack);
           setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
           setupAudioAnalyser(localStreamRef.current);
           setPermissionError(null);
+          await refreshDeviceList();
         }
-      } catch (err: any) {
-        console.warn('[WebRTC] Não foi possível ativar o microfone:', err?.message || err);
+      } else if (error) {
         setIsAudioMuted(true);
-        setPermissionError('Microfone não detectado ou permissão negada.');
+        setPermissionError(error);
         return;
       }
     }
@@ -723,27 +1090,31 @@ export function useWebRTCMeeting({
       let videoTrack = localStreamRef.current?.getVideoTracks()[0];
 
       if (!videoTrack) {
-        try {
-          const freshStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-          });
-          const newTrack = freshStream.getVideoTracks()[0];
+        const { stream, error } = await acquireMediaWithCascade(
+          false,
+          true,
+          undefined,
+          selectedVideoDeviceId,
+          videoQuality,
+          audioEnhancements
+        );
+
+        if (stream) {
+          const newTrack = stream.getVideoTracks()[0];
           if (newTrack) {
             if (!localStreamRef.current) {
               localStreamRef.current = new MediaStream();
             }
             localStreamRef.current.addTrack(newTrack);
             cameraTrackRef.current = newTrack;
-            (Object.values(peerConnectionsRef.current) as RTCPeerConnection[]).forEach((pc) => {
-              pc.addTrack(newTrack, localStreamRef.current!);
-            });
+            replaceTrackOnPeers(newTrack);
             setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
             setPermissionError(null);
+            await refreshDeviceList();
           }
-        } catch (e: any) {
-          console.warn('[WebRTC] Não foi possível ativar a câmara:', e?.message || e);
+        } else if (error) {
           setIsVideoOff(true);
-          setPermissionError('Câmara não detectada ou permissão negada.');
+          setPermissionError(error);
           return;
         }
       } else {
@@ -951,5 +1322,30 @@ export function useWebRTCMeeting({
     hostMuteAll,
     hostEndMeeting,
     toggleRecording,
+
+    // Hardware devices and controls
+    audioInputDevices,
+    videoInputDevices,
+    audioOutputDevices,
+    selectedAudioDeviceId,
+    selectedVideoDeviceId,
+    selectedAudioOutputDeviceId,
+    switchAudioDevice,
+    switchVideoDevice,
+    switchAudioOutputDevice,
+    retryMediaPermissions,
+    refreshDeviceList,
+
+    // Audio VU Meter & Quality
+    audioLevel,
+    speakingWhileMuted,
+    audioEnhancements,
+    toggleAudioEnhancement,
+
+    // Video Quality & Display
+    videoQuality,
+    changeVideoQuality,
+    isMirrored,
+    toggleMirrorVideo,
   };
 }

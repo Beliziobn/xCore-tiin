@@ -643,6 +643,9 @@ export const initialDetailedStudents: StudentRegistrationData[] = [
 ];
 
 export function getStoredStudents(): StudentRegistrationData[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return initialDetailedStudents;
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -681,10 +684,12 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
     updatedList = [ensuredData, ...currentList];
   }
 
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
-  } catch (err) {
-    console.error('Error saving student in localStorage:', err);
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
+    } catch (err) {
+      console.error('Error saving student in localStorage:', err);
+    }
   }
 
   return ensuredData;
@@ -693,13 +698,16 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
 export function deleteStudent(id: string): boolean {
   const currentList = getStoredStudents();
   const filtered = currentList.filter((s) => s.id !== id);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-    return true;
-  } catch (err) {
-    console.error('Error deleting student:', err);
-    return false;
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      return true;
+    } catch (err) {
+      console.error('Error deleting student:', err);
+      return false;
+    }
   }
+  return true;
 }
 
 /**

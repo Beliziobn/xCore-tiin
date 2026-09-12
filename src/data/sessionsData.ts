@@ -9,7 +9,7 @@ export const sessionsData: Record<string, SessionProfile> = {
     title: 'Administrador da Rede',
     email: 'admin.fred@ucore.edu.br',
     unit: 'Rede Central Integrada (31 Escolas)',
-    academicYear: '2026',
+    academicYear: '2026/2027',
     cards: [
       {
         id: 'admin-alunos',
@@ -148,7 +148,7 @@ export const sessionsData: Record<string, SessionProfile> = {
     title: 'Diretor da Escola Modelo Central',
     email: 'diretor.carl@ucore.edu.br',
     unit: 'Escola Municipal Modelo Central',
-    academicYear: '2026',
+    academicYear: '2026/2027',
     cards: [
       {
         id: 'diretor-alunos',
@@ -273,7 +273,7 @@ export const sessionsData: Record<string, SessionProfile> = {
     title: 'Professor Regente Titular',
     email: 'prof.santar@ucore.edu.br',
     unit: 'Escola Modelo Central - 4ª Classe',
-    academicYear: '2026',
+    academicYear: '2026/2027',
     cards: [
       {
         id: 'prof-alunos',

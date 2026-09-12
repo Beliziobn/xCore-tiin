@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://sige.med.gov.ao/schemas/sige-2024-2025.json",
-  "title": "SIGE 2024/2025 - Schema Oficial de Dados Agregados (MED / GEPE)",
-  "description": "Especificação normativa e contratual de dados estatísticos agregados para o Instrumento Oficial Complementar Anual do SIGE (2024/2025). O documento define exactamente 18 chaves de topo alinhadas ao motor de preenchimento, cobrindo as 9 folhas oficiais e garantindo total ausência de dados nominais/identificáveis.",
+  "$id": "https://sige.med.gov.ao/schemas/sige-2026-2027.json",
+  "title": "SIGE 2026/2027 - Schema Oficial de Dados Agregados (MED / GEPE)",
+  "description": "Especificação normativa e contratual de dados estatísticos agregados para o Instrumento Oficial Complementar Anual do SIGE (2026/2027). O documento define exactamente 18 chaves de topo alinhadas ao motor de preenchimento, cobrindo as 9 folhas oficiais e garantindo total ausência de dados nominais/identificáveis.",
   "type": "object",
   "additionalProperties": false,
   "documentation": {
-    "versao": "2.0.0",
-    "ano_lectivo": "2024/2025",
+    "versao": "2.1.0",
+    "ano_lectivo": "2026/2027",
     "ministerio": "República de Angola - Ministério da Educação (MED)",
     "gabinete": "Gabinete de Estudos, Planeamento e Estatística (GEPE)",
     "folhas_oficiais": [
@@ -101,7 +101,7 @@
       "_exemplo": {
         "provincia": "MALANJE",
         "municipio": "MALANJE - QUÊSSUA",
-        "data_entrega": "23 de Setembro de 2025"
+        "data_entrega": "23 de Setembro de 2026"
       }
     },
     "pre_escolar": {

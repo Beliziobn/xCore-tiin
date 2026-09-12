@@ -492,119 +492,123 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right CTA Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick Approvals Button for Director */}
-          {activeRole === 'diretor' && (
-            <button
-              id="navbar-director-quick-approvals-btn"
-              onClick={() => onSelectPage('diretor-aprovacoes')}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                currentView === 'diretor-aprovacoes' || currentView === 'diretor-inscricoes'
-                  ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
-                  : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
-              }`}
-              title="Aprovação de Inscrições da Escola"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-              <span>Inscrições</span>
-              {pendingAppsCount.director > 0 && (
-                <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
-                  {pendingAppsCount.director}
-                </span>
-              )}
-            </button>
-          )}
-
-          {/* Quick Approvals Button for Admin */}
-          {activeRole === 'admin' && (
-            <button
-              id="navbar-admin-quick-approvals-btn"
-              onClick={() => onSelectPage('admin-aprovacoes')}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                currentView === 'admin-aprovacoes' || currentView === 'admin-inscricoes'
-                  ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
-                  : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
-              }`}
-              title="Central de Homologação de Diretores e Inscrições"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-              <span>Homologações</span>
-              {pendingAppsCount.admin > 0 && (
-                <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
-                  {pendingAppsCount.admin}
-                </span>
-              )}
-            </button>
-          )}
-
-          {/* Notification Bell */}
-          <div className="relative">
-            <button
-              id="notification-bell-btn"
-              onClick={() => setShowNotifications((prev) => !prev)}
-              className="relative p-2 rounded-full text-white hover:bg-white/20 transition-colors cursor-pointer focus:outline-none"
-              title="Notificações"
-              aria-label="Notificações"
-            >
-              <Bell className="w-6 h-6 text-white" strokeWidth={2.2} />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-white rounded-full ring-2 ring-[#f75142]" />
-              )}
-            </button>
-
-            {/* Notifications Popover */}
-            {showNotifications && (
-              <div className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-slate-900">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs uppercase tracking-[0.15em] text-[#002133]">Notificações</span>
-                    {unreadCount > 0 && (
-                      <span className="text-[10px] bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-full font-bold uppercase">
-                        {unreadCount} novas
-                      </span>
-                    )}
-                  </div>
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={markAllAsRead}
-                      className="text-[10px] uppercase tracking-wider text-slate-600 hover:text-slate-900 font-bold cursor-pointer underline"
-                    >
-                      Marcar lidas
-                    </button>
+          {currentUser && (
+            <>
+              {/* Quick Approvals Button for Director */}
+              {activeRole === 'diretor' && (
+                <button
+                  id="navbar-director-quick-approvals-btn"
+                  onClick={() => onSelectPage('diretor-aprovacoes')}
+                  className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                    currentView === 'diretor-aprovacoes' || currentView === 'diretor-inscricoes'
+                      ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                      : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                  }`}
+                  title="Aprovação de Inscrições da Escola"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Inscrições</span>
+                  {pendingAppsCount.director > 0 && (
+                    <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                      {pendingAppsCount.director}
+                    </span>
                   )}
-                </div>
+                </button>
+              )}
 
-                <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto mt-2">
-                  {notifications.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`py-2.5 px-2 rounded-lg transition-colors ${
-                        item.read ? 'opacity-50 hover:bg-slate-50' : 'bg-slate-50/80 hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
-                        <span className="text-[10px] text-slate-400 tracking-wider">{item.time}</span>
+              {/* Quick Approvals Button for Admin */}
+              {activeRole === 'admin' && (
+                <button
+                  id="navbar-admin-quick-approvals-btn"
+                  onClick={() => onSelectPage('admin-aprovacoes')}
+                  className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                    currentView === 'admin-aprovacoes' || currentView === 'admin-inscricoes'
+                      ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                      : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                  }`}
+                  title="Central de Homologação de Diretores e Inscrições"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Homologações</span>
+                  {pendingAppsCount.admin > 0 && (
+                    <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                      {pendingAppsCount.admin}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* Notification Bell */}
+              <div className="relative">
+                <button
+                  id="notification-bell-btn"
+                  onClick={() => setShowNotifications((prev) => !prev)}
+                  className="relative p-2 rounded-full text-white hover:bg-white/20 transition-colors cursor-pointer focus:outline-none"
+                  title="Notificações"
+                  aria-label="Notificações"
+                >
+                  <Bell className="w-6 h-6 text-white" strokeWidth={2.2} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-white rounded-full ring-2 ring-[#f75142]" />
+                  )}
+                </button>
+
+                {/* Notifications Popover */}
+                {showNotifications && (
+                  <div className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-slate-900">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs uppercase tracking-[0.15em] text-[#002133]">Notificações</span>
+                        {unreadCount > 0 && (
+                          <span className="text-[10px] bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-full font-bold uppercase">
+                            {unreadCount} novas
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-[10px] uppercase tracking-wider text-slate-600 hover:text-slate-900 font-bold cursor-pointer underline"
+                        >
+                          Marcar lidas
+                        </button>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Direct Settings Trigger Icon */}
-          {onOpenSettings && (
-            <button
-              id="navbar-settings-btn"
-              type="button"
-              onClick={onOpenSettings}
-              className="p-2 text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-              title="Configurações da Conta & Palavra-passe"
-              aria-label="Configurações da Conta & Palavra-passe"
-            >
-              <Settings className="w-5 h-5 text-white" strokeWidth={2.2} />
-            </button>
+                    <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto mt-2">
+                      {notifications.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`py-2.5 px-2 rounded-lg transition-colors ${
+                            item.read ? 'opacity-50 hover:bg-slate-50' : 'bg-slate-50/80 hover:bg-slate-100'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
+                            <span className="text-[10px] text-slate-400 tracking-wider">{item.time}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Direct Settings Trigger Icon */}
+              {onOpenSettings && (
+                <button
+                  id="navbar-settings-btn"
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="p-2 text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+                  title="Configurações da Conta & Palavra-passe"
+                  aria-label="Configurações da Conta & Palavra-passe"
+                >
+                  <Settings className="w-5 h-5 text-white" strokeWidth={2.2} />
+                </button>
+              )}
+            </>
           )}
 
           {/* Começar or Logged-in User Profile */}
@@ -642,7 +646,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={handleLoginClick}
                 disabled={isLoginLoading || isRegisterLoading}
                 aria-busy={isLoginLoading}
-                className={`hidden sm:inline-flex items-center justify-center gap-2 font-bold text-sm px-3.5 py-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                className={`inline-flex items-center justify-center gap-2 font-bold text-sm px-3.5 sm:px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer ${
                   isLoginLoading || isRegisterLoading ? 'opacity-75 cursor-wait' : ''
                 } ${
                   currentPage === 'login'
@@ -665,7 +669,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={handleRegisterClick}
                 disabled={isLoginLoading || isRegisterLoading}
                 aria-busy={isRegisterLoading}
-                className={`inline-flex items-center justify-center gap-2 text-white font-black text-sm px-5 sm:px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-[0_8px_20px_-6px_rgba(0,33,51,0.5)] hover:shadow-[0_10px_26px_-6px_rgba(0,33,51,0.7)] active:scale-95 whitespace-nowrap bg-[#002133] hover:bg-[#001726] ${
+                className={`inline-flex items-center justify-center gap-2 text-white font-black text-sm px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-[0_8px_20px_-6px_rgba(0,33,51,0.5)] hover:shadow-[0_10px_26px_-6px_rgba(0,33,51,0.7)] active:scale-95 whitespace-nowrap bg-[#002133] hover:bg-[#001726] ${
                   isLoginLoading || isRegisterLoading ? 'opacity-75 cursor-wait' : ''
                 } ${
                   currentPage === 'register'
@@ -1077,7 +1081,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>A carregar...</span>
                     </>
                   ) : (
-                    <span>Começar</span>
+                    <span>Inscreva - se</span>
                   )}
                 </button>
               </div>

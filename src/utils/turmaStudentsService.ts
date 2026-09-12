@@ -398,7 +398,7 @@ export function getStudentsForTurma(options: GetTurmaStudentsOptions = {}): Turm
     municipio: 'ADMINISTRAÇÃO MUNICIPAL DE QUÊSSUA',
     direccao: 'DIRECÇÃO MUNICIPAL DA EDUCAÇÃO DO QUÊSSUA',
     escola: schoolName,
-    anoLectivo: '2025 / 2026',
+    anoLectivo: '2026 / 2027',
     classe: normalizedClass,
     turma: normalizedTurma,
     turno: shift,

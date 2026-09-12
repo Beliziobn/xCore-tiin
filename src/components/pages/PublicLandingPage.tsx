@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { UserAccount } from '../../types';
 import { SectionShader } from '../SectionShader';
+import { QuessuaMunicipalLogo } from '../common/QuessuaMunicipalLogo';
 
 interface PublicLandingPageProps {
   onAcessarPlataforma: () => void;
@@ -118,9 +119,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
           {/* Live Trust Indicators */}
           <div className="mt-12 pt-8 border-t border-slate-200/60 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-semibold text-slate-500">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>100% Homologado BNCC & Censo Escolar</span>
+            <div 
+              id="hero-quessua-logo-badge"
+              className="flex items-center gap-2 transition-all cursor-default group"
+              title="Administração Municipal de Quêssua"
+            >
+              <QuessuaMunicipalLogo className="h-7 sm:h-8 w-auto text-[#002133] transition-transform group-hover:scale-102" />
             </div>
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-indigo-600" />

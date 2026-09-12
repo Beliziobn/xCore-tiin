@@ -5,8 +5,6 @@
  */
 
 import { AuditLog, AuditAction, AuditSeverity } from '../types/audit';
-import { db, auth } from '../firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
 
 const LOCAL_STORAGE_KEY = 'ucore_audit_logs_v1';
 const MAX_LOCAL_LOGS = 500;
@@ -41,11 +39,23 @@ export class AuditLogger {
     details: string;
     metadata?: Record<string, unknown>;
   }): Promise<AuditLog> {
-    const currentUser = auth?.currentUser;
+    let currentUserId: string | undefined;
+    let currentUserEmail: string | undefined;
+
+    if (typeof window !== 'undefined') {
+      try {
+        const { auth } = await import('../firebase');
+        currentUserId = auth?.currentUser?.uid;
+        currentUserEmail = auth?.currentUser?.email || undefined;
+      } catch {
+        // Firebase não disponível ou teste
+      }
+    }
+
     const now = new Date().toISOString();
     const id = `audit_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    const actorId = entry.actorId || currentUser?.uid || 'anonymous_system';
+    const actorId = entry.actorId || currentUserId || 'anonymous_system';
     const actorRole = entry.actorRole || 'utilizador';
 
     const logItem: AuditLog = {
@@ -53,7 +63,7 @@ export class AuditLogger {
       action: entry.action,
       severity: entry.severity || 'INFO',
       actorId,
-      actorEmail: entry.actorEmail || currentUser?.email || undefined,
+      actorEmail: entry.actorEmail || currentUserEmail,
       actorRole,
       targetId: entry.targetId,
       targetType: entry.targetType,
@@ -69,33 +79,39 @@ export class AuditLogger {
     this.saveToLocalCache(logItem);
 
     // 2. Enviar para a API Express com rate limiting
-    try {
-      fetch('/api/audit/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(logItem),
-      }).catch(() => {
-        // Silencioso em caso de indisponibilidade transitória
-      });
-    } catch {
-      // Ignora erro de rede para não bloquear a UI
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      try {
+        fetch('/api/audit/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(logItem),
+        }).catch(() => {
+          // Silencioso em caso de indisponibilidade transitória
+        });
+      } catch {
+        // Ignora erro de rede para não bloquear a UI
+      }
     }
 
-    // 3. Tentar persistir no Firestore se autenticado (conforme RLS de audit_logs)
-    if (db && currentUser && currentUser.uid === actorId) {
+    // 3. Tentar persistir no Firestore se autenticado no browser (conforme RLS de audit_logs)
+    if (typeof window !== 'undefined' && currentUserId && currentUserId === actorId) {
       try {
-        const docRef = doc(collection(db, 'audit_logs'), id);
-        await setDoc(docRef, {
-          id: logItem.id,
-          action: logItem.action,
-          severity: logItem.severity,
-          actorId: logItem.actorId,
-          actorRole: logItem.actorRole,
-          targetId: logItem.targetId || null,
-          targetType: logItem.targetType || null,
-          details: logItem.details,
-          timestamp: logItem.timestamp,
-        });
+        const { db } = await import('../firebase');
+        const { collection, doc, setDoc } = await import('firebase/firestore');
+        if (db) {
+          const docRef = doc(collection(db, 'audit_logs'), id);
+          await setDoc(docRef, {
+            id: logItem.id,
+            action: logItem.action,
+            severity: logItem.severity,
+            actorId: logItem.actorId,
+            actorRole: logItem.actorRole,
+            targetId: logItem.targetId || null,
+            targetType: logItem.targetType || null,
+            details: logItem.details,
+            timestamp: logItem.timestamp,
+          });
+        }
       } catch (err) {
         console.debug('Nota: Registro no Firestore de auditoria diferido (offline/permissão)');
       }

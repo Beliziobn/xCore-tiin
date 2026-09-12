@@ -383,10 +383,10 @@ export const AdminAdvancedFilter: React.FC<AdminAdvancedFilterProps> = ({
             onChange={(e) => handleUpdate('academicYear', e.target.value)}
             className="w-full h-10 px-3 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer shadow-2xs"
           >
-            <option value="2026">2026 (Ano Corrente)</option>
-            <option value="2025">2025 (Ano Anterior)</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
+            <option value="2026/2027">2026 / 2027 (Ano Corrente)</option>
+            <option value="2025/2026">2025 / 2026 (Ano Anterior)</option>
+            <option value="2024/2025">2024 / 2025</option>
+            <option value="2023/2024">2023 / 2024</option>
           </select>
         </div>
 

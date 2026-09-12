@@ -148,7 +148,7 @@ export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [
     isPreRegistered: true,
     preRegisteredDetails: 'Histórico escolar e processo individual transferido da Escola 402 com aproveitamento positivo.',
     createdAt: '11/09/2026, 11:20',
-    notes: 'Inscrição de transferência escolar para o ano letivo 2026. Apresentou certidão com notas da 6ª classe.',
+    notes: 'Inscrição de transferência escolar para o ano lectivo 2026/2027. Apresentou certidão com notas da 6ª classe.',
   },
   {
     id: 'app-func-001',
