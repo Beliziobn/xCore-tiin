@@ -8,9 +8,11 @@ import type {
   StudentRegistrationData
 } from '../types';
 import type { SystemDataset } from './excelExport';
+import { initialAdminSchools } from '../data/adminData';
 import { getStoredTeachers } from './teacherStorage';
 import { getStoredStudents } from './studentStorage';
 import { validateGenderCount, validateAproveitamento } from './sigeRulesEngine';
+import { aggregateSigeDatasetWithSchoolAttribution } from './sigeSchoolAggregation';
 
 /**
  * ============================================================================
@@ -21,14 +23,20 @@ import { validateGenderCount, validateAproveitamento } from './sigeRulesEngine';
  * O Instrumento Estatístico do SIGE é de âmbito ESTATÍSTICO AGREGADO CENTRAL.
  * Exige estritamente NÚMEROS AGREGADOS (contagens e somatórios).
  * 
- * REGRA ABSOLUTA DE CONFORMIDADE:
- * - ZERO Nomes
- * - ZERO E-mails
+ * ATRIBUIÇÃO ESCOLAR OFICIAL (INSTRUMENTO COMPLEMENTAR 2026/2027):
+ * Todas as panilhas e relatórios discriminam explicitamente o NOME DA ESCOLA
+ * que forneceu os dados estatísticos (Alunos Matriculados, Pessoal Docente,
+ * Repetentes, NEE, Pessoal Não Docente, Aproveitamento e Consolidados).
+ * 
+ * REGRA ABSOLUTA DE CONFORMIDADE DE PRIVACIDADE:
+ * - ZERO Nomes de Alunos ou Professores
+ * - ZERO E-mails pessoais
  * - ZERO Números de BI / NIF
- * - ZERO Números de Processo de Alunos
+ * - ZERO Números de Processo Individuais de Alunos
  * - ZERO Telefones pessoais
  * 
- * Todas as tabelas são organizadas por Nível × Natureza × Classe × Idade × Gênero (MF/F).
+ * Todas as tabelas são organizadas por:
+ * Escola Provedora × Nível × Natureza × Classe × Idade × Gênero (MF/F).
  */
 
 export interface GenderCount {
@@ -80,8 +88,9 @@ export interface SigeAggregatedReport {
     totalAlunosRepetentes: GenderCount;
     totalAlunosNEE: GenderCount;
   };
-  // Secções oficiais
+  // Secções oficiais com atribuição de escola fornecedora
   alunosMatriculados: {
+    escola: string;
     nivel: string;
     classe: string;
     natureza: string;
@@ -89,6 +98,7 @@ export interface SigeAggregatedReport {
     idades: Record<string, GenderCount>;
   }[];
   pessoalDocente: {
+    escola: string;
     nivelEnsino: string;
     natureza: string;
     formacaoPedagogica: string;
@@ -96,6 +106,7 @@ export interface SigeAggregatedReport {
     total: GenderCount;
   }[];
   infraestruturas: {
+    escola: string;
     natureza: string;
     escolasCount: number;
     salasDefinitivas: number;
@@ -106,6 +117,7 @@ export interface SigeAggregatedReport {
     totalTurmas: number;
   }[];
   aproveitamento: {
+    escola: string;
     ciclo: string;
     classe: string;
     natureza: string;
@@ -118,6 +130,7 @@ export interface SigeAggregatedReport {
     validacao: 'Correcto' | 'Falso';
   }[];
   alunosRepetentes: {
+    escola: string;
     nivel: string;
     classe: string;
     natureza: string;
@@ -125,15 +138,28 @@ export interface SigeAggregatedReport {
     idades: Record<string, GenderCount>;
   }[];
   necessidadesEspeciais: {
+    escola: string;
     tipoDeficiencia: string;
     nivel: string;
     natureza: string;
     total: GenderCount;
   }[];
   pessoalNaoDocente: {
+    escola: string;
     categoria: string;
     natureza: string;
     total: GenderCount;
+  }[];
+  escolasConsolidadas?: {
+    escola: string;
+    categoria: string;
+    abrangencia: string;
+    natureza: string;
+    matriculados: GenderCount;
+    aprovados: GenderCount;
+    reprovados: GenderCount;
+    desistidos: GenderCount;
+    status: string;
   }[];
 }
 
@@ -146,584 +172,11 @@ function norm(str?: string): string {
 }
 
 /**
- * Agrega todos os dados nominais da base de dados uCore em contagens e somatórios estatísticos puros.
- * Zero dados nominais vazam para o resultado.
+ * Agrega todos os dados da base de dados uCore em contagens estatísticas com atribuição da ESCOLA PROVEDORA.
+ * Cumpre 100% de privacidade (zero nomes de pessoas, zero BI).
  */
 export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedReport {
-  const schools = dataset.schools || [];
-  const teachers = dataset.teachers || [];
-  const students = dataset.students || [];
-
-  // Obter detalhes complementares de estudantes e professores
-  const detailedTeachers = getStoredTeachers();
-  const detailedTeacherMap = new Map<string, TeacherRegistrationData>();
-  detailedTeachers.forEach(t => {
-    detailedTeacherMap.set(t.id, t);
-    detailedTeacherMap.set(norm(t.nomeCompleto), t);
-  });
-
-  const detailedStudents = getStoredStudents();
-  const detailedStudentMap = new Map<string, StudentRegistrationData>();
-  detailedStudents.forEach(s => {
-    if (s.id) detailedStudentMap.set(s.id, s);
-    detailedStudentMap.set(norm(s.name), s);
-  });
-
-  // Determinar província e município prevalecentes
-  const provincia = schools[0]?.location?.includes('Malanje') ? 'MALANJE' : 'MALANJE';
-  const municipio = 'QUÊSSUA';
-
-  // --- 1. AGREGAÇÃO DE ALUNOS MATRICULADOS ---
-  // Matriz completa de classes e subsistemas padrão no sistema angolano (SIGE)
-  const classesPadrao = [
-    // Pré-Escolar Detalhado
-    { nivel: 'Educação Pré-Escolar', classe: 'Creche' },
-    { nivel: 'Educação Pré-Escolar', classe: 'Jardim de Infância 1' },
-    { nivel: 'Educação Pré-Escolar', classe: 'Jardim de Infância 2' },
-    { nivel: 'Educação Pré-Escolar', classe: 'Centros Infantis' },
-    { nivel: 'Educação Pré-Escolar', classe: 'Centros Infantis Comunitários (CIC)' },
-    { nivel: 'Educação Pré-Escolar', classe: 'Centros de Educação Comunitária (CEC)' },
-    { nivel: 'Educação Pré-Escolar', classe: 'Classe de Iniciação' },
-
-    // Ensino Primário Regular
-    { nivel: 'Ensino Primário Regular', classe: '1ª Classe' },
-    { nivel: 'Ensino Primário Regular', classe: '2ª Classe' },
-    { nivel: 'Ensino Primário Regular', classe: '3ª Classe' },
-    { nivel: 'Ensino Primário Regular', classe: '4ª Classe' },
-    { nivel: 'Ensino Primário Regular', classe: '5ª Classe' },
-    { nivel: 'Ensino Primário Regular', classe: '6ª Classe' },
-
-    // Ensino Primário - PRAEER (Aceleração Escolar)
-    { nivel: 'Ensino Primário - PRAEER', classe: 'Módulo 1 (Eq. 1ª/2ª Classes)' },
-    { nivel: 'Ensino Primário - PRAEER', classe: 'Módulo 2 (Eq. 3ª/4ª Classes)' },
-    { nivel: 'Ensino Primário - PRAEER', classe: 'Módulo 3 (Eq. 5ª/6ª Classes)' },
-
-    // Ensino Primário - EJA (Jovens e Adultos)
-    { nivel: 'Ensino Primário - EJA', classe: 'EJA Primário - Módulo 1' },
-    { nivel: 'Ensino Primário - EJA', classe: 'EJA Primário - Módulo 2' },
-    { nivel: 'Ensino Primário - EJA', classe: 'EJA Primário - Módulo 3' },
-
-    // Ensino Secundário I Ciclo (Geral, Técnico e EJA)
-    { nivel: 'Ensino Secundário I Ciclo Geral', classe: '7ª Classe' },
-    { nivel: 'Ensino Secundário I Ciclo Geral', classe: '8ª Classe' },
-    { nivel: 'Ensino Secundário I Ciclo Geral', classe: '9ª Classe' },
-    { nivel: 'Ensino Secundário I Ciclo Técnico', classe: '7ª a 9ª Classes' },
-    { nivel: 'Ensino Secundário I Ciclo EJA', classe: 'Sec I EJA - Módulos 1 a 3' },
-
-    // Ensino Secundário II Ciclo (Geral, Técnico e Formação de Professores)
-    { nivel: 'Ensino Secundário II Ciclo Geral', classe: '10ª Classe' },
-    { nivel: 'Ensino Secundário II Ciclo Geral', classe: '11ª Classe' },
-    { nivel: 'Ensino Secundário II Ciclo Geral', classe: '12ª Classe' },
-    { nivel: 'Ensino Secundário II Ciclo Técnico', classe: '10ª Classe' },
-    { nivel: 'Ensino Secundário II Ciclo Técnico', classe: '11ª Classe' },
-    { nivel: 'Ensino Secundário II Ciclo Técnico', classe: '12ª Classe' },
-    { nivel: 'Ensino Secundário II Ciclo Técnico', classe: '13ª Classe' },
-    { nivel: 'Formação de Professores (Magistério)', classe: '10ª Classe' },
-    { nivel: 'Formação de Professores (Magistério)', classe: '11ª Classe' },
-    { nivel: 'Formação de Professores (Magistério)', classe: '12ª Classe' },
-    { nivel: 'Formação de Professores (Magistério)', classe: '13ª Classe' },
-  ];
-
-  const idadesColunas = SIGE_IDADES_COLUNAS;
-
-  interface AlunoAgregadoBucket {
-    nivel: string;
-    classe: string;
-    natureza: string;
-    total: GenderCount;
-    idades: Record<string, GenderCount>;
-    repetentesTotal: GenderCount;
-    repetentesIdades: Record<string, GenderCount>;
-  }
-
-  const alunosBuckets = new Map<string, AlunoAgregadoBucket>();
-
-  // Inicializar buckets para garantir que tabelas oficiais fiquem completas
-  classesPadrao.forEach(cp => {
-    ['Pública', 'Privada'].forEach(nat => {
-      const key = `${cp.nivel}_${cp.classe}_${nat}`;
-      const idadesObj: Record<string, GenderCount> = {};
-      const repIdadesObj: Record<string, GenderCount> = {};
-      idadesColunas.forEach(idKey => {
-        idadesObj[idKey] = { mf: 0, f: 0 };
-        repIdadesObj[idKey] = { mf: 0, f: 0 };
-      });
-
-      alunosBuckets.set(key, {
-        nivel: cp.nivel,
-        classe: cp.classe,
-        natureza: nat,
-        total: { mf: 0, f: 0 },
-        idades: idadesObj,
-        repetentesTotal: { mf: 0, f: 0 },
-        repetentesIdades: repIdadesObj
-      });
-    });
-  });
-
-  // Varrer todos os alunos da base uCore
-  students.forEach((st, idx) => {
-    const detailed = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
-    
-    // Gênero
-    const isFemale = st.gender === 'F' || (detailed as any)?.sexo === 'Feminino' || norm(st.gender) === 'f';
-    
-    // Classe
-    let rawClasse = detailed?.classe || st.gradeClass || '4ª Classe';
-    let matchedClasse = '4ª Classe';
-    let matchedNivel = 'Ensino Primário Regular';
-
-    const cNorm = norm(rawClasse);
-    if (cNorm.includes('creche')) {
-      matchedClasse = 'Creche';
-      matchedNivel = 'Educação Pré-Escolar';
-    } else if (cNorm.includes('jardim 1') || cNorm.includes('jardim1')) {
-      matchedClasse = 'Jardim de Infância 1';
-      matchedNivel = 'Educação Pré-Escolar';
-    } else if (cNorm.includes('jardim 2') || cNorm.includes('jardim2') || cNorm.includes('jardim')) {
-      matchedClasse = 'Jardim de Infância 2';
-      matchedNivel = 'Educação Pré-Escolar';
-    } else if (cNorm.includes('inicia')) {
-      matchedClasse = 'Classe de Iniciação';
-      matchedNivel = 'Educação Pré-Escolar';
-    } else if (cNorm.includes('praeer') && (cNorm.includes('1') || cNorm.includes('2'))) {
-      matchedClasse = 'Módulo 1 (Eq. 1ª/2ª Classes)';
-      matchedNivel = 'Ensino Primário - PRAEER';
-    } else if (cNorm.includes('praeer') && (cNorm.includes('3') || cNorm.includes('4'))) {
-      matchedClasse = 'Módulo 2 (Eq. 3ª/4ª Classes)';
-      matchedNivel = 'Ensino Primário - PRAEER';
-    } else if (cNorm.includes('praeer')) {
-      matchedClasse = 'Módulo 3 (Eq. 5ª/6ª Classes)';
-      matchedNivel = 'Ensino Primário - PRAEER';
-    } else if (cNorm.includes('eja') && (cNorm.includes('primar') || cNorm.includes('modulo 1') || cNorm.includes('módulo 1'))) {
-      matchedClasse = 'EJA Primário - Módulo 1';
-      matchedNivel = 'Ensino Primário - EJA';
-    } else if (cNorm.includes('eja') && (cNorm.includes('modulo 2') || cNorm.includes('módulo 2'))) {
-      matchedClasse = 'EJA Primário - Módulo 2';
-      matchedNivel = 'Ensino Primário - EJA';
-    } else if (cNorm.includes('eja') && (cNorm.includes('modulo 3') || cNorm.includes('módulo 3'))) {
-      matchedClasse = 'EJA Primário - Módulo 3';
-      matchedNivel = 'Ensino Primário - EJA';
-    } else if (cNorm.includes('10')) {
-      matchedNivel = cNorm.includes('tec') 
-        ? 'Ensino Secundário II Ciclo Técnico' 
-        : (cNorm.includes('magis') || cNorm.includes('prof') ? 'Formação de Professores (Magistério)' : 'Ensino Secundário II Ciclo Geral');
-      matchedClasse = '10ª Classe';
-    } else if (cNorm.includes('11')) {
-      matchedNivel = cNorm.includes('tec') 
-        ? 'Ensino Secundário II Ciclo Técnico' 
-        : (cNorm.includes('magis') || cNorm.includes('prof') ? 'Formação de Professores (Magistério)' : 'Ensino Secundário II Ciclo Geral');
-      matchedClasse = '11ª Classe';
-    } else if (cNorm.includes('12')) {
-      matchedNivel = cNorm.includes('tec') 
-        ? 'Ensino Secundário II Ciclo Técnico' 
-        : (cNorm.includes('magis') || cNorm.includes('prof') ? 'Formação de Professores (Magistério)' : 'Ensino Secundário II Ciclo Geral');
-      matchedClasse = '12ª Classe';
-    } else if (cNorm.includes('13')) {
-      matchedNivel = cNorm.includes('magis') || cNorm.includes('prof') ? 'Formação de Professores (Magistério)' : 'Ensino Secundário II Ciclo Técnico';
-      matchedClasse = '13ª Classe';
-    } else if (cNorm.includes('1') || cNorm.includes('primeira')) {
-      matchedClasse = '1ª Classe';
-      matchedNivel = 'Ensino Primário Regular';
-    } else if (cNorm.includes('2') || cNorm.includes('segunda')) {
-      matchedClasse = '2ª Classe';
-      matchedNivel = 'Ensino Primário Regular';
-    } else if (cNorm.includes('3') || cNorm.includes('terceira')) {
-      matchedClasse = '3ª Classe';
-      matchedNivel = 'Ensino Primário Regular';
-    } else if (cNorm.includes('4') || cNorm.includes('quarta')) {
-      matchedClasse = '4ª Classe';
-      matchedNivel = 'Ensino Primário Regular';
-    } else if (cNorm.includes('5') || cNorm.includes('quinta')) {
-      matchedClasse = '5ª Classe';
-      matchedNivel = 'Ensino Primário Regular';
-    } else if (cNorm.includes('6') || cNorm.includes('sexta')) {
-      matchedClasse = '6ª Classe';
-      matchedNivel = 'Ensino Primário Regular';
-    } else if (cNorm.includes('7') || cNorm.includes('setima')) {
-      matchedClasse = '7ª Classe';
-      matchedNivel = 'Ensino Secundário I Ciclo Geral';
-    } else if (cNorm.includes('8') || cNorm.includes('oitava')) {
-      matchedClasse = '8ª Classe';
-      matchedNivel = 'Ensino Secundário I Ciclo Geral';
-    } else if (cNorm.includes('9') || cNorm.includes('nona')) {
-      matchedClasse = '9ª Classe';
-      matchedNivel = 'Ensino Secundário I Ciclo Geral';
-    }
-
-    // Natureza da escola do aluno
-    const schoolObj = schools.find(sc => sc.name === st.schoolName || sc.id === st.schoolName);
-    const natureza = schoolObj?.natureza || 'Pública';
-
-    // Idade com cálculo robusto de data de nascimento se necessário
-    const rawBirthDate = detailed?.dataNascimento || st.dataNascimento || (st as any)?.birthDate;
-    let computedAge = detailed?.idade || st.idade;
-    if (!computedAge && rawBirthDate) {
-      const bDate = new Date(rawBirthDate);
-      if (!isNaN(bDate.getTime())) {
-        const now = new Date();
-        let diff = now.getFullYear() - bDate.getFullYear();
-        const m = now.getMonth() - bDate.getMonth();
-        if (m < 0 || (m === 0 && now.getDate() < bDate.getDate())) diff--;
-        if (diff >= 0 && diff < 100) computedAge = diff;
-      }
-    }
-    const idadeNum = computedAge !== undefined ? computedAge : (6 + (idx % 8));
-
-    let idadeTag = '9 anos';
-    if (idadeNum < 5) idadeTag = '< 5 anos';
-    else if (idadeNum === 5) idadeTag = '5 anos';
-    else if (idadeNum === 6) idadeTag = '6 anos';
-    else if (idadeNum === 7) idadeTag = '7 anos';
-    else if (idadeNum === 8) idadeTag = '8 anos';
-    else if (idadeNum === 9) idadeTag = '9 anos';
-    else if (idadeNum === 10) idadeTag = '10 anos';
-    else if (idadeNum === 11) idadeTag = '11 anos';
-    else if (idadeNum === 12) idadeTag = '12 anos';
-    else if (idadeNum === 13) idadeTag = '13 anos';
-    else if (idadeNum === 14) idadeTag = '14 anos';
-    else if (idadeNum === 15) idadeTag = '15 anos';
-    else if (idadeNum === 16) idadeTag = '16 anos';
-    else if (idadeNum === 17) idadeTag = '17 anos';
-    else if (idadeNum === 18) idadeTag = '18 anos';
-    else idadeTag = '> 18 anos';
-
-    // Repetente
-    const isRepetente = (st.condicaoMatricula || detailed?.condicaoMatricula) === 'repetente' || (idx % 7 === 0);
-
-    const key = `${matchedNivel}_${matchedClasse}_${natureza}`;
-    let bucket = alunosBuckets.get(key);
-    if (!bucket) {
-      const idadesObj: Record<string, GenderCount> = {};
-      const repIdadesObj: Record<string, GenderCount> = {};
-      idadesColunas.forEach(idKey => {
-        idadesObj[idKey] = { mf: 0, f: 0 };
-        repIdadesObj[idKey] = { mf: 0, f: 0 };
-      });
-      bucket = {
-        nivel: matchedNivel,
-        classe: matchedClasse,
-        natureza,
-        total: { mf: 0, f: 0 },
-        idades: idadesObj,
-        repetentesTotal: { mf: 0, f: 0 },
-        repetentesIdades: repIdadesObj
-      };
-      alunosBuckets.set(key, bucket);
-    }
-
-    // Incrementa contagens gerais de alunos matriculados
-    bucket.total.mf += 1;
-    if (isFemale) bucket.total.f += 1;
-
-    if (!bucket.idades[idadeTag]) {
-      bucket.idades[idadeTag] = { mf: 0, f: 0 };
-    }
-    bucket.idades[idadeTag].mf += 1;
-    if (isFemale) bucket.idades[idadeTag].f += 1;
-
-    // Manter compatibilidade com leituras de faixa legado (> 13 anos)
-    if (idadeNum > 13) {
-      if (!bucket.idades['> 13 anos']) {
-        bucket.idades['> 13 anos'] = { mf: 0, f: 0 };
-      }
-      bucket.idades['> 13 anos'].mf += 1;
-      if (isFemale) bucket.idades['> 13 anos'].f += 1;
-    }
-
-    // Repetentes
-    if (isRepetente) {
-      bucket.repetentesTotal.mf += 1;
-      if (isFemale) bucket.repetentesTotal.f += 1;
-      if (!bucket.repetentesIdades[idadeTag]) {
-        bucket.repetentesIdades[idadeTag] = { mf: 0, f: 0 };
-      }
-      bucket.repetentesIdades[idadeTag].mf += 1;
-      if (isFemale) bucket.repetentesIdades[idadeTag].f += 1;
-
-      if (idadeNum > 13) {
-        if (!bucket.repetentesIdades['> 13 anos']) {
-          bucket.repetentesIdades['> 13 anos'] = { mf: 0, f: 0 };
-        }
-        bucket.repetentesIdades['> 13 anos'].mf += 1;
-        if (isFemale) bucket.repetentesIdades['> 13 anos'].f += 1;
-      }
-    }
-  });
-
-  // Se a base de alunos for muito pequena (ex: protótipo ou início de ano),
-  // ajustamos para representação fiel distribuída respeitando a rede de escolas
-  const totalAlunosContados = students.length;
-  if (totalAlunosContados > 0) {
-    // Garantir que todos os buckets possuam dados consistentes
-  }
-
-  // Montar lista de Alunos Matriculados
-  const alunosMatriculados = Array.from(alunosBuckets.values()).map(b => ({
-    nivel: b.nivel,
-    classe: b.classe,
-    natureza: b.natureza,
-    total: b.total,
-    idades: b.idades
-  }));
-
-  // Montar lista de Alunos Repetentes
-  const alunosRepetentes = Array.from(alunosBuckets.values()).map(b => ({
-    nivel: b.nivel,
-    classe: b.classe,
-    natureza: b.natureza,
-    total: b.repetentesTotal,
-    idades: b.repetentesIdades
-  }));
-
-  // --- 2. AGREGAÇÃO DE PESSOAL DOCENTE (SEM NOMES) ---
-  interface DocenteBucket {
-    nivelEnsino: string;
-    natureza: string;
-    formacaoPedagogica: string;
-    grauAcademico: string;
-    total: GenderCount;
-  }
-  const docentesBuckets = new Map<string, DocenteBucket>();
-
-  const combinacoesDocentes = [
-    { nivel: 'Ensino Primário', grau: 'Ensino Médio Pedagógico / Magistério', form: 'Com Formação Pedagógica (Magistério)' },
-    { nivel: 'Ensino Primário', grau: 'Licenciatura em Ciências da Educação', form: 'Com Formação Pedagógica (Magistério)' },
-    { nivel: 'Ensino Primário', grau: 'Ensino Médio Técnico / Outro', form: 'Sem Formação Pedagógica' },
-    { nivel: 'Iº Ciclo do Ensino Secundário', grau: 'Licenciatura em Ensino / Pedagogia', form: 'Com Formação Pedagógica (Magistério)' },
-    { nivel: 'Iº Ciclo do Ensino Secundário', grau: 'Licenciatura Geral / Bacharelato', form: 'Sem Formação Pedagógica' },
-  ];
-
-  combinacoesDocentes.forEach(cb => {
-    ['Pública', 'Privada'].forEach(nat => {
-      const key = `${cb.nivel}_${nat}_${cb.grau}_${cb.form}`;
-      docentesBuckets.set(key, {
-        nivelEnsino: cb.nivel,
-        natureza: nat,
-        grauAcademico: cb.grau,
-        formacaoPedagogica: cb.form,
-        total: { mf: 0, f: 0 }
-      });
-    });
-  });
-
-  teachers.forEach((t, idx) => {
-    const detailed = t.registrationData || detailedTeacherMap.get(t.id) || detailedTeacherMap.get(norm(t.name));
-    const isFemale = detailed?.sexo === 'Feminino' || idx % 2 === 0;
-
-    let nivel = 'Ensino Primário';
-    if (t.gradeClass && (t.gradeClass.includes('7') || t.gradeClass.includes('8') || t.gradeClass.includes('9'))) {
-      nivel = 'Iº Ciclo do Ensino Secundário';
-    }
-
-    const schoolObj = schools.find(sc => sc.name === t.schoolName || sc.id === t.schoolName);
-    const natureza = schoolObj?.natureza || detailed?.naturezaEscola || 'Pública';
-
-    const temFormacao = detailed?.temFormacaoPedagogica !== false;
-    const formacaoPedagogica = temFormacao 
-      ? 'Com Formação Pedagógica (Magistério)' 
-      : 'Sem Formação Pedagógica';
-
-    const grauAcademico = detailed?.nivelAcademico || 'Licenciatura em Ciências da Educação';
-
-    const key = `${nivel}_${natureza}_${grauAcademico}_${formacaoPedagogica}`;
-    let b = docentesBuckets.get(key);
-    if (!b) {
-      b = {
-        nivelEnsino: nivel,
-        natureza,
-        grauAcademico,
-        formacaoPedagogica,
-        total: { mf: 0, f: 0 }
-      };
-      docentesBuckets.set(key, b);
-    }
-    b.total.mf += 1;
-    if (isFemale) b.total.f += 1;
-  });
-
-  const pessoalDocente = Array.from(docentesBuckets.values());
-
-  // --- 3. AGREGAÇÃO DE INFRAESTRUTURAS ---
-  interface InfraBucket {
-    natureza: string;
-    escolasCount: number;
-    salasDefinitivas: number;
-    salasProvisorias: number;
-    turmasManha: number;
-    turmasTarde: number;
-    turmasNoite: number;
-    totalTurmas: number;
-  }
-  const infraMap = new Map<string, InfraBucket>();
-
-  ['Pública', 'Privada', 'Comparticipada'].forEach(nat => {
-    infraMap.set(nat, {
-      natureza: nat,
-      escolasCount: 0,
-      salasDefinitivas: 0,
-      salasProvisorias: 0,
-      turmasManha: 0,
-      turmasTarde: 0,
-      turmasNoite: 0,
-      totalTurmas: 0
-    });
-  });
-
-  schools.forEach(sc => {
-    const nat = sc.natureza || 'Pública';
-    let b = infraMap.get(nat);
-    if (!b) {
-      b = {
-        natureza: nat,
-        escolasCount: 0,
-        salasDefinitivas: 0,
-        salasProvisorias: 0,
-        turmasManha: 0,
-        turmasTarde: 0,
-        turmasNoite: 0,
-        totalTurmas: 0
-      };
-      infraMap.set(nat, b);
-    }
-    b.escolasCount += 1;
-    const totalSalas = sc.roomsCount || 10;
-    // Padrão estatístico angolano: 85% definitivas, 15% provisórias
-    const def = Math.round(totalSalas * 0.85);
-    const prov = Math.max(0, totalSalas - def);
-    b.salasDefinitivas += def;
-    b.salasProvisorias += prov;
-
-    const totalTurmas = sc.turmasCount || 12;
-    const manha = Math.round(totalTurmas * 0.55);
-    const tarde = Math.round(totalTurmas * 0.40);
-    const noite = Math.max(0, totalTurmas - manha - tarde);
-    b.turmasManha += manha;
-    b.turmasTarde += tarde;
-    b.turmasNoite += noite;
-    b.totalTurmas += totalTurmas;
-  });
-
-  const infraestruturas = Array.from(infraMap.values());
-
-  // --- 4. AGREGAÇÃO DE APROVEITAMENTO ESCOLAR (REGRA MATRICULADOS = APROVADOS + REPROVADOS + DESISTIDOS) ---
-  const aproveitamento = alunosMatriculados.map(am => {
-    const matMF = am.total.mf;
-    const matF = am.total.f;
-
-    // Taxa de aprovação típica de 82%, reprovação de 13%, desistência 5%
-    const aprMF = Math.round(matMF * 0.82);
-    const repMF = Math.round(matMF * 0.13);
-    const desMF = Math.max(0, matMF - aprMF - repMF); // Garante resíduo ZERO!
-
-    const aprF = Math.min(aprMF, Math.round(matF * 0.84));
-    const repF = Math.min(repMF, Math.round(matF * 0.11));
-    const desF = Math.min(desMF, Math.max(0, matF - aprF - repF)); // Garante F <= MF e resíduo zero
-
-    const residualMF = matMF - (aprMF + repMF + desMF);
-    const residualF = matF - (aprF + repF + desF);
-
-    return {
-      ciclo: am.nivel,
-      classe: am.classe,
-      natureza: am.natureza,
-      matriculados: { mf: matMF, f: matF },
-      aprovados: { mf: aprMF, f: aprF },
-      reprovados: { mf: repMF, f: repF },
-      desistidos: { mf: desMF, f: desF },
-      residualMF,
-      residualF,
-      validacao: (residualMF === 0 && aprF <= aprMF && repF <= repMF && desF <= desMF) ? 'Correcto' as const : 'Falso' as const
-    };
-  });
-
-  // --- 5. NECESSIDADES EDUCATIVAS ESPECIAIS (NEE) ---
-  const deficienciasPadrao = [
-    'Deficiência Visual / Baixa Visão',
-    'Deficiência Auditiva / Surdez',
-    'Deficiência Físico-Motora',
-    'Deficiência Intelectual / Cognitiva',
-    'Transtorno do Espectro Autista (TEA)',
-    'Deficiência Múltipla / Outras'
-  ];
-
-  const necessidadesEspeciais = deficienciasPadrao.map((def, i) => {
-    // Estimativa agregada oficial da rede
-    const countMF = Math.max(1, Math.round(students.length * (0.005 + i * 0.002)));
-    const countF = Math.max(0, Math.round(countMF * 0.45));
-    return {
-      tipoDeficiencia: def,
-      nivel: 'Ensino Primário Regular',
-      natureza: 'Pública',
-      total: { mf: countMF, f: countF }
-    };
-  });
-
-  // --- 6. PESSOAL NÃO DOCENTE ---
-  const categoriasNaoDocentes = [
-    { cat: 'Secretários Escolares & Apoio Administrativo', mf: 32, f: 24 },
-    { cat: 'Auxiliares de Acção Educativa / Limpeza', mf: 48, f: 42 },
-    { cat: 'Vigilantes / Agentes de Segurança', mf: 38, f: 4 },
-    { cat: 'Técnicos de Informática / Laboratório', mf: 12, f: 5 },
-  ];
-
-  const pessoalNaoDocente = categoriasNaoDocentes.map(c => ({
-    categoria: c.cat,
-    natureza: 'Pública',
-    total: { mf: c.mf, f: c.f }
-  }));
-
-  // Totais Gerais Consolidados
-  const totalAlunosMF = alunosMatriculados.reduce((acc, a) => acc + a.total.mf, 0);
-  const totalAlunosF = alunosMatriculados.reduce((acc, a) => acc + a.total.f, 0);
-
-  const totalRepMF = alunosRepetentes.reduce((acc, a) => acc + a.total.mf, 0);
-  const totalRepF = alunosRepetentes.reduce((acc, a) => acc + a.total.f, 0);
-
-  const totalDocMF = pessoalDocente.reduce((acc, d) => acc + d.total.mf, 0);
-  const totalDocF = pessoalDocente.reduce((acc, d) => acc + d.total.f, 0);
-
-  const totalNaoDocMF = pessoalNaoDocente.reduce((acc, n) => acc + n.total.mf, 0);
-  const totalNaoDocF = pessoalNaoDocente.reduce((acc, n) => acc + n.total.f, 0);
-
-  const totalNeeMF = necessidadesEspeciais.reduce((acc, n) => acc + n.total.mf, 0);
-  const totalNeeF = necessidadesEspeciais.reduce((acc, n) => acc + n.total.f, 0);
-
-  const totalEscolas = schools.length;
-  const totalSalas = infraestruturas.reduce((acc, i) => acc + i.salasDefinitivas + i.salasProvisorias, 0);
-  const totalTurmas = infraestruturas.reduce((acc, i) => acc + i.totalTurmas, 0);
-
-  return {
-    meta: {
-      pais: 'REPÚBLICA DE ANGOLA',
-      ministerio: 'MINISTÉRIO DA EDUCAÇÃO',
-      direccao: 'GEPE - Gabinete de Estudos, Planeamento e Estatística',
-      provincia,
-      municipio,
-      anoLectivo: '2026 / 2027',
-      dataEmissao: new Date().toLocaleDateString('pt-PT'),
-      responsavel: 'Gabinete Municipal de Estatística e Planeamento',
-      cargo: 'Responsável Estatístico Municipal',
-      contactoInstitucional: 'estatistica.quessua@med.gov.ao'
-    },
-    totaisGerais: {
-      totalEscolas,
-      totalSalas,
-      totalTurmas,
-      totalDocentes: { mf: totalDocMF, f: totalDocF },
-      totalNaoDocentes: { mf: totalNaoDocMF, f: totalNaoDocF },
-      totalAlunosMatriculados: { mf: totalAlunosMF, f: totalAlunosF },
-      totalAlunosRepetentes: { mf: totalRepMF, f: totalRepF },
-      totalAlunosNEE: { mf: totalNeeMF, f: totalNeeF }
-    },
-    alunosMatriculados,
-    pessoalDocente,
-    infraestruturas,
-    aproveitamento,
-    alunosRepetentes,
-    necessidadesEspeciais,
-    pessoalNaoDocente
-  };
+  return aggregateSigeDatasetWithSchoolAttribution(dataset);
 }
 
 /**
@@ -764,11 +217,12 @@ export function buildSigeCapaRows(report: SigeAggregatedReport): Record<string, 
 }
 
 /**
- * Folha 2: 1 - ALUNOS MATRICULADOS (Só números agregados)
+ * Folha 2: 1 - ALUNOS MATRICULADOS (Discriminado por Escola Provedora)
  */
 export function buildSigeAlunosMatriculadosRows(report: SigeAggregatedReport): Record<string, any>[] {
   return report.alunosMatriculados.map(item => {
     const row: Record<string, any> = {
+      'ESCOLA': item.escola || 'Rede Municipal',
       'SUBSISTEMA / NÍVEL': item.nivel,
       'NATUREZA DE ENSINO': item.natureza,
       'CLASSE': item.classe,
@@ -813,10 +267,11 @@ export function buildSigeAlunosMatriculadosRows(report: SigeAggregatedReport): R
 }
 
 /**
- * Folha 3: 2 - PESSOAL_DOCENTE (Contagens por formação/nível, sem nomes)
+ * Folha 3: 2 - PESSOAL_DOCENTE (Discriminado por Escola Provedora, sem nomes)
  */
 export function buildSigePessoalDocenteRows(report: SigeAggregatedReport): Record<string, any>[] {
   return report.pessoalDocente.map(item => ({
+    'ESCOLA': item.escola || 'Rede Municipal',
     'NÍVEL DE ENSINO LECCIONADO': item.nivelEnsino,
     'NATUREZA DA INSTITUIÇÃO': item.natureza,
     'QUALIFICAÇÃO ACADÉMICA': item.grauAcademico,
@@ -829,10 +284,11 @@ export function buildSigePessoalDocenteRows(report: SigeAggregatedReport): Recor
 }
 
 /**
- * Folha 4: 3 - INFRAESTRUTURAS (Nº escolas, salas, turmas)
+ * Folha 4: 3 - INFRAESTRUTURAS (Discriminado por Escola Provedora)
  */
 export function buildSigeInfraestruturasRows(report: SigeAggregatedReport): Record<string, any>[] {
   return report.infraestruturas.map(item => ({
+    'ESCOLA': item.escola || 'Rede Municipal',
     'NATUREZA DAS INSTITUIÇÕES': item.natureza,
     'Nº DE UNIDADES ESCOLARES': item.escolasCount,
     'SALAS DE AULA DEFINITIVAS': item.salasDefinitivas,
@@ -847,7 +303,7 @@ export function buildSigeInfraestruturasRows(report: SigeAggregatedReport): Reco
 }
 
 /**
- * Folha 5: 4 - APROVEITAMENTO (Matriculados / aprovados / reprovados / desistidos)
+ * Folha 5: 4 - APROVEITAMENTO (Discriminado por Escola Provedora)
  * Com validação formal da tutela (M = A + R + D e F <= MF)
  */
 export function buildSigeAproveitamentoRows(report: SigeAggregatedReport): Record<string, any>[] {
@@ -856,6 +312,7 @@ export function buildSigeAproveitamentoRows(report: SigeAggregatedReport): Recor
     const taxaAprovacao = item.matriculados.mf > 0 ? ((item.aprovados.mf / item.matriculados.mf) * 100).toFixed(1) + '%' : '0.0%';
 
     return {
+      'ESCOLA': item.escola || 'Rede Municipal',
       'SUBSISTEMA / NÍVEL': item.ciclo,
       'CLASSE': item.classe,
       'NATUREZA': item.natureza,
@@ -877,10 +334,11 @@ export function buildSigeAproveitamentoRows(report: SigeAggregatedReport): Recor
 }
 
 /**
- * Folha 6: 5 - ALUNOS REPETENTES (Totais agregados por classe e idade)
+ * Folha 6: 5 - ALUNOS REPETENTES (Discriminado por Escola Provedora)
  */
 export function buildSigeAlunosRepetentesRows(report: SigeAggregatedReport): Record<string, any>[] {
   return report.alunosRepetentes.map(item => ({
+    'ESCOLA': item.escola || 'Rede Municipal',
     'SUBSISTEMA / NÍVEL': item.nivel,
     'NATUREZA DE ENSINO': item.natureza,
     'CLASSE': item.classe,
@@ -924,11 +382,12 @@ export function buildSigeAlunosRepetentesRows(report: SigeAggregatedReport): Rec
 }
 
 /**
- * Folha 7: 6 - NEE (Necessidades Educativas Especiais)
+ * Folha 7: 6 - NEE (Discriminado por Escola Provedora)
  * Apresenta as 4 categorias oficiais da tutela + subtipos específicos
  */
 export function buildSigeNeeRows(report: SigeAggregatedReport): Record<string, any>[] {
   return report.necessidadesEspeciais.map(item => ({
+    'ESCOLA': item.escola || 'Rede Municipal',
     'CATEGORIA OFICIAL DA TUTELA': item.tipoDeficiencia.includes('Visual') ? '1. Deficiência Visual' :
                                    item.tipoDeficiencia.includes('Audit') ? '2. Deficiência Auditiva' :
                                    item.tipoDeficiencia.includes('Físic') || item.tipoDeficiencia.includes('Motor') ? '3. Deficiência Motora' : '4. Outras Deficiências',
@@ -943,10 +402,11 @@ export function buildSigeNeeRows(report: SigeAggregatedReport): Record<string, a
 }
 
 /**
- * Folha 8: 7 - PESSOAL NÃO DOCENTE
+ * Folha 8: 7 - PESSOAL NÃO DOCENTE (Discriminado por Escola Provedora)
  */
 export function buildSigePessoalNaoDocenteRows(report: SigeAggregatedReport): Record<string, any>[] {
   return report.pessoalNaoDocente.map(item => ({
+    'ESCOLA': item.escola || 'Rede Municipal',
     'CATEGORIA FUNCIONAL': item.categoria,
     'NATUREZA DA REDE': item.natureza,
     'TOTAL EFECTIVOS (MF)': item.total.mf,

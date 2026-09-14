@@ -11,8 +11,6 @@ import {
   Calendar,
   User,
   Bell,
-  Globe,
-  Sun,
   Lock,
   IdCard,
   ChevronRight,
@@ -519,30 +517,6 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
                       <span className="flex items-center gap-2.5">
                         <Bell className="w-4 h-4 text-slate-400 group-hover:text-[#f75142]" />
                         <span>Notificações</span>
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#f75142]" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('language')}
-                      className="w-full flex items-center justify-between py-3.5 text-left text-[#173d55] hover:text-[#f75142] transition-colors cursor-pointer group"
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <Globe className="w-4 h-4 text-slate-400 group-hover:text-[#f75142]" />
-                        <span>Idioma</span>
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#f75142]" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('theme')}
-                      className="w-full flex items-center justify-between py-3.5 text-left text-[#173d55] hover:text-[#f75142] transition-colors cursor-pointer group"
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <Sun className="w-4 h-4 text-slate-400 group-hover:text-[#f75142]" />
-                        <span>Tema</span>
                       </span>
                       <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#f75142]" />
                     </button>

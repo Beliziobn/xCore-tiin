@@ -53,11 +53,27 @@
     text-rendering: optimizeLegibility;
   }
 
+  html.dark,
+  html.dark body,
+  html.dark #root {
+    background-color: #090d16;
+    color: #f1f5f9;
+  }
+
   /* Display font for headings — restrained, modern, technical */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
     color: #002133;
+  }
+
+  html.dark h1,
+  html.dark h2,
+  html.dark h3,
+  html.dark h4,
+  html.dark h5,
+  html.dark h6 {
+    color: #f8fafc !important;
   }
 
   /* Body copy and controls use the humanist sans for legibility */
@@ -66,7 +82,7 @@
     font-family: var(--font-sans);
   }
 
-  /* Ensure text with black or darkest slate uses #002133 instead of pure black */
+  /* Ensure typography uses brand primary contrast #002133 */
   .text-black,
   .text-slate-950,
   .text-slate-900,

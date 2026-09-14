@@ -13,6 +13,7 @@ import { ModuleDetailModal } from './components/ModuleDetailModal';
 import { InfoModal, InfoModalType } from './components/InfoModal';
 import { SessionSettingsModal } from './components/SessionSettingsModal';
 import { sessionsData } from './data/sessionsData';
+import { initTheme } from './utils/themeService';
 
 // Director Pages
 import { DirectorStatisticsPage } from './components/pages/director/DirectorStatisticsPage';
@@ -206,6 +207,11 @@ export default function App() {
       );
     }
   };
+
+  // Initialize theme mode
+  useEffect(() => {
+    initTheme();
+  }, []);
 
   // Persist admin entities on change
   useEffect(() => {
@@ -2154,20 +2160,7 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenSettings={() => {
-          setCurrentPage('home');
-          setProfileInitialTab('configuracoes');
-          setProfileFocusZone(true);
-          setSettingsTriggerCount((c) => c + 1);
-          const ownProfile = getOwnProfileViewForUser(currentUser);
-          setCurrentView(ownProfile);
-          setTimeout(() => {
-            const el = document.getElementById('zona-dados-senha');
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-          }, 150);
+          setSettingsModalOpen(true);
         }}
         onOpenDemoModal={() => setIsDemoModalOpen(true)}
         onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}

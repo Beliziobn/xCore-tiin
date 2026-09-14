@@ -99,8 +99,8 @@ export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOption
 
   // Filter by school if requested
   if (options.escolaId) {
-    students = students.filter(s => s.schoolId === options.escolaId || s.schoolName === options.escolaId);
-    teachers = teachers.filter(t => t.schoolId === options.escolaId || t.schoolName === options.escolaId);
+    students = students.filter(s => (s as any).schoolId === options.escolaId || s.schoolName === options.escolaId);
+    teachers = teachers.filter(t => (t as any).schoolId === options.escolaId || t.schoolName === options.escolaId);
     schools = schools.filter(sc => sc.id === options.escolaId || sc.name === options.escolaId);
   }
 
@@ -190,10 +190,10 @@ export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOption
   students.forEach((st: AdminStudent) => {
     const reg: StudentRegistrationData | undefined = st.registrationData;
     const isFemale = (reg?.genero === 'F') || (st.gender === 'F');
-    const age = reg?.idade || st.age || 8;
-    const rawClasse = reg?.classe || st.grade || '1ª Classe';
+    const age = reg?.idade || st.idade || (st as any).age || 8;
+    const rawClasse = reg?.classe || st.gradeClass || (st as any).grade || '1ª Classe';
     const classe = normalizeClasse(rawClasse);
-    const natureza = normalizeNatureza(reg?.naturezaEscola || (st.schoolType as string));
+    const natureza = normalizeNatureza(reg?.naturezaEscola || ((st as any).schoolType as string));
     const isRepetente = reg?.alunoRepetente === true || reg?.condicaoMatricula === 'repetente';
     const isNee = reg?.temNecessidadesEspeciais === true || (reg?.tiposDeficiencia && reg.tiposDeficiencia.length > 0);
 
@@ -289,8 +289,8 @@ export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOption
 
   // 2. PROCESS TEACHERS (Folha 2)
   teachers.forEach((tc: AdminTeacher) => {
-    const isFemale = tc.gender === 'F';
-    const qual = tc.qualification || 'Magistério';
+    const isFemale = (tc.registrationData as any)?.genero === 'F' || (tc as any).gender === 'F';
+    const qual = (tc.registrationData as any)?.habilitacoesLiterarias || (tc as any).qualification || tc.category || 'Magistério';
     const category = qual.includes('Licenciatura') 
       ? 'Com Licenciatura em Ensino'
       : (qual.includes('Magistério') || qual.includes('IMNE') ? 'Com Magistério e Com IMNE Completo' : 'Sem Habilitação Pedagógica');

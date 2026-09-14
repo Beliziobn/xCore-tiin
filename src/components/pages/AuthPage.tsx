@@ -28,6 +28,7 @@ import {
   Phone
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
+import { verifyPassword, updatePassword } from '../../utils/passwordService';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
 import { googleSignIn } from '../../utils/googleAuth';
@@ -374,9 +375,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
     if (mode === 'login') {
       if (!email.trim() || !password.trim()) {
-        setErrorMsg('Por favor, informe seu e-mail e senha.');
+        setErrorMsg('Por favor, informe seu e-mail e palavra-passe.');
         return;
       }
+
+      if (!verifyPassword(email.trim(), password.trim())) {
+        setErrorMsg('A palavra-passe informada está incorreta para este e-mail.');
+        return;
+      }
+
       setLoading(true);
       onAuthLoadingChange?.(true, 'login');
 
@@ -531,6 +538,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const isTeacherCandidate = baseRole === 'professor';
         const isPending = isDirectorCandidate || isTeacherCandidate;
         const newUserId = 'usr_' + Date.now();
+
+        // Save custom password in storage
+        updatePassword(email.trim(), password.trim());
 
         // Create pending application record
         if (isPending) {
