@@ -33,7 +33,7 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
   onClose,
   onSave,
   editingAnnouncement,
-  adminName = 'Administração Central uCore',
+  adminName = 'Administração Central Sigre',
 }) => {
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -344,7 +344,7 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
                   type="text"
                   value={headline}
                   onChange={(e) => setHeadline(e.target.value)}
-                  placeholder="Ex: Período Regulamentar de Inserção de Notas e Médias no Sistema uCore"
+                  placeholder="Ex: Período Regulamentar de Inserção de Notas e Médias no Sistema Sigre"
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 font-medium"
                   required
                 />

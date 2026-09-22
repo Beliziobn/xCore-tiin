@@ -201,7 +201,7 @@ export const GoogleAnnouncementCard: React.FC<GoogleAnnouncementCardProps> = ({
             </span>
           </div>
 
-          {/* Title in uCore dark navy (#002133) */}
+          {/* Title in Sigre dark navy (#002133) */}
           <h3 className="text-base sm:text-lg font-bold tracking-tight text-[#002133] leading-snug">
             <button
               type="button"

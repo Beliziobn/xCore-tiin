@@ -1,6 +1,6 @@
-# CLAUDE.md - uCore Educational Platform Guidelines
+# CLAUDE.md - Sigre Educational Platform Guidelines
 
-Bem-vindo ao **uCore**, o Sistema Operacional de Gestão Escolar e Avaliação Académica desenhado para instituições de ensino e em conformidade com as normas oficiais do **Ministério da Educação de Angola (MED)**.
+Bem-vindo ao **Sigre**, o Sistema Operacional de Gestão Escolar e Avaliação Académica desenhado para instituições de ensino e em conformidade com as normas oficiais do **Ministério da Educação de Angola (MED)**.
 
 ---
 

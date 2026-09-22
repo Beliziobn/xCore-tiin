@@ -104,9 +104,9 @@ const DEFAULT_DME_STAFF: DMEStaffMember[] = [
     id: 'dme-5',
     name: 'Dra. Teresa de Jesus Santos',
     role: 'admin_sistema',
-    cargoTitle: 'Administradora de Sistema uCore & RH',
+    cargoTitle: 'Administradora de Sistema Sigre & RH',
     department: 'Secção de Recursos Humanos e Tecnologia',
-    email: 'rh.ti.dme@ucore.edu.ao',
+    email: 'rh.ti.dme@sigre.edu.ao',
     phone: '+244 927 550 005',
     status: 'Ativo',
   },
@@ -198,7 +198,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       case 'inspetor_escolar': return 'Inspetor(a) Escolar Municipal';
       case 'chefe_reparticao': return 'Chefe de Repartição / Ensino Geral';
       case 'tecnico_estatistica': return 'Técnico(a) de Planeamento & Estatística';
-      case 'admin_sistema': return 'Administrador(a) de Sistema uCore';
+      case 'admin_sistema': return 'Administrador(a) de Sistema Sigre';
       default: return 'Funcionário da Administração';
     }
   };
@@ -213,7 +213,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       role: newStaffRole,
       cargoTitle: getRoleTitle(newStaffRole),
       department: newStaffDept.trim() || 'Direcção Municipal da Educação',
-      email: newStaffEmail.trim() || `${newStaffName.toLowerCase().replace(/\s+/g, '.')}@ucore.edu.ao`,
+      email: newStaffEmail.trim() || `${newStaffName.toLowerCase().replace(/\s+/g, '.')}@sigre.edu.ao`,
       phone: newStaffPhone.trim() || '+244 923 000 000',
       status: 'Ativo',
     };
@@ -251,13 +251,13 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       // ignore
     }
     const adminName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Dr. Fred Silva';
-    const adminEmail = currentUser?.email || 'diretor.municipal@ucore.edu.ao';
+    const adminEmail = currentUser?.email || 'diretor.municipal@sigre.edu.ao';
     return {
       name: adminName,
       email: adminEmail,
       phone: '+244 923 001 100',
-      roleTitle: 'Superintendente & Administrador Geral da Rede uCore',
-      schoolName: 'Direcção Municipal da Educação & Rede uCore',
+      roleTitle: 'Superintendente & Administrador Geral da Rede Sigre',
+      schoolName: 'Direcção Municipal da Educação & Rede Sigre',
       biNumber: '005481920LA031',
       address: 'Edifício Monumental, Ingombota, Luanda',
     };
@@ -310,7 +310,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
         onOpenGetStarted={onOpenGetStarted}
         isLoggedIn={isLoggedIn}
         customTitle="Perfil do Administrador Geral"
-        customSubtitle="Supervisão executiva, conformidade e definições estratégicas da rede uCore"
+        customSubtitle="Supervisão executiva, conformidade e definições estratégicas da rede Sigre"
       />
 
       {/* Main Container - Aligned exactly with Hero's max-w-6xl and padding */}
@@ -353,7 +353,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                     </span>
                   </div>
                   <p className="text-sm sm:text-base font-semibold text-slate-700 mt-1">
-                    Superintendente & Administrador Geral da Rede Central uCore
+                    Superintendente & Administrador Geral da Rede Central Sigre
                   </p>
                 </div>
 
@@ -429,7 +429,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                   {schools.length}
                 </div>
                 <span className="inline-block mt-1 text-xs font-semibold text-[#f75142]">
-                  100% Integradas ao uCore
+                  100% Integradas ao Sigre
                 </span>
               </div>
               <div className="w-12 h-12 rounded-xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center shrink-0 border border-[#fee4e2]">
@@ -570,7 +570,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 <div className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <span className="text-slate-500 font-medium">Instituição Tutelar</span>
                   <span className="text-slate-900 font-semibold">
-                    {adminData.schoolName || 'Ministério da Educação & Rede uCore Escolas'}
+                    {adminData.schoolName || 'Ministério da Educação & Rede Sigre Escolas'}
                   </span>
                 </div>
 
@@ -768,7 +768,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                   <option value="inspetor_escolar">Inspetor(a) Escolar Municipal</option>
                   <option value="chefe_reparticao">Chefe de Repartição / Ensino Geral</option>
                   <option value="tecnico_estatistica">Técnico(a) de Planeamento & Estatística</option>
-                  <option value="admin_sistema">Administrador(a) de Sistema uCore / RH</option>
+                  <option value="admin_sistema">Administrador(a) de Sistema Sigre / RH</option>
                 </select>
               </div>
 

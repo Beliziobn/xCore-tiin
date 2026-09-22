@@ -184,7 +184,7 @@ export function getViewTitle(view: string): string {
     'professor-presenca': 'Livro de Chamada (Professor)',
     'chamada': 'Livro de Chamada (Professor)',
     'presenca': 'Livro de Presença (Professor)',
-    'sobre': 'Sobre a Plataforma uCore',
+    'sobre': 'Sobre a Plataforma Sigre',
     'termos': 'Termos de Utilização',
     'privacidade': 'Política de Privacidade',
     'seguranca': 'Segurança e Proteção de Dados',
@@ -261,7 +261,7 @@ export function canUserAccessView(user: UserAccount | null, view: string): ViewA
 
       return {
         allowed: false,
-        reason: `Política de Privacidade uCore: Um utilizador nunca pode entrar nem alterar o perfil de outros utilizadores. Está autenticado como ${user.firstName} (${role.toUpperCase()}) e tentou aceder ao ${profileInfo.title}.`,
+        reason: `Política de Privacidade Sigre: Um utilizador nunca pode entrar nem alterar o perfil de outros utilizadores. Está autenticado como ${user.firstName} (${role.toUpperCase()}) e tentou aceder ao ${profileInfo.title}.`,
         targetRole: profileInfo.role,
         targetViewTitle: profileInfo.title,
         userOwnProfileView: userOwnProfile,

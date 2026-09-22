@@ -121,7 +121,7 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({
               </div>
 
               <p className="text-xs text-slate-600 leading-relaxed">
-                A plataforma escolar <strong className="text-slate-900">uCore</strong> utiliza cookies essenciais para garantir a segurança da sessão, a escrituração de presenças e a integridade de dados institucionais. Não comercializamos dados de menores ou docentes.
+                A plataforma escolar <strong className="text-slate-900">Sigre</strong> utiliza cookies essenciais para garantir a segurança da sessão, a escrituração de presenças e a integridade de dados institucionais. Não comercializamos dados de menores ou docentes.
               </p>
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 mt-2 mb-4">
@@ -226,7 +226,7 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({
             {/* Modal Body with Cookie Categories */}
             <div className="p-6 overflow-y-auto space-y-4 text-xs sm:text-sm">
               <p className="text-slate-600 leading-relaxed">
-                Em conformidade com a <strong>Lei n.º 22/11 (Proteção de Dados Pessoais de Angola)</strong>, garantimos transparência total no processamento de dados nas instituições escolares geridas pela plataforma uCore.
+                Em conformidade com a <strong>Lei n.º 22/11 (Proteção de Dados Pessoais de Angola)</strong>, garantimos transparência total no processamento de dados nas instituições escolares geridas pela plataforma Sigre.
               </p>
 
               {/* Category 1: Strictly Necessary (Always Active) */}

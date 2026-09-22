@@ -573,7 +573,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                   {initialData ? 'Atualizar Ficha do Director(a)' : 'Cadastrar e Homologar Director(a)'}
                 </h2>
                 <p className="text-sm text-slate-500 mt-0.5 max-w-xl">
-                  Preencha a ficha do director(a) de forma guiada — o uCore calcula automaticamente a faixa etária, perfil de gestão e vínculo com a escola.
+                  Preencha a ficha do director(a) de forma guiada — o Sigre calcula automaticamente a faixa etária, perfil de gestão e vínculo com a escola.
                 </p>
               </div>
             </div>

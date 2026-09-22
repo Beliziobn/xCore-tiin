@@ -46,15 +46,15 @@ export const InfoModal: React.FC<InfoModalProps> = ({
 
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[9px] uppercase font-black tracking-[0.25em] text-[#f75142]">
-              Central uCore
+              Sigre
             </span>
           </div>
 
           <h3 className="text-2xl font-black uppercase tracking-tight text-[#002133]">
-            {type === 'about' && 'Sobre a Central uCore'}
+            {type === 'about' && 'Sobre o Sigre'}
             {type === 'terms' && 'Termos e Políticas de Privacidade'}
             {type === 'support' && 'Suporte & Contato'}
-            {type === 'profile' && 'Meu Perfil uCore'}
+            {type === 'profile' && 'Meu Perfil no Sigre'}
           </h3>
         </div>
 
@@ -63,7 +63,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
           {type === 'about' && (
             <>
               <p>
-                A <strong className="text-[#002133]">Central uCore</strong> nasceu com o propósito de transformar a gestão educacional em redes públicas e privadas de ensino em todo o país.
+                O <strong className="text-[#002133]">Sigre (Sistema Integrado de Gestão Escolar)</strong> nasceu com o propósito de transformar a gestão educacional em redes públicas e privadas de ensino em todo o país.
               </p>
               <div className="bg-[#fef2f1] border border-[#f75142]/20 rounded-2xl p-4 text-xs text-slate-700">
                 <p className="font-black mb-1 text-[#f75142] uppercase tracking-wider text-[11px]">
@@ -92,7 +92,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
           {type === 'terms' && (
             <>
               <p>
-                A Central uCore preza pela total transparência e proteção rigorosa de dados de estudantes, docentes e equipes gestoras.
+                O Sigre preza pela total transparência e proteção rigorosa de dados de estudantes, docentes e equipes gestoras.
               </p>
               <div className="space-y-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
@@ -102,7 +102,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                   </p>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">2. Conformidade LGPD</h5>
+                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">2. Proteção e Segurança de Dados</h5>
                   <p className="text-slate-600 mt-1">
                     Criptografia de ponta a ponta para diários de classe, históricos escolares e relatórios socioeducacionais.
                   </p>
@@ -110,7 +110,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
                   <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">3. Responsabilidade das Instituições</h5>
                   <p className="text-slate-600 mt-1">
-                    Cada instituição escolar conectada à uCore mantém autonomia de controle de acesso de suas respectivas turmas e matrículas.
+                    Cada instituição escolar conectada ao Sigre mantém autonomia de controle de acesso de suas respectivas turmas e matrículas.
                   </p>
                 </div>
               </div>
@@ -127,7 +127,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                   <Mail className="w-5 h-5 text-[#f75142]" />
                   <div>
                     <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">E-mail de Suporte</span>
-                    <span className="text-xs font-black text-[#002133]">suporte@ucore.educacao.br</span>
+                    <span className="text-xs font-black text-[#002133]">suporte@sigre.edu.ao</span>
                   </div>
                 </div>
 
@@ -201,7 +201,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between py-2 border-b border-slate-100">
                       <span className="text-slate-400 uppercase tracking-wider">Unidade Vinculada:</span>
-                      <span className="font-bold text-slate-950">Escola Modelo Central uCore</span>
+                      <span className="font-bold text-slate-950">Escola Central Sigre</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-slate-100">
                       <span className="text-slate-400 uppercase tracking-wider">Ano Letivo:</span>

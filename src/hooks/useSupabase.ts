@@ -60,7 +60,7 @@ export interface UseSupabaseReturn {
     matchValue: any
   ) => Promise<CrudResult<null>>;
 
-  // Métodos Específicos para o Domínio Escolar uCore
+  // Métodos Específicos para o Domínio Escolar Sigre
   getSchools: () => Promise<CrudResult<DbSchool[]>>;
   getStudents: (turmaId?: string) => Promise<CrudResult<DbStudent[]>>;
   createStudent: (student: Partial<DbStudent>) => Promise<CrudResult<DbStudent>>;

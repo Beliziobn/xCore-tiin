@@ -283,7 +283,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
               <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#f75142]">
-                Gestão da Classe • uCore
+                Gestão da Classe • Sigre
               </span>
               <h3 className="text-xl font-black text-slate-900 mt-0.5">
                 {currentClass?.name} • Organização Pedagógica

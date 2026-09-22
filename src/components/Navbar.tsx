@@ -184,7 +184,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
           <span className="text-2xl font-black tracking-tight text-[#002133]">
-            uCore
+            Sigre
           </span>
         </button>
 
@@ -467,7 +467,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">Ao Vivo</span>
                   </button>
 
-                  {/* uCore RAG Inteligente */}
+                  {/* Sigre RAG Inteligente */}
                   <button
                     id="nav-dropdown-rag"
                     onClick={() => {
@@ -482,7 +482,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     <span className="flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>uCore RAG Inteligente</span>
+                      <span>Sigre RAG Inteligente</span>
                     </span>
                     <span className="text-[9px] bg-indigo-100 text-indigo-800 font-black px-1.5 py-0.5 rounded">IA / MED</span>
                   </button>
@@ -992,7 +992,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-indigo-600" />
-              <span>uCore RAG Inteligente</span>
+              <span>Sigre RAG Inteligente</span>
             </div>
             <span className="text-[9px] bg-indigo-200 text-indigo-900 font-black px-1.5 py-0.5 rounded">IA / MED</span>
           </button>

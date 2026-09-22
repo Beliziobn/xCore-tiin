@@ -16,7 +16,7 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
     name: 'Português (Angola)',
     nativeName: 'Português (AO)',
     flag: '🇦🇴',
-    desc: 'Padrão Nacional uCore Education',
+    desc: 'Padrão Nacional Sigre Education',
   },
   {
     code: 'pt-pt',

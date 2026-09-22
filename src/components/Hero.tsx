@@ -125,13 +125,13 @@ export const Hero: React.FC<HeroProps> = ({
   }
 
   /* ---------------------------------------------------------------------
-   * Homepage hero (white) — matches the uCore reference composition.
+   * Homepage hero (white) — matches the Sigre reference composition.
    * ------------------------------------------------------------------- */
   const floatSlow = Math.min(28, scrollY * 0.06);
 
   return (
     <section
-      id="ucore-hero-section"
+      id="sigre-hero-section"
       className="relative w-full bg-background overflow-hidden px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-16 sm:pb-20"
     >
       <SectionShader variant="subtle" className="opacity-70" />
@@ -175,7 +175,7 @@ export const Hero: React.FC<HeroProps> = ({
               }}
             >
               <span className="hover-text">
-                {'Central uCore'.split('').map((char, index) => (
+                {'Sigre'.split('').map((char, index) => (
                   <span
                     key={index}
                     className="hover-char"

@@ -322,7 +322,7 @@ export async function exportTurmaStudentListToPDF(
     pdf.setFontSize(6.5);
     pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
     pdf.text(
-      `Autenticação SIGE / uCore Angola • Cód: ${data.metadata.codigoAutenticacao}`,
+      `Autenticação SIGE / Sigre Angola • Cód: ${data.metadata.codigoAutenticacao}`,
       marginX,
       footerY + 1.5
     );

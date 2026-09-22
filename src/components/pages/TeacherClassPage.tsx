@@ -348,7 +348,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         </button>
 
         <span className="text-[11px] font-bold text-slate-400 hidden sm:inline">
-          Gestão de Turma uCore
+          Gestão de Turma Sigre
         </span>
       </div>
 

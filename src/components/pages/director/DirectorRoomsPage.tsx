@@ -286,7 +286,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Equipamentos & Recursos</span>
               <p className="font-semibold text-slate-800">
-                Quadro branco magnético, iluminação natural LED, ventilação cruzada, armários pedagógicos e ponto de rede uCore.
+                Quadro branco magnético, iluminação natural LED, ventilação cruzada, armários pedagógicos e ponto de rede Sigre.
               </p>
             </div>
           </div>

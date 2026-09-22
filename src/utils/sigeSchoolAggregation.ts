@@ -17,7 +17,7 @@ function norm(str?: string): string {
 }
 
 /**
- * Agrega todos os dados da base de dados uCore em contagens e somatórios estatísticos puros,
+ * Agrega todos os dados da base de dados Sigre em contagens e somatórios estatísticos puros,
  * discriminando com precisão o NOME DA ESCOLA que forneceu os dados para cada categoria:
  * - Alunos Matriculados por Escola
  * - Pessoal Docente por Escola

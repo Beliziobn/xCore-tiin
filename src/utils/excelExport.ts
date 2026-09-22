@@ -124,7 +124,7 @@ export function buildExecutiveSummarySheet(dataset: SystemDataset): Record<strin
   const docPercent = totalStudents > 0 ? ((studentsWithDocs / totalStudents) * 100).toFixed(1) + '%' : '0%';
 
   return [
-    { 'INDICADOR / MÉTRICA': 'Sistema / Entidade', 'VALOR / DADOS': 'uCore - Rede de Gestão Escolar de Quêssua', 'OBSERVAÇÕES': 'Sistema Municipal Unificado' },
+    { 'INDICADOR / MÉTRICA': 'Sistema / Entidade', 'VALOR / DADOS': 'Sigre - Rede de Gestão Escolar de Quêssua', 'OBSERVAÇÕES': 'Sistema Municipal Unificado' },
     { 'INDICADOR / MÉTRICA': 'Data e Hora da Emissão', 'VALOR / DADOS': new Date().toLocaleString('pt-PT'), 'OBSERVAÇÕES': 'Gerado pelo Administrador Geral' },
     { 'INDICADOR / MÉTRICA': 'Total de Escolas Registadas', 'VALOR / DADOS': totalSchools, 'OBSERVAÇÕES': 'Unidades da Rede Municipal de Ensino' },
     { 'INDICADOR / MÉTRICA': 'Total de Directores Homologados', 'VALOR / DADOS': totalDirectors, 'OBSERVAÇÕES': 'Gestores titulares das instituições' },
@@ -441,11 +441,11 @@ export async function exportConsolidatedExcel(
 ): Promise<void> {
   const unified = getUnifiedSystemDataset(dataset);
   const dateTag = new Date().toISOString().substring(0, 10);
-  const filename = customFileName || `uCore_Relatorio_Geral_Consolidado_${dateTag}.xlsx`;
+  const filename = customFileName || `Sigre_Relatorio_Geral_Consolidado_${dateTag}.xlsx`;
 
   try {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'uCore';
+    wb.creator = 'Sigre';
     wb.lastModifiedBy = 'Administrador Municipal';
     wb.created = new Date();
 
@@ -513,11 +513,11 @@ export async function exportConsolidatedExcel(
 export async function exportTeachersExcel(teachers?: AdminTeacher[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ teachers });
   const dateTag = new Date().toISOString().substring(0, 10);
-  const filename = customFileName || `uCore_Planilha_Professores_${dateTag}.xlsx`;
+  const filename = customFileName || `Sigre_Planilha_Professores_${dateTag}.xlsx`;
 
   try {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'uCore';
+    wb.creator = 'Sigre';
     wb.created = new Date();
     const teachersData = buildTeachersSheetData(unified.teachers);
     appendExcelJsSheet(wb, 'Professores Cadastrados', teachersData, { enableFilter: true, tabColor: 'FF0E7490' });
@@ -540,11 +540,11 @@ export async function exportTeachersExcel(teachers?: AdminTeacher[], customFileN
 export async function exportDirectorsExcel(directors?: AdminDirector[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ directors });
   const dateTag = new Date().toISOString().substring(0, 10);
-  const filename = customFileName || `uCore_Planilha_Diretores_${dateTag}.xlsx`;
+  const filename = customFileName || `Sigre_Planilha_Diretores_${dateTag}.xlsx`;
 
   try {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'uCore';
+    wb.creator = 'Sigre';
     wb.created = new Date();
     const directorsData = buildDirectorsSheetData(unified.directors);
     appendExcelJsSheet(wb, 'Diretores Homologados', directorsData, { enableFilter: true, tabColor: 'FF0E7490' });
@@ -567,11 +567,11 @@ export async function exportDirectorsExcel(directors?: AdminDirector[], customFi
 export async function exportStudentsExcel(students?: AdminStudent[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ students });
   const dateTag = new Date().toISOString().substring(0, 10);
-  const filename = customFileName || `uCore_Planilha_Alunos_${dateTag}.xlsx`;
+  const filename = customFileName || `Sigre_Planilha_Alunos_${dateTag}.xlsx`;
 
   try {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'uCore';
+    wb.creator = 'Sigre';
     wb.created = new Date();
     const studentsData = buildStudentsSheetData(unified.students);
     appendExcelJsSheet(wb, 'Alunos Matriculados', studentsData, { enableFilter: true, tabColor: 'FF0891B2' });
@@ -594,11 +594,11 @@ export async function exportStudentsExcel(students?: AdminStudent[], customFileN
 export async function exportSchoolsExcel(schools?: AdminSchool[], customFileName?: string): Promise<void> {
   const unified = getUnifiedSystemDataset({ schools });
   const dateTag = new Date().toISOString().substring(0, 10);
-  const filename = customFileName || `uCore_Planilha_Escolas_${dateTag}.xlsx`;
+  const filename = customFileName || `Sigre_Planilha_Escolas_${dateTag}.xlsx`;
 
   try {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'uCore';
+    wb.creator = 'Sigre';
     wb.created = new Date();
     const schoolsData = buildSchoolsSheetData(unified.schools);
     appendExcelJsSheet(wb, 'Escolas Municipais', schoolsData, { enableFilter: true, tabColor: 'FF0B3D5C' });

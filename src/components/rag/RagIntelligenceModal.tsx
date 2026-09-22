@@ -45,7 +45,7 @@ const CATEGORY_LABELS: Record<RagCategory | 'todos', { label: string; color: str
   pedagogico: { label: 'Diretrizes Pedagógicas', color: 'bg-emerald-100 text-emerald-800' },
   secretaria_matriculas: { label: 'Secretaria & Matrículas', color: 'bg-purple-100 text-purple-800' },
   calendario_letivo: { label: 'Calendário & Prazos', color: 'bg-amber-100 text-amber-800' },
-  sistema_ucore: { label: 'Central uCore Sistema', color: 'bg-rose-100 text-rose-800' },
+  sistema_ucore: { label: 'Sistema Sigre', color: 'bg-rose-100 text-rose-800' },
   institucional: { label: 'Institucional / Circular', color: 'bg-indigo-100 text-indigo-800' },
 };
 
@@ -55,7 +55,7 @@ const SUGGESTED_QUERIES = [
   'Qual o limite de faltas injustificadas para exclusão de frequência?',
   'Quais os documentos obrigatórios para efetuar a matrícula de um novo aluno?',
   'Como funciona o conselho de notas e o prazo para reclamação de pauta?',
-  'Quais os mecanismos de segurança e validação de notas na plataforma uCore?',
+  'Quais os mecanismos de segurança e validação de notas na plataforma Sigre?',
 ];
 
 export const RagIntelligenceModal: React.FC<RagIntelligenceModalProps> = ({
@@ -226,7 +226,7 @@ export const RagIntelligenceModal: React.FC<RagIntelligenceModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold tracking-tight text-white">
-                  uCore RAG Inteligente
+                  Sigre RAG Inteligente
                 </h2>
                 <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-blue-500 text-white rounded-full">
                   Vector Engine v3
@@ -242,7 +242,7 @@ export const RagIntelligenceModal: React.FC<RagIntelligenceModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">
-                Recuperação Aumentada com Normativos Oficiais do MED Angola e Base Institucional uCore
+                Recuperação Aumentada com Normativos Oficiais do MED Angola e Base Institucional Sigre
               </p>
             </div>
           </div>
@@ -366,7 +366,7 @@ export const RagIntelligenceModal: React.FC<RagIntelligenceModalProps> = ({
                       <option value="pedagogico">Pedagógico & Avaliação</option>
                       <option value="secretaria_matriculas">Secretaria & Matrículas</option>
                       <option value="calendario_letivo">Calendário Letivo</option>
-                      <option value="sistema_ucore">Sistema uCore</option>
+                      <option value="sistema_ucore">Sistema Sigre</option>
                       <option value="institucional">Circulares Internas</option>
                     </select>
 
@@ -479,7 +479,7 @@ export const RagIntelligenceModal: React.FC<RagIntelligenceModalProps> = ({
                     <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span>
-                        Conteúdo gerado com ancoragem direta em documentos oficiais da Educação de Angola e parâmetros de segurança da plataforma uCore.
+                        Conteúdo gerado com ancoragem direta em documentos oficiais da Educação de Angola e parâmetros de segurança da plataforma Sigre.
                       </span>
                     </div>
                   </div>
@@ -860,7 +860,7 @@ export const RagIntelligenceModal: React.FC<RagIntelligenceModalProps> = ({
         <div className="px-5 py-3 border-t border-slate-200 bg-white flex items-center justify-between shrink-0 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-medium">Motor RAG Central uCore Ativo</span>
+            <span className="font-medium">Motor RAG Sigre Ativo</span>
           </div>
           <button
             onClick={onClose}

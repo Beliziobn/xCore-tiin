@@ -133,7 +133,7 @@ export const TeacherApplicationModal: React.FC<TeacherApplicationModalProps> = (
                     Candidatura Docente Direta à Escola
                   </p>
                   <p className="text-sky-700 mt-0.5">
-                    O professor selecionou esta unidade escolar durante a inscrição na uCore. Valide a especialidade e o BI antes de conceder acesso às turmas.
+                    O professor selecionou esta unidade escolar durante a inscrição no Sigre. Valide a especialidade e o BI antes de conceder acesso às turmas.
                   </p>
                 </div>
               </div>

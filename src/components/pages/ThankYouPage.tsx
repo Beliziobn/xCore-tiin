@@ -61,9 +61,9 @@ export const ThankYouPage: React.FC<ThankYouPageProps> = ({
       case 'school-registration':
         return {
           badge: 'Candidatura Institucional Registada',
-          defaultTitle: 'Obrigado pelo Registo Escolar no uCore!',
+          defaultTitle: 'Obrigado pelo Registo Escolar no Sigre!',
           defaultSubtitle:
-            'A solicitação de integração da sua instituição de ensino foi submetida com sucesso ao Ministério da Educação e aos serviços técnicos uCore Angola.',
+            'A solicitação de integração da sua instituição de ensino foi submetida com sucesso ao Ministério da Educação e aos serviços técnicos Sigre Angola.',
           steps: [
             {
               step: '01',
@@ -112,7 +112,7 @@ export const ThankYouPage: React.FC<ThankYouPageProps> = ({
           badge: 'Chamado Registado',
           defaultTitle: 'Mensagem Enviada com Sucesso!',
           defaultSubtitle:
-            'A sua solicitação foi encaminhada para a equipa de Suporte Técnico & Pedagógico uCore Angola.',
+            'A sua solicitação foi encaminhada para a equipa de Suporte Técnico & Pedagógico Sigre Angola.',
           steps: [
             {
               step: '01',
@@ -326,7 +326,7 @@ export const ThankYouPage: React.FC<ThankYouPageProps> = ({
               className="px-6 py-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <Video className="w-4 h-4 text-blue-600" />
-              <span>Salas de Reunião uCore</span>
+              <span>Salas de Reunião Sigre</span>
             </button>
           )}
         </div>

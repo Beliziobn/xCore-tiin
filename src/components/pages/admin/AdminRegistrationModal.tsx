@@ -533,7 +533,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
                 <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold block">Homologação Administrativa de Docente:</span>
-                  Na hierarquia uCore, o cadastro presencial de professores é de competência do Diretor de cada Escola. Este registro pelo Admin será processado como homologação extraordinária de rede vinculada à Direção da escola designada.
+                  Na hierarquia Sigre, o cadastro presencial de professores é de competência do Diretor de cada Escola. Este registro pelo Admin será processado como homologação extraordinária de rede vinculada à Direção da escola designada.
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

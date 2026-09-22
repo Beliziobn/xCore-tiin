@@ -54,7 +54,7 @@ export const AccessDeniedGuard: React.FC<AccessDeniedGuardProps> = ({
 
           <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-md">
             {reason ||
-              'O ecossistema uCore aplica uma política estrita de isolamento de identidade: cada utilizador apenas pode aceder e gerir o seu próprio perfil e dados autorizados.'}
+              'O ecossistema Sigre aplica uma política estrita de isolamento de identidade: cada utilizador apenas pode aceder e gerir o seu próprio perfil e dados autorizados.'}
           </p>
         </div>
 

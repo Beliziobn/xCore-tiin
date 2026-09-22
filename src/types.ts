@@ -16,7 +16,7 @@ export type AdminStaffRole =
   | 'inspetor_escolar'           // Inspetor(a) Escolar Municipal
   | 'tecnico_estatistica'        // Técnico(a) de Planeamento e Estatística
   | 'tecnico_recursos_humanos'   // Técnico(a) de Recursos Humanos / Secretaria Municipal
-  | 'admin_sistema';             // Administrador(a) de Sistema uCore
+  | 'admin_sistema';             // Administrador(a) de Sistema Sigre
 
 export interface SessionCard {
   id: string;

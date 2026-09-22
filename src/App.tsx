@@ -142,7 +142,7 @@ export default function App() {
   }>({
     type: 'general',
     title: 'Ação Concluída com Sucesso!',
-    subtitle: 'A sua solicitação foi recebida e registada na plataforma uCore.',
+    subtitle: 'A sua solicitação foi recebida e registada na plataforma Sigre.',
   });
 
   // Admin dynamic state
@@ -203,7 +203,7 @@ export default function App() {
       );
     } else {
       setHomeAIResponse(
-        `✨ Parecer Institucional Inteligente uCore:\nRecebido: "${prompt}".\nOs dados da Direção e da Secretaria Escolar de Quêssua encontram-se homologados e em total conformidade para o ano lectivo 2026/2027.`
+        `✨ Parecer Institucional Inteligente Sigre:\nRecebido: "${prompt}".\nOs dados da Direção e da Secretaria Escolar de Quêssua encontram-se homologados e em total conformidade para o ano lectivo 2026/2027.`
       );
     }
   };
@@ -885,7 +885,7 @@ export default function App() {
       if (!accessCheck.allowed) {
         showToast(
           accessCheck.reason ||
-            'Acesso negado: Política de segurança uCore proíbe entrar ou alterar o perfil de outros utilizadores.'
+            'Acesso negado: Política de segurança Sigre proíbe entrar ou alterar o perfil de outros utilizadores.'
         );
         return;
       }
@@ -1107,7 +1107,7 @@ export default function App() {
             try {
               localStorage.setItem('ucore_active_user', JSON.stringify(updatedUser));
             } catch {}
-            showToast(`Conta ativada com sucesso! Bem-vindo(a) à plataforma uCore, ${updatedUser.firstName}.`);
+            showToast(`Conta ativada com sucesso! Bem-vindo(a) à plataforma Sigre, ${updatedUser.firstName}.`);
           }}
           showToast={showToast}
           onOpenSupport={() => setInfoModalType('support')}
@@ -1282,12 +1282,12 @@ export default function App() {
         <AdminApprovalsPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
-          adminName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Administrador Municipal uCore'}
+          adminName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Administrador Municipal Sigre'}
           directors={adminDirectors}
           schools={adminSchools}
           onAddDirectorGlobal={(director) => {
             setAdminDirectors((prev) => [director, ...prev]);
-            showToast(`Diretor(a) "${director.name}" homologado(a) no uCore!`);
+            showToast(`Diretor(a) "${director.name}" homologado(a) no Sigre!`);
           }}
           showToast={showToast}
         />
@@ -1677,7 +1677,7 @@ export default function App() {
         <div className="w-full">
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
-            customTitle="Sobre a Plataforma uCore"
+            customTitle="Sobre a Plataforma Sigre"
             customSubtitle="Inovação e modernização da gestão escolar em Angola, unificando directores, docentes e alunos."
             badge="Institucional"
             breadcrumbs={[
@@ -1793,7 +1793,7 @@ export default function App() {
             setThankYouConfig({
               type: 'school-registration',
               title: 'Candidatura de Adesão Submetida!',
-              subtitle: 'A manifestação de interesse da sua instituição foi acolhida no portal uCore Angola. Em breve a equipa técnica entrará em contacto.',
+              subtitle: 'A manifestação de interesse da sua instituição foi acolhida no portal Sigre Angola. Em breve a equipa técnica entrará em contacto.',
               schoolName: name || 'Complexo Escolar Solicitante',
               referenceCode: `CASO-${Math.floor(100000 + Math.random() * 900000)}`,
             });
@@ -2043,7 +2043,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span>Resposta do Assistente uCore:</span>
+                      <span>Resposta do Assistente Sigre:</span>
                     </div>
                     <button
                       type="button"
@@ -2245,7 +2245,7 @@ export default function App() {
           setThankYouConfig({
             type: 'school-registration',
             title: 'Solicitação de Demonstração Recebida!',
-            subtitle: `Agradecemos o interesse, ${details.recipientName}. A equipa uCore entrará em contacto para o agendamento da sessão experimental.`,
+            subtitle: `Agradecemos o interesse, ${details.recipientName}. A equipa Sigre entrará em contacto para o agendamento da sessão experimental.`,
             recipientName: details.recipientName,
             schoolName: details.schoolName,
             userEmail: details.userEmail,
@@ -2369,7 +2369,7 @@ export default function App() {
         initialAudio={activeMeeting.initialAudio}
       />
 
-      {/* Intelligent RAG Vector Knowledge Center Modal (MED Angola & uCore) */}
+      {/* Intelligent RAG Vector Knowledge Center Modal (MED Angola & Sigre) */}
       <RagIntelligenceModal
         isOpen={isRagModalOpen}
         onClose={() => setIsRagModalOpen(false)}

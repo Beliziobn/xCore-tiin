@@ -81,7 +81,7 @@ export class SearchIndexer {
 }
 
 /**
- * Estrutura formal de índices do Firestore para a plataforma uCore
+ * Estrutura formal de índices do Firestore para a plataforma Sigre
  */
 export const REQUIRED_FIRESTORE_INDEXES = [
   {

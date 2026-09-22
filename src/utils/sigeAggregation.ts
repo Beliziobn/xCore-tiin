@@ -172,7 +172,7 @@ function norm(str?: string): string {
 }
 
 /**
- * Agrega todos os dados da base de dados uCore em contagens estatísticas com atribuição da ESCOLA PROVEDORA.
+ * Agrega todos os dados da base de dados Sigre em contagens estatísticas com atribuição da ESCOLA PROVEDORA.
  * Cumpre 100% de privacidade (zero nomes de pessoas, zero BI).
  */
 export function aggregateSigeDataset(dataset: SystemDataset): SigeAggregatedReport {

@@ -347,7 +347,7 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
                     Inscrições de Diretores Aguardando Validação e Despacho
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Conforme o protocolo uCore, os novos diretores permanecem em espera até homologação pelo Administrador Central.
+                    Conforme o protocolo Sigre, os novos diretores permanecem em espera até homologação pelo Administrador Central.
                   </p>
                 </div>
                 <button

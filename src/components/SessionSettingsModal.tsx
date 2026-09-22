@@ -150,7 +150,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
     }
 
     setPasswordSuccess(true);
-    setSavedFeedback('Palavra-passe atualizada com sucesso no uCore!');
+    setSavedFeedback('Palavra-passe atualizada com sucesso no Sigre!');
     setTimeout(() => {
       setPasswordSuccess(false);
       setCurrentPassword('');
@@ -357,7 +357,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
               <div>
                 <h4 className="text-sm font-bold text-slate-900">Segurança & Palavra-passe</h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Atualize a sua palavra-passe de acesso institucional à plataforma uCore.
+                  Atualize a sua palavra-passe de acesso institucional à plataforma Sigre.
                 </p>
               </div>
 

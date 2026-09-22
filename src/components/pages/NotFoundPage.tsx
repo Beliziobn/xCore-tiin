@@ -56,14 +56,14 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
     },
     {
       title: 'Casos de Sucesso Escolar',
-      desc: 'Conheça o impacto do uCore em colégios e liceus de Angola.',
+      desc: 'Conheça o impacto do Sigre em colégios e liceus de Angola.',
       icon: Award,
       action: onNavigateCases,
       badge: 'Destaques',
       color: 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white',
     },
     {
-      title: 'Sobre a Plataforma uCore',
+      title: 'Sobre a Plataforma Sigre',
       desc: 'Descubra a visão tecnológica para o ensino e gestão escolar.',
       icon: BookOpen,
       action: onNavigateAbout,
@@ -120,7 +120,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
                 {requestedPath}
               </code>
             )}{' '}
-            pode ter sido renomeado, removido ou está temporariamente indisponível no sistema integrado uCore.
+            pode ter sido renomeado, removido ou está temporariamente indisponível no sistema integrado Sigre.
           </p>
         </div>
 
@@ -230,7 +230,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
         <div className="mt-12 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3">
           <div className="flex items-center gap-2">
             <Shield className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Sistema Integrado de Gestão Escolar uCore • Angola 2026</span>
+            <span>Sistema Integrado de Gestão Escolar Sigre • Angola 2026</span>
           </div>
           <p className="text-[11px]">
             Se acredita que isto é uma anomalia, por favor reporte ao administrador escolar.

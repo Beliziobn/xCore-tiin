@@ -50,11 +50,11 @@ export const AboutPlatformPage: React.FC<AboutPlatformPageProps> = ({
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-              Sobre a Plataforma <span className="text-[#f75142]">uCore</span>
+              Sobre a Plataforma <span className="text-[#f75142]">Sigre</span>
             </h1>
 
             <p className="text-base sm:text-lg text-slate-600 leading-relaxed font-normal">
-              O <strong className="text-slate-900">uCore</strong> é o sistema integrado de governação e modernização escolar desenvolvido para unificar directores, professores, secretarias e direcções municipais de educação num ecossistema digital seguro, transparente e centrado no sucesso dos alunos.
+              O <strong className="text-slate-900">Sigre</strong> é o sistema integrado de governação e modernização escolar desenvolvido para unificar directores, professores, secretarias e direcções municipais de educação num ecossistema digital seguro, transparente e centrado no sucesso dos alunos.
             </p>
 
             <div className="pt-2 flex flex-wrap items-center gap-3">
@@ -110,7 +110,7 @@ export const AboutPlatformPage: React.FC<AboutPlatformPageProps> = ({
               Arquitetura de Soluções
             </span>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Os 4 Pilares Centrais do Sistema uCore
+              Os 4 Pilares Centrais do Sistema Sigre
             </h2>
             <p className="text-sm text-slate-600 mt-2 max-w-2xl">
               Cada módulo foi estruturado para refletir a realidade das escolas municipais e provinciais com facilidade de adoção:
@@ -185,7 +185,7 @@ export const AboutPlatformPage: React.FC<AboutPlatformPageProps> = ({
           </div>
 
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-            A plataforma <strong className="text-white">uCore</strong> é parametrizada de acordo com o calendário oficial e normas técnico-pedagógicas vigentes no país. Todos os relatórios de pauta, frequência e registo de professores seguem os modelos exigidos pelas Direcções Municipais e Gabinetes Provinciais da Educação.
+            A plataforma <strong className="text-white">Sigre</strong> é parametrizada de acordo com o calendário oficial e normas técnico-pedagógicas vigentes no país. Todos os relatórios de pauta, frequência e registo de professores seguem os modelos exigidos pelas Direcções Municipais e Gabinetes Provinciais da Educação.
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
@@ -211,7 +211,7 @@ export const AboutPlatformPage: React.FC<AboutPlatformPageProps> = ({
         {/* Links Rápidos Legais */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <h4 className="font-black text-slate-900 text-lg">Consulte os Documentos Oficiais uCore</h4>
+            <h4 className="font-black text-slate-900 text-lg">Consulte os Documentos Oficiais Sigre</h4>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Conheça as normas de utilização, nossa política de privacidade e os protocolos de segurança activa.
             </p>

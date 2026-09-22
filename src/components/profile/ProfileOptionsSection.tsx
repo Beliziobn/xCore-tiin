@@ -101,7 +101,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
   const [address, setAddress] = useState(user.address || 'Rua 21 de Janeiro, Maianga, Luanda');
   const [emergencyContact, setEmergencyContact] = useState(user.emergencyContact || 'Maria dos Santos');
   const [emergencyPhone, setEmergencyPhone] = useState(user.emergencyPhone || '+244 923 555 777');
-  const [schoolName, setSchoolName] = useState(user.schoolName || 'Complexo Escolar Primário e Secundário uCore');
+  const [schoolName, setSchoolName] = useState(user.schoolName || 'Complexo Escolar Primário e Secundário Sigre');
 
   // Notifications State
   const [notifications, setNotifications] = useState(() => {
@@ -612,7 +612,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 </div>
                 <div>
                   <h4 className="text-base font-bold text-white leading-tight">Informações Pessoais</h4>
-                  <p className="text-xs text-white/70">Documentos oficiais e dados de identificação do uCore</p>
+                  <p className="text-xs text-white/70">Documentos oficiais e dados de identificação do Sigre</p>
                 </div>
               </div>
               <button
@@ -629,7 +629,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
                 <div className="text-xs text-emerald-800">
                   <span className="font-bold block">Documentação Oficial Verificada</span>
-                  Registros vinculados ao Sistema Integrado do uCore Education.
+                  Registros vinculados ao Sistema Integrado do Sigre Education.
                 </div>
               </div>
 
@@ -952,7 +952,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 </div>
                 <h5 className="text-base font-bold text-slate-900">Senha alterada com sucesso!</h5>
                 <p className="text-xs text-slate-500">
-                  Suas credenciais foram sincronizadas com o banco central do uCore.
+                  Suas credenciais foram sincronizadas com o banco central do Sigre.
                 </p>
               </div>
             ) : (

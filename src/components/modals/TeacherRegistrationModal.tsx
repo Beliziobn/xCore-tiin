@@ -527,7 +527,7 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
                   {initialData ? 'Atualizar Ficha de Professor' : 'Candidatura & Cadastro de Professor'}
                 </h2>
                 <p className="text-sm text-slate-500 mt-0.5 max-w-xl">
-                  Preencha as informações do docente passo a passo — o uCore calcula automaticamente a classificação pedagógica e a alocação de disciplinas.
+                  Preencha as informações do docente passo a passo — o Sigre calcula automaticamente a classificação pedagógica e a alocação de disciplinas.
                 </p>
               </div>
             </div>

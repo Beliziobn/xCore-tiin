@@ -115,7 +115,7 @@ export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOption
       provincia,
       municipio,
       data_entrega: dataEntrega,
-      escola_origem: options.escolaId ? selectedSchool?.name : 'Rede Municipal Agregada (uCore)'
+      escola_origem: options.escolaId ? selectedSchool?.name : 'Rede Municipal Agregada (Sigre)'
     },
     iniciacao: {
       PÚBLICA: {},

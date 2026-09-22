@@ -82,15 +82,15 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
         (a) => a.userId === currentUser.id || a.email.toLowerCase() === currentUser.email.toLowerCase()
       );
       if (targetApp) {
-        approveApplication(targetApp.id, isDirector ? 'Super Admin uCore (Simulado)' : 'Diretor da Escola (Simulado)');
+        approveApplication(targetApp.id, isDirector ? 'Super Admin Sigre (Simulado)' : 'Diretor da Escola (Simulado)');
       }
       const approvedUser: UserAccount = {
         ...currentUser,
         status: 'ativo',
         approvedAt: new Date().toLocaleString('pt-AO'),
-        approvedBy: isDirector ? 'Super Admin uCore' : 'Diretor Escolar',
+        approvedBy: isDirector ? 'Super Admin Sigre' : 'Diretor Escolar',
       };
-      showToast?.(`Conta homologada com sucesso! Bem-vindo(a) à plataforma uCore, ${currentUser.firstName}.`);
+      showToast?.(`Conta homologada com sucesso! Bem-vindo(a) à plataforma Sigre, ${currentUser.firstName}.`);
       onApprovalConfirmed(approvedUser);
     }, 700);
   };
@@ -109,7 +109,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
         backgroundColor: '#fafbfc',
       }}
     >
-      {/* Interactive uCore Section Shader (Canvas 2D / WebGPU) - Variante Âmbar */}
+      {/* Interactive Sigre Section Shader (Canvas 2D / WebGPU) - Variante Âmbar */}
       <SectionShader
         id="pending-approval-shader"
         variant="amber"
@@ -315,7 +315,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-sm border border-slate-200/80 shadow-xs">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             <span className="text-[11px] font-semibold tracking-wide uppercase text-slate-600">
-              Ambiente de Homologação uCore
+              Ambiente de Homologação Sigre
             </span>
           </div>
         </div>
@@ -496,7 +496,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
           <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal pl-6">
             {isDirector ? (
               <>
-                Por critérios de segurança institucional da rede uCore, a credenciação de <strong>Diretores de Escola</strong> é homologada pelo Administrador Municipal / Central (DME). A sua inscrição já consta na lista de despacho.
+                Por critérios de segurança institucional da rede Sigre, a credenciação de <strong>Diretores de Escola</strong> é homologada pelo Administrador Municipal / Central (DME). A sua inscrição já consta na lista de despacho.
               </>
             ) : (
               <>
@@ -638,7 +638,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
           >
             <span>Precisa de suporte?</span>
             <span className="font-semibold underline underline-offset-2 group-hover:text-[#f75142] transition-colors">
-              Contactar o Apoio Institucional uCore
+              Contactar o Apoio Institucional Sigre
             </span>
             <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
           </button>

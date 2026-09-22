@@ -400,7 +400,7 @@ export function saveTeacher(
       data: now,
       autor: authorName,
       acao: 'Atualização',
-      detalhes: 'Dados cadastrais e habilitações atualizados no sistema uCore.',
+      detalhes: 'Dados cadastrais e habilitações atualizados no sistema Sigre.',
     };
 
     const updatedTeacher: TeacherRegistrationData = {

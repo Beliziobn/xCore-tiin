@@ -177,7 +177,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-white/70">Status:</span>
                   <span className="bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    Ativo no uCore
+                    Ativo no Sigre
                   </span>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                   </div>
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Unidade Central uCore
+                  Unidade Central Sigre
                 </span>
               </div>
 
@@ -411,7 +411,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
             </div>
             <div>
               <h4 className="text-sm font-black text-slate-900">
-                Diretoria de Ensino • Central uCore
+                Diretoria de Ensino • Central Sigre
               </h4>
               <p className="text-xs text-slate-500">
                 "Priorizamos a melhor organização da Educação" • Unidade Modelo Central

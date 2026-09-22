@@ -142,7 +142,7 @@ export async function createGoogleSpreadsheet(
     console.warn('Aviso: Falha ao preencher valores iniciais da folha de cálculo');
   }
 
-  // 3. Format header rows (uCore institutional navy #002133 background with crisp white bold text)
+  // 3. Format header rows (Sigre institutional navy #002133 background with crisp white bold text)
   try {
     const formatRequests: any[] = [];
     createdData.sheets?.forEach((sheetObj: any) => {

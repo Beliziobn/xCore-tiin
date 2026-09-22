@@ -420,7 +420,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                   Quadro Oficial de Homologação & Matrículas Escolares
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  Validação documental presencial, enquadramento de corpo docente e admissão definitiva de alunos e colaboradores no ecossistema uCore SIGE.
+                  Validação documental presencial, enquadramento de corpo docente e admissão definitiva de alunos e colaboradores no ecossistema Sigre SIGE.
                 </p>
               </div>
 
@@ -1357,7 +1357,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
                 <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                 <span>
-                  Ao confirmar a homologação, os dados complementares são salvos no dossiê oficial, a conta é ativada no uCore e o utilizador é integrado no quadro com acesso imediato.
+                  Ao confirmar a homologação, os dados complementares são salvos no dossiê oficial, a conta é ativada no Sigre e o utilizador é integrado no quadro com acesso imediato.
                 </span>
               </div>
             </div>

@@ -117,7 +117,7 @@ export const DirectorApplicationModal: React.FC<DirectorApplicationModalProps> =
                 <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div className="text-xs">
                   <p className="font-bold text-emerald-900">
-                    Registro Pré-Existente Identificado pelo Sistema uCore
+                    Registro Pré-Existente Identificado pelo Sistema Sigre
                   </p>
                   <p className="text-emerald-700 mt-0.5">
                     {application.preRegisteredDetails || 'O candidato já possui designação no Censo Escolar Municipal. A validação vinculará imediatamente a sua conta aos dados da escola.'}
@@ -233,7 +233,7 @@ export const DirectorApplicationModal: React.FC<DirectorApplicationModalProps> =
         {/* Modal Footer Actions */}
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-slate-500">
-            Aprovação exclusiva pela <strong>Direcção Municipal / Admin uCore</strong>.
+            Aprovação exclusiva pela <strong>Direcção Municipal / Admin Sigre</strong>.
           </div>
           <div className="flex items-center gap-2">
             {isRejecting ? (

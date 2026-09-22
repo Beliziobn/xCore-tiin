@@ -57,7 +57,7 @@ export const TermsOfUsePage: React.FC<TermsOfUsePageProps> = ({
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              Termos de Utilização <span className="text-[#f75142]">uCore</span>
+              Termos de Utilização <span className="text-[#f75142]">Sigre</span>
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -149,7 +149,7 @@ export const TermsOfUsePage: React.FC<TermsOfUsePageProps> = ({
                 <h3 className="text-lg font-black text-slate-900">1. Objeto & Âmbito de Aplicação</h3>
               </div>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Estes Termos de Utilização regulam o fornecimento, a administração e a operação do ecossistema digital <strong>uCore</strong> para redes de ensino públicas e comparticipadas em Angola. Aplicam-se imperativamente a Directores de Escola, Subdirectores Pedagógicos, Professores Titulares, Secretários Escolares e Técnicos das Direcções Municipais e Gabinetes Provinciais da Educação.
+                Estes Termos de Utilização regulam o fornecimento, a administração e a operação do ecossistema digital <strong>Sigre</strong> para redes de ensino públicas e comparticipadas em Angola. Aplicam-se imperativamente a Directores de Escola, Subdirectores Pedagógicos, Professores Titulares, Secretários Escolares e Técnicos das Direcções Municipais e Gabinetes Provinciais da Educação.
               </p>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700">
                 O acesso à plataforma é estritamente institucional e vinculado à nomeação oficial e exercício de funções docentes ou de administração pública escolar.
@@ -185,7 +185,7 @@ export const TermsOfUsePage: React.FC<TermsOfUsePageProps> = ({
                 <h3 className="text-lg font-black text-slate-900">3. Fé Pública do Livro de Ponto & Registos de Presença</h3>
               </div>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                O Livro de Ponto Docente eletrónico disponibilizado pelo uCore possui valor jurídico de escrituração oficial. Os registos efetuados pelos docentes e homologados pelos directores constituem comprovativo formal para efeitos de efetividade laboral, abono de faltas e processamento de remunerações.
+                O Livro de Ponto Docente eletrónico disponibilizado pelo Sigre possui valor jurídico de escrituração oficial. Os registos efetuados pelos docentes e homologados pelos directores constituem comprovativo formal para efeitos de efetividade laboral, abono de faltas e processamento de remunerações.
               </p>
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
                 <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />

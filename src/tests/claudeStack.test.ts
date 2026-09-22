@@ -11,7 +11,7 @@ describe('Claude Code Setup, OmniRoute, Headroom, Claude-Mem & Task Observer', (
       const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
       assert.ok(fs.existsSync(claudeMdPath), 'CLAUDE.md deve existir na raiz');
       const content = fs.readFileSync(claudeMdPath, 'utf8');
-      assert.match(content, /uCore/);
+      assert.match(content, /Sigre/);
       assert.match(content, /0 a 20 valores/);
       assert.match(content, /OmniRoute/);
       assert.match(content, /claude-mem/i);

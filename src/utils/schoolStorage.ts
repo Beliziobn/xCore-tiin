@@ -153,7 +153,7 @@ export function createNewSchoolRegistrationData(partial?: Partial<SchoolRegistra
         usuario: partial?.validacao?.responsavelPreenchimentoNome || 'Administrador do Sistema',
         cargo: partial?.validacao?.responsavelPreenchimentoCargo || 'Administração Municipal',
         acao: 'Cadastro Inicial da Escola',
-        detalhes: 'Registo e homologação cadastral no ecossistema municipal uCore.',
+        detalhes: 'Registo e homologação cadastral no ecossistema municipal Sigre.',
       },
     ],
   };
@@ -291,7 +291,7 @@ export function getSchoolRegistrationData(school: AdminSchool): SchoolRegistrati
         usuario: 'Direcção Municipal de Educação',
         cargo: 'Administrador do SIGE',
         acao: 'Censo e Homologação Inicial',
-        detalhes: 'Migração dos dados cadastrais para o módulo institucional uCore.',
+        detalhes: 'Migração dos dados cadastrais para o módulo institucional Sigre.',
       },
     ],
   };

@@ -68,7 +68,7 @@ export const ClassMatrixRegistrationModal: React.FC<ClassMatrixRegistrationModal
                     clipRule="evenodd"
                   />
                 </svg>
-                Gabinete de Direção · uCore
+                Gabinete de Direção · Sigre
               </div>
               <h2 className="text-lg font-semibold text-slate-900">Cadastrar Nova Matriz de Classe</h2>
               <p className="text-sm text-slate-500 mt-0.5">

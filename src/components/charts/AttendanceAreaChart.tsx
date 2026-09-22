@@ -52,7 +52,7 @@ const DATA_ANUAL: AttendanceTrendItem[] = [
   { year: '2021', presencial: 91, ead: 70, totalPresentes: 42, totalFaltas: 4, detalhe: 'Média anual consolidada' },
   { year: '2022', presencial: 93, ead: 72, totalPresentes: 43, totalFaltas: 3, detalhe: 'Evolução na transição curricular' },
   { year: '2023', presencial: 95, ead: 74, totalPresentes: 44, totalFaltas: 2, detalhe: 'Reforço do acompanhamento tutorial' },
-  { year: '2024', presencial: 96, ead: 77, totalPresentes: 44, totalFaltas: 2, detalhe: 'Integração de suporte digital uCore' },
+  { year: '2024', presencial: 96, ead: 77, totalPresentes: 44, totalFaltas: 2, detalhe: 'Integração de suporte digital Sigre' },
   { year: '2025', presencial: 97, ead: 75, totalPresentes: 45, totalFaltas: 1, detalhe: 'Atingimento das metas do ministério' },
   { year: '2026', presencial: 98, ead: 80, totalPresentes: 45, totalFaltas: 1, detalhe: 'Ciclo letivo em curso (alta performance)' },
 ];

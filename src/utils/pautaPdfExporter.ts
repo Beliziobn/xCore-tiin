@@ -365,9 +365,9 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(5.5);
     pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    const hashSignature = `UCORE-SEC-${Math.random().toString(36).substring(2, 9).toUpperCase()}-${defaultMeta.anoLectivo}`;
+    const hashSignature = `SIGRE-SEC-${Math.random().toString(36).substring(2, 9).toUpperCase()}-${defaultMeta.anoLectivo}`;
     pdf.text(
-      `Documento oficial gerado via Plataforma Educativa uCore · Homologação SIGE Angola · Código de Autenticidade: ${hashSignature}`,
+      `Documento oficial gerado via Plataforma Educativa Sigre · Homologação SIGE Angola · Código de Autenticidade: ${hashSignature}`,
       marginX,
       footerY
     );

@@ -377,7 +377,7 @@ export const StudentGradeHistoryChart: React.FC<StudentGradeHistoryChartProps> =
                 <stop offset="100%" stopColor="#c7d2fe" stopOpacity={0.25} />
               </linearGradient>
 
-              {/* Gradiente 2º Trimestre (Atual): Coral uCore Vibrante */}
+              {/* Gradiente 2º Trimestre (Atual): Coral Sigre Vibrante */}
               <linearGradient id="barGradTrim2" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#ff5148" stopOpacity={0.95} />
                 <stop offset="60%" stopColor="#ff7069" stopOpacity={0.75} />

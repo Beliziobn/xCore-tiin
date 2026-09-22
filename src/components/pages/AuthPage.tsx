@@ -198,15 +198,15 @@ export const ADMIN_ROLES_CONFIG: {
   },
   {
     id: 'admin_sistema',
-    label: 'Administrador(a) de Sistema uCore',
+    label: 'Administrador(a) de Sistema Sigre',
     badge: 'Super Admin TI',
     icon: Settings,
     desc: 'Gestão global da plataforma, parametrização dos módulos, utilizadores e segurança',
     prefix: 'Admin.',
     baseRole: 'admin',
-    defaultEmail: 'admin.sistema@ucore.edu.br',
+    defaultEmail: 'admin.sistema@sigre.edu.ao',
     defaultFirst: 'Suporte',
-    defaultLast: 'uCore',
+    defaultLast: 'Sigre',
     cargoFull: 'Superintendente & Administrador de Sistemas TI',
   },
 ];
@@ -245,7 +245,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [adminRole, setAdminRole] = useState<AdminStaffRole>('diretor_municipal');
   const [schoolOrUnitName, setSchoolOrUnitName] = useState('');
   
-  // uCore Predefined System Selection Options
+  // Sigre Predefined System Selection Options
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>(UCORE_MUNICIPALITIES[0]);
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>(initialAdminSchools[0]?.id || 'esc-01');
   const [biNumber, setBiNumber] = useState('');
@@ -257,7 +257,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // Real-time pre-registration search across uCore roster
+  // Real-time pre-registration search across Sigre roster
   useEffect(() => {
     if (mode !== 'register') {
       setPreRegResult(null);
@@ -457,7 +457,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const loggedUser: UserAccount = {
           id: 'usr_' + Date.now(),
           firstName: resolvedFirst,
-          lastName: lastName.trim() || 'uCore',
+          lastName: lastName.trim() || 'Sigre',
           email: email.trim(),
           role: resolvedRole,
           scope: matchedScope,
@@ -549,7 +549,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             id: appId,
             userId: newUserId,
             type: isDirectorCandidate ? 'diretor' : 'professor',
-            fullName: `${userFirst} ${lastName.trim() || 'uCore'}`.trim(),
+            fullName: `${userFirst} ${lastName.trim() || 'Sigre'}`.trim(),
             email: email.trim(),
             phone: phone.trim() || '+244 923 000 000',
             biNumber: biNumber.trim(),
@@ -573,7 +573,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const newUser: UserAccount = {
           id: newUserId,
           firstName: userFirst,
-          lastName: lastName.trim() || 'uCore',
+          lastName: lastName.trim() || 'Sigre',
           email: email.trim(),
           role: baseRole,
           scope: institutionalScope,
@@ -642,7 +642,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
               </div>
               <span className="text-2xl font-black tracking-tight text-[#002133]">
-                uCore
+                Sigre
               </span>
             </button>
 
@@ -698,7 +698,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <div className="hidden md:block md:col-span-5 lg:col-span-5 relative overflow-hidden bg-[#002133] select-none">
             <img
               src={teacherImg}
-              alt="Professora e ambiente escolar uCore"
+              alt="Professora e ambiente escolar Sigre"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover object-top filter brightness-[0.98] contrast-[1.02] transition-transform duration-700 hover:scale-105"
             />
@@ -716,7 +716,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 A sua escola, mais conectada.
               </h3>
               <p className="text-xs text-white/80 leading-relaxed font-normal pt-0.5">
-                Organização eficiente de turmas, docentes e rendimento escolar com a tecnologia uCore.
+                Organização eficiente de turmas, docentes e rendimento escolar com a tecnologia Sigre.
               </p>
             </div>
           </div>
@@ -800,7 +800,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     Bem-vindo à Central
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                    Introduza as suas credenciais para aceder à gestão escolar da uCore.
+                    Introduza as suas credenciais para aceder à gestão escolar do Sigre.
                   </p>
                 </div>
 
@@ -1053,7 +1053,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     </label>
                   </div>
 
-                  {/* Primary Submit Button: High contrast, coral uCore, prominent focus */}
+                  {/* Primary Submit Button: High contrast, coral Sigre, prominent focus */}
                   <button
                     id="submit-login-btn"
                     type="submit"
@@ -1121,7 +1121,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     Crie a sua conta
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                    Junte-se à plataforma uCore para gerir turmas, notas e indicadores escolares.
+                    Junte-se à plataforma Sigre para gerir turmas, notas e indicadores escolares.
                   </p>
                 </div>
 
@@ -1282,12 +1282,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     )}
                   </div>
 
-                  {/* 3. Lotação Institucional Pré-Definida na uCore */}
+                  {/* 3. Lotação Institucional Pré-Definida no Sigre */}
                   <div className="space-y-3 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <Building2 className="w-4 h-4 text-[#002133]" />
-                        3. Lotação Institucional uCore
+                        3. Lotação Institucional Sigre
                       </span>
                       <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
                         Opções Cadastradas na Rede
@@ -1437,7 +1437,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                       <div className="text-xs">
                         <p className="font-bold text-emerald-900">
-                          Registro Pré-Existente Localizado no Sistema uCore!
+                          Registro Pré-Existente Localizado no Sistema Sigre!
                         </p>
                         <p className="text-emerald-700 mt-0.5">
                           {preRegResult.details}
@@ -1517,7 +1517,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="seu.nome@ucore.edu.br"
+                        placeholder="seu.nome@sigre.edu.ao"
                         className="w-full h-[48px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                       />
                     </div>
@@ -1596,7 +1596,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         className="w-4 h-4 mt-0.5 rounded text-[#f75142] focus:ring-[#f75142] border-slate-300 cursor-pointer"
                       />
                       <span className="leading-tight">
-                        Concordo com os <span className="text-[#f75142] font-semibold underline">Termos de Uso</span> e a <span className="text-[#f75142] font-semibold underline">Política de Privacidade</span> da uCore.
+                        Concordo com os <span className="text-[#f75142] font-semibold underline">Termos de Uso</span> e a <span className="text-[#f75142] font-semibold underline">Política de Privacidade</span> do Sigre.
                       </span>
                     </label>
                   </div>
@@ -1643,7 +1643,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       {/* Footer Note (when standalone) */}
       {!hideHeader && (
         <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-200/80 bg-white">
-          Central uCore • Plataforma de Gestão Educacional para Escolas, Professores e Alunos
+          Sigre • Sistema Integrado de Gestão Escolar para Escolas, Professores e Alunos
         </footer>
       )}
     </div>

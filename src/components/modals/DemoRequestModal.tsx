@@ -101,7 +101,7 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({
               Solicitar Demonstração Gratuita
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1.5 leading-relaxed">
-              Descubra como o <strong className="text-slate-700">Central uCore</strong> unifica a secretaria, o livro de ponto, as turmas e a conformidade do Censo Escolar em uma única experiência inteligente.
+              Descubra como o <strong className="text-slate-700">Central Sigre</strong> unifica a secretaria, o livro de ponto, as turmas e a conformidade do Censo Escolar em uma única experiência inteligente.
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">

@@ -65,7 +65,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-300">
-                Registo Oficial de Matrícula • Sistema de Gestão Educacional uCore
+                Registo Oficial de Matrícula • Sistema Integrado de Gestão Escolar (Sigre)
               </p>
             </div>
           </div>

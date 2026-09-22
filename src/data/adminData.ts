@@ -5,7 +5,7 @@ import type {
   AdminDirector 
 } from '../types';
 
-// The 31 schools of the uCore Quêssua Municipal Network
+// The 31 schools of the Sigre Quêssua Municipal Network
 export const initialAdminSchools: AdminSchool[] = [
   {
     id: 'esc-01',

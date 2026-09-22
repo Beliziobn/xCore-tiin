@@ -72,7 +72,7 @@ export const RoomRegistrationModal: React.FC<RoomRegistrationModalProps> = ({
                     clipRule="evenodd"
                   />
                 </svg>
-                Gabinete de Direção · uCore
+                Gabinete de Direção · Sigre
               </div>
               <h2 className="text-lg font-semibold text-slate-900">Cadastrar Nova Sala Escolar</h2>
               <p className="text-sm text-slate-500 mt-0.5">

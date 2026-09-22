@@ -166,7 +166,7 @@ export const MeetingsHubPage: React.FC<MeetingsHubPageProps> = ({
             <div className="space-y-2.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-slate-300 text-xs font-medium tracking-wide border border-white/10">
                 <Video className="w-3.5 h-3.5 text-blue-400" />
-                <span>uCore Meet · Comunicação Escolar em Tempo Real</span>
+                <span>Sigre Meet · Comunicação Escolar em Tempo Real</span>
               </div>
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
                 Salas Virtuais & Reuniões Escolares

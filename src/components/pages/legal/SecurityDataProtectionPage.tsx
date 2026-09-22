@@ -58,7 +58,7 @@ export const SecurityDataProtectionPage: React.FC<SecurityDataProtectionPageProp
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              Segurança & Proteção de Dados <span className="text-[#f75142]">uCore</span>
+              Segurança & Proteção de Dados <span className="text-[#f75142]">Sigre</span>
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -144,7 +144,7 @@ export const SecurityDataProtectionPage: React.FC<SecurityDataProtectionPageProp
               2. Princípio do Menor Privilégio (RBAC)
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              A regra fundamental do uCore é categórica: <em>um utilizador nunca pode nem deve mexer ou aceder aos perfis de outros utilizadores</em>. Os professores só visualizam as turmas e pautas a que foram formalmente atribuídos pela Direcção Escolar; os directores gerem a sua escola; os administradores municipais mantêm a supervisão agregada.
+              A regra fundamental do Sigre é categórica: <em>um utilizador nunca pode nem deve mexer ou aceder aos perfis de outros utilizadores</em>. Os professores só visualizam as turmas e pautas a que foram formalmente atribuídos pela Direcção Escolar; os directores gerem a sua escola; os administradores municipais mantêm a supervisão agregada.
             </p>
             <div className="pt-1 flex items-center gap-2 text-xs font-semibold text-emerald-700">
               <CheckCircle2 className="w-4 h-4" />

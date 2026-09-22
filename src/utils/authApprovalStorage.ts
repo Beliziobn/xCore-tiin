@@ -64,7 +64,7 @@ export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [
     isPreRegistered: true,
     preRegisteredDetails: 'Encontrado pré-cadastro institucional no Censo Escolar Municipal de Quêssua.',
     createdAt: '11/09/2026, 08:30',
-    notes: 'Nomeado pelo despacho nº 412/DME/2025. Aguarda homologação formal de acesso ao sistema uCore.',
+    notes: 'Nomeado pelo despacho nº 412/DME/2025. Aguarda homologação formal de acesso ao sistema Sigre.',
   },
   {
     id: 'app-dir-002',
@@ -72,7 +72,7 @@ export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [
     type: 'diretor',
     roleRequested: 'Subdiretora Pedagógica',
     fullName: 'Dra. Teresa Van-Dúnem Santos',
-    email: 'teresa.santos@ucore.edu.ao',
+    email: 'teresa.santos@sigre.edu.ao',
     phone: '+244 924 887 902',
     biNumber: '003291882LA091',
     schoolName: 'Escola Primária 1º de Junho',
@@ -312,7 +312,7 @@ export function searchPreRegisteredDirector(
         found: true,
         directorName: d.name,
         schoolMatched: d.schoolName,
-        details: `Diretor(a) homologado(a) no mapa de dirigentes escolares municipais da rede uCore.`,
+        details: `Diretor(a) homologado(a) no mapa de dirigentes escolares municipais da rede Sigre.`,
       };
     }
   }
@@ -325,7 +325,7 @@ export function searchPreRegisteredDirector(
  */
 export function approveApplication(
   applicationId: string,
-  approverName: string = 'Administrador uCore',
+  approverName: string = 'Administrador Sigre',
   complementaryData?: PendingApprovalComplementaryData
 ): { success: boolean; app?: PendingApplication; activatedUser?: UserAccount } {
   try {
@@ -398,7 +398,7 @@ export function approveApplication(
 export function rejectApplication(
   applicationId: string,
   reason: string,
-  rejectorName: string = 'Responsável uCore'
+  rejectorName: string = 'Responsável Sigre'
 ): { success: boolean; app?: PendingApplication } {
   try {
     const applications = getPendingApplications();

@@ -46,7 +46,7 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({ card, onClose,
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                {roleTitle ? `Métrica da Sessão • ${roleTitle}` : 'Indicador uCore'}
+                {roleTitle ? `Métrica da Sessão • ${roleTitle}` : 'Indicador Sigre'}
               </span>
               <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">{card.title}</h3>
             </div>

@@ -99,7 +99,7 @@ export const AngolaCoatOfArms: React.FC<{ className?: string; size?: number }> =
 };
 
 /**
- * Logótipo Institucional da Escola / Sistema Educacional uCore
+ * Logótipo Institucional da Escola / Sistema Educacional Sigre
  */
 export const InstitutionLogo: React.FC<{
   className?: string;
@@ -288,7 +288,7 @@ export const DirectorDigitalSignature: React.FC<{
 
           <div className="mt-1 space-y-0.5 text-[7.5px] text-slate-600 font-mono">
             <div>
-              <strong className="text-slate-700">Norma:</strong> ICP-Angola / uCore SecureID
+              <strong className="text-slate-700">Norma:</strong> ICP-Angola / Sigre SecureID
             </div>
             <div>
               <strong className="text-slate-700">Timestamp:</strong> {currentTimestamp}

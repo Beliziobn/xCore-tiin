@@ -46,7 +46,7 @@ export const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              Política de Privacidade <span className="text-[#f75142]">uCore</span>
+              Política de Privacidade <span className="text-[#f75142]">Sigre</span>
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -134,7 +134,7 @@ export const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({
           <div className="space-y-4 pb-6 border-b border-slate-100">
             <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
               <span className="text-[#f75142]">2.</span>
-              Categorias de Dados Coletados no Ecossistema uCore
+              Categorias de Dados Coletados no Ecossistema Sigre
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs sm:text-sm">

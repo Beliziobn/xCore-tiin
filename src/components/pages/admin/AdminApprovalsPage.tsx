@@ -276,7 +276,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
         }
 
         const notify = showToast || alert;
-        notify(`Registo de "${updated.fullName}" homologado com sucesso com dados complementares no uCore! Acesso liberado.`);
+        notify(`Registo de "${updated.fullName}" homologado com sucesso com dados complementares no Sigre! Acesso liberado.`);
       }
       setIsSubmitting(false);
       setIsApproveModalOpen(false);
@@ -348,7 +348,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       <Hero
         onOpenGetStarted={onOpenGetStarted}
         customTitle="Central de Homologações & Credenciação"
-        customSubtitle="Validação de despachos, homologação formal de Diretores de Escola e credenciação de acesso ao ecossistema uCore SIGE."
+        customSubtitle="Validação de despachos, homologação formal de Diretores de Escola e credenciação de acesso ao ecossistema Sigre SIGE."
         badge="Administração Municipal da Educação"
         breadcrumbs={[
           { label: 'Início', onClick: () => window.location.reload() },
@@ -373,7 +373,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   Quadro Oficial de Homologação de Diretores
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  Conforme o Estatuto da Carreira Docente e Dirigente de Angola. Todos os despachos conferem permissão imediata de gestão escolar no SIGE uCore.
+                  Conforme o Estatuto da Carreira Docente e Dirigente de Angola. Todos os despachos conferem permissão imediata de gestão escolar no SIGE Sigre.
                 </p>
               </div>
 
@@ -1210,7 +1210,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
                 <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                 <span>
-                  Ao confirmar a homologação, o status do Diretor muda para <strong>Ativo</strong>. O seu dossiê completo de direção é gerado com os dados acadêmicos e pedagógicos informados, liberando o acesso total à gestão escolar no uCore.
+                  Ao confirmar a homologação, o status do Diretor muda para <strong>Ativo</strong>. O seu dossiê completo de direção é gerado com os dados acadêmicos e pedagógicos informados, liberando o acesso total à gestão escolar no Sigre.
                 </span>
               </div>
             </div>

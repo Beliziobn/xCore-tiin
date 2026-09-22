@@ -1,6 +1,6 @@
 /**
  * Utilitários para Emissão do Boletim Oficial de Matrícula
- * Sistema de Gestão Educacional uCore - Padrão República de Angola / MED
+ * Sistema de Gestão Educacional Sigre - Padrão República de Angola / MED
  */
 import type { StudentRegistrationData } from '../types';
 
@@ -560,7 +560,7 @@ export function generateBoletimHTML(student: StudentRegistrationData): string {
         <div style="font-weight: 900; border-bottom: 1px solid #a7f3d0; padding-bottom: 2px; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
           <span>🔒 ASSINATURA DIGITAL CERTIFICADA</span>
         </div>
-        <div>Norma: ICP-Angola / uCore ID</div>
+        <div>Norma: ICP-Angola / Sigre ID</div>
         <div>Hash SHA-256: e8f4${(student.codigoMatricula || '0000').slice(-4)}...9b21</div>
         <div>Timestamp: ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC</div>
         <div style="color: #059669; font-weight: 800; margin-top: 2px;">● CERTIFICADO VÁLIDO</div>
@@ -581,12 +581,12 @@ export function generateBoletimHTML(student: StudentRegistrationData): string {
         <div style="width: 50px; height: 50px; border: 1px solid #cbd5e1; background: #ffffff; padding: 2px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 7px; font-mono: monospace; color: #0b3d5c; font-weight: 800; text-align: center;">
           QR CODE<br>VALIDAÇÃO
         </div>
-        <span style="font-size: 7px; color: #64748b; margin-top: 2px;">Autenticidade uCore</span>
+        <span style="font-size: 7px; color: #64748b; margin-top: 2px;">Autenticidade Sigre</span>
       </div>
     </div>
 
     <div class="footer-note">
-      Documento processado por computador via <strong>uCore Central • Sistema de Gestão Educacional Integrado</strong>.<br>
+      Documento processado por computador via <strong>Sigre Central • Sistema de Gestão Educacional Integrado</strong>.<br>
       Código de Validação Digital: <code>VAL-${student.id}-${new Date().getFullYear()}</code> • Conservar este comprovativo durante todo o ano lectivo.
     </div>
   </div>

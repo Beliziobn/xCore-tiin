@@ -34,12 +34,12 @@ export const FAQ_QUESTIONS: FAQItem[] = [
     id: 'visao-geral',
     category: 'Gestão Escolar Integrada',
     categoryIcon: <Building2 className="w-4 h-4 text-[#f75142]" />,
-    question: '1. O que é a Central uCore Angola e como transforma a gestão das instituições de ensino?',
+    question: '1. O que é o Sigre Angola e como transforma a gestão das instituições de ensino?',
     summary: 'Plataforma oficial integrada de modernização escolar desenhada para as particularidades do ensino angolano.',
     answer: [
-      'O uCore é a plataforma de gestão escolar e inovação pedagógica desenvolvida especificamente para a realidade de Angola, atendendo desde o Ensino Primário, I Ciclo, II Ciclo até aos Institutos Médios Politécnicos e Magistérios.',
+      'O Sigre (Sistema Integrado de Gestão Escolar) é a plataforma de inovação pedagógica desenvolvida especificamente para a realidade de Angola, atendendo desde o Ensino Primário, I Ciclo, II Ciclo até aos Institutos Médios Politécnicos e Magistérios.',
       'A solução centraliza numa única interface a secretaria virtual, livros de sumários digitais, controlo rigoroso de assiduidade de alunos e professores, emissão de certidões com código QR de autenticidade e arquivo digital à prova de extravios.',
-      'Com o uCore, direções de escolas e gabinetes provinciais de educação reduzem em mais de 70% o tempo gasto com tarefas burocráticas manuais, eliminando o uso de livros de papel vulneráveis e garantindo dados fidedignos em tempo real.'
+      'Com o Sigre, direções de escolas e gabinetes provinciais de educação reduzem em mais de 70% o tempo gasto com tarefas burocráticas manuais, eliminando o uso de livros de papel vulneráveis e garantindo dados fidedignos em tempo real.'
     ],
     keyHighlights: [
       'Conformidade integral com normas do Ministério da Educação (MED)',
@@ -54,7 +54,7 @@ export const FAQ_QUESTIONS: FAQItem[] = [
     question: '2. Como funciona o cálculo automático de médias trimestrais e exportação das pautas oficiais?',
     summary: 'Automação matemática rigorosa das fórmulas MAC, NPP, NPT, MT e MF com exportação homologada.',
     answer: [
-      'O motor de cálculo do uCore opera em estrita conformidade com o Regulamento Geral de Avaliação de Angola. À medida que o professor insere a Média de Avaliação Contínua (MAC), a Nota da Prova do Professor (NPP) e a Nota da Prova Trimestral (NPT), o sistema calcula instantaneamente a Média Trimestral (MT): [MT = (MAC + NPP + NPT) / 3].',
+      'O motor de cálculo do Sigre opera em estrita conformidade com o Regulamento Geral de Avaliação de Angola. À medida que o professor insere a Média de Avaliação Contínua (MAC), a Nota da Prova do Professor (NPP) e a Nota da Prova Trimestral (NPT), o sistema calcula instantaneamente a Média Trimestral (MT): [MT = (MAC + NPP + NPT) / 3].',
       'No encerramento do ano letivo, o sistema processa automaticamente a Média Final (MF), termos de exame de recurso e pautas gerais de afixação para publicação no átrio escolar e arquivamento oficial.',
       'As pautas podem ser exportadas em PDF de alta qualidade para impressão com cabeçalho oficial da República de Angola ou descarregadas em folhas de cálculo Excel compatíveis com o Instrumento Complementar SIGE do Ministério.'
     ],
@@ -71,7 +71,7 @@ export const FAQ_QUESTIONS: FAQItem[] = [
     question: '3. Como os Encarregados de Educação acompanham faltas, notas e propinas em tempo real?',
     summary: 'Aproximação direta entre família e escola através de alertas instantâneos e boletim digital.',
     answer: [
-      'Através do Portal do Encarregado uCore (acessível por telemóvel, tablet ou computador), os pais e tutores legais têm acesso seguro e reservado ao dossiê escolar dos seus educandos.',
+      'Através do Portal do Encarregado Sigre (acessível por telemóvel, tablet ou computador), os pais e tutores legais têm acesso seguro e reservado ao dossiê escolar dos seus educandos.',
       'Sempre que um professor assinala uma falta no livro de presenças ou publica a nota de um teste, o encarregado pode receber um alerta imediato (via notificação e canais institucionais), evitando surpresas no final do trimestre.',
       'O portal permite ainda consultar o extrato de propinas escolares, emitir referências Multicaixa / Pagamentos GPO para liquidação bancária rápida e solicitar justificação médica de faltas diretamente à coordenação de turma.'
     ],
@@ -88,7 +88,7 @@ export const FAQ_QUESTIONS: FAQItem[] = [
     question: '4. A plataforma opera em regiões com instabilidade de internet ou cortes elétricos nas províncias?',
     summary: 'Arquitetura híbrida offline-first com sincronização bidirecional resiliente.',
     answer: [
-      'Sim. Sabemos que a infraestrutura de telecomunicações varia entre províncias e municípios de Angola (como nas zonas suburbanas e rurais de Malanje, Luanda, Benguela, Huambo ou Uíge). Por isso, o uCore foi concebido com arquitetura Offline-First.',
+      'Sim. Sabemos que a infraestrutura de telecomunicações varia entre províncias e municípios de Angola (como nas zonas suburbanas e rurais de Malanje, Luanda, Benguela, Huambo ou Uíge). Por isso, o Sigre foi concebido com arquitetura Offline-First.',
       'Professores e funcionários administrativos podem abrir o sistema, realizar a chamada diária da turma, lançar sumários e introduzir notas parciais sem necessitarem de qualquer ligação à internet ativa no momento da aula.',
       'Os dados ficam armazenados com encriptação no dispositivo local e, assim que o aparelho deteta qualquer rede (seja Wi-Fi escolar ou dados móveis 3G/4G), sincronizam-se automaticamente com os servidores centrais sem duplicidade de registos.'
     ],
@@ -102,11 +102,11 @@ export const FAQ_QUESTIONS: FAQItem[] = [
     id: 'adesao-capacitacao',
     category: 'Adesão & Formação',
     categoryIcon: <GraduationCap className="w-4 h-4 text-purple-600" />,
-    question: '5. Qual é o procedimento para uma escola pública ou colégio privado aderir ao sistema uCore?',
+    question: '5. Qual é o procedimento para uma escola pública ou colégio privado aderir ao sistema Sigre?',
     summary: 'Processo ágil em 4 passos com acompanhamento pedagógico e técnico dedicado.',
     answer: [
-      'O processo de integração no ecossistema uCore foi desenhado para ser rápido, sem atritos e sem sobrecarregar a rotina dos professores. Divide-se em 4 etapas práticas:',
-      'Passo 1: Manifestação de interesse no portal público uCore ou contacto com o nosso gabinete técnico em Luanda/Malanje.',
+      'O processo de integração no ecossistema Sigre foi desenhado para ser rápido, sem atritos e sem sobrecarregar a rotina dos professores. Divide-se em 4 etapas práticas:',
+      'Passo 1: Manifestação de interesse no portal público Sigre ou contacto com o nosso gabinete técnico em Luanda/Malanje.',
       'Passo 2: Parametrização institucional — a nossa equipa carrega a estrutura curricular da escola, turmas, cursos e lista de professores sem custos de implantação pesados.',
       'Passo 3: Capacitação pedagógica prática — realizamos sessões de formação (presenciais ou via salas virtuais interativas) para secretários, diretores e professores.',
       'Passo 4: Entrada em produção assistida — acompanhamento diário durante os primeiros lançamentos de pautas e apoio permanente via Helpdesk e WhatsApp institucional.'
@@ -193,7 +193,7 @@ export const FAQPage: React.FC<FAQPageProps> = ({
             <span>Perguntas Frequentes (FAQ)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#002133] tracking-tight leading-tight mb-4">
-            Esclarecimento Direto sobre o <span className="text-[#f75142]">uCore Angola</span>
+            Esclarecimento Direto sobre o <span className="text-[#f75142]">Sigre Angola</span>
           </h1>
           <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
             Consulte as 5 principais dúvidas operacionais e pedagógicas sobre o funcionamento da plataforma,
@@ -361,7 +361,7 @@ export const FAQPage: React.FC<FAQPageProps> = ({
                 A sua instituição precisa de apoio personalizado?
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
-                A nossa equipa de consultores pedagógicos e técnicos está disponível para apresentar uma demonstração personalizada da plataforma uCore à sua Direção Escolar.
+                A nossa equipa de consultores pedagógicos e técnicos está disponível para apresentar uma demonstração personalizada da plataforma Sigre à sua Direção Escolar.
               </p>
             </div>
 

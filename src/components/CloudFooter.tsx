@@ -95,7 +95,7 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
                 </div>
                 <div>
                   <div className="text-2xl font-black tracking-tight font-display text-white leading-none">
-                    u<span className="text-[#002133]">Core</span>
+                    Sig<span className="text-[#002133]">re</span>
                   </div>
                   <span className="text-[11px] font-bold text-white/85 tracking-wider uppercase mt-1 block">
                     Sistema Integrado de Gestão Escolar
@@ -217,16 +217,16 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold uppercase tracking-wider text-white transition-all cursor-pointer flex items-center justify-center sm:justify-start gap-2.5 shadow-xs"
                 >
                   <HelpCircle className="w-4 h-4 text-white" />
-                  <span>Central de Apoio uCore</span>
+                  <span>Central de Apoio Sigre</span>
                 </button>
 
                 <div className="bg-black/15 rounded-xl p-3.5 border border-white/15 text-xs space-y-1.5">
                   <span className="text-white/75 font-medium block">Linha de Suporte Técnico & Pedagógico:</span>
                   <a
-                    href="mailto:suporte@ucore.ao"
+                    href="mailto:suporte@sigre.ao"
                     className="font-bold text-sm text-white hover:underline flex items-center gap-1.5 transition-colors"
                   >
-                    <span>suporte@ucore.ao</span>
+                    <span>suporte@sigre.ao</span>
                   </a>
                   <p className="text-[11px] text-white/70 leading-normal">
                     Atendimento disponível nos dias úteis, das 08h00 às 17h00 (WAT).
@@ -240,7 +240,7 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/85">
             <div className="text-center sm:text-left space-y-0.5">
               <p className="tracking-normal font-normal">
-                © 2026 <strong className="text-white font-bold">uCore Angola</strong>. Todos os direitos reservados.
+                © 2026 <strong className="text-white font-bold">Sigre Angola</strong>. Todos os direitos reservados.
               </p>
               <p className="text-[11px] text-white/70">
                 Ministério da Educação • Direcções Municipais e Gabinetes Provinciais

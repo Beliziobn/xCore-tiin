@@ -166,9 +166,9 @@ export const ANGOLA_SCHOOLS: SchoolLocation[] = [
     status: 'certified'
   },
   {
-    id: 'ucore-headquarters',
-    name: 'Sede Operacional uCore Angola',
-    code: 'UCORE-HUB',
+    id: 'sigre-headquarters',
+    name: 'Sede Operacional Sigre Angola',
+    code: 'SIGRE-HUB',
     province: 'Luanda',
     municipality: 'Luanda',
     neighborhood: 'Baixa de Luanda',
@@ -178,8 +178,8 @@ export const ANGOLA_SCHOOLS: SchoolLocation[] = [
     studentCount: 0,
     teacherCount: 0,
     contactPhone: '+244 923 000 111',
-    contactEmail: 'suporte@ucore.ao',
-    directorName: 'Coordenação Técnica Nacional uCore',
+    contactEmail: 'suporte@sigre.ao',
+    directorName: 'Coordenação Técnica Nacional Sigre',
     courses: ['Gabinete de Apoio aos SIGE Provinciais', 'Centro de Formação de Professores'],
     status: 'certified'
   }
@@ -857,7 +857,7 @@ export const MapsRoutesPage: React.FC<MapsRoutesPageProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                         <span className="font-semibold text-slate-200">
-                          Cartografia Digital uCore Angola • Modo Demonstrativo Ativo
+                          Cartografia Digital Sigre Angola • Modo Demonstrativo Ativo
                         </span>
                       </div>
                       <a

@@ -191,7 +191,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
     setTimeout(() => {
       const dateTag = new Date().toISOString().substring(0, 10);
       const safeContext = filterStats.contextLabel.replace(/[^a-zA-Z0-9]/g, '_');
-      const filename = `uCore_Estatisticas_Filtradas_${safeContext}_${dateTag}.xlsx`;
+      const filename = `Sigre_Estatisticas_Filtradas_${safeContext}_${dateTag}.xlsx`;
 
       exportConsolidatedExcel(
         {

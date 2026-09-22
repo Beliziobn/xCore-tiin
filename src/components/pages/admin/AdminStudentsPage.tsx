@@ -492,7 +492,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h4 className="text-sm font-bold text-slate-800">
-              Registros de Alunos da Rede uCore ({filteredStudents.length})
+              Registros de Alunos da Rede Sigre ({filteredStudents.length})
             </h4>
             <span className="text-xs text-slate-500 font-medium">
               Clique em qualquer aluno para atualizar os cartões e métricas

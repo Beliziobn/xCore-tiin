@@ -571,7 +571,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                         <div
                           onClick={() => {
                             setExportScope('all');
-                            setSpreadsheetTitle(`uCore - Gestão Operacional Interna (${new Date().toLocaleDateString('pt-PT')})`);
+                            setSpreadsheetTitle(`Sigre - Gestão Operacional Interna (${new Date().toLocaleDateString('pt-PT')})`);
                           }}
                           className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
                             exportScope === 'all'
@@ -607,7 +607,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                         <div
                           onClick={() => {
                             setExportScope('students');
-                            setSpreadsheetTitle(`uCore - Registo de Alunos (${new Date().toLocaleDateString('pt-PT')})`);
+                            setSpreadsheetTitle(`Sigre - Registo de Alunos (${new Date().toLocaleDateString('pt-PT')})`);
                           }}
                           className={`px-3 py-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                             exportScope === 'students'
@@ -625,7 +625,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                         <div
                           onClick={() => {
                             setExportScope('teachers');
-                            setSpreadsheetTitle(`uCore - Quadro de Professores (${new Date().toLocaleDateString('pt-PT')})`);
+                            setSpreadsheetTitle(`Sigre - Quadro de Professores (${new Date().toLocaleDateString('pt-PT')})`);
                           }}
                           className={`px-3 py-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                             exportScope === 'teachers'
@@ -959,7 +959,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
         onClose={() => setIsSyncConfirmOpen(false)}
         onConfirm={handleConfirmSync}
         title="Confirmar Sobrescrita de Dados na Planilha Google"
-        description="Esta ação substituirá e atualizará os dados das abas correspondentes na planilha Google indicada com os dados educacionais mais recentes do uCore."
+        description="Esta ação substituirá e atualizará os dados das abas correspondentes na planilha Google indicada com os dados educacionais mais recentes do Sigre."
         affectedItem={`Planilha ID: ${targetSpreadsheetId}`}
         details={[
           'Os dados das abas (Resumo, Alunos, Professores, Diretores e Escolas) serão sobrescritos com a versão atual.',

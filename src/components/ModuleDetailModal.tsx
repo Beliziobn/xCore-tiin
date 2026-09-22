@@ -34,7 +34,7 @@ export const ModuleDetailModal: React.FC<ModuleDetailModalProps> = ({
           </span>
           <h3 className="text-2xl font-black uppercase tracking-tight text-[#002133]">{module.title}</h3>
           <p className="text-xs uppercase tracking-[0.1em] text-slate-500 mt-1">
-            Módulo Integrado da Central uCore
+            Módulo Integrado da Central Sigre
           </p>
         </div>
 

@@ -547,7 +547,7 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
                 {initialData ? 'Atualizar Cadastro da Escola' : 'Cadastrar Nova Escola'}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed max-w-xl">
-                Preencha as informações da escola passo a passo de forma simples e intuitiva — o uCore organiza as turmas, professores e localização automaticamente.
+                Preencha as informações da escola passo a passo de forma simples e intuitiva — o Sigre organiza as turmas, professores e localização automaticamente.
               </p>
             </div>
           </div>

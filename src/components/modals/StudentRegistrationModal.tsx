@@ -542,7 +542,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   {initialData ? 'Atualizar Matrícula do Aluno' : 'Candidatura & Matrícula de Aluno'}
                 </h2>
                 <p className="text-sm text-slate-500 mt-0.5 max-w-xl">
-                  Preencha a ficha do aluno de forma simples e assistida — o uCore calcula automaticamente a idade, faixa etária e sugere a turma ideal.
+                  Preencha a ficha do aluno de forma simples e assistida — o Sigre calcula automaticamente a idade, faixa etária e sugere a turma ideal.
                 </p>
               </div>
             </div>

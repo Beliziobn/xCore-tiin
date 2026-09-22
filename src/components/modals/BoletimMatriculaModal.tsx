@@ -552,7 +552,7 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
 
             {/* RODAPÉ DO DOCUMENTO */}
             <div className="mt-3 pt-2 border-t border-slate-200 text-center text-[8.5px] text-slate-400 leading-normal">
-              Documento emitido e autenticado digitalmente pelo <strong>uCore Central • Sistema de Gestão Educacional Integrado</strong>.<br />
+              Documento emitido e autenticado digitalmente pelo <strong>Sigre • Sistema Integrado de Gestão Escolar</strong>.<br />
               Código de Autenticidade Digital: <code className="font-mono text-slate-700 font-bold">VAL-{student.codigoMatricula || student.id}</code> • Válido perante as autoridades de ensino para o Ano Lectivo 2026 / 2027.
             </div>
           </div>

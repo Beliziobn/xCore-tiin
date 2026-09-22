@@ -104,7 +104,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       beforeSituation:
         'Cálculo manual de médias em folhas soltas de papel, com atrasos sistemáticos na entrega de notas e filas de encarregados de educação no final de cada trimestre.',
       afterSituation:
-        'Sistema integrado uCore com lançamento automático de avaliações contínuas, cálculo instantâneo ponderado e publicação de pautas em conformidade com o MED.',
+        'Sistema integrado Sigre com lançamento automático de avaliações contínuas, cálculo instantâneo ponderado e publicação de pautas em conformidade com o MED.',
       results: [
         '1.420 pautas trimestrais processadas sem divergência de notas.',
         'Assiduidade docente acompanhada em tempo real pelo Gabinete Provincial.',
@@ -113,7 +113,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       quote: {
         author: 'Dra. Esperança Muquixe',
         role: 'Directora Geral Pedagógica',
-        text: 'O uCore devolveu a tranquilidade ao nosso conselho pedagógico. Antes levávamos semanas a conferir pautas manuais; hoje, com um clique, as notas estão auditadas e validadas.',
+        text: 'O Sigre devolveu a tranquilidade ao nosso conselho pedagógico. Antes levávamos semanas a conferir pautas manuais; hoje, com um clique, as notas estão auditadas e validadas.',
       },
       tags: ['Pautas Automáticas', 'Malanje', 'IIº Ciclo', 'Conselho de Notas'],
       badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
@@ -142,7 +142,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       quote: {
         author: 'Prof. Domingos Kapenda',
         role: 'Coordenador do Turno da Manhã',
-        text: 'A precisão do livro de ponto uCore acabou com as dúvidas e justificações tardias. Todos os professores sabem que o seu trabalho está devidamente registado e valorizado.',
+        text: 'A precisão do livro de ponto Sigre acabou com as dúvidas e justificações tardias. Todos os professores sabem que o seu trabalho está devidamente registado e valorizado.',
       },
       tags: ['Livro de Ponto', 'Luanda', 'Cazenga', 'Biometria'],
       badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -162,7 +162,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       beforeSituation:
         'Falta de acompanhamento individual das aulas de laboratório técnico e comunicação fragmentada com empresas parceiras de estágio.',
       afterSituation:
-        'Ficha pedagógica digital completa para cada futuro técnico, permitindo aos professores registrar notas práticas e realizar videoconferências de alinhamento pelo uCore Meet.',
+        'Ficha pedagógica digital completa para cada futuro técnico, permitindo aos professores registrar notas práticas e realizar videoconferências de alinhamento pelo Sigre Meet.',
       results: [
         'Realização de 48 reuniões pedagógicas virtuais sem custos de deslocação.',
         'Controlo de frequência em 6 laboratórios especializados com QR code.',
@@ -171,7 +171,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       quote: {
         author: 'Eng. Mateus Tchissingui',
         role: 'Director Técnico-Pedagógico',
-        text: 'O módulo de reuniões em tempo real do uCore permitiu-nos coordenar estágios em várias províncias sem sair do gabinete. É uma revolução na educação técnica.',
+        text: 'O módulo de reuniões em tempo real do Sigre permitiu-nos coordenar estágios em várias províncias sem sair do gabinete. É uma revolução na educação técnica.',
       },
       tags: ['Ensino Técnico', 'Huambo', 'Videoconferência', 'Certificados'],
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -191,7 +191,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       beforeSituation:
         'Encarregados de educação só sabiam das notas ou faltas dos filhos quando eram convocados no fim do ano letivo.',
       afterSituation:
-        'Canal direto no uCore onde cada encarregado visualiza o comportamento, faltas justificadas e tarefas do aluno.',
+        'Canal direto no Sigre onde cada encarregado visualiza o comportamento, faltas justificadas e tarefas do aluno.',
       results: [
         'Redução de 65% em casos de indisciplina após notificação antecipada.',
         'Adesão total de 1.400 famílias ao acompanhamento digital.',
@@ -229,7 +229,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       quote: {
         author: 'Professor Bartolomeu Haufiku',
         role: 'Director da Escola',
-        text: 'Mesmo nos pontos mais distantes de Ondjiva, o uCore funciona. Conseguimos saber quais alunos faltaram e ir ao encontro das suas famílias antes que desistam da escola.',
+        text: 'Mesmo nos pontos mais distantes de Ondjiva, o Sigre funciona. Conseguimos saber quais alunos faltaram e ir ao encontro das suas famílias antes que desistam da escola.',
       },
       tags: ['Inclusão Social', 'Cunene', 'Busca Ativa', 'Combate ao Abandono'],
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -249,7 +249,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       beforeSituation:
         'Estágios pedagógicos com diários manuscritos em papel, difíceis de orientar e corrigir pelos professores metodólogos.',
       afterSituation:
-        'Ambiente uCore onde os futuros professores criam, simulam e submetem planos de aula e mini-pautas para correção remota dos formadores.',
+        'Ambiente Sigre onde os futuros professores criam, simulam e submetem planos de aula e mini-pautas para correção remota dos formadores.',
       results: [
         'Formação de mais de 450 novos docentes por ano já adaptados ao SIGE.',
         'Biblioteca digital de 2.100 planos de aula para partilha nacional.',
@@ -258,7 +258,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
       quote: {
         author: 'Profª Dra. Teresa Caveto',
         role: 'Coordenadora de Estágios Pedagógicos',
-        text: 'Os nossos estudantes de magistério já saem para as salas de aula de Angola preparados para o futuro digital. O uCore é a ferramenta essencial dessa transição.',
+        text: 'Os nossos estudantes de magistério já saem para as salas de aula de Angola preparados para o futuro digital. O Sigre é a ferramenta essencial dessa transição.',
       },
       tags: ['Magistério', 'Huíla', 'Lubango', 'Formação Docente'],
       badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
@@ -292,7 +292,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white font-display leading-tight">
-              Como o uCore está a Transformar a Educação em Angola
+              Como o Sigre está a Transformar a Educação em Angola
             </h1>
 
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl font-normal">
@@ -480,7 +480,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
               Metodologia & Inovação
             </span>
             <h2 className="text-2xl sm:text-3xl font-black text-[#002133] tracking-tight mt-1 font-display">
-              Gestão Escolar Tradicional vs. Plataforma uCore
+              Gestão Escolar Tradicional vs. Plataforma Sigre
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-2">
               A evolução prática do dia a dia das escolas após a transição digital.
@@ -499,7 +499,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
                   <strong>Antes:</strong> 3 semanas de conferência manual de médias, risco alto de erro de arredondamento e papel rasurado.
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-100 text-xs">
-                  <strong>Com uCore:</strong> Lançamento em tempo real, cálculo automatizado de coeficientes do MED e publicação em 24h.
+                  <strong>Com Sigre:</strong> Lançamento em tempo real, cálculo automatizado de coeficientes do MED e publicação em 24h.
                 </div>
               </div>
             </div>
@@ -515,7 +515,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
                   <strong>Antes:</strong> Assinatura em livro de folhas vulneráveis, atrasos no envio de relatórios de assiduidade.
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-100 text-xs">
-                  <strong>Com uCore:</strong> Ponto biométrico/digital criptografado com auditoria instantânea para o director escolar.
+                  <strong>Com Sigre:</strong> Ponto biométrico/digital criptografado com auditoria instantânea para o director escolar.
                 </div>
               </div>
             </div>
@@ -531,7 +531,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
                   <strong>Antes:</strong> Pais ausentes ou chamados apenas quando o aluno já acumulava muitas faltas e notas negativas.
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-100 text-xs">
-                  <strong>Com uCore:</strong> Alerta preventivo no telemóvel dos pais e reuniões pedagógicas virtuais integradas.
+                  <strong>Com Sigre:</strong> Alerta preventivo no telemóvel dos pais e reuniões pedagógicas virtuais integradas.
                 </div>
               </div>
             </div>
@@ -548,7 +548,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
               Quer ver a sua escola ou colégio em destaque aqui?
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
-              A equipa técnica uCore apoia directores escolares em todo o processo de adesão, parametrização de turmas e formação dos professores.
+              A equipa técnica Sigre apoia directores escolares em todo o processo de adesão, parametrização de turmas e formação dos professores.
             </p>
           </div>
 
@@ -642,7 +642,7 @@ export const CasesPage: React.FC<CasesPageProps> = ({
 
               <div>
                 <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider mb-1">
-                  A Solução Implementada com uCore
+                  A Solução Implementada com Sigre
                 </h4>
                 <p className="text-slate-600 leading-relaxed bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
                   {activeCaseModal.afterSituation}

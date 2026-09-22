@@ -54,7 +54,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
   isOpen,
   onClose,
   roomId,
-  roomTitle = 'Reunião uCore em Tempo Real',
+  roomTitle = 'Reunião Sigre em Tempo Real',
   currentUser,
   initialVideo = true,
   initialAudio = true,
@@ -80,9 +80,9 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
     id: currentUser?.id || `user_${Math.random().toString(36).substring(2, 9)}`,
     name: currentUser
       ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
-      : 'Convidado uCore',
+      : 'Convidado Sigre',
     role: currentUser?.role || 'docente',
-    schoolName: currentUser?.schoolName || 'Escola uCore Malanje',
+    schoolName: currentUser?.schoolName || 'Escola Sigre Malanje',
   };
 
   const {
@@ -173,7 +173,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
 
   const handleCopyInvite = () => {
     const directUrl = `${window.location.origin}/?meet=${cleanRoomId}`;
-    const inviteText = `Participe da reunião "${roomTitle}" no SIGE uCore!\nCódigo da Sala: ${cleanRoomId}\nLink Direto: ${directUrl}`;
+    const inviteText = `Participe da reunião "${roomTitle}" no SIGE Sigre!\nCódigo da Sala: ${cleanRoomId}\nLink Direto: ${directUrl}`;
     navigator.clipboard.writeText(inviteText);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -225,12 +225,12 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
       id="zoom-meeting-modal-container"
       className="fixed inset-0 z-50 bg-[#F8FAFC] text-slate-900 flex flex-col select-none overflow-hidden font-sans"
     >
-      {/* TOP HEADER (Clean, Professional SaaS uCore Meet) */}
+      {/* TOP HEADER (Clean, Professional SaaS Sigre Meet) */}
       <header className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 py-2.5 flex items-center justify-between shrink-0 z-30 gap-4">
         {/* Left: Meeting Info */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-sm shrink-0">
-            uM
+            SM
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">

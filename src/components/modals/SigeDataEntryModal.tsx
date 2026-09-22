@@ -465,10 +465,10 @@ print("Ficheiro gerado:", resultado["arquivo_gerado"])
               type="button"
               onClick={handleAutoAggregateFromUcore}
               className="px-3 py-1.5 bg-[#1F4E79] hover:bg-[#163a5c] text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              title="Carrega dados vivos das escolas, alunos e professores do uCore e extrai contagens agregadas (Zero nomes)"
+              title="Carrega dados vivos das escolas, alunos e professores do Sigre e extrai contagens agregadas (Zero nomes)"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Agregar Dados uCore (Zero Nomes)</span>
+              <span>Agregar Dados Sigre (Zero Nomes)</span>
             </button>
 
             <button
