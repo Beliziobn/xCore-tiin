@@ -1,14 +1,9 @@
 const PASSWORDS_STORAGE_KEY = 'ucore_user_passwords';
 const SECURITY_LOGS_KEY = 'ucore_security_logs';
 
-// Default mock passwords for existing demonstration accounts
+// Official credentials
 const DEFAULT_PASSWORDS: Record<string, string> = {
-  'admin@ucore.ao': 'admin123',
-  'diretor@escola.ao': 'diretor123',
-  'carl.diretor@escola.ao': 'diretor123',
-  'professor@escola.ao': 'professor123',
-  'santar.prof@escola.ao': 'professor123',
-  'docente@escola.ao': 'professor123',
+  'dmedoquessua@gmail.com': 'quessua000',
 };
 
 export interface SecurityAuditLog {
@@ -49,17 +44,26 @@ export function getUserPassword(email: string): string {
 
 export function verifyPassword(email: string, inputPassword: string): boolean {
   if (!inputPassword) return false;
-  const current = getUserPassword(email);
+  const normalizedEmail = (email || '').trim().toLowerCase();
   const trimmed = inputPassword.trim();
+  const stored = getStoredPasswords();
+
+  // For Director Municipal: check custom password if changed, otherwise require quessua000
+  if (normalizedEmail === 'dmedoquessua@gmail.com') {
+    if (stored[normalizedEmail]) {
+      return trimmed === stored[normalizedEmail];
+    }
+    return trimmed === 'quessua000';
+  }
+
+  const current = getUserPassword(email);
 
   // Accept if it matches the current stored password
   if (trimmed === current) return true;
 
-  // Also accept demo standard passwords if user hasn't explicitly set a custom one
-  const stored = getStoredPasswords();
-  const normalizedEmail = (email || '').trim().toLowerCase();
+  // Also accept standard initial passwords if user hasn't explicitly set a custom one
   if (!stored[normalizedEmail]) {
-    if (trimmed === '123456' || trimmed === '12345678' || trimmed === 'admin123' || trimmed === 'diretor123' || trimmed === 'professor123' || trimmed === 'ucore2026') {
+    if (trimmed === '123456' || trimmed === '12345678' || trimmed === 'admin123' || trimmed === 'diretor123' || trimmed === 'professor123' || trimmed === 'quessua000') {
       return true;
     }
   }

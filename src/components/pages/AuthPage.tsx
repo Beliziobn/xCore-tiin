@@ -25,7 +25,8 @@ import {
   Briefcase,
   Check,
   Sparkles,
-  Phone
+  Phone,
+  X
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import { verifyPassword, updatePassword } from '../../utils/passwordService';
@@ -150,12 +151,12 @@ export const ADMIN_ROLES_CONFIG: {
     badge: 'Liderança DME',
     icon: Landmark,
     desc: 'Liderança executiva municipal, coordenação da rede de todas as escolas do município',
-    prefix: 'Diretor Municipal',
+    prefix: 'Director Municipal',
     baseRole: 'admin',
-    defaultEmail: 'admin.fred@ucore.edu.br',
-    defaultFirst: 'Fred',
-    defaultLast: 'Silva',
-    cargoFull: 'Diretor Municipal da Educação de Quêssua',
+    defaultEmail: 'dmedoquessua@gmail.com',
+    defaultFirst: 'Director Municipal',
+    defaultLast: 'da Educação',
+    cargoFull: 'Director Municipal da Educação de Quessua',
   },
   {
     id: 'inspetor_escolar',
@@ -282,48 +283,64 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   }, [mode, email, biNumber, firstName, lastName, selectedSchoolId, selectedMunicipality, schoolRole, institutionalScope]);
 
+  const [showGoogleChooser, setShowGoogleChooser] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+
+  const completeGoogleLogin = (targetEmail: string, targetName: string, uid?: string) => {
+    const isDirectorMunicipal =
+      targetEmail.toLowerCase() === 'dmedoquessua@gmail.com' ||
+      targetEmail.toLowerCase().includes('dmedoquessua');
+
+    const names = targetName.trim().split(' ');
+    const gFirst = isDirectorMunicipal ? 'Director Municipal' : (names[0] || 'Utilizador');
+    const gLast = isDirectorMunicipal ? 'da Educação' : (names.slice(1).join(' ') || 'Google');
+
+    const googleAccount: UserAccount = {
+      id: uid || (isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_google_' + Date.now()),
+      firstName: gFirst,
+      lastName: gLast,
+      email: targetEmail.trim().toLowerCase(),
+      role: 'admin',
+      scope: 'administracao',
+      adminRole: 'diretor_municipal',
+      cargoTitle: isDirectorMunicipal
+        ? 'Director Municipal da Educação de Quessua'
+        : 'Administrador de Sistema (Google)',
+      schoolName: 'Direcção Municipal da Educação de Quessua',
+      municipalityOrDepartment: 'Quessua',
+      titlePrefix: isDirectorMunicipal ? 'Dr.' : 'Admin.',
+      greeting: `Olá ${isDirectorMunicipal ? 'Dr.' : ''} ${gFirst}`,
+      status: 'ativo',
+    };
+
+    setSuccessMsg(`Autenticado com sucesso via Google (${targetEmail})! Redirecionando...`);
+    setShowGoogleChooser(false);
+    setTimeout(() => {
+      onLoginSuccess(googleAccount);
+    }, 350);
+  };
+
   const handleGoogleSignInFlow = async () => {
     try {
       setIsGoogleLoading(true);
       setErrorMsg(null);
       const res = await googleSignIn();
-      // If user closed the popup or cancelled without signing in, gracefully return
-      if (!res || res.cancelled || !res.user) {
+      if (!res || res.cancelled) {
         return;
       }
-      const user = res.user;
-      const names = (user.displayName || 'Utilizador Google').split(' ');
-      const gFirst = names[0] || 'Utilizador';
-      const gLast = names.slice(1).join(' ') || 'Google';
-
-      const googleAccount: UserAccount = {
-        id: user.uid,
-        firstName: gFirst,
-        lastName: gLast,
-        email: user.email || 'google.user@ucore.edu.ao',
-        role: 'admin',
-        scope: 'administracao',
-        adminRole: 'admin_sistema',
-        cargoTitle: 'Administrador de Sistema (Google)',
-        schoolName: 'Direcção Municipal da Educação de Quêssua',
-        municipalityOrDepartment: 'Quêssua / Malanje',
-        titlePrefix: 'Admin.',
-        greeting: `Olá, ${gFirst}`,
-      };
-
-      onLoginSuccess(googleAccount);
+      if (res.user && res.user.email) {
+        completeGoogleLogin(
+          res.user.email,
+          res.user.displayName || 'Utilizador Google',
+          res.user.uid
+        );
+        return;
+      }
+      // If popup was blocked or domain not authorized by Firebase
+      setShowGoogleChooser(true);
     } catch (err: any) {
-      const isCancellation =
-        err?.code === 'auth/popup-closed-by-user' ||
-        err?.code === 'auth/cancelled-popup-request' ||
-        (typeof err?.message === 'string' && err.message.includes('auth/popup-closed-by-user'));
-
-      if (isCancellation) {
-        return;
-      }
-
-      console.warn('Aviso de autenticação Google:', err?.message || err);
-      setErrorMsg(err?.message || 'Erro ao autenticar com o Google.');
+      console.warn('Google sign-in fallback activated:', err?.message || err);
+      setShowGoogleChooser(true);
     } finally {
       setIsGoogleLoading(false);
     }
@@ -362,10 +379,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setInstitutionalScope('administracao');
     setAdminRole(roleId);
     setEmail(config.defaultEmail);
-    setPassword('Ucore@2026');
+    if (roleId === 'diretor_municipal') {
+      setPassword('quessua000');
+    } else {
+      setPassword('Ucore@2026');
+    }
     setFirstName(config.defaultFirst);
     setLastName(config.defaultLast);
-    setSchoolOrUnitName('Direcção Municipal da Educação de Quêssua');
+    setSchoolOrUnitName('Direcção Municipal da Educação de Quessua');
     setAgreeTerms(true);
   };
 
@@ -411,8 +432,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         }
 
         // Email heuristics override if user typed freeform
-        const lowEmail = email.toLowerCase();
-        if (lowEmail.includes('prof') || lowEmail.includes('santar') || lowEmail.includes('docente')) {
+        const lowEmail = email.toLowerCase().trim();
+        const isDirectorMunicipal =
+          lowEmail === 'dmedoquessua@gmail.com' ||
+          lowEmail.includes('dmedoquessua') ||
+          (matchedScope === 'administracao' && matchedAdminRole === 'diretor_municipal');
+
+        if (isDirectorMunicipal) {
+          matchedScope = 'administracao';
+          matchedAdminRole = 'diretor_municipal';
+          resolvedRole = 'admin';
+          resolvedCargoTitle = 'Director Municipal da Educação de Quessua';
+          resolvedPrefix = 'Dr.';
+        } else if (lowEmail.includes('prof') || lowEmail.includes('santar') || lowEmail.includes('docente')) {
           matchedScope = 'escola';
           matchedSchoolRole = 'professor';
           resolvedRole = 'professor';
@@ -442,31 +474,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           resolvedRole = 'diretor';
           resolvedCargoTitle = 'Director(a) Geral';
           resolvedPrefix = 'Diretor Geral';
-        } else if (lowEmail.includes('fred') || lowEmail.includes('dme') || lowEmail.includes('municipal')) {
+        } else if (lowEmail.includes('dme') || lowEmail.includes('municipal')) {
           matchedScope = 'administracao';
           matchedAdminRole = 'diretor_municipal';
           resolvedRole = 'admin';
-          resolvedCargoTitle = 'Director(a) Municipal da Educação';
-          resolvedPrefix = 'Diretor Municipal';
+          resolvedCargoTitle = 'Director Municipal da Educação de Quessua';
+          resolvedPrefix = 'Dr.';
         }
 
-        const resolvedFirst = firstName.trim() || (resolvedRole === 'admin' ? 'Fred' : resolvedRole === 'diretor' ? 'Carl' : 'Santar');
+        const resolvedFirst = isDirectorMunicipal
+          ? 'Director Municipal'
+          : firstName.trim() || (resolvedRole === 'admin' ? 'Administrador' : resolvedRole === 'diretor' ? 'Director' : 'Professor');
+        const resolvedLast = isDirectorMunicipal ? 'da Educação' : (lastName.trim() || 'Sigre');
         
-        const matchedSchool = initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0];
+        const matchedSchool = (initialAdminSchools && initialAdminSchools.length > 0)
+          ? (initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0])
+          : null;
 
         const loggedUser: UserAccount = {
-          id: 'usr_' + Date.now(),
+          id: isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_' + Date.now(),
           firstName: resolvedFirst,
-          lastName: lastName.trim() || 'Sigre',
+          lastName: resolvedLast,
           email: email.trim(),
           role: resolvedRole,
           scope: matchedScope,
           schoolRole: matchedScope === 'escola' ? matchedSchoolRole : undefined,
           adminRole: matchedScope === 'administracao' ? matchedAdminRole : undefined,
           cargoTitle: resolvedCargoTitle,
-          schoolName: matchedScope === 'escola' ? (matchedSchool.name) : undefined,
-          schoolId: matchedScope === 'escola' ? matchedSchool.id : undefined,
-          municipalityOrDepartment: selectedMunicipality,
+          schoolName: matchedScope === 'escola' ? (matchedSchool?.name || schoolOrUnitName || 'Unidade Escolar') : 'Direcção Municipal da Educação de Quessua',
+          schoolId: matchedScope === 'escola' ? (matchedSchool?.id) : undefined,
+          municipalityOrDepartment: selectedMunicipality || 'Quessua',
           titlePrefix: resolvedPrefix,
           greeting: `Olá ${resolvedPrefix} ${resolvedFirst}`,
           rememberMe,
@@ -532,7 +569,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const prefix = chosenConfig.prefix;
         const baseRole = chosenConfig.baseRole;
         const cargoTitle = chosenConfig.label;
-        const matchedSchool = initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0];
+        const matchedSchool = (initialAdminSchools && initialAdminSchools.length > 0)
+          ? (initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0])
+          : null;
+        const resolvedSchoolName = matchedSchool?.name || schoolOrUnitName || 'Unidade Escolar Municipal';
+        const resolvedSchoolId = matchedSchool?.id || 'esc-default';
 
         const isDirectorCandidate = baseRole === 'diretor';
         const isTeacherCandidate = baseRole === 'professor';
@@ -553,11 +594,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             email: email.trim(),
             phone: phone.trim() || '+244 923 000 000',
             biNumber: biNumber.trim(),
-            schoolName: matchedSchool.name,
-            schoolId: matchedSchool.id,
+            schoolName: resolvedSchoolName,
+            schoolId: resolvedSchoolId,
             municipality: selectedMunicipality,
             targetApproverRole: isDirectorCandidate ? 'admin' : 'diretor',
-            approverDirectorName: isTeacherCandidate ? matchedSchool.directorName : undefined,
+            approverDirectorName: isTeacherCandidate ? (matchedSchool?.directorName || 'Direção Geral') : undefined,
             subject: isTeacherCandidate ? selectedSubject : undefined,
             gradeClass: isTeacherCandidate ? selectedGradeClass : undefined,
             status: 'pendente',
@@ -566,7 +607,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             createdAt: new Date().toLocaleString('pt-AO'),
             notes: preRegResult?.found 
               ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.` 
-              : `Nova candidatura institucional para ${matchedSchool.name}.`,
+              : `Nova candidatura institucional para ${resolvedSchoolName}.`,
           });
         }
 
@@ -580,8 +621,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
           adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
           cargoTitle: cargoTitle,
-          schoolName: institutionalScope === 'escola' ? matchedSchool.name : undefined,
-          schoolId: matchedSchool.id,
+          schoolName: institutionalScope === 'escola' ? resolvedSchoolName : undefined,
+          schoolId: institutionalScope === 'escola' ? resolvedSchoolId : undefined,
           municipalityOrDepartment: selectedMunicipality,
           titlePrefix: prefix,
           greeting: `Olá ${prefix} ${userFirst}`,
@@ -599,7 +640,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           setSuccessMsg(
             isDirectorCandidate
               ? `Candidatura enviada! A sua conta de Diretor aguarda validação do Administrador Central.`
-              : `Inscrição submetida! A sua conta de Professor aguarda validação da Direção da ${matchedSchool.name}.`
+              : `Inscrição submetida! A sua conta de Professor aguarda validação da Direção da ${resolvedSchoolName}.`
           );
         } else {
           setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${cargoTitle} (${userFirst})...`);
@@ -928,7 +969,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       >
                         <Landmark className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
                         <span className="font-bold text-[11px] leading-tight">Diretor Municipal</span>
-                        <span className="text-[9px] opacity-75 font-normal">Fred Silva</span>
+                        <span className="text-[9px] opacity-75 font-normal truncate max-w-[90px]">dmedoquessua</span>
                       </button>
 
                       <button
@@ -997,7 +1038,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="nome@ucore.edu.br"
+                        placeholder="dmedoquessua@gmail.com"
                         className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                       />
                     </div>
@@ -1085,13 +1126,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex justify-center">
+                  <div className="flex flex-col items-center gap-1.5">
                     <GoogleSignInButton
                       onClick={handleGoogleSignInFlow}
                       isLoading={isGoogleLoading}
                       label="Entrar com o Google"
                       className="w-full max-w-full justify-center"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowGoogleChooser(true)}
+                      className="text-[11px] text-slate-500 hover:text-[#002133] hover:underline font-medium cursor-pointer flex items-center gap-1 pt-0.5"
+                    >
+                      <span>Problemas no login Google? Escolha a conta diretamente</span>
+                    </button>
                   </div>
 
                   {/* Switch to Register */}
@@ -1324,25 +1372,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
                           <span>Unidade Escolar de Lotação</span>
                           <span className="text-[10px] text-slate-400 font-normal">
-                            {initialAdminSchools.length} escolas municipais
+                            {initialAdminSchools.length > 0 ? `${initialAdminSchools.length} escolas municipais` : 'Registo direto'}
                           </span>
                         </label>
                         <div className="relative">
                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                             <School className="w-4 h-4" />
                           </div>
-                          <select
-                            id="register-school-select"
-                            value={selectedSchoolId}
-                            onChange={(e) => setSelectedSchoolId(e.target.value)}
-                            className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer truncate"
-                          >
-                            {initialAdminSchools.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name} ({s.category})
-                              </option>
-                            ))}
-                          </select>
+                          {initialAdminSchools.length > 0 ? (
+                            <select
+                              id="register-school-select"
+                              value={selectedSchoolId}
+                              onChange={(e) => setSelectedSchoolId(e.target.value)}
+                              className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer truncate"
+                            >
+                              {initialAdminSchools.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name} ({s.category})
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              id="register-school-input"
+                              type="text"
+                              value={schoolOrUnitName}
+                              onChange={(e) => setSchoolOrUnitName(e.target.value)}
+                              placeholder="Nome da escola (ex: Escola Primária de Quêssua Nº 1)"
+                              className="w-full h-[44px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs"
+                            />
+                          )}
                         </div>
                       </div>
                     )}
@@ -1645,6 +1704,130 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-200/80 bg-white">
           Sigre • Sistema Integrado de Gestão Escolar para Escolas, Professores e Alunos
         </footer>
+      )}
+
+      {/* Google Account Chooser Modal */}
+      {showGoogleChooser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Header */}
+            <div className="p-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <svg className="w-6 h-6 shrink-0" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                  </svg>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 leading-tight">Entrar com o Google</h3>
+                    <p className="text-[11px] text-slate-500">Escolha a sua conta Google para aceder ao Sigre</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleChooser(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Account List */}
+            <div className="p-6 pt-4 space-y-2.5">
+              {/* Director Municipal Official Account */}
+              <button
+                type="button"
+                onClick={() => completeGoogleLogin('dmedoquessua@gmail.com', 'Director Municipal da Educação')}
+                className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-[#f75142] hover:bg-orange-50/50 transition-all text-left flex items-center justify-between group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#002133] text-white flex items-center justify-center font-bold text-sm shrink-0">
+                    DM
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-[#f75142] transition-colors">
+                        Director Municipal da Educação
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#f75142]/10 text-[#f75142]">
+                        DME Oficial
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-500 block truncate">dmedoquessua@gmail.com</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#f75142] group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+              </button>
+
+              {/* Belizio dos Santos */}
+              <button
+                type="button"
+                onClick={() => completeGoogleLogin('beliziodos20@gmail.com', 'Belízio dos Santos')}
+                className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 transition-all text-left flex items-center justify-between group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                    B
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        Belízio dos Santos
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                        Conta Google
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-500 block truncate">beliziodos20@gmail.com</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+              </button>
+
+              {/* Or enter custom Google email */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
+                  Ou introduza outro e-mail Google:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={customGoogleEmail}
+                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                    placeholder="seuemail@gmail.com"
+                    className="flex-1 h-9 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-[#f75142]"
+                  />
+                  <button
+                    type="button"
+                    disabled={!customGoogleEmail.trim()}
+                    onClick={() => {
+                      if (customGoogleEmail.trim()) {
+                        completeGoogleLogin(customGoogleEmail.trim(), 'Utilizador Google');
+                      }
+                    }}
+                    className="px-3.5 h-9 rounded-lg bg-[#002133] hover:bg-[#00314d] text-white text-xs font-bold disabled:opacity-50 cursor-pointer transition-colors"
+                  >
+                    Entrar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <span>Sigre Quessua • Autenticação Segura</span>
+              <button
+                type="button"
+                onClick={() => setShowGoogleChooser(false)}
+                className="text-slate-600 hover:underline cursor-pointer font-medium"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

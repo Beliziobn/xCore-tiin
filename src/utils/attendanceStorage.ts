@@ -31,84 +31,9 @@ const STUDENT_STORAGE_KEY = 'ucore_student_attendance_records_v2';
 const TEACHER_STORAGE_KEY = 'ucore_teacher_attendance_records_v2';
 
 // Initial demonstration records for realistic pre-locked audit trail
-const initialStudentRecords: StudentAttendanceRecord[] = [
-  {
-    id: 'att-stu-seed-1',
-    studentId: '1',
-    studentName: 'Albert Silveira',
-    turma: 'Turma A',
-    date: '2026-09-04',
-    status: 'presente',
-    recordedAt: '2026-09-04T08:15:22.000Z',
-    recordedBy: 'Prof. Santar Goes',
-    isLocked: true,
-  },
-  {
-    id: 'att-stu-seed-2',
-    studentId: '2',
-    studentName: 'Beatriz Costa',
-    turma: 'Turma A',
-    date: '2026-09-04',
-    status: 'presente',
-    recordedAt: '2026-09-04T08:15:35.000Z',
-    recordedBy: 'Prof. Santar Goes',
-    isLocked: true,
-  },
-  {
-    id: 'att-stu-seed-3',
-    studentId: '3',
-    studentName: 'Carlos Manuel',
-    turma: 'Turma A',
-    date: '2026-09-04',
-    status: 'falta',
-    justified: true,
-    observacao: 'Consulta médica apresentada pelo encarregado',
-    recordedAt: '2026-09-04T08:16:10.000Z',
-    recordedBy: 'Prof. Santar Goes',
-    isLocked: true,
-  },
-];
+const initialStudentRecords: StudentAttendanceRecord[] = [];
 
-const initialTeacherRecords: TeacherAttendanceRecord[] = [
-  {
-    id: 'att-tch-seed-1',
-    teacherId: 'prof-1',
-    teacherName: 'Santar Goes',
-    schoolName: 'Escola Modelo Central',
-    date: '2026-09-04',
-    status: 'presente',
-    shift: 'Manhã',
-    recordedAt: '2026-09-04T07:45:10.000Z',
-    recordedBy: 'Diretor Fert Horlan',
-    isLocked: true,
-  },
-  {
-    id: 'att-tch-seed-2',
-    teacherId: 'prof-2',
-    teacherName: 'Maria Helena Santos',
-    schoolName: 'Escola Modelo Central',
-    date: '2026-09-04',
-    status: 'presente',
-    shift: 'Manhã',
-    recordedAt: '2026-09-04T07:46:02.000Z',
-    recordedBy: 'Diretor Fert Horlan',
-    isLocked: true,
-  },
-  {
-    id: 'att-tch-seed-3',
-    teacherId: 'prof-3',
-    teacherName: 'Joaquim Nzinga',
-    schoolName: 'Escola Modelo Central',
-    date: '2026-09-04',
-    status: 'falta',
-    justified: true,
-    observacao: 'Participação no seminário pedagógico municipal',
-    shift: 'Tarde',
-    recordedAt: '2026-09-04T13:05:40.000Z',
-    recordedBy: 'Diretor Fert Horlan',
-    isLocked: true,
-  },
-];
+const initialTeacherRecords: TeacherAttendanceRecord[] = [];
 
 export function getStoredStudentAttendance(): StudentAttendanceRecord[] {
   try {
@@ -120,7 +45,7 @@ export function getStoredStudentAttendance(): StudentAttendanceRecord[] {
   } catch (err) {
     console.warn('Erro ao carregar registros de presença de alunos:', err);
   }
-  return initialStudentRecords;
+  return [];
 }
 
 export function saveStudentAttendanceRecord(record: StudentAttendanceRecord): StudentAttendanceRecord[] {
@@ -195,7 +120,7 @@ export function getStoredTeacherAttendance(): TeacherAttendanceRecord[] {
   } catch (err) {
     console.warn('Erro ao carregar registros de presença de professores:', err);
   }
-  return initialTeacherRecords;
+  return [];
 }
 
 export function saveTeacherAttendanceRecord(record: TeacherAttendanceRecord): TeacherAttendanceRecord[] {

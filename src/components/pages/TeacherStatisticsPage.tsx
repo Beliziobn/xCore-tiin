@@ -34,15 +34,15 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
     setIsDrillDownOpen(true);
   };
 
-  // Global counts matching 7.png
+  // Global counts matching clean slate
   const globalCounts = {
-    total: 5051,
-    meninas: 4310,
-    meninos: 741,
-    semDocMeninas: 4310,
-    semDocMeninos: 741,
-    comDocMeninas: 4310,
-    comDocMeninos: 741,
+    total: 0,
+    meninas: 0,
+    meninos: 0,
+    semDocMeninas: 0,
+    semDocMeninos: 0,
+    comDocMeninas: 0,
+    comDocMeninos: 0,
   };
 
   const isGlobal = dataView === 'global';
@@ -68,7 +68,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
             Painel do Professor
           </span>
           <span className="text-xs font-bold text-slate-500">
-            Turma 1 • 4ª Classe • Sala 04
+            Turma a Atribuir • Ensino Primário
           </span>
         </div>
 
@@ -82,7 +82,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Padrão 7.png (Rede)
+            Rede ({effectiveStudents.length} Alunos)
           </button>
           <button
             onClick={() => setDataView('turma')}
@@ -92,7 +92,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Minha Turma Real ({effectiveStudents.length} Alunos)
+            Minha Turma ({effectiveStudents.length} Alunos)
           </button>
         </div>
       </div>
@@ -114,7 +114,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           card={{
             id: 'alunos',
             title: 'Nº Alunos',
-            value: String(effectiveStudents.length || 46),
+            value: String(effectiveStudents.length),
             icon: 'users',
             isClickable: true,
             actionText: 'Ver mais',
@@ -127,7 +127,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           card={{
             id: 'turmas',
             title: 'Nº Turmas',
-            value: '1',
+            value: '0',
             icon: 'home',
             isClickable: false,
             subtitle: 'Turma atribuída ao docente',
@@ -138,7 +138,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           card={{
             id: 'minha-turma',
             title: 'Minha Turma',
-            value: '1',
+            value: '---',
             icon: 'home',
             isClickable: true,
             actionText: 'Ver mais',
@@ -151,10 +151,10 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           card={{
             id: 'classe',
             title: 'Classe',
-            value: '4ª',
+            value: '---',
             icon: 'flag',
             isClickable: false,
-            subtitle: 'Ensino Primário Regular',
+            subtitle: 'Aguardando atribuição',
           }}
         />
       </div>
@@ -184,12 +184,11 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           {/* Chart 2: Desempenho dos alunos (Semestres) */}
           <PerformanceBarChart
             data={[
-              { period: '2017.1', aprovacao: 69, reprovacao: 31, distincao: 10, regular: 22, recuperacao: 14, totalAvaliados: 46 },
-              { period: '2017.2', aprovacao: 76, reprovacao: 24, distincao: 12, regular: 23, recuperacao: 11, totalAvaliados: 46 },
-              { period: '2018.1', aprovacao: 72, reprovacao: 28, distincao: 11, regular: 22, recuperacao: 13, totalAvaliados: 46 },
-              { period: '2018.2', aprovacao: 89, reprovacao: 11, distincao: 20, regular: 21, recuperacao: 5, totalAvaliados: 46 },
-              { period: '2019.1', aprovacao: 79, reprovacao: 21, distincao: 14, regular: 22, recuperacao: 10, totalAvaliados: 46 },
-              { period: '2019.2', aprovacao: 81, reprovacao: 19, distincao: 15, regular: 22, recuperacao: 9, totalAvaliados: 46 },
+              { period: '2022.1', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+              { period: '2023.1', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+              { period: '2024.1', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+              { period: '2025.1', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+              { period: '2026.1', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
             ]}
             title="Desempenho Acadêmico"
             badgeText="Desempenho dos alunos"
@@ -208,12 +207,11 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
           {/* Chart 3: Presença (EAD vs Presencial) */}
           <AttendanceAreaChart
             data={[
-              { year: '2017', presencial: 96, ead: 65, totalPresentes: 44, totalFaltas: 2, detalhe: '44 alunos frequentes regulares' },
-              { year: '2018', presencial: 95, ead: 70, totalPresentes: 43, totalFaltas: 3, detalhe: '43 alunos frequentes regulares' },
-              { year: '2019', presencial: 96, ead: 82, totalPresentes: 44, totalFaltas: 2, detalhe: '44 alunos frequentes regulares' },
-              { year: '2021', presencial: 97, ead: 75, totalPresentes: 45, totalFaltas: 1, detalhe: '45 alunos frequentes regulares' },
-              { year: '2023', presencial: 96, ead: 68, totalPresentes: 44, totalFaltas: 2, detalhe: '44 alunos frequentes regulares' },
-              { year: '2026', presencial: 98, ead: 65, totalPresentes: 45, totalFaltas: 1, detalhe: '45 alunos frequentes regulares' },
+              { year: '2022', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos frequentes' },
+              { year: '2023', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos frequentes' },
+              { year: '2024', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos frequentes' },
+              { year: '2025', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos frequentes' },
+              { year: '2026', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos frequentes' },
             ]}
             title="Frequência & Presença"
             badgeText="Presença"

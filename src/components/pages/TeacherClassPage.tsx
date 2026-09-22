@@ -51,7 +51,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
     if (student.grades && student.grades.length > 0) {
       return student.grades.reduce((acc, g) => acc + g.media, 0) / student.grades.length;
     }
-    return 14.0;
+    return 0;
   };
 
   const getStudentMedia = (student: StudentProfile): string => {
@@ -114,39 +114,41 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
     students.forEach((s) => {
       const m = s.grades && s.grades.length > 0
         ? s.grades.reduce((acc, g) => acc + g.media, 0) / s.grades.length
-        : 14.0;
-      const p = s.presencaPercent ?? 100;
+        : 0;
+      const p = s.presencaPercent ?? 0;
 
       // Faixas de média
       if (m >= 16) excelenteCount++;
       else if (m >= 14) bomCount++;
       else if (m >= 10) suficienteCount++;
-      else insuficienteCount++;
+      else if (m > 0) insuficienteCount++;
 
       // Assiduidade
       if (p >= 90) altaPresencaCount++;
       else if (p >= 75) regularPresencaCount++;
-      else criticaPresencaCount++;
+      else if (p > 0) criticaPresencaCount++;
 
       // Status de aprovação
-      if (m < 10) reprovadosCount++;
+      if (m === 0) {
+        // Sem notas ainda
+      } else if (m < 10) reprovadosCount++;
       else if (m < 10.5 || p < 75) riscoCount++;
       else aprovadosCount++;
     });
 
     const avgPresencaRaw = total > 0
-      ? students.reduce((acc, s) => acc + (s.presencaPercent ?? 95), 0) / total
-      : 95;
+      ? students.reduce((acc, s) => acc + (s.presencaPercent ?? 0), 0) / total
+      : 0;
     const avgPresencaFormatted = avgPresencaRaw.toFixed(1).replace('.', ',');
 
     const avgGeralRaw = total > 0
       ? students.reduce((acc, s) => {
           const sAvg = s.grades && s.grades.length > 0
             ? s.grades.reduce((a, g) => a + g.media, 0) / s.grades.length
-            : 14.0;
+            : 0;
           return acc + sAvg;
         }, 0) / total
-      : 16.5;
+      : 0;
     const avgGeralFormatted = avgGeralRaw.toFixed(1).replace('.', ',');
 
     return { 
@@ -367,7 +369,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
             Manhã · Sala 04 · Pavilhão A · Ano letivo 2026
           </p>
           <p className="text-xs text-slate-500 font-semibold mt-0.5">
-            Professor titular: <span className="text-slate-800 font-bold">Santar Goes</span>
+            Docente titular: <span className="text-slate-800 font-bold">Professor(a) Regente</span>
           </p>
         </div>
 

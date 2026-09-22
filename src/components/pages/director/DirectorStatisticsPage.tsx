@@ -77,7 +77,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             card={{
               id: 'alunos',
               title: 'Nº Alunos',
-              value: '489',
+              value: '0',
               icon: 'users',
               isClickable: true,
               actionText: 'Ver mais',
@@ -90,7 +90,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             card={{
               id: 'turmas',
               title: 'Nº Turmas',
-              value: '14',
+              value: '0',
               icon: 'home',
               isClickable: false,
               subtitle: 'Turmas Ativas na Unidade',
@@ -101,7 +101,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             card={{
               id: 'salas',
               title: 'Salas',
-              value: '11',
+              value: '0',
               icon: 'home',
               isClickable: true,
               actionText: 'Ver mais',
@@ -114,7 +114,7 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
             card={{
               id: 'professores',
               title: 'Professores',
-              value: '23',
+              value: '0',
               icon: 'user',
               isClickable: true,
               actionText: 'Ver mais',
@@ -146,16 +146,16 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
               }}
             />
 
-            {/* Chart 2: [Desempenho dos alunos] (2017.1 to 2019.2) */}
+            {/* Chart 2: [Desempenho dos alunos] */}
             <PerformanceBarChart
               data={directorStatsData.academicPerformance.map((item) => ({
                 period: item.semester,
                 aprovacao: item.approval,
                 reprovacao: item.reproval,
-                distincao: Math.round(item.approval * 0.25),
-                regular: Math.round(item.approval * 0.75),
-                recuperacao: item.reproval,
-                totalAvaliados: 489,
+                distincao: 0,
+                regular: 0,
+                recuperacao: 0,
+                totalAvaliados: 0,
               }))}
               title="Desempenho da Unidade"
               badgeText="Desempenho dos alunos"
@@ -171,20 +171,19 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
               }}
             />
 
-            {/* Chart 3: [Presença] (EAD vs Presencial Trend lines / Area) */}
+            {/* Chart 3: [Presença] */}
             <AttendanceAreaChart
               data={[
-                { year: '2009', presencial: 95, ead: 60, totalPresentes: 465, totalFaltas: 24, detalhe: '465 alunos presentes em média' },
-                { year: '2013', presencial: 94, ead: 65, totalPresentes: 460, totalFaltas: 29, detalhe: '460 alunos presentes em média' },
-                { year: '2016', presencial: 95, ead: 75, totalPresentes: 465, totalFaltas: 24, detalhe: '465 alunos presentes em média' },
-                { year: '2019', presencial: 96, ead: 80, totalPresentes: 470, totalFaltas: 19, detalhe: '470 alunos presentes em média' },
-                { year: '2023', presencial: 97, ead: 72, totalPresentes: 474, totalFaltas: 15, detalhe: '474 alunos presentes em média' },
-                { year: '2026', presencial: 98, ead: 70, totalPresentes: 479, totalFaltas: 10, detalhe: '479 alunos presentes em média' },
+                { year: '2022', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos presentes' },
+                { year: '2023', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos presentes' },
+                { year: '2024', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos presentes' },
+                { year: '2025', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos presentes' },
+                { year: '2026', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: '0 alunos presentes' },
               ]}
               title="Presença & Assiduidade"
               badgeText="Presença"
               subtitle="Controle diário de assiduidade na escola"
-              averageRate={97.2}
+              averageRate={0}
               onOpenDrillDown={(period) => {
                 openFilter({
                   type: 'attendance',
@@ -200,12 +199,12 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {/* Chart 4: Alunos sem documentos */}
             <DocumentStatusChart
-              totalWithDocs={4310}
-              totalWithoutDocs={741}
-              femaleWithDocs={4310}
+              totalWithDocs={0}
+              totalWithoutDocs={0}
+              femaleWithDocs={0}
               maleWithDocs={0}
               femaleWithoutDocs={0}
-              maleWithoutDocs={741}
+              maleWithoutDocs={0}
               title="Pendências Documentais"
               badgeText="Alunos sem documentos"
               subtitle="Alunos em processo de emissão de cédula ou BI"
@@ -222,12 +221,12 @@ export const DirectorStatisticsPage: React.FC<DirectorStatisticsPageProps> = ({
 
             {/* Chart 5: Alunos com documentos */}
             <DocumentStatusChart
-              totalWithDocs={4310}
-              totalWithoutDocs={741}
-              femaleWithDocs={4310}
+              totalWithDocs={0}
+              totalWithoutDocs={0}
+              femaleWithDocs={0}
               maleWithDocs={0}
               femaleWithoutDocs={0}
-              maleWithoutDocs={741}
+              maleWithoutDocs={0}
               title="Regularidade Registral"
               badgeText="Alunos com documentos"
               subtitle="Documentação completa validada pela secretaria"

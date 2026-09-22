@@ -125,7 +125,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
       const sum = filterStats.filteredSchools.reduce((acc, s) => acc + s.attendanceRate, 0);
       return Number((sum / filterStats.filteredSchools.length).toFixed(1));
     }
-    return 95.8;
+    return 0;
   }, [filterStats.filteredStudents, filterStats.filteredSchools]);
 
   // Overall approval rate for filtered cohort
@@ -141,34 +141,34 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
       const sum = filterStats.filteredSchools.reduce((acc, s) => acc + s.performanceRate, 0);
       return Math.round(sum / filterStats.filteredSchools.length);
     }
-    return 80;
+    return 0;
   }, [filterStats.filteredStudents, filterStats.filteredSchools]);
 
   // Performance Chart Data adapted for filter period & scope
   const performanceChartData = useMemo(() => {
     const approval = overallApprovalRate;
-    const reproval = Math.max(0, 100 - approval);
+    const reproval = approval > 0 ? Math.max(0, 100 - approval) : 0;
 
     if (filters.periodType === 'trimestre') {
       return [
-        { period: '1º Trimestre', aprovacao: Math.min(100, Math.round(approval * 0.94)), reprovacao: Math.max(0, 100 - Math.round(approval * 0.94)) },
-        { period: '2º Trimestre', aprovacao: Math.min(100, Math.round(approval * 0.98)), reprovacao: Math.max(0, 100 - Math.round(approval * 0.98)) },
+        { period: '1º Trimestre', aprovacao: Math.min(100, Math.round(approval * 0.94)), reprovacao: approval > 0 ? Math.max(0, 100 - Math.round(approval * 0.94)) : 0 },
+        { period: '2º Trimestre', aprovacao: Math.min(100, Math.round(approval * 0.98)), reprovacao: approval > 0 ? Math.max(0, 100 - Math.round(approval * 0.98)) : 0 },
         { period: '3º Trimestre', aprovacao: approval, reprovacao: reproval },
       ];
     }
     if (filters.periodType === 'semestre') {
       return [
-        { period: '1º Semestre', aprovacao: Math.min(100, Math.round(approval * 0.95)), reprovacao: Math.max(0, 100 - Math.round(approval * 0.95)) },
+        { period: '1º Semestre', aprovacao: Math.min(100, Math.round(approval * 0.95)), reprovacao: approval > 0 ? Math.max(0, 100 - Math.round(approval * 0.95)) : 0 },
         { period: '2º Semestre', aprovacao: approval, reprovacao: reproval },
       ];
     }
-    // Default 6-period historical trend scaled to current filter
+    // Default historical trend scaled to current filter
     return historicalSchoolPerformance.slice(0, 6).map((item) => {
-      const blendedApproval = Math.min(100, Math.round((item.aprovacao + approval) / 2));
+      const blendedApproval = approval > 0 ? Math.min(100, Math.round((item.aprovacao + approval) / 2)) : 0;
       return {
         period: item.period,
         aprovacao: blendedApproval,
-        reprovacao: Math.max(0, 100 - blendedApproval),
+        reprovacao: blendedApproval > 0 ? Math.max(0, 100 - blendedApproval) : 0,
       };
     });
   }, [filters.periodType, overallApprovalRate]);
@@ -176,12 +176,12 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
   // Attendance Chart Data adapted for filter scope
   const attendanceChartData = useMemo(() => {
     const curPresencial = averageAttendanceRate;
-    const curEad = Math.min(100, Math.round(curPresencial * 0.73));
+    const curEad = curPresencial > 0 ? Math.min(100, Math.round(curPresencial * 0.73)) : 0;
 
     return historicalAttendanceTrends.map((t) => ({
       year: t.year,
-      presencial: Math.min(100, Math.round((t.presencial * 5.0 + curPresencial) / 2)),
-      ead: Math.min(100, Math.round((t.ead * 2.8 + curEad) / 2)),
+      presencial: curPresencial > 0 ? Math.min(100, Math.round((t.presencial * 5.0 + curPresencial) / 2)) : 0,
+      ead: curEad > 0 ? Math.min(100, Math.round((t.ead * 2.8 + curEad) / 2)) : 0,
     }));
   }, [averageAttendanceRate]);
 

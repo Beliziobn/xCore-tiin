@@ -16,7 +16,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   isLoggedIn,
 }) => {
   const [rooms, setRooms] = useState<DirectorRoom[]>(initialRooms);
-  const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[2]?.id || 'room-3'); // default Sala 03
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -37,20 +37,20 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   }, [rooms, searchQuery, typeFilter]);
 
   const currentRoom =
-    rooms.find((r) => r.id === selectedRoomId) || filteredRooms[0] || rooms[0];
+    rooms.find((r) => r.id === selectedRoomId) || filteredRooms[0] || rooms[0] || null;
 
   const handleCreateSuccess = (newRoom: any) => {
     const formatted: DirectorRoom = {
       id: newRoom.id,
       roomNumber: newRoom.name.startsWith('Sala') ? newRoom.name : `Sala ${newRoom.name}`,
-      name: `Sala de Aula ${newRoom.gradeClass}`,
-      turmasCount: 2,
-      turmas: [`${newRoom.gradeClass} ${newRoom.turma}`],
+      name: `Sala de Aula ${newRoom.gradeClass || ''}`,
+      turmasCount: 0,
+      turmas: newRoom.turma ? [`${newRoom.gradeClass || ''} ${newRoom.turma}`] : [],
       period: newRoom.period === 'Tarde' ? 'Tarde' : 'Manhã / Tarde',
-      classes: [newRoom.gradeClass],
-      teachers: ['Prof. Regente Alocado'],
-      capacity: newRoom.studentCount || 45,
-      currentStudents: 42,
+      classes: newRoom.gradeClass ? [newRoom.gradeClass] : [],
+      teachers: [],
+      capacity: newRoom.studentCount || 0,
+      currentStudents: 0,
       status: 'Ativa',
       type: newRoom.type || 'Regular',
     };
@@ -94,7 +94,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
                   }}
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
                 >
-                  Todas as Salas (11)
+                  Todas as Salas ({rooms.length})
                 </button>
                 <button
                   onClick={() => {
@@ -187,7 +187,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
             size="sm"
             card={{
               id: 'salas',
-              title: currentRoom?.roomNumber || 'Sala 03',
+              title: currentRoom?.roomNumber || 'Salas',
               value: String(rooms.length),
               isClickable: false,
               subtitle: 'Total de Salas Ativas',
@@ -199,9 +199,9 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
             card={{
               id: 'turmas',
               title: 'Nº Turmas',
-              value: String(currentRoom?.turmasCount || 2),
+              value: String(currentRoom?.turmasCount || 0),
               isClickable: false,
-              subtitle: '16 Turmas distribuídas',
+              subtitle: `${currentRoom?.turmasCount || 0} Turmas distribuídas`,
             }}
           />
           <StatCardItem
@@ -210,7 +210,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
             card={{
               id: 'capacidade',
               title: 'Capacidade',
-              value: String(currentRoom?.capacity || 46),
+              value: String(currentRoom?.capacity || 0),
               isClickable: true,
               actionText: 'Ver mais',
               subtitle: 'Lotação máxima sala',
@@ -225,9 +225,9 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
             card={{
               id: 'periodo',
               title: 'Periodo',
-              value: currentRoom?.period?.split(' ')[0] || 'Manhã',
+              value: currentRoom ? currentRoom.period?.split(' ')[0] || '---' : '---',
               isClickable: false,
-              subtitle: currentRoom?.period || 'Manhã / Tarde',
+              subtitle: currentRoom?.period || 'Aguardando salas',
             }}
           />
           <StatCardItem
@@ -236,60 +236,76 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
             card={{
               id: 'professores',
               title: 'Professores',
-              value: String(currentRoom?.teachers.length || 1),
+              value: String(currentRoom?.teachers?.length || 0),
               isClickable: false,
-              subtitle: currentRoom?.teachers[0] || 'Corpo Docente',
+              subtitle: currentRoom?.teachers?.[0] || 'Nenhum docente alocado',
             }}
           />
         </div>
 
         {/* Detailed Room Specifications Panel */}
         <div id="room-specs-section" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#f75142]">
-                Ficha Técnica da Sala
-              </span>
-              <h3 className="text-xl font-black text-slate-900 mt-0.5">
-                {currentRoom?.roomNumber} • {currentRoom?.name}
-              </h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold">
-                {currentRoom?.status || 'Ativa'}
-              </span>
-              <span className="text-xs bg-[#fef2f1] text-[#e04436] border border-[#fee4e2] px-3 py-1 rounded-full font-bold">
-                {currentRoom?.type}
-              </span>
-            </div>
-          </div>
+          {currentRoom ? (
+            <>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#f75142]">
+                    Ficha Técnica da Sala
+                  </span>
+                  <h3 className="text-xl font-black text-slate-900 mt-0.5">
+                    {currentRoom.roomNumber} • {currentRoom.name}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold">
+                    {currentRoom.status || 'Ativa'}
+                  </span>
+                  <span className="text-xs bg-[#fef2f1] text-[#e04436] border border-[#fee4e2] px-3 py-1 rounded-full font-bold">
+                    {currentRoom.type}
+                  </span>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-5 text-xs text-slate-600">
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Turmas Atendidas</span>
-              <ul className="space-y-1 font-semibold text-slate-800">
-                {currentRoom?.turmas.map((t, idx) => (
-                  <li key={idx} className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#f75142]" />
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Ocupação & Carteiras</span>
-              <p className="font-semibold text-slate-800">
-                {currentRoom?.currentStudents} alunos frequentes de {currentRoom?.capacity} lugares disponíveis (
-                {Math.round(((currentRoom?.currentStudents || 42) / (currentRoom?.capacity || 46)) * 100)}% de ocupação).
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-5 text-xs text-slate-600">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Turmas Atendidas</span>
+                  {currentRoom.turmas?.length > 0 ? (
+                    <ul className="space-y-1 font-semibold text-slate-800">
+                      {currentRoom.turmas.map((t, idx) => (
+                        <li key={idx} className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#f75142]" />
+                          <span>{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-slate-400 italic">Nenhuma turma atribuída</p>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Ocupação & Carteiras</span>
+                  <p className="font-semibold text-slate-800">
+                    {currentRoom.currentStudents} alunos frequentes de {currentRoom.capacity} lugares disponíveis (
+                    {currentRoom.capacity > 0 ? Math.round((currentRoom.currentStudents / currentRoom.capacity) * 100) : 0}% de ocupação).
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Equipamentos & Recursos</span>
+                  <p className="font-semibold text-slate-800">
+                    Quadro branco magnético, iluminação natural LED, ventilação cruzada, armários pedagógicos e ponto de rede Sigre.
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <Home className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <p className="font-bold text-slate-700 text-sm">Nenhuma sala cadastrada</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Ainda não existem salas de aula adicionadas. Clique em "Cadastrar Sala" acima para iniciar o lançamento.
               </p>
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Equipamentos & Recursos</span>
-              <p className="font-semibold text-slate-800">
-                Quadro branco magnético, iluminação natural LED, ventilação cruzada, armários pedagógicos e ponto de rede Sigre.
-              </p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

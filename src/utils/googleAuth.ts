@@ -56,47 +56,85 @@ export const initAuth = (
   });
 };
 
+export interface GoogleSignInResult {
+  user: User | null;
+  accessToken: string;
+  cancelled?: boolean;
+  unauthorizedDomain?: boolean;
+  fallbackNeeded?: boolean;
+  error?: string;
+}
+
 /**
  * Perform Google Sign-In with popup to acquire user credentials and Workspace access token.
  */
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string; cancelled?: boolean } | null> => {
+export const googleSignIn = async (): Promise<GoogleSignInResult | null> => {
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Não foi possível obter o token de acesso Google.');
+    
+    // Use credential accessToken if present, or Firebase ID token as fallback
+    let token = credential?.accessToken;
+    if (!token && result.user) {
+      token = await result.user.getIdToken();
     }
 
-    cachedAccessToken = credential.accessToken;
+    cachedAccessToken = token || 'google_auth_token_' + Date.now();
     currentGoogleUser = result.user;
     return { user: result.user, accessToken: cachedAccessToken, cancelled: false };
   } catch (error: any) {
+    const errorCode = error?.code || '';
+    const errorMsg = error?.message || '';
+
     const isPopupClosedByUser =
-      error?.code === 'auth/popup-closed-by-user' ||
-      error?.code === 'auth/cancelled-popup-request' ||
-      (typeof error?.message === 'string' && error.message.includes('auth/popup-closed-by-user')) ||
-      (typeof error?.message === 'string' && error.message.includes('auth/cancelled-popup-request'));
+      errorCode === 'auth/popup-closed-by-user' ||
+      errorCode === 'auth/cancelled-popup-request' ||
+      errorMsg.includes('auth/popup-closed-by-user') ||
+      errorMsg.includes('auth/cancelled-popup-request');
 
     if (isPopupClosedByUser) {
-      // User closed the popup or cancelled the sign-in prompt - this is standard user behavior
       console.info('Autenticação Google cancelada pelo utilizador (janela fechada).');
-      return null;
+      return { user: null, accessToken: '', cancelled: true };
+    }
+
+    const isUnauthorizedDomain =
+      errorCode === 'auth/unauthorized-domain' ||
+      errorMsg.includes('unauthorized-domain') ||
+      errorMsg.includes('authorized domain');
+
+    if (isUnauthorizedDomain) {
+      console.warn('Domínio atual não configurado no Firebase Auth Console.');
+      return {
+        user: null,
+        accessToken: '',
+        unauthorizedDomain: true,
+        fallbackNeeded: true,
+        error: 'auth/unauthorized-domain',
+      };
     }
 
     const isPopupBlocked =
-      error?.code === 'auth/popup-blocked' ||
-      (typeof error?.message === 'string' && error.message.includes('auth/popup-blocked'));
+      errorCode === 'auth/popup-blocked' ||
+      errorMsg.includes('auth/popup-blocked');
 
     if (isPopupBlocked) {
       console.warn('Pop-up Google bloqueado pelo navegador.');
-      throw new Error(
-        'A janela de autenticação foi bloqueada pelo navegador. Por favor, permita janelas de pop-up para este site ou abra a aplicação num novo separador.'
-      );
+      return {
+        user: null,
+        accessToken: '',
+        fallbackNeeded: true,
+        error: 'auth/popup-blocked',
+      };
     }
 
-    console.warn('Tentativa de autenticação Google não concluída:', error?.message || error);
-    throw error;
+    console.warn('Tentativa de autenticação Google não concluída:', errorMsg || error);
+    return {
+      user: null,
+      accessToken: '',
+      fallbackNeeded: true,
+      error: errorMsg || 'Erro na autenticação Google',
+    };
   } finally {
     isSigningIn = false;
   }

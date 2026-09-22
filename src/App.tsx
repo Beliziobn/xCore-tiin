@@ -145,6 +145,29 @@ export default function App() {
     subtitle: 'A sua solicitação foi recebida e registada na plataforma Sigre.',
   });
 
+  // Ensure clean slate on first load if old demo mock caches existed
+  if (typeof window !== 'undefined' && localStorage.getItem('sigre_clean_slate_active_v1') !== 'true') {
+    try {
+      const keysToClean = [
+        'ucore_admin_schools',
+        'ucore_admin_teachers',
+        'ucore_admin_students',
+        'ucore_admin_directors',
+        'ucore_teacher_students',
+        'ucore_teacher_profile',
+        'ucore_attendance_records',
+        'ucore_attendance_sessions',
+        'sigre_school_registrations',
+        'sigre_director_rooms',
+        'sigre_director_classes',
+      ];
+      keysToClean.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem('sigre_clean_slate_active_v1', 'true');
+    } catch {
+      // ignore
+    }
+  }
+
   // Admin dynamic state
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
     try {
@@ -195,15 +218,15 @@ export default function App() {
     const p = prompt.toLowerCase();
     if (p.includes('ponto') || p.includes('presen') || p.includes('falta') || p.includes('docente') || p.includes('professor')) {
       setHomeAIResponse(
-        `📊 Análise de Presenças (Livro de Ponto Docente):\n• Total de Professores: 23 docentes lotados na unidade.\n• Presentes: 22 docentes em regência de classe regular.\n• Falta Justificada: 1 docente (comprovativo médico homologado na secretaria).\n• Índice de Assiduidade: 95.7% no dia de hoje.`
+        `📊 Análise de Presenças (Livro de Ponto Docente):\n• Total de Professores Cadastrados: ${adminTeachers.length} docentes.\n• Presentes: 0 docentes.\n• Falta Justificada: 0 docentes.\n• O sistema está pronto para registo de novos docentes.`
       );
     } else if (p.includes('turma') || p.includes('aluno') || p.includes('sala')) {
       setHomeAIResponse(
-        `🎓 Panorama Discente & Turmas:\n• 489 alunos distribuídos por 16 turmas nos turnos da manhã e tarde.\n• Frequência discente média da unidade: 96.2%.\n• 11 salas operacionais com iluminação e ventilação certificadas.`
+        `🎓 Panorama Discente & Turmas:\n• ${adminStudents.length} alunos cadastrados em ${adminSchools.length} escolas ativas.\n• Sem pendências ou registros arquivados no momento.`
       );
     } else {
       setHomeAIResponse(
-        `✨ Parecer Institucional Inteligente Sigre:\nRecebido: "${prompt}".\nOs dados da Direção e da Secretaria Escolar de Quêssua encontram-se homologados e em total conformidade para o ano lectivo 2026/2027.`
+        `✨ Parecer Institucional Inteligente Sigre:\nRecebido: "${prompt}".\nA plataforma municipal da Educação de Quêssua está inicializada e pronta para novos cadastros no ano lectivo 2026/2027.`
       );
     }
   };
@@ -735,32 +758,42 @@ export default function App() {
     let demoUser: UserAccount;
     if (role === 'admin') {
       demoUser = {
-        id: 'user-fred-admin',
-        firstName: 'Fred',
-        lastName: 'Silva',
-        email: 'admin.fred@ucore.edu.br',
+        id: 'usr-dir-municipal-quessua',
+        firstName: 'Director Municipal',
+        lastName: 'da Educação',
+        email: 'dmedoquessua@gmail.com',
         role: 'admin',
-        greeting: 'Olá Admin. Fred',
+        scope: 'administracao',
+        adminRole: 'diretor_municipal',
+        cargoTitle: 'Director Municipal da Educação de Quessua',
+        schoolName: 'Direcção Municipal da Educação de Quessua',
+        municipalityOrDepartment: 'Quessua',
+        titlePrefix: 'Dr.',
+        greeting: 'Olá Dr. Director Municipal',
         rememberMe: true,
       };
     } else if (role === 'professor') {
       demoUser = {
-        id: 'user-santar-prof',
-        firstName: 'Santar',
-        lastName: 'Goes',
-        email: 'prof.santar@ucore.edu.br',
+        id: 'user-docente',
+        firstName: 'Professor(a)',
+        lastName: 'Docente',
+        email: 'professor@sigre.edu.ao',
         role: 'professor',
-        greeting: 'Olá Prof. Santar',
+        scope: 'escola',
+        cargoTitle: 'Professor(a) Titular',
+        greeting: 'Olá Professor(a)',
         rememberMe: true,
       };
     } else {
       demoUser = {
-        id: 'user-carl-diretor',
-        firstName: 'Carl',
-        lastName: 'Mendes',
-        email: 'diretor.carl@ucore.edu.br',
+        id: 'user-diretor-escola',
+        firstName: 'Diretor(a)',
+        lastName: 'Geral',
+        email: 'diretor@sigre.edu.ao',
         role: 'diretor',
-        greeting: 'Olá Diretor Carl',
+        scope: 'escola',
+        cargoTitle: 'Diretor(a) Geral da Escola',
+        greeting: 'Olá Diretor(a)',
         rememberMe: true,
       };
     }
