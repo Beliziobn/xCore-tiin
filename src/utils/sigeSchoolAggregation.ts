@@ -186,7 +186,7 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
     // Identificar alunos cadastrados para esta escola
     const realStudentsForSchool = students.filter(st => {
       const matchName = norm(st.schoolName) === norm(schoolName);
-      const matchId = st.schoolName === sc.id || (sc.code && norm(st.schoolName) === norm(sc.code));
+      const matchId = st.schoolName === sc.id || (sc.codigoSIGE && norm(st.schoolName) === norm(sc.codigoSIGE));
       return matchName || matchId;
     });
 

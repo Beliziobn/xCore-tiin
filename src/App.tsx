@@ -646,7 +646,7 @@ export default function App() {
       const totalStudents = adminSchools.reduce((acc, s) => acc + s.studentsWithDocs + s.studentsWithoutDocs, 0);
       const avgPerf = adminSchools.length > 0 
         ? Math.round(adminSchools.reduce((acc, s) => acc + s.performanceRate, 0) / adminSchools.length)
-        : 79;
+        : 0;
 
       computedBase = {
         ...base,
@@ -674,13 +674,13 @@ export default function App() {
         ...base,
         cards: base.cards.map((c) => {
           if (c.title.toLowerCase().includes('turma') || c.id.includes('turma')) {
-            return { ...c, value: '1' };
+            return { ...c, value: teacherStudents.length > 0 ? '1' : '0' };
           }
           if (c.title.toLowerCase().includes('aluno') || c.id.includes('aluno')) {
-            return { ...c, value: String(teacherStudents.length || 46) };
+            return { ...c, value: String(teacherStudents.length) };
           }
           if (c.title.toLowerCase().includes('desempenho') || c.title.toLowerCase().includes('estatística')) {
-            return { ...c, value: '88%' };
+            return { ...c, value: teacherStudents.length > 0 ? '88%' : '0%' };
           }
           return c;
         }),

@@ -171,7 +171,9 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
     { key: 'resultado', title: 'SITUAÇÃO', width: 28, align: 'center' as const },
   ];
 
-  const columns = isLandscape ? columnsGeneral : columnsSingleDiscipline;
+  const columns: { key: string; title: string; width: number; align: 'left' | 'center' | 'right' }[] = isLandscape
+    ? columnsGeneral
+    : columnsSingleDiscipline;
 
   // Pagination logic:
   // In Landscape, header takes ~46mm, bottom summary + signatures takes ~38mm.

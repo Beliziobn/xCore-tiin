@@ -30,8 +30,9 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
   isOpen,
   onClose,
   students,
-  metadata = {},
+  metadata,
 }) => {
+  const safeMetadata: PautaMetadata = metadata || {};
   const [mode, setMode] = useState<'geral' | 'disciplina'>('geral');
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>('Língua Portuguesa');
   const [isExporting, setIsExporting] = useState(false);
@@ -86,14 +87,14 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
       await exportPautaToPDF({
         students,
         metadata: {
-          escola: metadata.escola || 'Escola Primária Nº 1024 - Luanda Sul',
-          turma: metadata.turma || 'Turma 1',
-          classe: metadata.classe || '4ª Classe',
-          turno: metadata.turno || 'Manhã',
-          sala: metadata.sala || 'Sala 04',
-          anoLectivo: metadata.anoLectivo || '2026',
-          trimestre: metadata.trimestre || '1º Trimestre',
-          professorTitular: metadata.professorTitular || 'Santar Goes',
+          escola: safeMetadata.escola || 'Escola Primária Nº 1024 - Luanda Sul',
+          turma: safeMetadata.turma || 'Turma 1',
+          classe: safeMetadata.classe || '4ª Classe',
+          turno: safeMetadata.turno || 'Manhã',
+          sala: safeMetadata.sala || 'Sala 04',
+          anoLectivo: safeMetadata.anoLectivo || '2026',
+          trimestre: safeMetadata.trimestre || '1º Trimestre',
+          professorTitular: safeMetadata.professorTitular || 'Santar Goes',
         },
         mode,
         selectedDiscipline,

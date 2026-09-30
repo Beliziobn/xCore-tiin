@@ -43,113 +43,7 @@ export const TEAM_IMAGE_FALLBACKS: Record<string, string> = {
   "/team/daniel-antonio.jpg": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=400&auto=format&fit=crop",
 };
 
-export const defaultSchoolMembers: SchoolMember[] = [
-  {
-    id: "1",
-    name: "Ana Maria Fernandes",
-    role: "Diretora Geral",
-    photo: "/team/ana-maria.jpg",
-    department: "Direção Geral",
-    bio: "Responsável pela gestão geral da instituição, acompanhamento pedagógico e coordenação da equipa escolar no município do Quêssua.",
-    profileUrl: "#",
-    email: "ana.maria@educacao.gov.ao",
-    phone: "+244 923 100 201",
-  },
-  {
-    id: "2",
-    name: "Carlos Manuel Quiala",
-    role: "Professor de Matemática",
-    photo: "/team/carlos-manuel.jpg",
-    department: "Ciências Exatas",
-    subject: "Matemática",
-    bio: "Professor dedicado ao desenvolvimento do raciocínio lógico e da aprendizagem matemática dos estudantes.",
-    profileUrl: "#",
-    email: "carlos.manuel@educacao.gov.ao",
-    phone: "+244 924 200 302",
-  },
-  {
-    id: "3",
-    name: "João Sebastião Dala",
-    role: "Professor de Física",
-    photo: "/team/joao-sebastiao.jpg",
-    department: "Ciências Exatas",
-    subject: "Física",
-    bio: "Especialista em experimentos práticos e preparação de alunos para olimpíadas científicas.",
-    profileUrl: "#",
-    email: "joao.sebastiao@educacao.gov.ao",
-    phone: "+244 925 300 403",
-  },
-  {
-    id: "4",
-    name: "Maria José Neto",
-    role: "Coordenadora Pedagógica",
-    photo: "/team/maria-jose.jpg",
-    department: "Coordenação Pedagógica",
-    bio: "Lidera o planejamento curricular, formação contínua docente e planos de reforço escolar.",
-    profileUrl: "#",
-    email: "maria.jose@educacao.gov.ao",
-    phone: "+244 926 400 504",
-  },
-  {
-    id: "5",
-    name: "Pedro António Gaspar",
-    role: "Professor de Língua Portuguesa",
-    photo: "/team/pedro-antonio.jpg",
-    department: "Línguas e Humanidades",
-    subject: "Língua Portuguesa",
-    bio: "Focado em produção textual, oratória, incentivo à leitura e valorização da literatura angolana.",
-    profileUrl: "#",
-    email: "pedro.antonio@educacao.gov.ao",
-    phone: "+244 927 500 605",
-  },
-  {
-    id: "6",
-    name: "Isabel Domingos Canga",
-    role: "Professora de Biologia",
-    photo: "/team/isabel-domingos.jpg",
-    department: "Ciências Naturais",
-    subject: "Biologia",
-    bio: "Promove estudos sobre botânica, biodiversidade local da província de Malanje e educação ambiental.",
-    profileUrl: "#",
-    email: "isabel.domingos@educacao.gov.ao",
-    phone: "+244 928 600 706",
-  },
-  {
-    id: "7",
-    name: "Manuel Francisco Bumba",
-    role: "Diretor Pedagógico",
-    photo: "/team/manuel-francisco.jpg",
-    department: "Direção Pedagógica",
-    bio: "Coordenação dos conselhos pedagógicos, avaliação de desempenho escolar e articulação com as famílias.",
-    profileUrl: "#",
-    email: "manuel.francisco@educacao.gov.ao",
-    phone: "+244 929 700 807",
-  },
-  {
-    id: "8",
-    name: "Teresa Paulo Mendes",
-    role: "Professora de História",
-    photo: "/team/teresa-paulo.jpg",
-    department: "Ciências Humanas",
-    subject: "História",
-    bio: "Dedicada à preservação da memória histórica, patrimônio cultural nacional e história de África.",
-    profileUrl: "#",
-    email: "teresa.paulo@educacao.gov.ao",
-    phone: "+244 921 800 908",
-  },
-  {
-    id: "9",
-    name: "Daniel António Lemos",
-    role: "Professor de Química",
-    photo: "/team/daniel-antonio.jpg",
-    department: "Ciências Exatas",
-    subject: "Química",
-    bio: "Dinamizador de feiras de ciências e projetos experimentais em química aplicada.",
-    profileUrl: "#",
-    email: "daniel.antonio@educacao.gov.ao",
-    phone: "+244 922 900 109",
-  },
-];
+export const defaultSchoolMembers: SchoolMember[] = [];
 
 export default function SchoolTeamSection({
   members = defaultSchoolMembers,
@@ -205,42 +99,56 @@ export default function SchoolTeamSection({
       </motion.div>
 
       <div className="relative w-full">
-        {/* 3 Continuous animated rows */}
-        <div className="relative z-10 flex flex-col gap-5 overflow-hidden py-8 sm:gap-7 sm:py-10">
-          {rows.map((row, rowIndex) => (
-            <motion.div
-              key={rowIndex}
-              className="flex min-w-max items-center gap-4 px-4 sm:gap-6"
-              animate={{
-                x:
-                  rowIndex % 2 === 0
-                    ? ["0%", "-28%"]
-                    : ["-28%", "0%"],
-              }}
-              transition={{
-                duration: 42 + rowIndex * 4,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-            >
-              {[...row, ...row, ...row, ...row].map((member, index) => {
-                const colIndex = index % row.length;
-                const staggerOrder = colIndex * 3 + rowIndex;
-                const cardDelay = Math.min(staggerOrder * 0.055 + 0.1, 0.75);
+        {rows.length === 0 ? (
+          <div className="mx-auto max-w-xl px-5 py-8 text-center">
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-8 shadow-2xs">
+              <GraduationCap className="mx-auto mb-3 h-8 w-8 text-slate-400" />
+              <p className="text-sm font-bold text-slate-700">
+                Nenhum professor cadastrado no momento
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Assim que novos docentes forem registados e homologados na plataforma, os seus perfis aparecerão aqui.
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* 3 Continuous animated rows */
+          <div className="relative z-10 flex flex-col gap-5 overflow-hidden py-8 sm:gap-7 sm:py-10">
+            {rows.map((row, rowIndex) => (
+              <motion.div
+                key={rowIndex}
+                className="flex min-w-max items-center gap-4 px-4 sm:gap-6"
+                animate={{
+                  x:
+                    rowIndex % 2 === 0
+                      ? ["0%", "-28%"]
+                      : ["-28%", "0%"],
+                }}
+                transition={{
+                  duration: 42 + rowIndex * 4,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              >
+                {[...row, ...row, ...row, ...row].map((member, index) => {
+                  const colIndex = index % row.length;
+                  const staggerOrder = colIndex * 3 + rowIndex;
+                  const cardDelay = Math.min(staggerOrder * 0.055 + 0.1, 0.75);
 
-                return (
-                  <MemberCapsule
-                    key={`${member.id}-${rowIndex}-${index}`}
-                    id={`member-capsule-${member.id}-${rowIndex}-${index}`}
-                    member={member}
-                    delay={cardDelay}
-                    onClick={() => handleSelect(member)}
-                  />
-                );
-              })}
-            </motion.div>
-          ))}
-        </div>
+                  return (
+                    <MemberCapsule
+                      key={`${member.id}-${rowIndex}-${index}`}
+                      id={`member-capsule-${member.id}-${rowIndex}-${index}`}
+                      member={member}
+                      delay={cardDelay}
+                      onClick={() => handleSelect(member)}
+                    />
+                  );
+                })}
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Interactive Modal View - Clean Centered Card Design */}
