@@ -87,6 +87,81 @@ async function startServer() {
   }
   const serverTransactionsStore: ServerTransaction[] = [];
 
+  // ============================================================================
+  // SHARED NETWORK REGISTRY STORE (PERSISTED ON DISK FOR ALL USERS / SESSIONS)
+  // ============================================================================
+  interface NetworkRegistryStore {
+    schools: any[];
+    directors: any[];
+    teachers: any[];
+    students: any[];
+    applications: any[];
+    updatedAt: string;
+  }
+
+  const networkDataDir = path.join(process.cwd(), "data");
+  const networkStoreFile = path.join(networkDataDir, "sigre-network-store.json");
+
+  function loadNetworkStore(): NetworkRegistryStore {
+    try {
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          return {
+            schools: Array.isArray(parsed.schools) ? parsed.schools : [],
+            directors: Array.isArray(parsed.directors) ? parsed.directors : [],
+            teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
+            students: Array.isArray(parsed.students) ? parsed.students : [],
+            applications: Array.isArray(parsed.applications) ? parsed.applications : [],
+            updatedAt: parsed.updatedAt || new Date().toISOString(),
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("[NetworkStore] Failed to read store file, initializing empty:", err);
+    }
+    return {
+      schools: [],
+      directors: [],
+      teachers: [],
+      students: [],
+      applications: [],
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const networkStore: NetworkRegistryStore = loadNetworkStore();
+
+  function persistNetworkStore() {
+    try {
+      if (!fs.existsSync(networkDataDir)) {
+        fs.mkdirSync(networkDataDir, { recursive: true });
+      }
+      networkStore.updatedAt = new Date().toISOString();
+      fs.writeFileSync(networkStoreFile, JSON.stringify(networkStore, null, 2), "utf-8");
+    } catch (err) {
+      console.warn("[NetworkStore] Failed to write store file:", err);
+    }
+  }
+
+  function upsertByKey(list: any[], incomingItems: any[], getKey: (item: any) => string): any[] {
+    const map = new Map<string, any>();
+    list.forEach((item) => {
+      const k = getKey(item);
+      if (k) map.set(k, item);
+    });
+    incomingItems.forEach((item) => {
+      if (!item) return;
+      const k = getKey(item);
+      if (k) {
+        const existing = map.get(k);
+        map.set(k, existing ? { ...existing, ...item } : item);
+      }
+    });
+    return Array.from(map.values());
+  }
+
   function createRateLimiter(options: { windowMs: number; maxRequests: number; message: string; map: Map<string, RateRecord> }) {
     return (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1";
@@ -153,6 +228,199 @@ async function startServer() {
         rlsPolicy: "least-privilege",
         ssdHeadersEnabled: true,
       },
+    });
+  });
+
+  // ============================================================================
+  // NETWORK REGISTRY API (SCHOOLS, DIRECTORS, TEACHERS, STUDENTS, APPLICATIONS)
+  // Ensures registered schools and their data appear for all users signing up
+  // ============================================================================
+  app.get("/api/network/state", (req, res) => {
+    res.json({
+      success: true,
+      ...networkStore,
+    });
+  });
+
+  app.get("/api/network/schools", (req, res) => {
+    res.json({
+      success: true,
+      schools: networkStore.schools,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/network/schools", (req, res) => {
+    const { school, schools } = req.body || {};
+    const incoming: any[] = [];
+    if (school && typeof school === "object") incoming.push(school);
+    if (Array.isArray(schools)) incoming.push(...schools);
+
+    const validIncoming = incoming.filter(
+      (sc) =>
+        sc &&
+        (sc.name || sc.nomeOficial) &&
+        !String(sc.name || sc.nomeOficial)
+          .trim()
+          .toLowerCase()
+          .includes("modelo central")
+    );
+
+    if (validIncoming.length > 0) {
+      networkStore.schools = upsertByKey(
+        networkStore.schools,
+        validIncoming,
+        (sc) => String(sc.id || sc.name || sc.nomeOficial || "").trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      schools: networkStore.schools,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/network/schools/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim().toLowerCase();
+    const targetName = String(req.query.name || "").trim().toLowerCase();
+
+    networkStore.schools = networkStore.schools.filter((sc) => {
+      const sId = String(sc?.id || "").trim().toLowerCase();
+      const sName = String(sc?.name || sc?.nomeOficial || "").trim().toLowerCase();
+      if (targetId && sId === targetId) return false;
+      if (targetName && sName === targetName) return false;
+      return true;
+    });
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      schools: networkStore.schools,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/network/applications", (req, res) => {
+    const { application, applications } = req.body || {};
+    const incoming: any[] = [];
+    if (application && typeof application === "object") incoming.push(application);
+    if (Array.isArray(applications)) incoming.push(...applications);
+
+    if (incoming.length > 0) {
+      networkStore.applications = upsertByKey(
+        networkStore.applications,
+        incoming,
+        (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
+      );
+
+      // If any approved application is a School Director, also update the school's directorName in networkStore.schools
+      incoming.forEach((appItem) => {
+        if (appItem && appItem.type === "diretor" && appItem.status === "aprovado" && appItem.schoolName && appItem.fullName) {
+          const normSchool = String(appItem.schoolName).trim().toLowerCase();
+          networkStore.schools = networkStore.schools.map((sc) => {
+            const scName = String(sc.name || sc.nomeOficial || "").trim().toLowerCase();
+            if (scName && (scName === normSchool || scName.includes(normSchool) || normSchool.includes(scName))) {
+              return {
+                ...sc,
+                directorName: appItem.fullName,
+                registrationData: sc.registrationData
+                  ? {
+                      ...sc.registrationData,
+                      director: {
+                        ...(sc.registrationData.director || {}),
+                        nome: appItem.fullName,
+                        email: appItem.email || sc.registrationData.director?.email,
+                        contacto: appItem.phone || sc.registrationData.director?.contacto,
+                      },
+                    }
+                  : sc.registrationData,
+              };
+            }
+            return sc;
+          });
+        }
+      });
+
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      applications: networkStore.applications,
+      schools: networkStore.schools,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/network/sync", (req, res) => {
+    const { schools, directors, teachers, students, applications } = req.body || {};
+    let changed = false;
+
+    if (Array.isArray(schools) && schools.length > 0) {
+      const validSchools = schools.filter(
+        (sc) =>
+          sc &&
+          (sc.name || sc.nomeOficial) &&
+          !String(sc.name || sc.nomeOficial)
+            .trim()
+            .toLowerCase()
+            .includes("modelo central")
+      );
+      if (validSchools.length > 0) {
+        networkStore.schools = upsertByKey(
+          networkStore.schools,
+          validSchools,
+          (sc) => String(sc.id || sc.name || sc.nomeOficial || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(directors) && directors.length > 0) {
+      networkStore.directors = upsertByKey(
+        networkStore.directors,
+        directors,
+        (d) => String(d.id || d.name || d.nomeCompleto || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(teachers) && teachers.length > 0) {
+      networkStore.teachers = upsertByKey(
+        networkStore.teachers,
+        teachers,
+        (t) => String(t.id || t.name || t.nomeCompleto || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(students) && students.length > 0) {
+      networkStore.students = upsertByKey(
+        networkStore.students,
+        students,
+        (s) => String(s.id || s.name || s.nomeCompleto || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(applications) && applications.length > 0) {
+      networkStore.applications = upsertByKey(
+        networkStore.applications,
+        applications,
+        (a) => String(a.id || a.userId || a.email || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (changed) {
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      ...networkStore,
     });
   });
 

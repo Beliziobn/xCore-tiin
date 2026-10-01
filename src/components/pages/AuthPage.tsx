@@ -26,7 +26,12 @@ import {
   Check,
   Sparkles,
   Phone,
-  X
+  X,
+  MapPin,
+  Users,
+  Layers,
+  Clock,
+  DoorOpen
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import { verifyPassword, updatePassword } from '../../utils/passwordService';
@@ -45,6 +50,7 @@ import {
 } from '../../utils/authApprovalStorage';
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
+import { getSchoolRegistrationData, getOfferedLevelsBadges, syncSchoolsFromServer } from '../../utils/schoolStorage';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -226,19 +232,40 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [storageRevision, setStorageRevision] = useState(0);
 
-  // Escolas já cadastradas no sistema (prop + localStorage + initialAdminSchools)
+  // Sync registered schools from server and localStorage events so other people signing up see all registered schools
+  useEffect(() => {
+    let mounted = true;
+    syncSchoolsFromServer().then(() => {
+      if (mounted) setStorageRevision((r) => r + 1);
+    });
+    const handleStorageUpdate = () => {
+      if (mounted) setStorageRevision((r) => r + 1);
+    };
+    window.addEventListener('sigre-data-synced', handleStorageUpdate);
+    window.addEventListener('storage', handleStorageUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('sigre-data-synced', handleStorageUpdate);
+      window.removeEventListener('storage', handleStorageUpdate);
+    };
+  }, [mode]);
+
+  // Escolas já cadastradas no sistema (prop + localStorage + servidor + initialAdminSchools)
   const registeredSchools = React.useMemo(() => {
     const fromStorage = getRegisteredSchoolsFromStorage();
     const combined = [...(propSchools || []), ...fromStorage, ...initialAdminSchools];
     const uniqueMap = new Map<string, AdminSchool>();
     combined.forEach((sc) => {
       if (sc && sc.name) {
-        uniqueMap.set(sc.name.trim().toLowerCase(), sc);
+        const key = sc.name.trim().toLowerCase();
+        const existing = uniqueMap.get(key);
+        uniqueMap.set(key, existing ? { ...existing, ...sc, registrationData: sc.registrationData || existing.registrationData } : sc);
       }
     });
     return Array.from(uniqueMap.values());
-  }, [propSchools, mode]);
+  }, [propSchools, mode, storageRevision]);
 
   // Form fields
   const [firstName, setFirstName] = useState('');
@@ -275,16 +302,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // Keep selectedSchoolId synced with registeredSchools
+  // Keep selectedSchoolId synced with registeredSchools and auto-fill municipality from registered school data
   useEffect(() => {
     if (registeredSchools.length > 0) {
       const exists = registeredSchools.some((s) => s.id === selectedSchoolId);
+      const targetSc = exists
+        ? registeredSchools.find((s) => s.id === selectedSchoolId)!
+        : registeredSchools[0];
       if (!exists) {
-        setSelectedSchoolId(registeredSchools[0].id);
-        setSchoolOrUnitName(registeredSchools[0].name);
-      } else {
-        const current = registeredSchools.find((s) => s.id === selectedSchoolId);
-        if (current) setSchoolOrUnitName(current.name);
+        setSelectedSchoolId(targetSc.id);
+      }
+      setSchoolOrUnitName(targetSc.name);
+      const regData = getSchoolRegistrationData(targetSc);
+      const schoolMun = regData.endereco?.municipio?.trim();
+      if (schoolMun) {
+        const matchedMun = UCORE_MUNICIPALITIES.find((m) =>
+          m.toLowerCase().includes(schoolMun.toLowerCase()) ||
+          schoolMun.toLowerCase().includes(m.toLowerCase())
+        );
+        if (matchedMun) {
+          setSelectedMunicipality(matchedMun);
+        }
       }
     } else {
       setSelectedSchoolId('');
@@ -1332,9 +1370,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                             {registeredSchools.length > 0 ? (
                               registeredSchools.map((s) => {
                                 const dirName = resolveSchoolDirectorName(s, s.name);
+                                const reg = getSchoolRegistrationData(s);
                                 return (
                                   <option key={s.id} value={s.id}>
-                                    {s.name} ({s.category}) — Diretor(a): {dirName}
+                                    {s.name} [{reg.codigoSIGE}] ({reg.natureza} • {s.category}) — Diretor(a): {dirName}
                                   </option>
                                 );
                               })
@@ -1345,24 +1384,167 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                             )}
                           </select>
                         </div>
+
+                        {/* Quick-select pills when multiple schools are registered */}
+                        {registeredSchools.length > 1 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {registeredSchools.map((sc) => {
+                              const isSelected = sc.id === selectedSchoolId;
+                              return (
+                                <button
+                                  key={sc.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedSchoolId(sc.id);
+                                    setSchoolOrUnitName(sc.name);
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                                    isSelected
+                                      ? 'bg-[#002133] text-white border-[#002133] shadow-2xs'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  <School className={`w-3 h-3 ${isSelected ? 'text-[#f75142]' : 'text-slate-400'}`} />
+                                  <span className="truncate max-w-[180px]">{sc.name}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Complete Registered School Data Card */}
                         {(() => {
                           const currentSc = registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0];
                           if (!currentSc) {
                             return (
-                              <p className="text-[10px] text-slate-500 mt-1">
-                                Selecione exclusivamente uma escola já cadastrada no sistema para evitar erros de digitação.
+                              <p className="text-[10px] text-slate-500 mt-1.5">
+                                Selecione exclusivamente uma escola já cadastrada no sistema para visualizar os dados institucionais da unidade.
                               </p>
                             );
                           }
                           const dirName = resolveSchoolDirectorName(currentSc, currentSc.name);
+                          const regData = getSchoolRegistrationData(currentSc);
+                          const offeredBadges = getOfferedLevelsBadges(regData.oferta);
+                          const totalRooms = currentSc.roomsCount || regData.infraestrutura.totalSalas || 0;
+                          const totalTurmas = currentSc.turmasCount || regData.infraestrutura.turmasFuncionamento || 0;
+                          const totalTeachers = currentSc.teachersCount || regData.pessoal.totalDocentesProfessores || 0;
+                          const turnosText = (regData.infraestrutura.turnos && regData.infraestrutura.turnos.length > 0)
+                            ? regData.infraestrutura.turnos.join(' / ')
+                            : 'Manhã / Tarde';
+                          const fullAddress = [
+                            regData.endereco?.rua,
+                            regData.endereco?.bairro,
+                            regData.endereco?.comuna,
+                            `${regData.endereco?.municipio || 'Quêssua'} (${regData.endereco?.provincia || 'Malanje'})`
+                          ]
+                            .filter(Boolean)
+                            .join(', ');
+
                           return (
-                            <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 text-[11px] text-slate-600 flex items-center justify-between gap-2">
-                              <span>
-                                Escola: <strong className="text-slate-900">{currentSc.name}</strong>
-                              </span>
-                              <span className="text-emerald-700 font-bold">
-                                Diretor(a): {dirName}
-                              </span>
+                            <div
+                              id="registered-school-details-card"
+                              className="mt-2.5 p-3 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-2.5 text-[11px] text-slate-600 animate-in fade-in duration-150"
+                            >
+                              {/* School Title + SIGE Code + Natureza Badges */}
+                              <div className="flex flex-wrap items-start justify-between gap-2 pb-2 border-b border-slate-100">
+                                <div>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#002133] text-white">
+                                      {regData.codigoSIGE || currentSc.codigoSIGE || 'SIGE'}
+                                    </span>
+                                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      {regData.natureza || currentSc.natureza || 'Pública'}
+                                    </span>
+                                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                      {currentSc.category}
+                                    </span>
+                                  </div>
+                                  <h4 className="font-black text-slate-900 text-xs mt-1 leading-snug">
+                                    {currentSc.name}
+                                  </h4>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                                    Direção Escolar
+                                  </span>
+                                  <span className="text-emerald-700 font-black text-[11px]">
+                                    {dirName}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Key Institutional Metrics Grid */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
+                                    <DoorOpen className="w-2.5 h-2.5 text-slate-400" />
+                                    Salas
+                                  </span>
+                                  <span className="font-black text-slate-900 text-xs">{totalRooms} salas</span>
+                                </div>
+                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
+                                    <Layers className="w-2.5 h-2.5 text-slate-400" />
+                                    Turmas
+                                  </span>
+                                  <span className="font-black text-slate-900 text-xs">{totalTurmas} turmas</span>
+                                </div>
+                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
+                                    <Clock className="w-2.5 h-2.5 text-slate-400" />
+                                    Turnos
+                                  </span>
+                                  <span className="font-bold text-slate-900 text-[10px] truncate block" title={turnosText}>
+                                    {turnosText}
+                                  </span>
+                                </div>
+                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
+                                    <Users className="w-2.5 h-2.5 text-slate-400" />
+                                    Docentes
+                                  </span>
+                                  <span className="font-black text-slate-900 text-xs">{totalTeachers} prof.</span>
+                                </div>
+                              </div>
+
+                              {/* Location & Contacts */}
+                              <div className="space-y-1 text-[10px] text-slate-600">
+                                <div className="flex items-start gap-1.5">
+                                  <MapPin className="w-3 h-3 text-[#f75142] shrink-0 mt-0.5" />
+                                  <span>
+                                    <strong className="text-slate-800">Localização:</strong> {fullAddress}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-3 h-3 text-slate-400" />
+                                    <span>{currentSc.phone || regData.contactoTelefonico}</span>
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Mail className="w-3 h-3 text-slate-400" />
+                                    <span>{currentSc.email || regData.emailDireccao}</span>
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Educational Offer Badges */}
+                              {offeredBadges.length > 0 && (
+                                <div className="pt-1.5 border-t border-slate-100">
+                                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                                    Oferta Educativa Cadastrada na Escola:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {offeredBadges.map((badge, bIdx) => (
+                                      <span
+                                        key={bIdx}
+                                        className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200/80 text-[9px] font-bold"
+                                      >
+                                        {badge}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}

@@ -48,6 +48,8 @@ import {
   purgeModeloCentralData,
   deleteSchoolAndRelatedData,
   isModeloCentralSchool,
+  saveRegisteredSchool,
+  syncSchoolsFromServer,
 } from './utils/schoolStorage';
 
 // Teacher & Student Pages
@@ -258,15 +260,23 @@ export default function App() {
     }
   };
 
-  // Initialize theme mode
+  // Initialize theme mode and sync network schools/data from server
   useEffect(() => {
     initTheme();
+    syncSchoolsFromServer().catch(() => {
+      // ignore offline
+    });
   }, []);
 
-  // Persist admin entities on change
+  // Persist admin entities on change and sync to backend network store
   useEffect(() => {
     try {
       localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schools: adminSchools }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
@@ -275,6 +285,11 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teachers: adminTeachers }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
@@ -283,6 +298,11 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directors: adminDirectors }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
@@ -291,6 +311,11 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: adminStudents }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
@@ -1271,6 +1296,7 @@ export default function App() {
           schools={adminSchools}
           onOpenRegisterModal={() => setAdminModalType('school')}
           onUpdateSchool={(updated) => {
+            saveRegisteredSchool(updated);
             setAdminSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
             showToast(`Dados da escola "${updated.name}" atualizados com sucesso!`);
           }}
@@ -2425,7 +2451,8 @@ export default function App() {
         isOpen={adminModalType !== null}
         onClose={() => setAdminModalType(null)}
         onAddSchool={(newSchool) => {
-          setAdminSchools((prev) => [newSchool, ...prev]);
+          const next = saveRegisteredSchool(newSchool);
+          setAdminSchools(next);
           showToast(`Escola "${newSchool.name}" cadastrada na rede com sucesso!`);
         }}
         onAddTeacher={(newTeacher) => {

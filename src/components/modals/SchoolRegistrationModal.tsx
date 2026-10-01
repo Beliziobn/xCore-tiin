@@ -52,6 +52,7 @@ import {
   convertRegistrationDataToAdminSchool,
   DEFICIENCIAS_DISPONIVEIS,
   calculateTotalClassesOffered,
+  saveRegisteredSchool,
 } from '../../utils/schoolStorage';
 import { getStoredTeachers } from '../../utils/teacherStorage';
 import { getStoredStudents } from '../../utils/studentStorage';
@@ -514,6 +515,7 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
     };
 
     const finalSchool = convertRegistrationDataToAdminSchool(registrationData, existingSchool || undefined);
+    saveRegisteredSchool(finalSchool);
     onSuccess(finalSchool);
     onClose();
   };

@@ -32,6 +32,11 @@ import {
 import {
   incrementTurmaOccupancy,
 } from '../../data/classesConfig';
+import {
+  getSchoolRegistrationData,
+  getOfferedLevelsBadges,
+  syncSchoolsFromServer,
+} from '../../utils/schoolStorage';
 import { BoletimMatriculaModal } from './BoletimMatriculaModal';
 import {
   validateAngolaBI,
@@ -74,7 +79,23 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
 
-  // Escolas cadastradas no sistema (prop + localStorage)
+  // Escolas cadastradas no sistema (prop + localStorage + backend)
+  const [schoolRefreshTick, setSchoolRefreshTick] = useState(0);
+  useEffect(() => {
+    if (isOpen) {
+      syncSchoolsFromServer()
+        .then(() => setSchoolRefreshTick((t) => t + 1))
+        .catch(() => {});
+    }
+    const handleSync = () => setSchoolRefreshTick((t) => t + 1);
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [isOpen]);
+
   const registeredSchools = useMemo(() => {
     const fromStorage = getRegisteredSchoolsFromStorage();
     const combined = [...(propSchools || []), ...fromStorage];
@@ -85,7 +106,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       }
     });
     return Array.from(uniqueMap.values());
-  }, [propSchools, isOpen]);
+  }, [propSchools, isOpen, schoolRefreshTick]);
 
   // Active Wizard Step: 1=Identificação, 2=Natureza & Modalidade, 3=Classe & Faixa Etária, 4=Família & Documentos
   const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
@@ -1047,7 +1068,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-black uppercase tracking-wider text-[#0b3d5c] block">
-                        Unidade Escolar Vinculada Automaticamente (Direção de Escola)
+                        Unidade Escolar Vinculada (Escolas Cadastradas no Sistema)
                       </span>
                       <p className="text-sm font-black text-slate-900 mt-0.5">
                         {nomeEscola || selectedSchoolObj?.name || 'Unidade Escolar da Direção'}
@@ -1055,6 +1076,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                     </div>
                     {selectedSchoolObj && (
                       <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-black uppercase bg-slate-900 text-white px-2 py-0.5 rounded">
+                          {getSchoolRegistrationData(selectedSchoolObj).codigoSIGE || selectedSchoolObj.codigoSIGE || 'SIGE'}
+                        </span>
                         <span className="text-[11px] font-bold bg-[#0b3d5c] text-white px-2.5 py-0.5 rounded-full">
                           {selectedSchoolObj.category}
                         </span>
@@ -1064,6 +1088,67 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       </div>
                     )}
                   </div>
+
+                  {registeredSchools.length > 0 && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-900 mb-1">
+                        Seleccionar Escola Cadastrada:
+                      </label>
+                      <select
+                        value={selectedSchoolObj?.id || selectedSchoolId || ''}
+                        onChange={(e) => {
+                          const found = registeredSchools.find((s) => s.id === e.target.value);
+                          if (found) handleSelectSchoolFromSystem(found);
+                        }}
+                        className="w-full rounded-xl border border-cyan-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-cyan-500 outline-none"
+                      >
+                        {registeredSchools.map((sc) => {
+                          const reg = getSchoolRegistrationData(sc);
+                          return (
+                            <option key={sc.id} value={sc.id}>
+                              {sc.name} [{reg.codigoSIGE || sc.codigoSIGE || 'SIGE'}] ({reg.natureza || sc.natureza || 'Pública'} • {sc.category}) — {sc.location}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedSchoolObj && (() => {
+                    const reg = getSchoolRegistrationData(selectedSchoolObj);
+                    const offered = getOfferedLevelsBadges(reg.oferta);
+                    return (
+                      <div className="p-2.5 rounded-lg bg-white/95 border border-cyan-200/80 text-[11px] text-slate-700 space-y-1.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Salas</span>
+                            <span className="font-bold text-slate-900">{selectedSchoolObj.roomsCount || reg.infraestrutura.totalSalas || 0} salas</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Turmas</span>
+                            <span className="font-bold text-slate-900">{selectedSchoolObj.turmasCount || reg.infraestrutura.turmasFuncionamento || 0} turmas</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Docentes</span>
+                            <span className="font-bold text-slate-900">{selectedSchoolObj.teachersCount || reg.pessoal.totalDocentesProfessores || 0} prof.</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Localização</span>
+                            <span className="font-bold text-slate-900 truncate block">{selectedSchoolObj.location}</span>
+                          </div>
+                        </div>
+                        {offered.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100">
+                            {offered.map((b, idx) => (
+                              <span key={idx} className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-800 border border-cyan-200 text-[10px] font-semibold">
+                                {b}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {selectedSchoolStudentQuota && (
                     <div className="grid grid-cols-3 gap-2 pt-1 text-center">

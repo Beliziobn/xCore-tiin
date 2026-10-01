@@ -26,6 +26,12 @@ import {
   TEACHING_LEVELS_CATALOG,
 } from '../../utils/teacherStorage';
 import { initialAdminSchools } from '../../data/adminData';
+import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
+import {
+  getSchoolRegistrationData,
+  getOfferedLevelsBadges,
+  syncSchoolsFromServer,
+} from '../../utils/schoolStorage';
 import {
   validateAngolaBI,
   validateAngolaPhone,
@@ -88,25 +94,31 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   const [tipoInstituicaoOutro, setTipoInstituicaoOutro] = useState('');
 
   // Lista de escolas cadastradas no sistema para alocação do docente e abatimento de pendentes
+  const [schoolRefreshTick, setSchoolRefreshTick] = useState(0);
+  useEffect(() => {
+    if (isOpen) {
+      syncSchoolsFromServer()
+        .then(() => setSchoolRefreshTick((t) => t + 1))
+        .catch(() => {});
+    }
+    const handleSync = () => setSchoolRefreshTick((t) => t + 1);
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [isOpen]);
+
   const availableSchools = useMemo<AdminSchool[]>(() => {
     const map = new Map<string, AdminSchool>();
     initialAdminSchools.forEach((s) => map.set(s.id, s));
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('ucore_admin_schools');
-        if (raw) {
-          const parsed: AdminSchool[] = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            map.clear();
-            parsed.forEach((s) => map.set(s.id, s));
-          }
-        }
-      } catch {
-        // ignore
-      }
+    const stored = getRegisteredSchoolsFromStorage();
+    if (stored.length > 0) {
+      stored.forEach((s) => map.set(s.id, s));
     }
     return Array.from(map.values());
-  }, [isOpen]);
+  }, [isOpen, schoolRefreshTick]);
 
   const currentMatchedSchool = useMemo<AdminSchool | undefined>(() => {
     if (escolaId) {
@@ -764,13 +776,46 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
                     >
                       {availableSchools.map((sc) => {
                         const q = getSchoolTeacherQuotaStatus(sc);
+                        const reg = getSchoolRegistrationData(sc);
                         return (
                           <option key={sc.id} value={sc.id}>
-                            {sc.name} ({sc.natureza || 'Pública'}) — Declarados: {q.declaredTotal} | Cadastrados: {q.registeredCount} | Pendentes: {q.pendingCount}
+                            {sc.name} [{reg.codigoSIGE || sc.codigoSIGE || 'SIGE'}] ({reg.natureza || sc.natureza || 'Pública'} • {sc.category}) — Declarados: {q.declaredTotal} | Cadastrados: {q.registeredCount} | Pendentes: {q.pendingCount}
                           </option>
                         );
                       })}
                     </select>
+
+                    {currentMatchedSchool && (() => {
+                      const reg = getSchoolRegistrationData(currentMatchedSchool);
+                      const offered = getOfferedLevelsBadges(reg.oferta);
+                      return (
+                        <div className="p-2.5 rounded-lg bg-white/95 border border-amber-200/90 text-[11px] text-slate-700 space-y-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-black uppercase">
+                                {reg.codigoSIGE || currentMatchedSchool.codigoSIGE || 'SIGE'}
+                              </span>
+                              <span className="font-bold text-slate-900">{currentMatchedSchool.name}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-bold">
+                                {reg.natureza || currentMatchedSchool.natureza || 'Pública'} • {currentMatchedSchool.category}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              Local: {currentMatchedSchool.location} • Salas: {currentMatchedSchool.roomsCount || reg.infraestrutura.totalSalas || 0} • Turmas: {currentMatchedSchool.turmasCount || reg.infraestrutura.turmasFuncionamento || 0}
+                            </span>
+                          </div>
+                          {offered.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {offered.map((b, idx) => (
+                                <span key={idx} className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-semibold">
+                                  {b}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {selectedSchoolQuota && (
                       <div className="grid grid-cols-3 gap-2 pt-1">

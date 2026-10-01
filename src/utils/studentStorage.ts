@@ -6,7 +6,9 @@ import type {
   StudentDocumentType,
   AdminSchool,
   AdminStudent,
+  SchoolRegistrationData,
 } from '../types';
+import { convertRegistrationDataToAdminSchool } from './schoolStorage';
 
 export interface StudentModalityConfig {
   key: StudentModalidadeKey;
@@ -564,18 +566,40 @@ export function getRegisteredSchoolsFromStorage(): AdminSchool[] {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return [];
   }
+  const norm = (str?: string) => (str || '').trim().toLowerCase();
+  const map = new Map<string, AdminSchool>();
+
   try {
     const raw = localStorage.getItem('ucore_admin_schools');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const filtered = parsed.filter(
-      (sc: AdminSchool) => !String(sc?.name || '').trim().toLowerCase().includes('modelo central')
-    );
-    if (filtered.length !== parsed.length) {
-      localStorage.setItem('ucore_admin_schools', JSON.stringify(filtered));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((sc: AdminSchool) => {
+          const n = norm(sc?.name);
+          if (n && !n.includes('modelo central')) {
+            map.set(n, sc);
+          }
+        });
+      }
     }
-    return filtered;
+
+    // Also merge detailed school registrations if present
+    const rawReg = localStorage.getItem('sigre_school_registrations');
+    if (rawReg) {
+      const parsedReg = JSON.parse(rawReg);
+      if (Array.isArray(parsedReg)) {
+        parsedReg.forEach((reg: SchoolRegistrationData) => {
+          const n = norm(reg?.nomeOficial);
+          if (n && !n.includes('modelo central')) {
+            const existing = map.get(n);
+            const converted = convertRegistrationDataToAdminSchool(reg, existing);
+            map.set(n, converted);
+          }
+        });
+      }
+    }
+
+    return Array.from(map.values());
   } catch {
     return [];
   }

@@ -29,6 +29,12 @@ import {
   NIVEL_ACADEMICO_OPTIONS,
   saveDirector,
 } from '../../utils/directorStorage';
+import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
+import {
+  getSchoolRegistrationData,
+  getOfferedLevelsBadges,
+  syncSchoolsFromServer,
+} from '../../utils/schoolStorage';
 
 interface DirectorRegistrationModalProps {
   isOpen: boolean;
@@ -161,20 +167,70 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
     );
   }, [temFormacaoPedagogica, temMagisterioCompleto, temImneCompleto, temOutraFormacaoPedagogica]);
 
-  // Handle school selection to auto-inherit attributes
+  // Merge schools prop with registered schools from localStorage & backend
+  const [schoolRefreshTick, setSchoolRefreshTick] = useState(0);
+  useEffect(() => {
+    if (isOpen) {
+      syncSchoolsFromServer()
+        .then(() => setSchoolRefreshTick((t) => t + 1))
+        .catch(() => {});
+    }
+    const handleSync = () => setSchoolRefreshTick((t) => t + 1);
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [isOpen]);
+
+  const availableSchools = useMemo(() => {
+    const stored = getRegisteredSchoolsFromStorage();
+    const map = new Map<string, AdminSchool>();
+    for (const s of [...schools, ...stored]) {
+      if (s && s.id && s.name) {
+        map.set(s.id, s);
+      }
+    }
+    return Array.from(map.values());
+  }, [schools, schoolRefreshTick]);
+
+  // Handle school selection to auto-inherit attributes from the registered school
   const handleSchoolChange = (schoolId: string) => {
     setSelectedSchoolId(schoolId);
-    const target = schools.find((s) => s.id === schoolId);
+    const target = availableSchools.find((s) => s.id === schoolId);
     if (target) {
+      const regData = getSchoolRegistrationData(target);
+      const badges = getOfferedLevelsBadges(regData.oferta);
       setNomeEscola(target.name);
-      setCodigoEscola(`ESC-QSS-${target.id.replace('esc-', '').padStart(3, '0')}`);
-      setProvinciaEscola('Malanje');
-      setMunicipioEscola('Quéssua');
-      setProfessoresSobDirecao(target.teachersCount || 28);
-      setAlunosSobDirecao((target.studentsWithDocs || 0) + (target.studentsWithoutDocs || 0) || 450);
-      setEmailInstitucional(target.email || `${target.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@ucore.edu.ao`);
+      setCodigoEscola(
+        regData.codigoSIGE ||
+          target.codigoSIGE ||
+          `ESC-QSS-${target.id.replace('esc-', '').padStart(3, '0')}`
+      );
+      setProvinciaEscola(regData.endereco?.provincia || 'Malanje');
+      setMunicipioEscola(regData.endereco?.municipio || 'Quéssua');
+      setProfessoresSobDirecao(
+        target.teachersCount || regData.pessoal?.totalDocentesProfessores || 0
+      );
+      setAlunosSobDirecao(
+        (target.studentsWithDocs || 0) + (target.studentsWithoutDocs || 0)
+      );
+      setEmailInstitucional(
+        target.email ||
+          regData.emailDireccao ||
+          `${target.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@ucore.edu.ao`
+      );
+      if (badges.length > 0) {
+        setNiveisEscolaOferece(badges);
+      }
 
-      if (target.category?.toLowerCase().includes('privad') && !target.category?.toLowerCase().includes('público')) {
+      if (regData.natureza) {
+        setNaturezaEscola(regData.natureza as TeacherNaturezaEscola);
+      } else if (
+        target.category?.toLowerCase().includes('privad') &&
+        !target.category?.toLowerCase().includes('público')
+      ) {
         setNaturezaEscola('Privada');
       } else if (
         target.category?.toLowerCase().includes('público-privada') ||
@@ -251,10 +307,10 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
       setDesafiosGestaoOutro(initialData.desafiosGestaoOutro || '');
       setDisponibilidadeFormacaoContinua(initialData.disponibilidadeFormacaoContinua || 'Total');
       setDirectoresAnteriores(initialData.directoresAnteriores || []);
-    } else if (schools.length > 0 && !selectedSchoolId) {
-      handleSchoolChange(schools[0].id);
+    } else if (availableSchools.length > 0 && !selectedSchoolId) {
+      handleSchoolChange(availableSchools[0].id);
     }
-  }, [initialData, schools]);
+  }, [initialData, availableSchools]);
 
   if (!isOpen) return null;
 
@@ -869,12 +925,66 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
                     onChange={(e) => handleSchoolChange(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
-                    {schools.map((school) => (
-                      <option key={school.id} value={school.id}>
-                        {school.name} — {school.location} ({school.category || 'Ensino Primário'})
-                      </option>
-                    ))}
+                    {availableSchools.map((school) => {
+                      const reg = getSchoolRegistrationData(school);
+                      return (
+                        <option key={school.id} value={school.id}>
+                          {school.name} [{reg.codigoSIGE || school.codigoSIGE || 'SIGE'}] — {school.location} ({reg.natureza || school.natureza || 'Pública'} • {school.category || 'Ensino Primário'})
+                        </option>
+                      );
+                    })}
                   </select>
+
+                  {(() => {
+                    const currentSc =
+                      availableSchools.find((s) => s.id === selectedSchoolId) ||
+                      availableSchools[0];
+                    if (!currentSc) return null;
+                    const reg = getSchoolRegistrationData(currentSc);
+                    const offered = getOfferedLevelsBadges(reg.oferta);
+                    return (
+                      <div className="mt-3 p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs text-slate-600">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white mr-1.5">
+                              {reg.codigoSIGE || currentSc.codigoSIGE || 'SIGE'}
+                            </span>
+                            <span className="font-bold text-slate-900">{currentSc.name}</span>
+                          </div>
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {reg.natureza || currentSc.natureza || 'Pública'} • {currentSc.category}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                            <span className="block text-[10px] text-slate-400 uppercase font-bold">Salas</span>
+                            <span className="font-bold text-slate-900">{currentSc.roomsCount || reg.infraestrutura.totalSalas || 0} salas</span>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                            <span className="block text-[10px] text-slate-400 uppercase font-bold">Turmas</span>
+                            <span className="font-bold text-slate-900">{currentSc.turmasCount || reg.infraestrutura.turmasFuncionamento || 0} turmas</span>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                            <span className="block text-[10px] text-slate-400 uppercase font-bold">Docentes</span>
+                            <span className="font-bold text-slate-900">{currentSc.teachersCount || reg.pessoal.totalDocentesProfessores || 0} prof.</span>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                            <span className="block text-[10px] text-slate-400 uppercase font-bold">Localização</span>
+                            <span className="font-bold text-slate-900 truncate block">{currentSc.location}</span>
+                          </div>
+                        </div>
+                        {offered.length > 0 && (
+                          <div className="pt-1 flex flex-wrap gap-1">
+                            {offered.map((b, idx) => (
+                              <span key={idx} className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold">
+                                {b}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

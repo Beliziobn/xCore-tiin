@@ -93,6 +93,14 @@ export function savePendingApplication(app: PendingApplication): void {
     const existing = getPendingApplications();
     const updated = [app, ...existing.filter((a) => a.id !== app.id && a.userId !== app.userId)];
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      fetch('/api/network/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application: app }),
+      }).catch(() => {});
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (e) {
     console.error('Erro ao salvar candidatura:', e);
   }
@@ -281,6 +289,15 @@ export function approveApplication(
       }
     }
 
+    if (typeof window !== 'undefined') {
+      fetch('/api/network/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application: updatedApp }),
+      }).catch(() => {});
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
+
     return { success: true, app: updatedApp, activatedUser };
   } catch (e) {
     console.error('Erro ao aprovar candidatura:', e);
@@ -325,6 +342,15 @@ export function rejectApplication(
       } catch {
         // ignore
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/network/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application: updatedApp }),
+      }).catch(() => {});
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     }
 
     return { success: true, app: updatedApp };

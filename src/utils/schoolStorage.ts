@@ -664,10 +664,201 @@ export function deleteSchoolAndRelatedData(schoolId: string, schoolName?: string
 
     window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
+
+    // Also delete from backend network store so all other users/sessions see the removal
+    fetch(`/api/network/schools/${encodeURIComponent(targetId || 'by-name')}?name=${encodeURIComponent(targetNameNorm)}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+
     return nextSchools;
   } catch (err) {
     console.error('Erro ao apagar escola e dados relacionados:', err);
     return [];
+  }
+}
+
+/**
+ * Persists a newly registered or updated school into localStorage (ucore_admin_schools & sigre_school_registrations),
+ * syncs it to the shared server registry (/api/network/schools), and dispatches 'sigre-data-synced' so all other
+ * people signing up immediately see the school and its full institutional data.
+ */
+export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return [school];
+  }
+
+  const norm = (str?: string) => (str || '').trim().toLowerCase();
+  if (!school || !school.name || isModeloCentralSchool(school.name)) {
+    return [];
+  }
+
+  try {
+    // 1. Update ucore_admin_schools
+    const rawSchools = localStorage.getItem(STORAGE_KEY_SCHOOLS);
+    const existingList: AdminSchool[] = rawSchools ? JSON.parse(rawSchools) : [];
+    const safeList = Array.isArray(existingList)
+      ? existingList.filter((s) => s && s.name && !isModeloCentralSchool(s.name))
+      : [];
+
+    const existingIdx = safeList.findIndex(
+      (s) => s.id === school.id || norm(s.name) === norm(school.name)
+    );
+
+    let nextSchools: AdminSchool[];
+    if (existingIdx >= 0) {
+      nextSchools = [...safeList];
+      nextSchools[existingIdx] = {
+        ...nextSchools[existingIdx],
+        ...school,
+        registrationData: school.registrationData || nextSchools[existingIdx].registrationData,
+      };
+    } else {
+      nextSchools = [school, ...safeList];
+    }
+
+    localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(nextSchools));
+
+    // 2. Also update sigre_school_registrations with full 7-section registrationData
+    const regData = school.registrationData || getSchoolRegistrationData(school);
+    const rawReg = localStorage.getItem('sigre_school_registrations');
+    const existingRegList: SchoolRegistrationData[] = rawReg ? JSON.parse(rawReg) : [];
+    const safeRegList = Array.isArray(existingRegList)
+      ? existingRegList.filter((r) => r && r.nomeOficial && !isModeloCentralSchool(r.nomeOficial))
+      : [];
+
+    const regIdx = safeRegList.findIndex(
+      (r) => r.id === regData.id || norm(r.nomeOficial) === norm(regData.nomeOficial)
+    );
+    const nextRegList =
+      regIdx >= 0
+        ? safeRegList.map((r, idx) => (idx === regIdx ? regData : r))
+        : [regData, ...safeRegList];
+
+    localStorage.setItem('sigre_school_registrations', JSON.stringify(nextRegList));
+
+    // 3. Push to shared backend store so other users/browsers signing up see this school immediately
+    fetch('/api/network/schools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ school: { ...school, registrationData: regData } }),
+    }).catch(() => {});
+
+    window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    return nextSchools;
+  } catch (err) {
+    console.error('Erro ao salvar escola cadastrada:', err);
+    return [school];
+  }
+}
+
+/**
+ * Synchronizes registered schools, directors, teachers, students, and pending applications
+ * between the browser localStorage and the shared backend (/api/network/state).
+ * Ensures that when other people register on any session/device, all registered schools and their data appear.
+ */
+export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return [];
+  }
+
+  const norm = (str?: string) => (str || '').trim().toLowerCase();
+
+  try {
+    const localRawSchools = localStorage.getItem(STORAGE_KEY_SCHOOLS);
+    const localSchools: AdminSchool[] = localRawSchools ? JSON.parse(localRawSchools) : [];
+    const localRawDirs = localStorage.getItem('ucore_admin_directors');
+    const localDirs = localRawDirs ? JSON.parse(localRawDirs) : [];
+    const localRawTeachers = localStorage.getItem('ucore_admin_teachers');
+    const localTeachers = localRawTeachers ? JSON.parse(localRawTeachers) : [];
+    const localRawStudents = localStorage.getItem('ucore_admin_students');
+    const localStudents = localRawStudents ? JSON.parse(localRawStudents) : [];
+    const localRawApps = localStorage.getItem('ucore_pending_applications');
+    const localApps = localRawApps ? JSON.parse(localRawApps) : [];
+
+    const res = await fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schools: Array.isArray(localSchools) ? localSchools : [],
+        directors: Array.isArray(localDirs) ? localDirs : [],
+        teachers: Array.isArray(localTeachers) ? localTeachers : [],
+        students: Array.isArray(localStudents) ? localStudents : [],
+        applications: Array.isArray(localApps) ? localApps : [],
+      }),
+    });
+
+    if (!res.ok) {
+      return Array.isArray(localSchools) ? localSchools : [];
+    }
+
+    const data = await res.json();
+    let changed = false;
+
+    if (Array.isArray(data.schools) && data.schools.length > 0) {
+      const mergedMap = new Map<string, AdminSchool>();
+      (Array.isArray(localSchools) ? localSchools : []).forEach((s) => {
+        if (s && s.name && !isModeloCentralSchool(s.name)) {
+          mergedMap.set(norm(s.name), s);
+        }
+      });
+      data.schools.forEach((s: AdminSchool) => {
+        if (s && s.name && !isModeloCentralSchool(s.name)) {
+          const existing = mergedMap.get(norm(s.name));
+          mergedMap.set(norm(s.name), existing ? { ...existing, ...s } : s);
+        }
+      });
+      const mergedSchools = Array.from(mergedMap.values());
+      if (JSON.stringify(mergedSchools) !== JSON.stringify(localSchools)) {
+        localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(mergedSchools));
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(data.directors) && data.directors.length > 0) {
+      const dirMap = new Map<string, any>();
+      (Array.isArray(localDirs) ? localDirs : []).forEach((d: any) => {
+        if (d && (d.id || d.name)) dirMap.set(norm(d.id || d.name), d);
+      });
+      data.directors.forEach((d: any) => {
+        if (d && (d.id || d.name)) {
+          const k = norm(d.id || d.name);
+          dirMap.set(k, { ...(dirMap.get(k) || {}), ...d });
+        }
+      });
+      const mergedDirs = Array.from(dirMap.values());
+      if (JSON.stringify(mergedDirs) !== JSON.stringify(localDirs)) {
+        localStorage.setItem('ucore_admin_directors', JSON.stringify(mergedDirs));
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(data.applications) && data.applications.length > 0) {
+      const appMap = new Map<string, any>();
+      (Array.isArray(localApps) ? localApps : []).forEach((a: any) => {
+        if (a && (a.id || a.userId || a.email)) appMap.set(norm(a.id || a.userId || a.email), a);
+      });
+      data.applications.forEach((a: any) => {
+        if (a && (a.id || a.userId || a.email)) {
+          const k = norm(a.id || a.userId || a.email);
+          appMap.set(k, { ...(appMap.get(k) || {}), ...a });
+        }
+      });
+      const mergedApps = Array.from(appMap.values());
+      if (JSON.stringify(mergedApps) !== JSON.stringify(localApps)) {
+        localStorage.setItem('ucore_pending_applications', JSON.stringify(mergedApps));
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
+
+    const updatedRaw = localStorage.getItem(STORAGE_KEY_SCHOOLS);
+    return updatedRaw ? JSON.parse(updatedRaw) : [];
+  } catch {
+    const fallbackRaw = localStorage.getItem(STORAGE_KEY_SCHOOLS);
+    return fallbackRaw ? JSON.parse(fallbackRaw) : [];
   }
 }
 
