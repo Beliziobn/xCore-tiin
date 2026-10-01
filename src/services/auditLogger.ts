@@ -169,45 +169,6 @@ export class AuditLogger {
   }
 
   private static getInitialSeedLogs(): AuditLog[] {
-    return [
-      {
-        id: 'audit_init_001',
-        action: 'PAUTA_HOMOLOGATED',
-        severity: 'INFO',
-        actorId: 'admin_central_01',
-        actorEmail: 'direcao@ucore.ao',
-        actorRole: 'admin',
-        targetId: 'pauta_2026_1trim',
-        targetType: 'Pauta Trimestral',
-        schoolId: 'quessua_complexo_01',
-        details: 'Homologação oficial das pautas do 1º Trimestre para o Complexo Escolar de Quêssua.',
-        timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-        checksum: 'chk-init01',
-      },
-      {
-        id: 'audit_init_002',
-        action: 'USER_STATUS_CHANGE',
-        severity: 'INFO',
-        actorId: 'admin_central_01',
-        actorEmail: 'admin@ucore.ao',
-        actorRole: 'admin',
-        targetId: 'prof_carlos_02',
-        targetType: 'Professor',
-        schoolId: 'quessua_complexo_01',
-        details: 'Aprovação e validação da conta docente de Carlos Manuel.',
-        timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
-        checksum: 'chk-init02',
-      },
-      {
-        id: 'audit_init_003',
-        action: 'SECURITY_RATE_LIMIT_HIT',
-        severity: 'WARNING',
-        actorId: 'system_guard',
-        actorRole: 'sistema',
-        details: 'Disparo preventivo do limitador de requisições (Rate Limit) em requisições de consulta.',
-        timestamp: new Date(Date.now() - 3600000 * 3).toISOString(),
-        checksum: 'chk-init03',
-      },
-    ];
+    return [];
   }
 }

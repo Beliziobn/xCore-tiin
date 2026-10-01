@@ -4,7 +4,7 @@ import {
   Plus, Eye, Award, Sparkles, RefreshCw, FileText, CalendarCheck, Lock, 
   LayoutList, LayoutGrid, ArrowUpDown, X, Users, AlertTriangle, ChevronRight,
   Clock, Megaphone, Check, Save, ExternalLink, Filter, TrendingUp, TrendingDown,
-  FileDown
+  FileDown, Trash2
 } from 'lucide-react';
 import { StudentProfile, defaultDisciplinasList } from '../../data/teacherData';
 import { StudentRegistrationModal } from '../modals/StudentRegistrationModal';
@@ -12,6 +12,7 @@ import { TurmaStudentListPdfModal } from '../modals/TurmaStudentListPdfModal';
 import { PautaPdfExportModal } from '../modals/PautaPdfExportModal';
 import type { StudentRegistrationData, SchoolAnnouncement } from '../../types';
 import { getStoredAnnouncements, isAnnouncementExpired } from '../../utils/announcementStorage';
+import { deleteStudent } from '../../utils/studentStorage';
 
 interface TeacherClassPageProps {
   onBackToStats: () => void;
@@ -45,6 +46,13 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
   const [selectedDiscipline, setSelectedDiscipline] = useState('Língua Portuguesa');
   const [selectedEvaluation, setSelectedEvaluation] = useState<'p1' | 'p2' | 'trabalho'>('p1');
   const [gradeSaveNotification, setGradeSaveNotification] = useState<string | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const handleConfirmDeleteStudent = () => {
+    if (!studentToDelete) return;
+    deleteStudent(studentToDelete.id, studentToDelete.name);
+    setStudentToDelete(null);
+  };
 
   // Helper para calcular média de um aluno
   const getStudentMediaNum = (student: StudentProfile): number => {
@@ -928,18 +936,30 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                         </span>
                       </td>
 
-                      {/* Ação: Ver ficha */}
+                      {/* Ação: Ver ficha e Apagar */}
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectStudent(student);
-                          }}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-white hover:bg-[#002133] bg-slate-100 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-                        >
-                          <span>Ver ficha</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectStudent(student);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-white hover:bg-[#002133] bg-slate-100 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                          >
+                            <span>Ver ficha</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStudentToDelete({ id: student.id, name: student.name });
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 hover:bg-rose-100 bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                            title="Apagar cadastro deste aluno"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1021,7 +1041,18 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                   </div>
 
                   {/* Rodapé com Botão */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStudentToDelete({ id: student.id, name: student.name });
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-800 cursor-pointer"
+                      title="Apagar cadastro deste aluno"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Apagar</span>
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1036,6 +1067,43 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Modal de Confirmação para Apagar Aluno */}
+        {studentToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Apagar Cadastro do Aluno</h3>
+                  <p className="text-xs text-slate-500">Esta ação remove o registo do sistema e atualiza as estatísticas da escola.</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200">
+                Tem a certeza que deseja apagar o cadastro de <strong className="text-slate-900">{studentToDelete.name}</strong>?
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStudentToDelete(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteStudent}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Sim, Apagar</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1347,7 +1415,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         defaultTurma="Turma 1"
         defaultRoom="Sala 04"
         defaultPeriod="Manhã"
-        schoolName="Escola Modelo Central"
+        schoolName=""
       />
 
       {/* Modal de Lista de Alunos em PDF (A-Z) */}
@@ -1356,7 +1424,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         onClose={() => setIsTurmaPdfModalOpen(false)}
         initialClass="4ª Classe"
         initialTurma="Turma A"
-        schoolName="Escola Primária e Iº Ciclo Modelo Central de Quêssua"
+        schoolName="Unidade Escolar Municipal de Quêssua"
       />
 
       {/* Modal de Exportação da Pauta com Notas e Médias em PDF */}

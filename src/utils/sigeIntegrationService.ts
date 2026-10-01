@@ -274,19 +274,6 @@ export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOption
     }
   });
 
-  // Ensure Aproveitamento equation closure if student list was empty or mock fallback needed
-  const aprClasses = ['1ª Classe', '2ª Classe', '3ª Classe', '4ª Classe', '5ª Classe', '6ª Classe'];
-  aprClasses.forEach(c => {
-    const item = payload.aproveitamento.primario[c]?.PÚBLICA;
-    if (item && item.matriculados.MF === 0) {
-      // Seed realistic consistency
-      item.matriculados = { MF: 80, F: 42 };
-      item.aprovados = { MF: 68, F: 36 };
-      item.reprovados = { MF: 9, F: 4 };
-      item.desistidos = { MF: 3, F: 2 };
-    }
-  });
-
   // 2. PROCESS TEACHERS (Folha 2)
   teachers.forEach((tc: AdminTeacher) => {
     const isFemale = (tc.registrationData as any)?.genero === 'F' || (tc as any).gender === 'F';
@@ -302,13 +289,6 @@ export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOption
     }
   });
 
-  // If teacher list was empty in local state, provide the standard municipality counts
-  if (payload.docentes.primario.PÚBLICA['Com Magistério e Com IMNE Completo'].ate_6a.MF === 0) {
-    payload.docentes.primario.PÚBLICA['Com Magistério e Com IMNE Completo'].ate_6a = { MF: 42, F: 24 };
-    payload.docentes.primario.PÚBLICA['Com Licenciatura em Ensino'].ate_6a = { MF: 18, F: 9 };
-    payload.docentes.primario.PÚBLICA['Sem Habilitação Pedagógica'].ate_6a = { MF: 6, F: 2 };
-  }
-
   // 3. PROCESS INFRASTRUCTURES (Folha 3)
   schools.forEach((sc: AdminSchool) => {
     const cat = sc.category || 'Ensino Primário';
@@ -322,20 +302,13 @@ export function buildSigePayloadFromSystemDatabase(options: SigeExtractionOption
     else payload.infraestruturas.escolas.Pública.primarias += 1;
 
     // Classrooms: 85% Definitivas, 15% Provisórias
-    const rooms = sc.roomsCount || 10;
+    const rooms = sc.roomsCount || 0;
     const def = Math.round(rooms * 0.85);
     const prov = rooms - def;
 
     payload.infraestruturas.salas.Definitivas.Pública.primarias += def;
     payload.infraestruturas.salas.Provisórias.Pública.primarias += prov;
   });
-
-  // Ensure realistic infrastructure defaults if no school records were found
-  if (payload.infraestruturas.escolas.Pública.primarias === 0) {
-    payload.infraestruturas.escolas.Pública = { primarias: 31, colegios: 6, liceus: 2 };
-    payload.infraestruturas.salas.Definitivas.Pública = { primarias: 184 };
-    payload.infraestruturas.salas.Provisórias.Pública = { primarias: 22 };
-  }
 
   return payload;
 }

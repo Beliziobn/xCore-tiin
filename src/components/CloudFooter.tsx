@@ -106,11 +106,6 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
               <p className="text-sm text-white/90 leading-relaxed max-w-sm font-normal">
                 Ecossistema digital unificado para modernização pedagógica, controlo biométrico de assiduidade e monitorização em tempo real para directores, professores e estudantes em Angola.
               </p>
-
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/20 border border-white/15 text-xs text-white font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Plataforma Ativa • Ano Letivo 2026</span>
-              </div>
             </div>
 
             {/* Institucional column */}
@@ -122,82 +117,12 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
               <ul className="space-y-2 text-sm">
                 <li>
                   <button
-                    id="footer-link-sobre-nos"
-                    onClick={onOpenAbout}
-                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
-                    <span className="font-medium">Sobre a Plataforma</span>
-                  </button>
-                </li>
-                <li>
-                  <button
                     id="footer-link-casos-sucesso"
                     onClick={handleCases}
                     className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
                   >
                     <span className="w-1 h-1 rounded-full bg-[#002133] group-hover:bg-white transition-colors"></span>
                     <span className="font-medium text-white">Casos de Sucesso Escolar</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    id="footer-link-mapas-rotas"
-                    onClick={handleMaps}
-                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-white/70 group-hover:bg-white transition-colors"></span>
-                    <span className="font-medium text-white">Mapa de Escolas & Rotas</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    id="footer-link-faq"
-                    onClick={handleFAQ}
-                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-white/70 group-hover:bg-white transition-colors"></span>
-                    <span className="font-medium text-white">Perguntas Frequentes (FAQ)</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    id="footer-link-termos-privacidade"
-                    onClick={onOpenTerms}
-                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
-                    <span className="font-medium">Termos de Utilização</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    id="footer-link-privacidade"
-                    onClick={handlePrivacy}
-                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
-                    <span className="font-medium">Política de Privacidade</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    id="footer-link-seguranca"
-                    onClick={handleSecurity}
-                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-white/50 group-hover:bg-white transition-colors"></span>
-                    <span className="font-medium">Segurança e Proteção de Dados</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    id="footer-link-cookies"
-                    onClick={handleCookies}
-                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
-                  >
-                    <Cookie className="w-3.5 h-3.5 text-white/70 group-hover:text-white transition-colors" />
-                    <span className="font-medium">Preferências de Cookies</span>
                   </button>
                 </li>
               </ul>
@@ -219,19 +144,6 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
                   <HelpCircle className="w-4 h-4 text-white" />
                   <span>Central de Apoio Sigre</span>
                 </button>
-
-                <div className="bg-black/15 rounded-xl p-3.5 border border-white/15 text-xs space-y-1.5">
-                  <span className="text-white/75 font-medium block">Linha de Suporte Técnico & Pedagógico:</span>
-                  <a
-                    href="mailto:suporte@sigre.ao"
-                    className="font-bold text-sm text-white hover:underline flex items-center gap-1.5 transition-colors"
-                  >
-                    <span>suporte@sigre.ao</span>
-                  </a>
-                  <p className="text-[11px] text-white/70 leading-normal">
-                    Atendimento disponível nos dias úteis, das 08h00 às 17h00 (WAT).
-                  </p>
-                </div>
               </div>
             </div>
           </div>
@@ -275,14 +187,6 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
               >
                 <Cookie className="w-3 h-3 text-white/70" />
                 <span>Cookies</span>
-              </button>
-              <span className="text-white/30 hidden sm:inline">•</span>
-              <button
-                onClick={scrollToTop}
-                className="hover:text-white font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 text-white bg-black/15 px-3 py-1 rounded-lg border border-white/10"
-              >
-                <span>Voltar ao topo</span>
-                <ArrowUp className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

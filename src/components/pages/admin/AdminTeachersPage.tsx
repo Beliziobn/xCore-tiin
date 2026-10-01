@@ -16,11 +16,18 @@ import {
   Building,
   FileText,
   Edit3,
-  CheckCircle2
+  CheckCircle2,
+  Trash2,
+  Clock
 } from 'lucide-react';
 import { Hero } from '../../Hero';
-import type { AdminTeacher, TeacherRegistrationData } from '../../../types';
-import { getStoredTeachers, saveTeacher } from '../../../utils/teacherStorage';
+import type { AdminSchool, AdminTeacher, TeacherRegistrationData } from '../../../types';
+import {
+  getStoredTeachers,
+  deleteTeacher,
+  getSchoolTeacherQuotaStatus
+} from '../../../utils/teacherStorage';
+import { initialAdminSchools } from '../../../data/adminData';
 import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
 import { TeacherDetailModal } from '../../modals/TeacherDetailModal';
 import { TeacherAnalyticalMatrixModal } from '../../modals/TeacherAnalyticalMatrixModal';
@@ -56,14 +63,56 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
   // Modals state
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [editingTeacherData, setEditingTeacherData] = useState<TeacherRegistrationData | null>(null);
+  const [preselectedSchoolName, setPreselectedSchoolName] = useState<string>('');
   const [detailModalTeacher, setDetailModalTeacher] = useState<TeacherRegistrationData | null>(null);
   const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
 
   // Sync stored teachers on mount and local changes
   useEffect(() => {
-    const list = getStoredTeachers();
-    setDetailedTeachers(list);
+    const refresh = () => {
+      setDetailedTeachers(getStoredTeachers());
+    };
+    refresh();
+    window.addEventListener('ucore-teachers-updated', refresh);
+    return () => window.removeEventListener('ucore-teachers-updated', refresh);
   }, []);
+
+  // Lista de escolas cadastradas no sistema com status de quota docente (Declarados vs Cadastrados vs Pendentes)
+  const schoolQuotaList = useMemo(() => {
+    const map = new Map<string, AdminSchool>();
+    initialAdminSchools.forEach((s) => map.set(s.id, s));
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ucore_admin_schools');
+        if (raw) {
+          const parsed: AdminSchool[] = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            map.clear();
+            parsed.forEach((s) => map.set(s.id, s));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return Array.from(map.values()).map((sc) => ({
+      school: sc,
+      quota: getSchoolTeacherQuotaStatus(sc, teachers),
+    }));
+  }, [detailedTeachers, teachers]);
+
+  const totalDeclaredAllSchools = useMemo(
+    () => schoolQuotaList.reduce((acc, item) => acc + item.quota.declaredTotal, 0),
+    [schoolQuotaList]
+  );
+  const totalRegisteredAllSchools = useMemo(
+    () => schoolQuotaList.reduce((acc, item) => acc + item.quota.registeredCount, 0),
+    [schoolQuotaList]
+  );
+  const totalPendingAllSchools = useMemo(
+    () => schoolQuotaList.reduce((acc, item) => acc + item.quota.pendingCount, 0),
+    [schoolQuotaList]
+  );
 
   // Filtered teachers list
   const filteredTeachers = useMemo(() => {
@@ -90,13 +139,24 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
     detailedTeachers[0];
 
   const availableSchools = useMemo(() => {
-    return Array.from(new Set(detailedTeachers.map((t) => t.nomeEscola)));
-  }, [detailedTeachers]);
+    const names = new Set<string>();
+    schoolQuotaList.forEach((item) => names.add(item.school.name));
+    detailedTeachers.forEach((t) => names.add(t.nomeEscola));
+    return Array.from(names);
+  }, [detailedTeachers, schoolQuotaList]);
 
   const handleTeacherSaved = (saved: TeacherRegistrationData) => {
     const updated = getStoredTeachers();
     setDetailedTeachers(updated);
     setSelectedTeacherId(saved.id);
+  };
+
+  const handleDeleteTeacher = (id: string) => {
+    const updated = deleteTeacher(id);
+    setDetailedTeachers(updated);
+    if (selectedTeacherId === id) {
+      setSelectedTeacherId(updated[0]?.id || '');
+    }
   };
 
   return (
@@ -128,6 +188,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
             <button
               onClick={() => {
                 setEditingTeacherData(null);
+                setPreselectedSchoolName(schoolFilter !== 'all' ? schoolFilter : (availableSchools[0] || ''));
                 setIsRegisterModalOpen(true);
               }}
               className="px-4 py-1.5 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
@@ -135,6 +196,96 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
               <Plus className="w-4 h-4" />
               <span>Novo Cadastro</span>
             </button>
+          </div>
+        </div>
+
+        {/* Painel de Reconciliação de Pessoal Docente por Escola (Instrumento Complementar 2026/2027) */}
+        <div className="mb-6 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600" />
+                <span>Controlo de Quotas Docentes por Escola — Instrumento Complementar 2026/2027</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                O nº de docentes informado no cadastro da escola permanece como <strong>Pendente</strong>. À medida que cada docente é cadastrado, o saldo pendente diminui (ex: 32 → 31 → 30) e o docente entra na planilha oficial.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-slate-500">Declarados</span>
+                <span className="text-sm font-black text-slate-900">{totalDeclaredAllSchools}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-emerald-700">Cadastrados (Planilha)</span>
+                <span className="text-sm font-black text-emerald-800">{totalRegisteredAllSchools}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-amber-800">Pendentes</span>
+                <span className="text-sm font-black text-amber-900">{totalPendingAllSchools}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {schoolQuotaList.map(({ school, quota }) => (
+              <div
+                key={school.id}
+                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white transition flex flex-col justify-between gap-2.5"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-900 leading-snug line-clamp-1">
+                      {school.name}
+                    </h4>
+                    <span
+                      className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                        quota.pendingCount > 0
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      }`}
+                    >
+                      {quota.pendingCount > 0 ? `${quota.pendingCount} Pendentes` : 'Concluído'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 mt-2.5 text-center">
+                    <div className="bg-white rounded-lg py-1 px-1.5 border border-slate-200/80">
+                      <span className="block text-[9px] uppercase text-slate-400 font-bold">Declarados</span>
+                      <span className="text-xs font-black text-slate-800">{quota.declaredTotal}</span>
+                    </div>
+                    <div className="bg-emerald-50/70 rounded-lg py-1 px-1.5 border border-emerald-200/80">
+                      <span className="block text-[9px] uppercase text-emerald-700 font-bold">Na Planilha</span>
+                      <span className="text-xs font-black text-emerald-800">{quota.registeredCount}</span>
+                    </div>
+                    <div className="bg-amber-50/80 rounded-lg py-1 px-1.5 border border-amber-200/80">
+                      <span className="block text-[9px] uppercase text-amber-800 font-bold">Faltam</span>
+                      <span className="text-xs font-black text-amber-900">{quota.pendingCount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full transition-all"
+                      style={{ width: `${quota.progressPercent}%` }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTeacherData(null);
+                      setPreselectedSchoolName(school.name);
+                      setIsRegisterModalOpen(true);
+                    }}
+                    className="text-[11px] font-bold text-[#f75142] hover:underline cursor-pointer shrink-0 flex items-center gap-0.5"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Cadastrar Docente</span>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -461,6 +612,17 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTeacher(t.id);
+                            }}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Apagar Cadastro do Docente"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -481,7 +643,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
         }}
         initialData={editingTeacherData}
         onSuccess={handleTeacherSaved}
-        defaultSchoolName={availableSchools[0] || 'Escola Modelo Central de Quêssua'}
+        defaultSchoolName={preselectedSchoolName || availableSchools[0] || 'Complexo Escolar Nº 12 - Quêssua Sede'}
         defaultMunicipality="Quêssua"
         defaultProvince="Malanje"
         authorName="Administrador Geral"

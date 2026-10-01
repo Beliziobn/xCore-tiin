@@ -167,7 +167,7 @@ export interface GetTurmaStudentsOptions {
 export function getStudentsForTurma(options: GetTurmaStudentsOptions = {}): TurmaStudentListResult {
   const normalizedClass = normalizeClasseName(options.gradeClass || '4ª Classe');
   const normalizedTurma = normalizeTurmaName(options.turma || 'Turma A');
-  const schoolName = options.schoolName || 'Escola Primária e Iº Ciclo Modelo Central de Quêssua';
+  const schoolName = options.schoolName || 'Unidade Escolar Municipal de Quêssua';
 
   // Target student count (official ceiling is 45 students per Angolan standard)
   const targetCount = options.turma?.includes('B') ? 42 : 45;
@@ -279,62 +279,7 @@ export function getStudentsForTurma(options: GetTurmaStudentsOptions = {}): Turm
     });
   });
 
-  // 2. If we have fewer than targetCount, supplement from the Angolan names pool
-  // Calculate appropriate age based on grade level
-  const baseAge = (() => {
-    if (normalizedClass.includes('Iniciação')) return 5;
-    if (normalizedClass.includes('1ª')) return 6;
-    if (normalizedClass.includes('2ª')) return 7;
-    if (normalizedClass.includes('3ª')) return 8;
-    if (normalizedClass.includes('4ª')) return 9;
-    if (normalizedClass.includes('5ª')) return 10;
-    if (normalizedClass.includes('6ª')) return 11;
-    if (normalizedClass.includes('7ª')) return 12;
-    if (normalizedClass.includes('8ª')) return 13;
-    if (normalizedClass.includes('9ª')) return 14;
-    return 10;
-  })();
-
-  const birthYear = 2026 - baseAge;
-
-  // Pull from pool if needed
-  let poolIdx = 0;
-  while (collectedMap.size < targetCount && poolIdx < ANGOLAN_STUDENT_NAMES_POOL.length) {
-    const candidate = ANGOLAN_STUDENT_NAMES_POOL[poolIdx];
-    poolIdx++;
-
-    const key = candidate.nome.toLowerCase();
-    if (!collectedMap.has(key)) {
-      // 90% have documents, 10% in registration process
-      const hasDocs = (poolIdx % 10) !== 4;
-      const docType = hasDocs ? (poolIdx % 2 === 0 ? 'BI' : 'Cédula de Nascimento') : 'Pendente de Certidão';
-      const numDoc = hasDocs 
-        ? `00${(89400000 + poolIdx * 1357).toString()}ME04${(poolIdx % 9) + 1}` 
-        : 'Processo BUIF / Registos';
-
-      const birthMonth = String((poolIdx % 12) + 1).padStart(2, '0');
-      const birthDay = String((poolIdx % 28) + 1).padStart(2, '0');
-
-      collectedMap.set(key, {
-        id: `turma-std-${poolIdx}-${Date.now().toString(36)}`,
-        numeroOrdem: 0,
-        codigoMatricula: `MAT-2026/${String(collectedMap.size + 1).padStart(3, '0')}`,
-        nomeCompleto: candidate.nome,
-        genero: candidate.genero,
-        dataNascimento: `${birthYear}-${birthMonth}-${birthDay}`,
-        idade: baseAge,
-        tipoDocumento: docType,
-        numeroDocumento: numDoc,
-        temDocumento: hasDocs,
-        encarregado: candidate.encarregado,
-        telefone: `+244 923 ${String(100 + poolIdx * 7).padStart(3, '0')} ${String(200 + poolIdx * 11).padStart(3, '0')}`,
-        condicaoMatricula: poolIdx === 3 ? 'Repetente' : poolIdx === 7 ? 'Transferido' : 'Novo',
-        endereco: `Bairro Modelo Central, Quêssua - Zona ${(poolIdx % 4) + 1}`,
-      });
-    }
-  }
-
-  // 3. STRICT A-Z SORTING (CRITICAL REQUIREMENT)
+  // 2. STRICT A-Z SORTING (CRITICAL REQUIREMENT)
   const studentList = Array.from(collectedMap.values());
   studentList.sort((a, b) =>
     a.nomeCompleto.localeCompare(b.nomeCompleto, 'pt-PT', { sensitivity: 'base' })
@@ -353,14 +298,14 @@ export function getStudentsForTurma(options: GetTurmaStudentsOptions = {}): Turm
   const comDocumentos = studentList.filter((s) => s.temDocumento).length;
   const semDocumentos = total - comDocumentos;
   const repetentes = studentList.filter((s) => s.condicaoMatricula === 'Repetente').length;
-  const avgAge = total > 0 ? (studentList.reduce((acc, s) => acc + s.idade, 0) / total).toFixed(1) : String(baseAge);
+  const avgAge = total > 0 ? (studentList.reduce((acc, s) => acc + s.idade, 0) / total).toFixed(1) : '0';
 
   const stats: TurmaStats = {
     total,
     meninos,
     meninas,
-    percentualM: total > 0 ? `${Math.round((meninos / total) * 100)}%` : '50%',
-    percentualF: total > 0 ? `${Math.round((meninas / total) * 100)}%` : '50%',
+    percentualM: total > 0 ? `${Math.round((meninos / total) * 100)}%` : '0%',
+    percentualF: total > 0 ? `${Math.round((meninas / total) * 100)}%` : '0%',
     comDocumentos,
     semDocumentos,
     repetentes,

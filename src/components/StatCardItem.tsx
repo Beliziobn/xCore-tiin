@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowUpRight, Activity } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import { ComposablesLucideIcon } from './common/ComposablesLucideIcon';
 
 export interface StatCardData {
   id: string;
@@ -94,6 +95,14 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
             : 'h-32 sm:h-36'
         }`}
       >
+        <div className="absolute top-3 left-3 w-7 h-7 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center text-[#002133] group-hover:text-[#f75142] transition-colors">
+          <ComposablesLucideIcon
+            name={card.icon}
+            titleFallback={card.title}
+            size={15}
+            strokeWidth={2}
+          />
+        </div>
         {showPercentages && String(card.value).includes('%') && (
           <span className="absolute top-3 right-3 bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-bold uppercase tracking-[-0.01em] px-2.5 py-0.5 rounded-full shadow-2xs">
             Taxa %

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Lock, ArrowUpRight } from 'lucide-react';
 import type { EducationalModule } from '../types';
+import { ComposablesLucideIcon } from './common/ComposablesLucideIcon';
 
 interface CyanCardsSectionProps {
   onSelectModule: (module: EducationalModule) => void;
@@ -122,12 +123,17 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
             <div>
               {/* Nested Radius Rule: Outer 48px - Padding 16px = Inner 32px */}
               <div className="w-full bg-slate-50/90 group-hover:bg-slate-100/90 rounded-[32px] p-4 mb-4 border border-slate-100 flex items-center justify-between transition-colors duration-200">
-                <div className="w-10 h-10 rounded-full bg-white group-hover:bg-[#002133] flex items-center justify-center text-slate-800 group-hover:text-white font-mono font-black text-xs transition-colors duration-200 shadow-2xs">
-                  {String(idx + 1).padStart(2, '0')}
+                <div className="w-11 h-11 rounded-2xl bg-white group-hover:bg-[#002133] border border-slate-200/80 group-hover:border-[#002133] flex items-center justify-center text-[#002133] group-hover:text-white transition-all duration-200 shadow-2xs">
+                  <ComposablesLucideIcon
+                    name={module.icon}
+                    titleFallback={module.title}
+                    size={20}
+                    strokeWidth={2}
+                  />
                 </div>
                 {!isLoggedIn ? (
-                  <div className="w-8 h-8 rounded-full bg-white/80 border border-slate-200/80 flex items-center justify-center text-slate-400" title="Requer início de sessão">
-                    <Lock className="w-3.5 h-3.5" />
+                  <div className="w-8 h-8 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 shadow-2xs" title="Requer início de sessão">
+                    <Lock className="w-3.5 h-3.5" strokeWidth={2} />
                   </div>
                 ) : (
                   <span className="text-[10px] uppercase tracking-[-0.01em] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">

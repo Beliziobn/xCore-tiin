@@ -12,7 +12,7 @@ export const RoomRegistrationModal: React.FC<RoomRegistrationModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  schoolName = 'Escola Modelo Central',
+  schoolName = '',
   directorName = 'Fert Horlan',
 }) => {
   const [roomName, setRoomName] = useState('');

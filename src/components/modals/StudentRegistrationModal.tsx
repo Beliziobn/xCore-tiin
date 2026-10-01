@@ -17,12 +17,17 @@ import type {
   StudentModalidadeKey,
   StudentNaturezaEscola,
   StudentTipoDeficiencia,
+  AdminSchool,
 } from '../../types';
 import {
   STUDENT_MODALITIES_CATALOG,
   DISABILITY_TYPES_OPTIONS,
   calculateStudentAgeAndFaixa,
+  calculateSuggestedClassForAgeAndModality,
   saveStudent,
+  getRegisteredSchoolsFromStorage,
+  getSuggestedModalityForSchool,
+  getSchoolStudentQuotaStatus,
 } from '../../utils/studentStorage';
 import {
   incrementTurmaOccupancy,
@@ -49,6 +54,7 @@ interface StudentRegistrationModalProps {
   defaultRoom?: string;
   defaultPeriod?: string;
   schoolName?: string;
+  schools?: AdminSchool[];
 }
 
 export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
@@ -60,12 +66,26 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   defaultTurma = 'Turma A',
   defaultRoom = 'Sala 03',
   defaultPeriod = 'Manhã',
-  schoolName = 'Escola Modelo Central do Quéssua',
+  schoolName = '',
+  schools: propSchools,
 }) => {
   const photoInputId = useId();
   const docInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  // Escolas cadastradas no sistema (prop + localStorage)
+  const registeredSchools = useMemo(() => {
+    const fromStorage = getRegisteredSchoolsFromStorage();
+    const combined = [...(propSchools || []), ...fromStorage];
+    const uniqueMap = new Map<string, AdminSchool>();
+    combined.forEach((sc) => {
+      if (sc && sc.name) {
+        uniqueMap.set(sc.name.trim().toLowerCase(), sc);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [propSchools, isOpen]);
 
   // Active Wizard Step: 1=Identificação, 2=Natureza & Modalidade, 3=Classe & Faixa Etária, 4=Família & Documentos
   const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
@@ -73,13 +93,6 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   // Exibir Boletim de Matrícula imediatamente após cadastrar
   const [registeredStudentForBoletim, setRegisteredStudentForBoletim] = useState<StudentRegistrationData | null>(null);
   const prevIsOpenRef = useRef(isOpen);
-
-  useEffect(() => {
-    if (!prevIsOpenRef.current && isOpen) {
-      setRegisteredStudentForBoletim(null);
-    }
-    prevIsOpenRef.current = isOpen;
-  }, [isOpen]);
 
   // Smart Autofill state
   const [isAutofillMinimized, setIsAutofillMinimized] = useState(false);
@@ -100,13 +113,64 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   const [municipio, setMunicipio] = useState(initialData?.municipio || 'Quéssua');
 
   // 2. Natureza & Modalidade da Escola
-  const [nomeEscola, setNomeEscola] = useState(initialData?.escola || schoolName);
+  const [nomeEscola, setNomeEscola] = useState(
+    initialData?.escola || (registeredSchools[0]?.name ?? schoolName)
+  );
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | undefined>(
+    initialData?.schoolId || registeredSchools[0]?.id
+  );
+  const [isCustomSchoolInput, setIsCustomSchoolInput] = useState(false);
   const [tipoEscolaModalidade, setTipoEscolaModalidade] = useState<StudentModalidadeKey>(
-    initialData?.tipoEscolaModalidade || 'primario_regular'
+    initialData?.tipoEscolaModalidade || getSuggestedModalityForSchool(registeredSchools[0])
   );
   const [naturezaEscola, setNaturezaEscola] = useState<StudentNaturezaEscola>(
-    initialData?.naturezaEscola || 'Pública'
+    initialData?.naturezaEscola || (registeredSchools[0]?.natureza as StudentNaturezaEscola) || 'Pública'
   );
+
+  const selectedSchoolObj = useMemo(() => {
+    return registeredSchools.find(
+      (sc) =>
+        (selectedSchoolId && sc.id === selectedSchoolId) ||
+        sc.name.trim().toLowerCase() === nomeEscola.trim().toLowerCase()
+    );
+  }, [registeredSchools, selectedSchoolId, nomeEscola]);
+
+  const selectedSchoolStudentQuota = useMemo(() => {
+    if (!selectedSchoolObj) return null;
+    return getSchoolStudentQuotaStatus(selectedSchoolObj);
+  }, [selectedSchoolObj, isOpen, nomeEscola]);
+
+  const handleSelectSchoolFromSystem = (school: AdminSchool) => {
+    setIsCustomSchoolInput(false);
+    setNomeEscola(school.name);
+    setSelectedSchoolId(school.id);
+    if (school.natureza) {
+      setNaturezaEscola(school.natureza as StudentNaturezaEscola);
+    }
+    if (school.registrationData?.endereco?.provincia) {
+      setProvincia(school.registrationData.endereco.provincia);
+    }
+    if (school.registrationData?.endereco?.municipio) {
+      setMunicipio(school.registrationData.endereco.municipio);
+    }
+    const suggestedMod = getSuggestedModalityForSchool(school);
+    setTipoEscolaModalidade(suggestedMod);
+  };
+
+  useEffect(() => {
+    if (!prevIsOpenRef.current && isOpen) {
+      setRegisteredStudentForBoletim(null);
+      if (!initialData && registeredSchools.length > 0) {
+        const matched =
+          registeredSchools.find((s) => s.name.trim().toLowerCase() === schoolName.trim().toLowerCase()) ||
+          registeredSchools[0];
+        if (matched) {
+          handleSelectSchoolFromSystem(matched);
+        }
+      }
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialData, registeredSchools, schoolName]);
 
   // 3. Classe / Etapa / Módulo e Idade específica
   const selectedModalityConfig = useMemo(() => {
@@ -116,13 +180,28 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     );
   }, [tipoEscolaModalidade]);
 
+  // Dynamic Age & Normative Class calculation
+  const calculatedAgeData = useMemo(() => {
+    return calculateStudentAgeAndFaixa(dataNascimento, tipoEscolaModalidade);
+  }, [dataNascimento, tipoEscolaModalidade]);
+
   const [classeEtapaModulo, setClasseEtapaModulo] = useState<string>(() => {
-    return initialData?.classeEtapaModulo || selectedModalityConfig.etapasOuClasses[0] || '1.ª Classe';
+    return (
+      initialData?.classeEtapaModulo ||
+      calculateStudentAgeAndFaixa(initialData?.dataNascimento || '2016-04-15', initialData?.tipoEscolaModalidade || 'primario_regular').suggestedClass ||
+      selectedModalityConfig.etapasOuClasses[0] ||
+      '1.ª Classe'
+    );
   });
 
   const [idadeEspecificaNivel, setIdadeEspecificaNivel] = useState<string>(() => {
-    return initialData?.idadeEspecificaNivel || selectedModalityConfig.agePresets[0] || '10 anos';
+    return initialData?.idadeEspecificaNivel || calculatedAgeData.suggestedFaixa || selectedModalityConfig.agePresets[0] || '10 anos';
   });
+
+  // State for confirming the automatically calculated class vs choosing an adequate class manually
+  const [isClassConfirmPromptOpen, setIsClassConfirmPromptOpen] = useState<boolean>(false);
+  const [isManualClassSelectionMode, setIsManualClassSelectionMode] = useState<boolean>(false);
+  const [hasConfirmedClassForYear, setHasConfirmedClassForYear] = useState<boolean>(Boolean(initialData));
 
   // Selected Disabilities for Special Education (or mainstream with inclusive needs)
   const [selectedDisabilities, setSelectedDisabilities] = useState<StudentTipoDeficiencia[]>(
@@ -153,16 +232,19 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   // Validation & Error
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Dynamic Age calculation
-  const calculatedAgeData = useMemo(() => {
-    return calculateStudentAgeAndFaixa(dataNascimento, tipoEscolaModalidade);
-  }, [dataNascimento, tipoEscolaModalidade]);
-
-  // Synchronize classeEtapaModulo when modality changes
+  // Synchronize classeEtapaModulo and idadeEspecificaNivel when birthDate or modality changes
   useEffect(() => {
-    if (!selectedModalityConfig.etapasOuClasses.includes(classeEtapaModulo)) {
-      setClasseEtapaModulo(selectedModalityConfig.etapasOuClasses[0] || '');
+    if (!initialData && !isManualClassSelectionMode) {
+      const autoClass = calculatedAgeData.suggestedClass;
+      if (autoClass && selectedModalityConfig.etapasOuClasses.includes(autoClass)) {
+        setClasseEtapaModulo(autoClass);
+      } else {
+        setClasseEtapaModulo(selectedModalityConfig.etapasOuClasses[0] || '');
+      }
+    } else if (!selectedModalityConfig.etapasOuClasses.includes(classeEtapaModulo)) {
+      setClasseEtapaModulo(calculatedAgeData.suggestedClass || selectedModalityConfig.etapasOuClasses[0] || '');
     }
+
     // Update age preset default
     if (calculatedAgeData.suggestedFaixa && selectedModalityConfig.agePresets.includes(calculatedAgeData.suggestedFaixa)) {
       setIdadeEspecificaNivel(calculatedAgeData.suggestedFaixa);
@@ -175,7 +257,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       setNaturezaEscola('Pública');
       setTemNecessidadesEspeciais(true);
     }
-  }, [tipoEscolaModalidade, selectedModalityConfig, calculatedAgeData.suggestedFaixa]);
+  }, [tipoEscolaModalidade, selectedModalityConfig, calculatedAgeData.suggestedFaixa, calculatedAgeData.suggestedClass]);
 
   // Sync initialData when provided
   useEffect(() => {
@@ -286,7 +368,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       setEndereco('Bairro Modelo - Quéssua');
       setProvincia('Malanje');
       setMunicipio('Quéssua');
-      setNomeEscola('Escola Modelo Central do Quéssua');
+      setNomeEscola(registeredSchools[0]?.name || schoolName || '');
       setTipoEscolaModalidade('primario_regular');
       setNaturezaEscola('Pública');
       setClasseEtapaModulo('1.ª Classe');
@@ -321,6 +403,10 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
         setErrorMessage('Por favor informe o Nome da Escola onde o Aluno está Matriculado.');
         return;
       }
+      if (!hasConfirmedClassForYear) {
+        setIsClassConfirmPromptOpen(true);
+        return;
+      }
       setActiveTab(3);
     } else if (activeTab === 3) {
       if (!classeEtapaModulo) {
@@ -333,6 +419,26 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       }
       setActiveTab(4);
     }
+  };
+
+  const handleConfirmCalculatedClassAndAdvance = () => {
+    setErrorMessage(null);
+    setHasConfirmedClassForYear(true);
+    setIsManualClassSelectionMode(false);
+    setIsClassConfirmPromptOpen(false);
+    if (selectedModalityConfig.isSpecialEducation && selectedDisabilities.length === 0) {
+      setActiveTab(3);
+    } else {
+      setActiveTab(4);
+    }
+  };
+
+  const handleRejectCalculatedClassAndChooseAdequate = () => {
+    setErrorMessage(null);
+    setHasConfirmedClassForYear(false);
+    setIsManualClassSelectionMode(true);
+    setIsClassConfirmPromptOpen(false);
+    setActiveTab(3);
   };
 
   // Submit Handler
@@ -441,7 +547,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       periodo: turno,
       turno,
       sala,
-      escola: nomeEscola,
+      escola: nomeEscola.trim(),
+      schoolId: selectedSchoolObj?.id || selectedSchoolId,
+      categoriaEscola: selectedSchoolObj?.category || selectedModalityConfig.categoryName,
       condicaoMatricula: alunoRepetente ? 'repetente' : 'primeira_vez',
       alunoRepetente,
       temNecessidadesEspeciais: temNecessidadesEspeciais || selectedModalityConfig.isSpecialEducation,
@@ -538,11 +646,18 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                 </svg>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {initialData ? 'Atualizar Matrícula do Aluno' : 'Candidatura & Matrícula de Aluno'}
-                </h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {initialData ? 'Atualizar Matrícula do Aluno' : 'Candidatura & Matrícula de Aluno'}
+                  </h2>
+                  {nomeEscola && (
+                    <span className="text-xs font-bold bg-[#0b3d5c] text-white px-2.5 py-0.5 rounded-full">
+                      Escola: {nomeEscola}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-slate-500 mt-0.5 max-w-xl">
-                  Preencha a ficha do aluno de forma simples e assistida — o Sigre calcula automaticamente a idade, faixa etária e sugere a turma ideal.
+                  O sistema identifica automaticamente a unidade escolar do Director ({nomeEscola || 'Direção Escolar'}) e vincula este aluno à respectiva escola.
                 </p>
               </div>
             </div>
@@ -679,51 +794,6 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
             ======================================================== */}
             {activeTab === 1 && (
               <div className="space-y-6 animate-in fade-in duration-150">
-                {/* Preenchimento Inteligente */}
-                <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">Preenchimento Inteligente</p>
-                        <p className="text-xs text-slate-500">Carregue dados a partir de um perfil registado</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAutofillMinimized(!isAutofillMinimized)}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 cursor-pointer"
-                    >
-                      {isAutofillMinimized ? 'Expandir' : 'Minimizar'}
-                    </button>
-                  </div>
-
-                  {!isAutofillMinimized && (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <select
-                        value={selectedProfileId}
-                        onChange={(e) => setSelectedProfileId(e.target.value as any)}
-                        className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="admin">Sua Conta Ativa (Fred Silva) — Sessão iniciada como ADMIN</option>
-                        <option value="guardian">Encarregado(a) Padrão — Maria António Quessua</option>
-                        <option value="demo_student">Ficha Demonstrativa — Teresa Domingos Manuel (10 anos)</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleApplySmartAutofill}
-                        className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs"
-                      >
-                        Preencher com este Perfil
-                      </button>
-                    </div>
-                  )}
-                </div>
-
                 {/* 1. Dados do Aluno */}
                 <section>
                   <div className="flex items-center gap-2 mb-4">
@@ -834,7 +904,11 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                           type="date"
                           required
                           value={dataNascimento}
-                          onChange={(e) => setDataNascimento(e.target.value)}
+                          onChange={(e) => {
+                            setDataNascimento(e.target.value);
+                            setIsManualClassSelectionMode(false);
+                            setHasConfirmedClassForYear(false);
+                          }}
                           className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         />
                         <div className="mt-2 flex flex-wrap gap-2">
@@ -843,6 +917,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                           </span>
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/50">
                             Faixa: {calculatedAgeData.suggestedFaixa}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200/60">
+                            Classe Calculada: {calculatedAgeData.suggestedClass}
                           </span>
                         </div>
                       </div>
@@ -966,41 +1043,97 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Nome da Escola onde o Aluno está Matriculado <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={nomeEscola}
-                    onChange={(e) => setNomeEscola(e.target.value)}
-                    placeholder="Escola Modelo Central do Quéssua"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
+                <div className="p-4 rounded-xl bg-cyan-50/70 border border-cyan-200 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#0b3d5c] block">
+                        Unidade Escolar Vinculada Automaticamente (Direção de Escola)
+                      </span>
+                      <p className="text-sm font-black text-slate-900 mt-0.5">
+                        {nomeEscola || selectedSchoolObj?.name || 'Unidade Escolar da Direção'}
+                      </p>
+                    </div>
+                    {selectedSchoolObj && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] font-bold bg-[#0b3d5c] text-white px-2.5 py-0.5 rounded-full">
+                          {selectedSchoolObj.category}
+                        </span>
+                        <span className="text-[11px] font-semibold bg-white text-cyan-900 border border-cyan-300 px-2.5 py-0.5 rounded-full">
+                          {selectedSchoolObj.natureza || naturezaEscola}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedSchoolStudentQuota && (
+                    <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                      <div className="bg-white rounded-lg p-2 border border-slate-200">
+                        <span className="block text-[10px] font-bold uppercase text-slate-500">Quota Declarada</span>
+                        <span className="text-sm font-black text-slate-900">{selectedSchoolStudentQuota.declaredTotal}</span>
+                      </div>
+                      <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                        <span className="block text-[10px] font-bold uppercase text-emerald-700">Já Cadastrados</span>
+                        <span className="text-sm font-black text-emerald-800">{selectedSchoolStudentQuota.registeredCount}</span>
+                      </div>
+                      <div className="bg-amber-50 rounded-lg p-2 border border-amber-200">
+                        <span className="block text-[10px] font-bold uppercase text-amber-800">Pendentes</span>
+                        <span className="text-sm font-black text-amber-900">{selectedSchoolStudentQuota.pendingCount}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-cyan-900/85">
+                    ✓ Como o cadastro é realizado pelo <strong>Director de Escola</strong>, o sistema reconhece automaticamente que a escola <strong>{nomeEscola || 'da Direção'}</strong> é quem está a matricular este aluno.
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    Tipo de Escola / Modalidade (Escolha Principal de A a F) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {STUDENT_MODALITIES_CATALOG.slice(0, 6).map((mod) => {
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Categoria / Subsistema de Ensino no Instrumento Complementar 2026/2027 (A a O){' '}
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    {selectedSchoolObj && (
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Escola: {selectedSchoolObj.category}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1">
+                    {STUDENT_MODALITIES_CATALOG.map((mod) => {
                       const isSelected = tipoEscolaModalidade === mod.key;
+                      const isSuggestedForSchool =
+                        selectedSchoolObj && getSuggestedModalityForSchool(selectedSchoolObj) === mod.key;
+                      const calculatedClassForMod = calculateSuggestedClassForAgeAndModality(
+                        calculatedAgeData.age,
+                        mod.key,
+                        calculatedAgeData.isBaby
+                      );
                       return (
                         <button
                           key={mod.key}
                           type="button"
                           onClick={() => {
+                            const autoClass = calculateSuggestedClassForAgeAndModality(
+                              calculatedAgeData.age,
+                              mod.key,
+                              calculatedAgeData.isBaby
+                            );
                             setTipoEscolaModalidade(mod.key);
+                            setClasseEtapaModulo(autoClass);
+                            setIsManualClassSelectionMode(false);
+                            setHasConfirmedClassForYear(false);
                             if (mod.isSpecialEducation) {
                               setNaturezaEscola('Pública');
                               setTemNecessidadesEspeciais(true);
                             }
+                            setIsClassConfirmPromptOpen(true);
                           }}
-                          className={`text-left p-4 rounded-xl transition cursor-pointer relative ${
+                          className={`text-left p-3.5 rounded-xl transition cursor-pointer relative ${
                             isSelected
                               ? 'border-2 border-rose-400 bg-rose-50/40'
+                              : isSuggestedForSchool
+                              ? 'border-2 border-cyan-300 bg-cyan-50/30 hover:border-cyan-400'
                               : 'border border-slate-200 hover:border-slate-300 bg-white'
                           }`}
                         >
@@ -1013,8 +1146,13 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                             </span>
                           )}
 
-                          <div className="flex items-center gap-2 pr-24">
-                            <p className="font-medium text-slate-800">{mod.label}</p>
+                          <div className="flex items-center flex-wrap gap-1.5 pr-24">
+                            <p className="font-semibold text-sm text-slate-800">{mod.label}</p>
+                            {isSuggestedForSchool && (
+                              <span className="text-[10px] font-bold bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded shrink-0">
+                                Categoria da Escola
+                              </span>
+                            )}
                             {mod.isSpecialEducation && (
                               <span className="text-[10px] font-medium bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded shrink-0">
                                 Ensino Especial
@@ -1022,10 +1160,61 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                             )}
                           </div>
                           <p className="text-xs text-slate-500 mt-1">{mod.description}</p>
-                          <p className="text-xs text-slate-400 mt-2">{mod.etapasOuClasses.length} opção(ões) de nível</p>
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-1 pt-1.5 border-t border-slate-100">
+                            <span className="text-[11px] text-slate-400">
+                              Classes: {mod.etapasOuClasses.join(', ')}
+                            </span>
+                            <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/60">
+                              Pela idade ({calculatedAgeData.ageLabel}) → {calculatedClassForMod}
+                            </span>
+                          </div>
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* Card de Cálculo Automático da Classe e Confirmação na Etapa 2 */}
+                <div className="p-4 rounded-2xl bg-indigo-50/80 border-2 border-indigo-200 space-y-3 animate-in fade-in duration-150">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-indigo-800">
+                        <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                        Cálculo Automático de Classe pela Idade / Faixa Etária
+                      </span>
+                      <p className="text-sm font-bold text-slate-900 mt-1">
+                        Com base na idade de <span className="text-indigo-700 font-black">{calculatedAgeData.ageLabel}</span> (Faixa: <span className="text-indigo-700 font-black">{calculatedAgeData.suggestedFaixa}</span>) e na modalidade <span className="text-indigo-700 font-black">{selectedModalityConfig.label}</span>, o sistema calculou que o(a) aluno(a) vai frequentar a{' '}
+                        <span className="underline decoration-indigo-500 decoration-2 font-black text-indigo-900">
+                          {classeEtapaModulo}
+                        </span>.
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-indigo-600 text-white px-3 py-1 rounded-full shrink-0">
+                      {classeEtapaModulo}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-white rounded-xl border border-indigo-200/80 space-y-2.5">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900">
+                      Tem a certeza que o(a) aluno(a) vai fazer a <span className="text-rose-600 font-black">{classeEtapaModulo}</span> este ano lectivo?
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleConfirmCalculatedClassAndAdvance}
+                        className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Sim, tenho a certeza (Avançar)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRejectCalculatedClassAndChooseAdequate}
+                        className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition cursor-pointer"
+                      >
+                        Não, escolher uma classe adequada
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1096,25 +1285,134 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   </button>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    Selecione a Classe, Etapa ou Módulo correspondente <span className="text-rose-500">*</span>
-                  </label>
+                {/* Painel de Confirmação da Classe Calculada pela Faixa Etária / Idade */}
+                <div
+                  className={`p-4 rounded-2xl border-2 space-y-3 transition ${
+                    isManualClassSelectionMode
+                      ? 'bg-amber-50/80 border-amber-300'
+                      : 'bg-indigo-50/80 border-indigo-200'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span
+                        className={`text-[11px] font-black uppercase tracking-wider block ${
+                          isManualClassSelectionMode ? 'text-amber-900' : 'text-indigo-900'
+                        }`}
+                      >
+                        {isManualClassSelectionMode
+                          ? 'Escolha Manual de Classe Adequada Activa'
+                          : 'Classe Calculada Automaticamente pela Faixa Etária / Idade'}
+                      </span>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Idade do Aluno: <strong>{calculatedAgeData.ageLabel}</strong> • Faixa Etária: <strong>{idadeEspecificaNivel}</strong> • Classe sugerida pela idade: <strong>{calculatedAgeData.suggestedClass}</strong>
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-slate-900 text-white px-3 py-1 rounded-full">
+                      Classe Actual: {classeEtapaModulo}
+                    </span>
+                  </div>
+
+                  {!isManualClassSelectionMode ? (
+                    <div className="p-3.5 bg-white rounded-xl border border-indigo-200/80 space-y-2.5">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">
+                        Tem a certeza que o(a) aluno(a) vai fazer a{' '}
+                        <span className="text-rose-600 font-black">{classeEtapaModulo}</span> este ano lectivo?
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={handleConfirmCalculatedClassAndAdvance}
+                          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>Sim, avança ({classeEtapaModulo})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsManualClassSelectionMode(true);
+                            setHasConfirmedClassForYear(false);
+                          }}
+                          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition cursor-pointer"
+                        >
+                          Não, escolher uma classe adequada
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-white rounded-xl border border-amber-200 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-amber-900">
+                        Selecione abaixo a classe adequada para o(a) aluno(a) neste ano lectivo e clique em confirmar:
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleConfirmCalculatedClassAndAdvance}
+                        className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Confirmar {classeEtapaModulo} e Avançar</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={`p-4 rounded-2xl transition ${
+                    isManualClassSelectionMode
+                      ? 'ring-2 ring-amber-400 bg-amber-50/30'
+                      : 'bg-slate-50/60 border border-slate-200/80'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      {isManualClassSelectionMode
+                        ? 'Escolha a Classe, Etapa ou Módulo adequada para o aluno *'
+                        : 'Classe, Etapa ou Módulo correspondente *'}
+                    </label>
+                    {!isManualClassSelectionMode && (
+                      <button
+                        type="button"
+                        onClick={() => setIsManualClassSelectionMode(true)}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                      >
+                        Escolher outra classe manualmente
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {selectedModalityConfig.etapasOuClasses.map((item) => {
                       const isSelected = classeEtapaModulo === item;
+                      const isSuggestedNormative = calculatedAgeData.suggestedClass === item;
                       return (
                         <button
                           key={item}
                           type="button"
-                          onClick={() => setClasseEtapaModulo(item)}
-                          className={`py-2.5 rounded-xl text-sm font-medium transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                          onClick={() => {
+                            setClasseEtapaModulo(item);
+                            setIsManualClassSelectionMode(true);
+                            setHasConfirmedClassForYear(true);
+                          }}
+                          className={`py-2.5 px-3 rounded-xl text-sm font-medium transition cursor-pointer flex items-center justify-between gap-1.5 ${
                             isSelected
                               ? 'bg-slate-900 text-white shadow-xs'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              : isSuggestedNormative
+                              ? 'bg-indigo-50 text-indigo-900 border border-indigo-300 hover:bg-indigo-100'
+                              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                           }`}
                         >
-                          <span>{item}</span>
+                          <div className="flex flex-col text-left">
+                            <span>{item}</span>
+                            {isSuggestedNormative && (
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  isSelected ? 'text-emerald-300' : 'text-indigo-600'
+                                }`}
+                              >
+                                Sugerida p/ {calculatedAgeData.ageLabel}
+                              </span>
+                            )}
+                          </div>
                           {isSelected && (
                             <svg className="w-4 h-4 text-white shrink-0" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -1142,7 +1440,20 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                         <button
                           key={ageOpt}
                           type="button"
-                          onClick={() => setIdadeEspecificaNivel(ageOpt)}
+                          onClick={() => {
+                            setIdadeEspecificaNivel(ageOpt);
+                            const autoClassForFaixa = calculateSuggestedClassForAgeAndModality(
+                              ageOpt,
+                              tipoEscolaModalidade,
+                              calculatedAgeData.isBaby
+                            );
+                            if (selectedModalityConfig.etapasOuClasses.includes(autoClassForFaixa)) {
+                              setClasseEtapaModulo(autoClassForFaixa);
+                              setIsManualClassSelectionMode(false);
+                              setHasConfirmedClassForYear(false);
+                              setIsClassConfirmPromptOpen(true);
+                            }
+                          }}
                           className={`py-2 rounded-xl text-sm font-medium transition cursor-pointer ${
                             isSelected
                               ? 'bg-rose-500 text-white shadow-xs'
@@ -1490,6 +1801,79 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
             )}
           </div>
         </div>
+
+        {/* Modal de Confirmação da Classe Calculada pela Idade / Faixa Etária */}
+        {isClassConfirmPromptOpen && (
+          <div
+            className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/65 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={() => setIsClassConfirmPromptOpen(false)}
+          >
+            <div
+              className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block">
+                    Cálculo Automático de Classe • Ano Lectivo 2026/2027
+                  </span>
+                  <h4 className="text-base font-black text-slate-900 mt-0.5">
+                    Confirmação da Classe do Aluno
+                  </h4>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs text-slate-700">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Aluno(a):</span>
+                  <span className="font-bold text-slate-900">{nomeCompleto.trim() || 'Novo Aluno'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Idade / Faixa Etária:</span>
+                  <span className="font-bold text-emerald-700">
+                    {calculatedAgeData.ageLabel} ({idadeEspecificaNivel || calculatedAgeData.suggestedFaixa})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Modalidade Escolhida:</span>
+                  <span className="font-bold text-slate-900">{selectedModalityConfig.label}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                  <span className="text-slate-600 font-semibold">Classe Calculada pelo Sistema:</span>
+                  <span className="text-sm font-black text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                    {classeEtapaModulo}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm font-bold text-slate-900 leading-snug">
+                Tem a certeza que o(a) aluno(a) vai fazer a{' '}
+                <span className="text-rose-600 font-black underline">{classeEtapaModulo}</span> este ano lectivo?
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleConfirmCalculatedClassAndAdvance}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Sim, avança</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRejectCalculatedClassAndChooseAdequate}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition cursor-pointer"
+                >
+                  Não, escolher classe adequada
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, Video, Sparkles } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, Video, Sparkles, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications } from '../utils/authApprovalStorage';
 
@@ -28,32 +28,8 @@ interface NavbarProps {
   onOpenGoogleSheets?: () => void;
 }
 
-const mockNotifications: NotificationItem[] = [
-  {
-    id: '1',
-    title: 'Fechamento de Notas',
-    message: 'O prazo do 1º Bimestre encerra nesta sexta-feira às 18:00.',
-    time: 'Há 15 min',
-    read: false,
-    type: 'academic',
-  },
-  {
-    id: '2',
-    title: 'Nova Matrícula Efetuada',
-    message: 'Aluno Lucas Silveira matriculado no 8º Ano B.',
-    time: 'Há 1 hora',
-    read: false,
-    type: 'event',
-  },
-  {
-    id: '3',
-    title: 'Reunião de Coordenação',
-    message: 'Pauta pedagógica de alinhamento com diretores agendada.',
-    time: 'Ontem',
-    read: true,
-    type: 'alert',
-  },
-];
+const mockNotifications: NotificationItem[] = [];
+
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenGetStarted,
@@ -183,8 +159,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="w-10 h-10 rounded-xl bg-[#002133] flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(0,33,51,0.45)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
             <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-2xl font-black tracking-tight text-[#002133]">
-            Sigre
+          <span className="text-2xl font-black tracking-tight text-[#002133] uppercase">
+            SIGRE
           </span>
         </button>
 
@@ -223,54 +199,60 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('admin-dashboard');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Painel Central Admin
+                        <LayoutDashboard className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Painel Central Admin</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('admin-estatisticas');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Estatísticas da Rede
+                        <BarChart3 className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Estatísticas da Rede</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('admin-escolas');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Minhas Escolas
+                        <School className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Minhas Escolas</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('admin-directores');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Meus Directores
+                        <UserCheck className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Meus Directores</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('admin-professores');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Meus Professores
+                        <GraduationCap className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Meus Professores</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('admin-alunos');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Meus Alunos
+                        <Users className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Meus Alunos</span>
                       </button>
                       <button
                         onClick={() => {
@@ -279,7 +261,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }}
                         className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
                       >
-                        <span>Demandas & Editais</span>
+                        <span className="flex items-center gap-2.5">
+                          <Megaphone className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                          <span>Demandas & Editais</span>
+                        </span>
                         <span className="text-[9px] bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded">Oficial</span>
                       </button>
 
@@ -288,9 +273,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('admin-perfil');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors mt-1 uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Perfil do Administrador
+                        <User className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Perfil do Administrador</span>
                       </button>
                     </>
                   ) : activeRole === 'diretor' ? (
@@ -300,9 +286,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('diretor-dashboard');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Painel do Diretor
+                        <LayoutDashboard className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Painel do Diretor</span>
                       </button>
 
                       <button
@@ -310,18 +297,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('diretor-estatisticas');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Analisa suas estatísticas
+                        <BarChart3 className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Analisa suas estatísticas</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('diretor-professores');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Meus Professores
+                        <GraduationCap className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Meus Professores</span>
                       </button>
                       <button
                         onClick={() => {
@@ -330,7 +319,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }}
                         className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
                       >
-                        <span>Presença Professores (Ponto)</span>
+                        <span className="flex items-center gap-2.5">
+                          <ClipboardCheck className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                          <span>Presença Professores (Ponto)</span>
+                        </span>
                         <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
                       </button>
                       <button
@@ -338,36 +330,40 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('diretor-alunos');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Meus Alunos
+                        <Users className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Meus Alunos</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('diretor-salas');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Minhas Salas
+                        <DoorOpen className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Minhas Salas</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('diretor-classes');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Minhas Classes
+                        <BookOpen className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Minhas Classes</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('diretor-perfil');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Perfil do Director
+                        <User className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Perfil do Director</span>
                       </button>
                     </>
                   ) : activeRole === 'professor' ? (
@@ -377,18 +373,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('estatisticas');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Analisa suas estatísticas
+                        <BarChart3 className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Analisa suas estatísticas</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('minha-turma');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Minha Turma (4ª Classe)
+                        <BookOpen className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Minha Turma (4ª Classe)</span>
                       </button>
                       <button
                         onClick={() => {
@@ -397,7 +395,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }}
                         className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#f75142] transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
                       >
-                        <span>Presença dos Alunos (Chamada)</span>
+                        <span className="flex items-center gap-2.5">
+                          <ClipboardCheck className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                          <span>Presença dos Alunos (Chamada)</span>
+                        </span>
                         <span className="text-[9px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded">Diário</span>
                       </button>
                       <button
@@ -405,9 +406,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('perfil-professor');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Meu Perfil de Docente
+                        <User className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Meu Perfil de Docente</span>
                       </button>
                     </>
                   ) : (
@@ -417,36 +419,40 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onSelectPage('escolas');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Rede de Escolas
+                        <School className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Rede de Escolas</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('professores');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Portal dos Professores
+                        <GraduationCap className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Portal dos Professores</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('alunos');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Ambiente do Aluno
+                        <Users className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Ambiente do Aluno</span>
                       </button>
                       <button
                         onClick={() => {
                           onSelectPage('calendario');
                           setShowPagesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer block"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
-                        Calendário Letivo 2026
+                        <Calendar className="w-4 h-4 text-slate-500" strokeWidth={2} />
+                        <span>Calendário Letivo 2026</span>
                       </button>
                     </>
                   )}
@@ -604,8 +610,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   type="button"
                   onClick={onOpenSettings}
                   className="p-2 text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-                  title="Configurações da Conta & Palavra-passe"
-                  aria-label="Configurações da Conta & Palavra-passe"
+                  title="Configurações do Perfil"
+                  aria-label="Configurações do Perfil"
                 >
                   <Settings className="w-5 h-5 text-white" strokeWidth={2.2} />
                 </button>

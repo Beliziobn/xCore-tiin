@@ -30,6 +30,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { AdminSchool, SchoolRegistrationData } from '../../types';
+import { getSchoolTeacherQuotaStatus } from '../../utils/teacherStorage';
 import {
   getSchoolRegistrationData,
   getOfferedLevelsBadges,
@@ -572,6 +573,41 @@ export const SchoolDetailModal: React.FC<SchoolDetailModalProps> = ({
           {/* TAB 4: PESSOAL & DOCÊNCIA */}
           {activeTab === 'pessoal' && (
             <div className="space-y-6 animate-in fade-in">
+              {(() => {
+                const q = getSchoolTeacherQuotaStatus(school);
+                return (
+                  <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div>
+                        <h5 className="text-xs font-black uppercase tracking-wider text-amber-950">
+                          Reconciliação de Pessoal Docente — Instrumento Complementar 2026/2027
+                        </h5>
+                        <p className="text-[11px] text-amber-800 mt-0.5">
+                          Os docentes declarados ficam como pendentes até que cada professor seja cadastrado no sistema.
+                        </p>
+                      </div>
+                      <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-950">
+                        {q.pendingCount} Pendentes de Cadastro
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2.5 text-center">
+                      <div className="bg-white rounded-xl p-2.5 border border-amber-200">
+                        <span className="block text-[10px] font-bold uppercase text-slate-500">Quota Declarada</span>
+                        <span className="text-lg font-black text-slate-900">{q.declaredTotal}</span>
+                      </div>
+                      <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-200">
+                        <span className="block text-[10px] font-bold uppercase text-emerald-700">Cadastrados (Na Planilha)</span>
+                        <span className="text-lg font-black text-emerald-800">{q.registeredCount}</span>
+                      </div>
+                      <div className="bg-amber-100 rounded-xl p-2.5 border border-amber-300">
+                        <span className="block text-[10px] font-bold uppercase text-amber-900">Saldo Pendente</span>
+                        <span className="text-lg font-black text-amber-950">{q.pendingCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
                   <span className="text-[10px] font-bold text-slate-500 block mb-1">Educadores de Infância</span>

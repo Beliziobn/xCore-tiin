@@ -20,7 +20,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
   entityType,
   onSuccess,
   initialData,
-  schoolName = 'Escola Modelo Central',
+  schoolName = '',
   directorName = 'Diretor de Escola',
 }) => {
   if (!isOpen) return null;
@@ -57,6 +57,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
           const formattedTeacher = {
             id: teacherData.id,
             name: teacherData.nomeCompleto,
+            schoolName: teacherData.nomeEscola || schoolName,
             gradeClass: teacherData.niveisLecciona[0]?.nome || '4ª Classe',
             room: 'Sala 03',
             turma: 'Turma A',

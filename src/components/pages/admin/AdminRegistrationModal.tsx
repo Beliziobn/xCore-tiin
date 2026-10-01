@@ -57,7 +57,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
   const [tTurma, setTTurma] = useState('Turma A');
   const [tCategory, setTCategory] = useState('Professor Primário Efetivo');
   const [tLocation, setTLocation] = useState('Pavilhão 1 - Bloco B');
-  const [tSchool, setTSchool] = useState(availableSchools[0] || 'Escola Modelo Central');
+  const [tSchool, setTSchool] = useState(availableSchools[0] || '');
   const [tSubject, setTSubject] = useState('Língua Portuguesa & Matemática');
 
   // Student Form State
@@ -70,12 +70,12 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
   const [sLocation, setSLocation] = useState('');
   const [sHasDocs, setSHasDocs] = useState(true);
   const [sDocType, setSDocType] = useState('BI Regularizado');
-  const [sSchool, setSSchool] = useState(availableSchools[0] || 'Escola Modelo Central');
+  const [sSchool, setSSchool] = useState(availableSchools[0] || '');
   const [sScore, setSScore] = useState('8.5');
 
   // Director Form State
   const [dName, setDName] = useState('');
-  const [dSchool, setDSchool] = useState(availableSchools[0] || 'Escola Modelo Central');
+  const [dSchool, setDSchool] = useState(availableSchools[0] || '');
   const [dPhone, setDPhone] = useState('+244 923 111 222');
   const [dEmail, setDEmail] = useState('');
   const [dYear, setDYear] = useState('2024');
@@ -102,16 +102,17 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
       <StudentRegistrationModal
         isOpen={isOpen}
         onClose={onClose}
+        schools={schools}
         onSuccess={(regData) => {
           const newStudent: AdminStudent = {
-            id: `std-${Date.now()}`,
-            name: regData.name.trim(),
-            gender: regData.genero,
-            gradeClass: regData.classe,
-            room: regData.sala,
+            id: regData.id || `std-${Date.now()}`,
+            name: (regData.nomeCompleto || regData.name).trim(),
+            gender: regData.genero === 'M' ? 'M' : 'F',
+            gradeClass: regData.classeEtapaModulo || regData.classe,
+            room: regData.sala || 'Sala 03',
             turma: regData.turma,
             guardianName: regData.encarregado.trim() || 'Encarregado de Educação',
-            location: regData.endereco || 'Luanda Central',
+            location: regData.endereco || `${regData.municipio || 'Quêssua'}, ${regData.provincia || 'Malanje'}`,
             presenceRate: 97.5,
             hasDocuments: regData.tipoDocumento !== 'sem Documento',
             documentType: regData.tipoDocumento,
@@ -122,7 +123,9 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
             foto: regData.foto,
             anexoDocumentoNome: regData.anexoDocumentoNome,
             performanceScore: 8.5,
-            schoolName: sSchool || availableSchools[0] || 'Escola Modelo Central',
+            schoolName: regData.escola || schools?.[0]?.name || sSchool || availableSchools[0] || '',
+            schoolId: regData.schoolId,
+            schoolType: regData.naturezaEscola || 'Pública',
             registrationData: regData,
           };
           onAddStudent?.(newStudent);
@@ -131,7 +134,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
         defaultTurma="Turma A"
         defaultRoom="Sala 03"
         defaultPeriod="Manhã"
-        schoolName={sSchool || availableSchools[0] || 'Escola Modelo Central'}
+        schoolName={schools?.[0]?.name || sSchool || availableSchools[0] || ''}
       />
     );
   }
@@ -141,7 +144,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({
       <TeacherRegistrationModal
         isOpen={isOpen}
         onClose={onClose}
-        defaultSchoolName={availableSchools[0] || 'Escola Modelo Central de Quêssua'}
+        defaultSchoolName={availableSchools[0] || ''}
         defaultMunicipality="Quêssua"
         defaultProvince="Malanje"
         authorName="Administrador Municipal"

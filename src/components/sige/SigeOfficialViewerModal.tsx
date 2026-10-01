@@ -128,19 +128,41 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('capa');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedEscola, setSelectedEscola] = useState('');
   const [selectedNatureza, setSelectedNatureza] = useState('');
   const [selectedNivel, setSelectedNivel] = useState('');
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  React.useEffect(() => {
+    const handleUpdate = () => setRefreshTick((t) => t + 1);
+    window.addEventListener('ucore-teachers-updated', handleUpdate);
+    return () => window.removeEventListener('ucore-teachers-updated', handleUpdate);
+  }, []);
 
   // Compute dataset and official report
   const dataset = useMemo(() => {
     return getUnifiedSystemDataset({ schools, teachers, directors, students });
-  }, [schools, teachers, directors, students]);
+  }, [schools, teachers, directors, students, isOpen, refreshTick]);
 
   const report: SigeAggregatedReport = useMemo(() => {
     return aggregateSigeDataset(dataset);
-  }, [dataset]);
+  }, [dataset, isOpen, refreshTick]);
+
+  const availableSchoolNames = useMemo(() => {
+    const names = new Set<string>();
+    (dataset.schools || []).forEach(s => {
+      if (s.name) names.add(s.name);
+    });
+    (report.escolasConsolidadas || []).forEach(ec => {
+      if (ec.escola) names.add(ec.escola);
+    });
+    report.alunosMatriculados.forEach(a => {
+      if (a.escola) names.add(a.escola);
+    });
+    return Array.from(names);
+  }, [dataset.schools, report]);
 
   const consolidadoRows = useMemo(() => {
     return buildSigeConsolidadoRows(report);
@@ -169,14 +191,18 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
 
   const handleClearFilters = () => {
     setSearchQuery('');
+    setSelectedEscola('');
     setSelectedNatureza('');
     setSelectedNivel('');
   };
 
   // Helper filter
-  const filterRecord = (text: string, naturezaVal?: string, nivelVal?: string) => {
+  const filterRecord = (text: string, naturezaVal?: string, nivelVal?: string, escolaVal?: string) => {
     const q = searchQuery.toLowerCase().trim();
     if (q && !text.toLowerCase().includes(q)) return false;
+    if (selectedEscola && escolaVal && escolaVal.toLowerCase() !== selectedEscola.toLowerCase()) {
+      return false;
+    }
     if (selectedNatureza && naturezaVal && !naturezaVal.toLowerCase().includes(selectedNatureza.toLowerCase())) {
       return false;
     }
@@ -188,8 +214,8 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
 
   // Filtered data lists
   const filteredAlunos = report.alunosMatriculados.filter(item => {
-    const fullText = `${item.nivel} ${item.classe} ${item.natureza} ${item.total.mf} ${item.total.f}`;
-    return filterRecord(fullText, item.natureza, item.nivel);
+    const fullText = `${item.escola || ''} ${item.nivel} ${item.classe} ${item.natureza} ${item.total.mf} ${item.total.f}`;
+    return filterRecord(fullText, item.natureza, item.nivel, item.escola);
   });
 
   const alunosTotals = useMemo(() => {
@@ -221,23 +247,23 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
   }, [filteredAlunos]);
 
   const filteredDocentes = report.pessoalDocente.filter(item => {
-    const fullText = `${item.nivelEnsino} ${item.natureza} ${item.grauAcademico} ${item.formacaoPedagogica} ${item.total.mf} ${item.total.f}`;
-    return filterRecord(fullText, item.natureza, item.nivelEnsino);
+    const fullText = `${item.escola || ''} ${item.nivelEnsino} ${item.natureza} ${item.grauAcademico} ${item.formacaoPedagogica} ${item.total.mf} ${item.total.f}`;
+    return filterRecord(fullText, item.natureza, item.nivelEnsino, item.escola);
   });
 
   const filteredInfra = report.infraestruturas.filter(item => {
-    const fullText = `${item.natureza} ${item.escolasCount} ${item.salasDefinitivas} ${item.salasProvisorias} ${item.totalTurmas}`;
-    return filterRecord(fullText, item.natureza);
+    const fullText = `${item.escola || ''} ${item.natureza} ${item.escolasCount} ${item.salasDefinitivas} ${item.salasProvisorias} ${item.totalTurmas}`;
+    return filterRecord(fullText, item.natureza, undefined, item.escola);
   });
 
   const filteredAproveitamento = report.aproveitamento.filter(item => {
-    const fullText = `${item.ciclo} ${item.classe} ${item.natureza} ${item.matriculados.mf} ${item.aprovados.mf} ${item.reprovados.mf} ${item.desistidos.mf}`;
-    return filterRecord(fullText, item.natureza, item.ciclo);
+    const fullText = `${item.escola || ''} ${item.ciclo} ${item.classe} ${item.natureza} ${item.matriculados.mf} ${item.aprovados.mf} ${item.reprovados.mf} ${item.desistidos.mf}`;
+    return filterRecord(fullText, item.natureza, item.ciclo, item.escola);
   });
 
   const filteredRepetentes = report.alunosRepetentes.filter(item => {
-    const fullText = `${item.nivel} ${item.classe} ${item.natureza} ${item.total.mf} ${item.total.f}`;
-    return filterRecord(fullText, item.natureza, item.nivel);
+    const fullText = `${item.escola || ''} ${item.nivel} ${item.classe} ${item.natureza} ${item.total.mf} ${item.total.f}`;
+    return filterRecord(fullText, item.natureza, item.nivel, item.escola);
   });
 
   const repetentesTotals = useMemo(() => {
@@ -269,18 +295,23 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
   }, [filteredRepetentes]);
 
   const filteredNee = report.necessidadesEspeciais.filter(item => {
-    const fullText = `${item.tipoDeficiencia} ${item.nivel} ${item.natureza} ${item.total.mf} ${item.total.f}`;
-    return filterRecord(fullText, item.natureza, item.nivel);
+    const fullText = `${item.escola || ''} ${item.tipoDeficiencia} ${item.nivel} ${item.natureza} ${item.total.mf} ${item.total.f}`;
+    return filterRecord(fullText, item.natureza, item.nivel, item.escola);
   });
 
   const filteredNaoDocentes = report.pessoalNaoDocente.filter(item => {
-    const fullText = `${item.categoria} ${item.natureza} ${item.total.mf} ${item.total.f}`;
-    return filterRecord(fullText, item.natureza);
+    const fullText = `${item.escola || ''} ${item.categoria} ${item.natureza} ${item.total.mf} ${item.total.f}`;
+    return filterRecord(fullText, item.natureza, undefined, item.escola);
   });
 
   const filteredConsolidado = consolidadoRows.filter(row => {
     const fullText = Object.values(row).join(' ');
     return filterRecord(fullText, row['NATUREZA'], row['SUBSISTEMA / NÍVEL DE ENSINO']);
+  });
+
+  const filteredEscolasConsolidadas = (report.escolasConsolidadas || []).filter(ec => {
+    const fullText = `${ec.escola} ${ec.categoria} ${ec.abrangencia} ${ec.natureza}`;
+    return filterRecord(fullText, ec.natureza, ec.categoria, ec.escola);
   });
 
   // Nature badge component
@@ -487,14 +518,10 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Alunos matriculados (MF)</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Alunos Cadastrados (MF)</span>
                   <div className="text-2xl font-bold text-[#0b3d5c] mt-1">{report.totaisGerais.totalAlunosMatriculados.mf}</div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Feminino: {report.totaisGerais.totalAlunosMatriculados.f} (
-                    {report.totaisGerais.totalAlunosMatriculados.mf > 0
-                      ? ((report.totaisGerais.totalAlunosMatriculados.f / report.totaisGerais.totalAlunosMatriculados.mf) * 100).toFixed(1)
-                      : '0.0'}
-                    %)
+                    Fem: {report.totaisGerais.totalAlunosMatriculados.f} · Declarados: {report.totaisGerais.totalAlunosDeclarados ?? report.totaisGerais.totalAlunosMatriculados.mf} · <strong className="text-amber-700">Pendentes: {report.totaisGerais.totalAlunosPendentes ?? 0}</strong>
                   </p>
                 </div>
 
@@ -511,9 +538,11 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Docentes em exercício (MF)</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Docentes Cadastrados (MF)</span>
                   <div className="text-2xl font-bold text-[#0b3d5c] mt-1">{report.totaisGerais.totalDocentes.mf}</div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Feminino: {report.totaisGerais.totalDocentes.f}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Fem: {report.totaisGerais.totalDocentes.f} · Declarados: {report.totaisGerais.totalDocentesDeclarados ?? report.totaisGerais.totalDocentes.mf} · <strong className="text-amber-700">Pendentes: {report.totaisGerais.totalDocentesPendentes ?? 0}</strong>
+                  </p>
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
@@ -546,12 +575,26 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                   <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="search"
-                    placeholder="Pesquisar tabela..."
+                    placeholder="Pesquisar escola, categoria, classe..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg w-52 sm:w-64 focus:outline-hidden focus:border-[#0891b2] focus:bg-white transition-all text-slate-800"
                   />
                 </div>
+
+                {/* Filtro por Escola Cadastrada no Sistema */}
+                <select
+                  value={selectedEscola}
+                  onChange={e => setSelectedEscola(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs bg-cyan-50/70 border border-cyan-300 font-semibold rounded-lg text-[#0b3d5c] cursor-pointer focus:outline-hidden focus:border-[#0891b2]"
+                >
+                  <option value="">Todas as Escolas Cadastradas ({availableSchoolNames.length})</option>
+                  {availableSchoolNames.map(scName => (
+                    <option key={scName} value={scName}>
+                      {scName}
+                    </option>
+                  ))}
+                </select>
 
                 <select
                   value={selectedNatureza}
@@ -569,19 +612,21 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                     onChange={e => setSelectedNivel(e.target.value)}
                     className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-700 cursor-pointer focus:outline-hidden focus:border-[#0891b2]"
                   >
-                    <option value="">Todos os subsistemas / níveis</option>
-                    <option value="Pré-Escolar">Educação Pré-Escolar</option>
+                    <option value="">Todas as categorias / subsistemas</option>
+                    <option value="Pré-Escolar">Educação Pré-Escolar / Iniciação</option>
                     <option value="Primário Regular">Ensino Primário Regular</option>
+                    <option value="Primário Especial">Ensino Primário Especial</option>
                     <option value="PRAEER">Ensino Primário - PRAEER</option>
-                    <option value="EJA">Ensino Primário - EJA</option>
-                    <option value="Secundário I">Ensino Secundário I Ciclo</option>
-                    <option value="Secundário II">Ensino Secundário II Ciclo</option>
+                    <option value="EJA">Ensino Primário - EJA / Adultos</option>
+                    <option value="Secundário I">Ensino Secundário Iº Ciclo</option>
+                    <option value="Secundário II">Ensino Secundário IIº Ciclo</option>
+                    <option value="Professores">Formação de Professores (Magistério)</option>
                   </select>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
-                {(searchQuery || selectedNatureza || selectedNivel) && (
+                {(searchQuery || selectedEscola || selectedNatureza || selectedNivel) && (
                   <button
                     onClick={handleClearFilters}
                     className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
@@ -596,191 +641,327 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
 
           {/* ════ ABA 2: 1 - ALUNOS MATRICULADOS ════ */}
           {activeTab === 'alunos' && (
-            <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 bg-slate-50">
-                <div>
-                  <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                    1 — Alunos Matriculados (Por Idades &amp; Classes)
-                  </h2>
-                  <p className="text-[11px] text-slate-500">
-                    Discriminação completa por idades oficiais (&lt;5 a &gt;18 anos), classes e gênero (MF/F)
+            <div className="space-y-4">
+              {/* Resumo de Reconciliação de Quotas de Alunos por Escola */}
+              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs">
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-amber-950 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                    Reconciliação de Alunos por Escola: Declarados vs. Cadastrados na Planilha vs. Pendentes
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    Os alunos informados no cadastro da escola (ex: 567 alunos) não entram directo na planilha: permanecem como <strong>Pendentes</strong> e vão sendo subtraídos à medida que cada aluno é cadastrado (ex: cadastrou 546, ficam pendentes 21).
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                    Idades 5 a 18+ anos activas
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {filteredAlunos.length} linhas
-                  </span>
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <div className="bg-white border border-amber-200 rounded-lg px-3.5 py-2 text-center">
+                    <span className="block text-[10px] font-bold uppercase text-slate-500">Quota Declarada</span>
+                    <span className="text-base font-black text-slate-900">
+                      {report.totaisGerais.totalAlunosDeclarados ?? report.totaisGerais.totalAlunosMatriculados.mf}
+                    </span>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3.5 py-2 text-center">
+                    <span className="block text-[10px] font-bold uppercase text-emerald-700">Na Planilha (MF)</span>
+                    <span className="text-base font-black text-emerald-800">
+                      {report.totaisGerais.totalAlunosMatriculados.mf}
+                    </span>
+                  </div>
+                  <div className="bg-amber-100 border border-amber-300 rounded-lg px-3.5 py-2 text-center">
+                    <span className="block text-[10px] font-bold uppercase text-amber-900">Pendentes</span>
+                    <span className="text-base font-black text-amber-950">
+                      {report.totaisGerais.totalAlunosPendentes ?? 0}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="overflow-x-auto max-h-[540px] overflow-y-auto">
-                <table className="w-full text-xs text-left border-collapse min-w-[1700px]">
-                  <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[10px] font-semibold tracking-wider z-10 select-none">
-                    <tr>
-                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[180px] sticky left-0 bg-[#0b3d5c] z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
-                        Subsistema / Nível
-                      </th>
-                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
-                        Natureza
-                      </th>
-                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
-                        Classe
-                      </th>
-                      <th colSpan={2} className="p-1.5 text-center border-r border-[#082a40] bg-[#082f49]">
-                        Total Geral
-                      </th>
-                      {ALUNOS_IDADE_COLUNAS.map(col => (
-                        <th
-                          key={col.key}
-                          colSpan={2}
-                          title={col.title}
-                          className="p-1.5 text-center border-r border-[#082a40] last:border-r-0 whitespace-nowrap"
-                        >
-                          {col.short}
+
+              <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 bg-slate-50">
+                  <div>
+                    <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
+                      1 — Alunos Matriculados Cadastrados por Escola, Categoria, Idades e Quota Pendente
+                    </h2>
+                    <p className="text-[11px] text-slate-500">
+                      Apenas alunos efectivamente cadastrados entram nas colunas etárias (&lt;5 a &gt;18 anos, MF/F), subtraindo do saldo pendente da escola
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                      Por Escola &amp; Categoria
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {filteredAlunos.length} linhas
+                    </span>
+                  </div>
+                </div>
+                <div className="overflow-x-auto max-h-[540px] overflow-y-auto">
+                  <table className="w-full text-xs text-left border-collapse min-w-[2050px]">
+                    <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[10px] font-semibold tracking-wider z-10 select-none">
+                      <tr>
+                        <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[210px] sticky left-0 bg-[#0b3d5c] z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
+                          Escola Cadastrada
                         </th>
-                      ))}
-                    </tr>
-                    <tr className="bg-[#0e486c] text-[10px] text-sky-100">
-                      <th className="p-1.5 text-right font-medium min-w-[48px]">MF</th>
-                      <th className="p-1.5 text-right font-medium min-w-[48px] border-r border-[#082a40]">F</th>
-                      {ALUNOS_IDADE_COLUNAS.map(col => (
-                        <React.Fragment key={`${col.key}-sub`}>
-                          <th className="p-1.5 text-right font-medium min-w-[44px]">MF</th>
-                          <th className="p-1.5 text-right font-medium min-w-[44px] border-r border-[#082a40] last:border-r-0">F</th>
-                        </React.Fragment>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredAlunos.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5 + ALUNOS_IDADE_COLUNAS.length * 2}
-                          className="p-8 text-center text-slate-400 italic"
-                        >
-                          Nenhum registo encontrado para os filtros seleccionados.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredAlunos.map((row, idx) => (
-                        <tr
-                          key={idx}
-                          className={idx % 2 === 0 ? 'bg-white hover:bg-sky-50/70' : 'bg-slate-50/60 hover:bg-sky-50/70'}
-                        >
-                          <td className="p-2.5 font-medium text-slate-800 border-r border-slate-100 sticky left-0 bg-inherit z-10">
-                            {row.nivel}
-                          </td>
-                          <td className="p-2.5 border-r border-slate-100">
-                            <NatureBadge natureza={row.natureza} />
-                          </td>
-                          <td className="p-2.5 font-semibold text-slate-700 border-r border-slate-100">
-                            {row.classe}
-                          </td>
-                          <td className="p-2 text-right tabular-nums font-bold text-[#0b3d5c] bg-sky-50/40">
-                            {row.total.mf}
-                          </td>
-                          <td className="p-2 text-right tabular-nums font-semibold text-slate-700 border-r border-slate-200 bg-sky-50/40">
-                            {row.total.f}
-                          </td>
-                          {ALUNOS_IDADE_COLUNAS.map(col => {
-                            const counts = getAlunoIdadeCount(row, col.key);
-                            const hasCount = counts.mf > 0;
-                            return (
-                              <React.Fragment key={col.key}>
-                                <td
-                                  className={`p-2 text-right tabular-nums ${
-                                    hasCount ? 'font-semibold text-slate-800' : 'text-slate-300'
-                                  }`}
-                                >
-                                  {counts.mf}
-                                </td>
-                                <td
-                                  className={`p-2 text-right tabular-nums border-r border-slate-100 last:border-r-0 ${
-                                    counts.f > 0 ? 'font-medium text-slate-700' : 'text-slate-300'
-                                  }`}
-                                >
-                                  {counts.f}
-                                </td>
-                              </React.Fragment>
-                            );
-                          })}
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                  {filteredAlunos.length > 0 && (
-                    <tfoot className="sticky bottom-0 bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-800 z-10">
-                      <tr>
-                        <td colSpan={3} className="p-2.5 uppercase tracking-wider text-[11px] text-[#0b3d5c] sticky left-0 bg-slate-100 z-20">
-                          Total Geral Agregado
-                        </td>
-                        <td className="p-2 text-right tabular-nums text-[#0b3d5c]">
-                          {alunosTotals.totalMf}
-                        </td>
-                        <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-300">
-                          {alunosTotals.totalF}
-                        </td>
+                        <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[175px]">
+                          Categoria / Subsistema
+                        </th>
+                        <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
+                          Natureza
+                        </th>
+                        <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
+                          Classe
+                        </th>
+                        <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[215px] text-center bg-[#082f49]">
+                          Quota Escola (Decl. / Cad. / Pend.)
+                        </th>
+                        <th colSpan={2} className="p-1.5 text-center border-r border-[#082a40] bg-[#082f49]">
+                          Na Classe
+                        </th>
                         {ALUNOS_IDADE_COLUNAS.map(col => (
-                          <React.Fragment key={`tot-${col.key}`}>
-                            <td className="p-2 text-right tabular-nums text-slate-800">
-                              {alunosTotals.idades[col.key]?.mf || 0}
-                            </td>
-                            <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-200 last:border-r-0">
-                              {alunosTotals.idades[col.key]?.f || 0}
-                            </td>
+                          <th
+                            key={col.key}
+                            colSpan={2}
+                            title={col.title}
+                            className="p-1.5 text-center border-r border-[#082a40] last:border-r-0 whitespace-nowrap"
+                          >
+                            {col.short}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr className="bg-[#0e486c] text-[10px] text-sky-100">
+                        <th className="p-1.5 text-right font-medium min-w-[48px]">MF</th>
+                        <th className="p-1.5 text-right font-medium min-w-[48px] border-r border-[#082a40]">F</th>
+                        {ALUNOS_IDADE_COLUNAS.map(col => (
+                          <React.Fragment key={`${col.key}-sub`}>
+                            <th className="p-1.5 text-right font-medium min-w-[44px]">MF</th>
+                            <th className="p-1.5 text-right font-medium min-w-[44px] border-r border-[#082a40] last:border-r-0">F</th>
                           </React.Fragment>
                         ))}
                       </tr>
-                    </tfoot>
-                  )}
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredAlunos.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={7 + ALUNOS_IDADE_COLUNAS.length * 2}
+                            className="p-8 text-center text-slate-400 italic"
+                          >
+                            Nenhum registo encontrado para os filtros seleccionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredAlunos.map((row, idx) => {
+                          const decl = row.quotaDeclarada ?? row.total.mf;
+                          const cad = row.cadastradosEscola ?? row.total.mf;
+                          const pend = row.pendentesEscola ?? Math.max(0, decl - cad);
+                          return (
+                            <tr
+                              key={idx}
+                              className={idx % 2 === 0 ? 'bg-white hover:bg-sky-50/70' : 'bg-slate-50/60 hover:bg-sky-50/70'}
+                            >
+                              <td className="p-2.5 font-bold text-[#0b3d5c] border-r border-slate-100 sticky left-0 bg-inherit z-10">
+                                {row.escola || 'Rede Municipal'}
+                              </td>
+                              <td className="p-2.5 font-medium text-slate-800 border-r border-slate-100">
+                                {row.nivel}
+                              </td>
+                              <td className="p-2.5 border-r border-slate-100">
+                                <NatureBadge natureza={row.natureza} />
+                              </td>
+                              <td className="p-2.5 font-semibold text-slate-700 border-r border-slate-100">
+                                {row.classe}
+                              </td>
+                              <td className="p-2 text-center border-r border-slate-100">
+                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold bg-slate-50 border-slate-200 whitespace-nowrap">
+                                  <span className="text-slate-600" title="Alunos Declarados na Escola">
+                                    Decl: <strong>{decl}</strong>
+                                  </span>
+                                  <span className="text-slate-300">|</span>
+                                  <span className="text-emerald-700" title="Total Cadastrados na Escola">
+                                    Cad: <strong>{cad}</strong>
+                                  </span>
+                                  <span className="text-slate-300">|</span>
+                                  <span
+                                    className={
+                                      pend > 0
+                                        ? 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300'
+                                        : 'px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    }
+                                    title="Alunos Pendentes de Cadastro na Escola"
+                                  >
+                                    Pend: {pend}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="p-2 text-right tabular-nums font-bold text-[#0b3d5c] bg-sky-50/40">
+                                {row.total.mf}
+                              </td>
+                              <td className="p-2 text-right tabular-nums font-semibold text-slate-700 border-r border-slate-200 bg-sky-50/40">
+                                {row.total.f}
+                              </td>
+                              {ALUNOS_IDADE_COLUNAS.map(col => {
+                                const counts = getAlunoIdadeCount(row, col.key);
+                                const hasCount = counts.mf > 0;
+                                return (
+                                  <React.Fragment key={col.key}>
+                                    <td
+                                      className={`p-2 text-right tabular-nums ${
+                                        hasCount ? 'font-semibold text-slate-800' : 'text-slate-300'
+                                      }`}
+                                    >
+                                      {counts.mf}
+                                    </td>
+                                    <td
+                                      className={`p-2 text-right tabular-nums border-r border-slate-100 last:border-r-0 ${
+                                        counts.f > 0 ? 'font-medium text-slate-700' : 'text-slate-300'
+                                      }`}
+                                    >
+                                      {counts.f}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                    {filteredAlunos.length > 0 && (
+                      <tfoot className="sticky bottom-0 bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-800 z-10">
+                        <tr>
+                          <td colSpan={5} className="p-2.5 uppercase tracking-wider text-[11px] text-[#0b3d5c] sticky left-0 bg-slate-100 z-20">
+                            Total Geral Cadastrado na Planilha
+                          </td>
+                          <td className="p-2 text-right tabular-nums text-[#0b3d5c]">
+                            {alunosTotals.totalMf}
+                          </td>
+                          <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-300">
+                            {alunosTotals.totalF}
+                          </td>
+                          {ALUNOS_IDADE_COLUNAS.map(col => (
+                            <React.Fragment key={`tot-${col.key}`}>
+                              <td className="p-2 text-right tabular-nums text-slate-800">
+                                {alunosTotals.idades[col.key]?.mf || 0}
+                              </td>
+                              <td className="p-2 text-right tabular-nums text-slate-700 border-r border-slate-200 last:border-r-0">
+                                {alunosTotals.idades[col.key]?.f || 0}
+                              </td>
+                            </React.Fragment>
+                          ))}
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
               </div>
             </div>
           )}
 
           {/* ════ ABA 3: 2 - PESSOAL DOCENTE ════ */}
           {activeTab === 'docentes' && (
-            <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                  2 — Pessoal Docente
-                </h2>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  Apenas contagens estatísticas · Sem dados nominais
-                </span>
+            <div className="space-y-4">
+              {/* Resumo de Reconciliação de Quotas Docentes por Escola */}
+              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs">
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-amber-950 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                    Reconciliação de Pessoal Docente: Declarados vs. Cadastrados na Planilha vs. Pendentes
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    Os docentes informados pelo diretor no cadastro da escola permanecem como <strong>Pendentes</strong> até serem nominalmente cadastrados. À medida que cada docente é cadastrado (ex: 32 → 31 → 30...), o número de pendentes diminui e o docente entra automaticamente nos dados desta planilha.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <div className="bg-white border border-amber-200 rounded-lg px-3.5 py-2 text-center">
+                    <span className="block text-[10px] font-bold uppercase text-slate-500">Quota Declarada</span>
+                    <span className="text-base font-black text-slate-900">
+                      {report.totaisGerais.totalDocentesDeclarados ?? report.totaisGerais.totalDocentes.mf}
+                    </span>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3.5 py-2 text-center">
+                    <span className="block text-[10px] font-bold uppercase text-emerald-700">Na Planilha (MF)</span>
+                    <span className="text-base font-black text-emerald-800">
+                      {report.totaisGerais.totalDocentes.mf}
+                    </span>
+                  </div>
+                  <div className="bg-amber-100 border border-amber-300 rounded-lg px-3.5 py-2 text-center">
+                    <span className="block text-[10px] font-bold uppercase text-amber-900">Pendentes</span>
+                    <span className="text-base font-black text-amber-950">
+                      {report.totaisGerais.totalDocentesPendentes ?? 0}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider z-10">
-                    <tr>
-                      <th className="p-2.5">Nível Leccionado</th>
-                      <th className="p-2.5">Natureza</th>
-                      <th className="p-2.5">Qualificação Académica</th>
-                      <th className="p-2.5">Formação Pedagógica</th>
-                      <th className="p-2.5 text-right">Total MF</th>
-                      <th className="p-2.5 text-right">Total F</th>
-                      <th className="p-2.5 text-right">% Feminina</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredDocentes.map((row, idx) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
-                        <td className="p-2.5 font-medium text-slate-800">{row.nivelEnsino}</td>
-                        <td className="p-2.5"><NatureBadge natureza={row.natureza} /></td>
-                        <td className="p-2.5 text-slate-700">{row.grauAcademico}</td>
-                        <td className="p-2.5 text-slate-600">{row.formacaoPedagogica}</td>
-                        <td className="p-2.5 text-right tabular-nums font-bold text-[#0b3d5c]">{row.total.mf}</td>
-                        <td className="p-2.5 text-right tabular-nums font-semibold text-slate-700">{row.total.f}</td>
-                        <td className="p-2.5 text-right tabular-nums text-slate-600">
-                          {row.total.mf > 0 ? ((row.total.f / row.total.mf) * 100).toFixed(1) + '%' : '0.0%'}
-                        </td>
+
+              <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                  <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
+                    2 — Pessoal Docente Cadastrado por Escola e Estado de Quota Pendente
+                  </h2>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Apenas contagens estatísticas · Sem dados nominais
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider z-10">
+                      <tr>
+                        <th className="p-2.5">Escola Cadastrada</th>
+                        <th className="p-2.5">Nível Leccionado</th>
+                        <th className="p-2.5">Natureza</th>
+                        <th className="p-2.5">Qualificação Académica</th>
+                        <th className="p-2.5">Formação Pedagógica</th>
+                        <th className="p-2.5 text-right">Cadastrados MF</th>
+                        <th className="p-2.5 text-right">Cadastrados F</th>
+                        <th className="p-2.5 text-right">% Feminina</th>
+                        <th className="p-2.5 text-center bg-[#082f49]">Quota da Escola (Decl. / Cad. / Pend.)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredDocentes.map((row, idx) => {
+                        const decl = row.quotaDeclarada ?? row.total.mf;
+                        const cad = row.cadastradosEscola ?? row.total.mf;
+                        const pend = row.pendentesEscola ?? Math.max(0, decl - cad);
+                        return (
+                          <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
+                            <td className="p-2.5 font-bold text-[#0b3d5c]">{row.escola || 'Rede Municipal'}</td>
+                            <td className="p-2.5 font-medium text-slate-800">{row.nivelEnsino}</td>
+                            <td className="p-2.5"><NatureBadge natureza={row.natureza} /></td>
+                            <td className="p-2.5 text-slate-700">{row.grauAcademico}</td>
+                            <td className="p-2.5 text-slate-600">{row.formacaoPedagogica}</td>
+                            <td className="p-2.5 text-right tabular-nums font-bold text-[#0b3d5c]">{row.total.mf}</td>
+                            <td className="p-2.5 text-right tabular-nums font-semibold text-slate-700">{row.total.f}</td>
+                            <td className="p-2.5 text-right tabular-nums text-slate-600">
+                              {row.total.mf > 0 ? ((row.total.f / row.total.mf) * 100).toFixed(1) + '%' : '0.0%'}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold bg-slate-50 border-slate-200">
+                                <span className="text-slate-600" title="Declarados pela Escola">
+                                  Decl: <strong>{decl}</strong>
+                                </span>
+                                <span className="text-slate-300">|</span>
+                                <span className="text-emerald-700" title="Efectivamente Cadastrados na Planilha">
+                                  Cad: <strong>{cad}</strong>
+                                </span>
+                                <span className="text-slate-300">|</span>
+                                <span
+                                  className={
+                                    pend > 0
+                                      ? 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300'
+                                      : 'px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  }
+                                  title="Docentes Pendentes de Cadastro"
+                                >
+                                  Pend: {pend}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -790,7 +971,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
             <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                 <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                  3 — Infraestruturas
+                  3 — Infraestruturas por Escola
                 </h2>
                 <span className="text-[11px] text-slate-500 font-medium">
                   Escolas · Salas de Aula · Turmas por Turno
@@ -800,6 +981,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 <table className="w-full text-xs text-left border-collapse">
                   <thead className="bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider">
                     <tr>
+                      <th className="p-2.5">Escola Cadastrada</th>
                       <th className="p-2.5">Natureza</th>
                       <th className="p-2.5 text-right">Nº Unidades</th>
                       <th className="p-2.5 text-right">Salas Definitivas</th>
@@ -814,6 +996,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                   <tbody className="divide-y divide-slate-100">
                     {filteredInfra.map((row, idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
+                        <td className="p-2.5 font-bold text-[#0b3d5c]">{row.escola || 'Rede Municipal'}</td>
                         <td className="p-2.5"><NatureBadge natureza={row.natureza} /></td>
                         <td className="p-2.5 text-right tabular-nums font-bold text-[#0b3d5c]">{row.escolasCount}</td>
                         <td className="p-2.5 text-right tabular-nums font-semibold text-slate-700">{row.salasDefinitivas}</td>
@@ -837,7 +1020,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
               <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                 <div>
                   <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                    4 — Aproveitamento Escolar
+                    4 — Aproveitamento Escolar por Escola e Categoria
                   </h2>
                   <p className="text-[11px] text-slate-500">
                     Regra Ministerial: Matriculados = Aprovados + Reprovados + Desistidos (Resíduo Zero)
@@ -851,7 +1034,8 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 <table className="w-full text-xs text-left border-collapse">
                   <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider z-10">
                     <tr>
-                      <th className="p-2.5">Ciclo / Subsistema</th>
+                      <th className="p-2.5">Escola Cadastrada</th>
+                      <th className="p-2.5">Categoria / Subsistema</th>
                       <th className="p-2.5">Classe</th>
                       <th className="p-2.5">Natureza</th>
                       <th className="p-2.5 text-right">Mat. MF</th>
@@ -870,6 +1054,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                       const isOk = row.validacao === 'Correcto';
                       return (
                         <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
+                          <td className="p-2.5 font-bold text-[#0b3d5c]">{row.escola || 'Rede Municipal'}</td>
                           <td className="p-2.5 font-medium text-slate-800">{row.ciclo}</td>
                           <td className="p-2.5 font-semibold text-slate-700">{row.classe}</td>
                           <td className="p-2.5"><NatureBadge natureza={row.natureza} /></td>
@@ -907,10 +1092,10 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
               <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 bg-slate-50">
                 <div>
                   <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                    5 — Alunos Repetentes (Por Idades &amp; Classes)
+                    5 — Alunos Repetentes por Escola, Categoria e Idades
                   </h2>
                   <p className="text-[11px] text-slate-500">
-                    Discriminação etária completa oficial (&lt;6 a &gt;16 anos) para ensino regular
+                    Discriminação etária completa oficial (&lt;6 a &gt;16 anos) por escola e categoria
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -924,11 +1109,14 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 </div>
               </div>
               <div className="overflow-x-auto max-h-[540px] overflow-y-auto">
-                <table className="w-full text-xs text-left border-collapse min-w-[1550px]">
+                <table className="w-full text-xs text-left border-collapse min-w-[1700px]">
                   <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[10px] font-semibold tracking-wider z-10 select-none">
                     <tr>
-                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[180px] sticky left-0 bg-[#0b3d5c] z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
-                        Subsistema / Nível
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[200px] sticky left-0 bg-[#0b3d5c] z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
+                        Escola Cadastrada
+                      </th>
+                      <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[170px]">
+                        Categoria / Subsistema
                       </th>
                       <th rowSpan={2} className="p-2.5 border-r border-[#082a40] min-w-[85px]">
                         Natureza
@@ -965,7 +1153,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                     {filteredRepetentes.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5 + REPETENTES_IDADE_COLUNAS.length * 2}
+                          colSpan={6 + REPETENTES_IDADE_COLUNAS.length * 2}
                           className="p-8 text-center text-slate-400 italic"
                         >
                           Nenhum registo de repetentes encontrado para os filtros seleccionados.
@@ -977,7 +1165,10 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                           key={idx}
                           className={idx % 2 === 0 ? 'bg-white hover:bg-sky-50/70' : 'bg-slate-50/60 hover:bg-sky-50/70'}
                         >
-                          <td className="p-2.5 font-medium text-slate-800 border-r border-slate-100 sticky left-0 bg-inherit z-10">
+                          <td className="p-2.5 font-bold text-[#0b3d5c] border-r border-slate-100 sticky left-0 bg-inherit z-10">
+                            {row.escola || 'Rede Municipal'}
+                          </td>
+                          <td className="p-2.5 font-medium text-slate-800 border-r border-slate-100">
                             {row.nivel}
                           </td>
                           <td className="p-2.5 border-r border-slate-100">
@@ -1021,7 +1212,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                   {filteredRepetentes.length > 0 && (
                     <tfoot className="sticky bottom-0 bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-800 z-10">
                       <tr>
-                        <td colSpan={3} className="p-2.5 uppercase tracking-wider text-[11px] text-[#0b3d5c] sticky left-0 bg-slate-100 z-20">
+                        <td colSpan={4} className="p-2.5 uppercase tracking-wider text-[11px] text-[#0b3d5c] sticky left-0 bg-slate-100 z-20">
                           Total Repetentes Agregado
                         </td>
                         <td className="p-2 text-right tabular-nums text-[#0b3d5c]">
@@ -1063,6 +1254,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 <table className="w-full text-xs text-left border-collapse">
                   <thead className="bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider">
                     <tr>
+                      <th className="p-2.5">Escola Cadastrada</th>
                       <th className="p-2.5">Categoria Oficial da Tutela</th>
                       <th className="p-2.5">Tipo / Subtipo de Deficiência</th>
                       <th className="p-2.5">Nível de Ensino</th>
@@ -1083,6 +1275,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                         : '4. Outras Deficiências';
                       return (
                         <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
+                          <td className="p-2.5 font-bold text-[#0b3d5c]">{row.escola || 'Rede Municipal'}</td>
                           <td className="p-2.5 font-bold text-[#0b3d5c]">{catTutela}</td>
                           <td className="p-2.5 font-medium text-slate-800">{row.tipoDeficiencia}</td>
                           <td className="p-2.5 text-slate-600">{row.nivel}</td>
@@ -1106,7 +1299,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
             <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                 <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                  7 — Pessoal Não Docente
+                  7 — Pessoal Não Docente por Escola
                 </h2>
                 <span className="text-[11px] text-slate-500 font-medium">
                   Apenas contagem funcional · Sem dados nominais
@@ -1116,6 +1309,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 <table className="w-full text-xs text-left border-collapse">
                   <thead className="bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider">
                     <tr>
+                      <th className="p-2.5">Escola Cadastrada</th>
                       <th className="p-2.5">Categoria Funcional</th>
                       <th className="p-2.5">Natureza da Rede</th>
                       <th className="p-2.5 text-right">Total MF</th>
@@ -1126,6 +1320,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                   <tbody className="divide-y divide-slate-100">
                     {filteredNaoDocentes.map((row, idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
+                        <td className="p-2.5 font-bold text-[#0b3d5c]">{row.escola || 'Rede Municipal'}</td>
                         <td className="p-2.5 font-medium text-slate-800">{row.categoria}</td>
                         <td className="p-2.5"><NatureBadge natureza={row.natureza} /></td>
                         <td className="p-2.5 text-right tabular-nums font-bold text-[#0b3d5c]">{row.total.mf}</td>
@@ -1139,15 +1334,17 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
             </div>
           )}
 
-          {/* ════ ABA 9: 9 - CONSOLIDADO (A QUE FALTAVA) ════ */}
+          {/* ════ ABA 9: 9 - CONSOLIDADO ════ */}
           {activeTab === 'consol' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               {/* Cards do Consolidado */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="bg-gradient-to-br from-[#f0fdfa] to-[#ecfeff] border border-cyan-200 rounded-xl p-3.5 shadow-2xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-800">Total Matriculados</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-800">Alunos (Na Planilha)</span>
                   <div className="text-xl font-bold text-[#0b3d5c] mt-1">{report.totaisGerais.totalAlunosMatriculados.mf}</div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">MF · F: {report.totaisGerais.totalAlunosMatriculados.f}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Decl: {report.totaisGerais.totalAlunosDeclarados ?? report.totaisGerais.totalAlunosMatriculados.mf} · <strong className="text-amber-700">Pend: {report.totaisGerais.totalAlunosPendentes ?? 0}</strong>
+                  </p>
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
@@ -1163,9 +1360,11 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Docentes</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Docentes (Na Planilha)</span>
                   <div className="text-xl font-bold text-[#0b3d5c] mt-1">{report.totaisGerais.totalDocentes.mf}</div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">MF · F: {report.totaisGerais.totalDocentes.f}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Decl: {report.totaisGerais.totalDocentesDeclarados ?? report.totaisGerais.totalDocentes.mf} · <strong className="text-amber-700">Pend: {report.totaisGerais.totalDocentesPendentes ?? 0}</strong>
+                  </p>
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
@@ -1182,6 +1381,87 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                   <p className="text-[10px] text-slate-500 mt-0.5">Unidades · Salas</p>
                 </div>
               </div>
+
+              {/* Quadro Consolidado por Escola Cadastrada e Categoria */}
+              {filteredEscolasConsolidadas.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-cyan-50/60">
+                    <div>
+                      <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
+                        Dados Consolidados por Escola Cadastrada e Categoria (2026/2027)
+                      </h2>
+                      <p className="text-[11px] text-slate-500">
+                        Totalização oficial dos alunos pertencentes a cada escola cadastrada no sistema de acordo com a sua categoria
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#0b3d5c] text-white">
+                      {filteredEscolasConsolidadas.length} {filteredEscolasConsolidadas.length === 1 ? 'Escola' : 'Escolas'}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[11px] font-semibold tracking-wider z-10">
+                        <tr>
+                          <th className="p-2.5">Escola Cadastrada no Sistema</th>
+                          <th className="p-2.5">Categoria Oficial</th>
+                          <th className="p-2.5">Natureza</th>
+                          <th className="p-2.5 text-center bg-[#082f49]">Alunos (Decl. / Cad. / Pend.)</th>
+                          <th className="p-2.5 text-center bg-[#082f49]">Docentes (Decl. / Cad. / Pend.)</th>
+                          <th className="p-2.5 text-right">Matriculados MF</th>
+                          <th className="p-2.5 text-right">Matriculados F</th>
+                          <th className="p-2.5 text-right">Aprovados MF</th>
+                          <th className="p-2.5 text-right">Reprovados MF</th>
+                          <th className="p-2.5 text-right">Desistidos MF</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredEscolasConsolidadas.map((ec, idx) => {
+                          const alDecl = ec.alunosDeclarados ?? ec.matriculados.mf;
+                          const alCad = ec.alunosCadastrados ?? ec.matriculados.mf;
+                          const alPend = ec.alunosPendentes ?? Math.max(0, alDecl - alCad);
+                          const docDecl = ec.docentesDeclarados ?? 0;
+                          const docCad = ec.docentesCadastrados ?? 0;
+                          const docPend = ec.docentesPendentes ?? Math.max(0, docDecl - docCad);
+                          return (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-[#e0f2fe]' : 'bg-slate-50/70 hover:bg-[#e0f2fe]'}>
+                              <td className="p-2.5 font-bold text-[#0b3d5c]">{ec.escola}</td>
+                              <td className="p-2.5 font-semibold text-slate-800">{ec.categoria}</td>
+                              <td className="p-2.5"><NatureBadge natureza={ec.natureza} /></td>
+                              <td className="p-2 text-center">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold bg-slate-50 border-slate-200 whitespace-nowrap">
+                                  <span>Decl: {alDecl}</span>
+                                  <span className="text-slate-300">|</span>
+                                  <span className="text-emerald-700">Cad: {alCad}</span>
+                                  <span className="text-slate-300">|</span>
+                                  <span className={alPend > 0 ? 'text-amber-900 bg-amber-100 px-1 rounded' : 'text-emerald-800'}>
+                                    Pend: {alPend}
+                                  </span>
+                                </span>
+                              </td>
+                              <td className="p-2 text-center">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold bg-slate-50 border-slate-200 whitespace-nowrap">
+                                  <span>Decl: {docDecl}</span>
+                                  <span className="text-slate-300">|</span>
+                                  <span className="text-emerald-700">Cad: {docCad}</span>
+                                  <span className="text-slate-300">|</span>
+                                  <span className={docPend > 0 ? 'text-amber-900 bg-amber-100 px-1 rounded' : 'text-emerald-800'}>
+                                    Pend: {docPend}
+                                  </span>
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-right tabular-nums font-bold text-[#0b3d5c]">{ec.matriculados.mf}</td>
+                              <td className="p-2.5 text-right tabular-nums font-semibold text-slate-700">{ec.matriculados.f}</td>
+                              <td className="p-2.5 text-right tabular-nums text-emerald-700 font-semibold">{ec.aprovados.mf}</td>
+                              <td className="p-2.5 text-right tabular-nums text-amber-700 font-semibold">{ec.reprovados.mf}</td>
+                              <td className="p-2.5 text-right tabular-nums text-red-600 font-semibold">{ec.desistidos.mf}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Tabela de Consolidação por Nível */}
               <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">

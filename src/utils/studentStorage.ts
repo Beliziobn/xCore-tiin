@@ -4,6 +4,8 @@ import type {
   StudentNaturezaEscola,
   StudentTipoDeficiencia,
   StudentDocumentType,
+  AdminSchool,
+  AdminStudent,
 } from '../types';
 
 export interface StudentModalityConfig {
@@ -332,21 +334,130 @@ export const DISABILITY_TYPES_OPTIONS: StudentTipoDeficiencia[] = [
 ];
 
 /**
+ * Calculates the normative Classe / Etapa / Módulo that a student should attend
+ * in the current school year based on their age (or faixa etária) and the chosen teaching modality.
+ */
+export function calculateSuggestedClassForAgeAndModality(
+  ageOrFaixa: number | string,
+  modalityKey: StudentModalidadeKey = 'primario_regular',
+  isBaby: boolean = false
+): string {
+  const config =
+    STUDENT_MODALITIES_CATALOG.find((c) => c.key === modalityKey) ||
+    STUDENT_MODALITIES_CATALOG[3];
+
+  let numericAge = typeof ageOrFaixa === 'number' ? ageOrFaixa : 10;
+  if (typeof ageOrFaixa === 'string') {
+    const lower = ageOrFaixa.toLowerCase();
+    if (lower.includes('3 meses')) {
+      numericAge = 2;
+    } else if (lower.includes('5 a 7')) {
+      numericAge = 6;
+    } else if (lower.includes('8 a 10')) {
+      numericAge = 9;
+    } else if (lower.includes('11 a 13')) {
+      numericAge = 11;
+    } else if (lower.includes('mais de')) {
+      const m = lower.match(/\d+/);
+      numericAge = m ? parseInt(m[0], 10) + 1 : 14;
+    } else if (lower.includes('menos de')) {
+      const m = lower.match(/\d+/);
+      numericAge = m ? Math.max(1, parseInt(m[0], 10) - 1) : 14;
+    } else {
+      const m = lower.match(/\d+/);
+      if (m) numericAge = parseInt(m[0], 10);
+    }
+  }
+
+  switch (modalityKey) {
+    case 'pre_escolar':
+      if (isBaby || numericAge < 3) return 'Creche';
+      if (numericAge === 3) return 'Jardim de Infância 1';
+      if (numericAge === 4) return 'Jardim de Infância 2';
+      if (numericAge === 5) return 'Centro Infantil';
+      return 'Centro Infantil Comunitário';
+
+    case 'iniciacao':
+      return 'Classe de Iniciação';
+
+    case 'especial_pre_escolar':
+      return numericAge <= 4 ? 'Sensorial' : 'Iniciação Especial';
+
+    case 'primario_regular':
+    case 'primario_especial':
+      if (numericAge <= 6) return '1.ª Classe';
+      if (numericAge === 7) return '2.ª Classe';
+      if (numericAge === 8) return '3.ª Classe';
+      if (numericAge === 9) return '4.ª Classe';
+      if (numericAge === 10) return '5.ª Classe';
+      return '6.ª Classe';
+
+    case 'praeer':
+      if (numericAge <= 9) return 'Etapa 1';
+      if (numericAge <= 11) return 'Etapa 2';
+      return 'Etapa 3';
+
+    case 'primario_adultos':
+      if (numericAge <= 17) return 'Módulo 1';
+      if (numericAge <= 20) return 'Módulo 2';
+      return 'Módulo 3';
+
+    case 'ciclo1_geral':
+    case 'ciclo1_especial':
+    case 'ciclo1_tecnico':
+      if (numericAge <= 12) return '7.ª Classe';
+      if (numericAge === 13) return '8.ª Classe';
+      return '9.ª Classe';
+
+    case 'ciclo1_adultos_eja':
+      return numericAge <= 18 ? '1.º Ano' : '2.º Ano';
+
+    case 'ciclo2_geral':
+      if (numericAge <= 15) return '10.ª Classe';
+      if (numericAge === 16) return '11.ª Classe';
+      return '12.ª Classe';
+
+    case 'ciclo2_especial':
+    case 'ciclo2_tecnico':
+    case 'ciclo2_formacao_professores':
+      if (numericAge <= 15) return '10.ª Classe';
+      if (numericAge === 16) return '11.ª Classe';
+      if (numericAge === 17) return '12.ª Classe';
+      return '13.ª Classe';
+
+    default:
+      return config.etapasOuClasses[0] || '1.ª Classe';
+  }
+}
+
+/**
  * Calculates student age and matches the corresponding faixa etária
- * according to the selected modality.
+ * and normative Classe according to the selected modality.
  */
 export function calculateStudentAgeAndFaixa(
   birthDateStr: string,
   modalityKey: StudentModalidadeKey = 'primario_regular'
-): { age: number; ageLabel: string; isBaby: boolean; suggestedFaixa: string } {
+): { age: number; ageLabel: string; isBaby: boolean; suggestedFaixa: string; suggestedClass: string } {
   if (!birthDateStr) {
-    return { age: 0, ageLabel: 'Não informada', isBaby: false, suggestedFaixa: 'N/A' };
+    return {
+      age: 0,
+      ageLabel: 'Não informada',
+      isBaby: false,
+      suggestedFaixa: 'N/A',
+      suggestedClass: calculateSuggestedClassForAgeAndModality(10, modalityKey, false),
+    };
   }
 
   const birthDate = new Date(birthDateStr);
   const today = new Date();
   if (isNaN(birthDate.getTime())) {
-    return { age: 0, ageLabel: 'Data inválida', isBaby: false, suggestedFaixa: 'N/A' };
+    return {
+      age: 0,
+      ageLabel: 'Data inválida',
+      isBaby: false,
+      suggestedFaixa: 'N/A',
+      suggestedClass: calculateSuggestedClassForAgeAndModality(10, modalityKey, false),
+    };
   }
 
   let age = today.getFullYear() - birthDate.getFullYear();
@@ -403,11 +514,15 @@ export function calculateStudentAgeAndFaixa(
     }
   }
 
+  const safeAge = Math.max(0, age);
+  const suggestedClass = calculateSuggestedClassForAgeAndModality(safeAge, modalityKey, isBaby);
+
   return {
-    age: Math.max(0, age),
+    age: safeAge,
     ageLabel,
     isBaby,
     suggestedFaixa,
+    suggestedClass,
   };
 }
 
@@ -429,13 +544,257 @@ export function getStoredStudents(): StudentRegistrationData[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed;
+      const filtered = parsed.filter((s: any) => {
+        const esc = String(s?.escola || s?.nomeEscola || '').trim().toLowerCase();
+        return !esc.includes('modelo central');
+      });
+      if (filtered.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      }
+      return filtered;
     }
     return [];
   } catch (err) {
     console.error('Error reading students from localStorage:', err);
     return [];
   }
+}
+
+export function getRegisteredSchoolsFromStorage(): AdminSchool[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem('ucore_admin_schools');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const filtered = parsed.filter(
+      (sc: AdminSchool) => !String(sc?.name || '').trim().toLowerCase().includes('modelo central')
+    );
+    if (filtered.length !== parsed.length) {
+      localStorage.setItem('ucore_admin_schools', JSON.stringify(filtered));
+    }
+    return filtered;
+  } catch {
+    return [];
+  }
+}
+
+export function getSuggestedModalityForSchool(school?: AdminSchool | null): StudentModalidadeKey {
+  if (!school) return 'primario_regular';
+  const oferta = school.registrationData?.oferta;
+  if (oferta?.ensinoEspecial?.activo) {
+    if (oferta.ensinoEspecial.preEscolarIniciacao) return 'especial_pre_escolar';
+    if (oferta.ensinoEspecial.ciclo1Especial) return 'ciclo1_especial';
+    if (oferta.ensinoEspecial.ciclo2Especial) return 'ciclo2_especial';
+    return 'primario_especial';
+  }
+  if (school.category === 'IIº Ciclo') {
+    if (oferta?.secundario?.ciclo2TecnicoProfissional) return 'ciclo2_tecnico';
+    if (oferta?.secundario?.ciclo2FormacaoProfessores) return 'ciclo2_formacao_professores';
+    return 'ciclo2_geral';
+  }
+  if (school.category === 'Iº Ciclo') {
+    if (oferta?.secundario?.ciclo1TecnicoProfissional) return 'ciclo1_tecnico';
+    if (oferta?.secundario?.ciclo1AdultosEJA) return 'ciclo1_adultos_eja';
+    return 'ciclo1_geral';
+  }
+  if (oferta?.preEscolar?.activo && !oferta?.primario?.activo) {
+    if (oferta.preEscolar.iniciacao) return 'iniciacao';
+    return 'pre_escolar';
+  }
+  return 'primario_regular';
+}
+
+export interface SchoolStudentQuotaStatus {
+  schoolId: string;
+  schoolName: string;
+  declaredTotal: number;
+  registeredCount: number;
+  registeredFemaleCount: number;
+  registeredMaleCount: number;
+  registeredWithDocs: number;
+  registeredWithoutDocs: number;
+  pendingCount: number;
+  progressPercent: number;
+  registeredStudents: StudentRegistrationData[];
+}
+
+const ACTIVE_DIRECTOR_SCHOOL_KEY = 'ucore_active_director_school_id';
+
+export function setActiveDirectorSchoolId(schoolId: string): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(ACTIVE_DIRECTOR_SCHOOL_KEY, schoolId);
+  } catch {}
+}
+
+export function getActiveDirectorSchool(
+  schoolsList?: AdminSchool[],
+  currentUserSchoolName?: string
+): AdminSchool | undefined {
+  const schools = schoolsList && schoolsList.length > 0 ? schoolsList : getRegisteredSchoolsFromStorage();
+  if (schools.length === 0) return undefined;
+
+  const norm = (str?: string) => (str || '').trim().toLowerCase();
+
+  // 1. If currentUser has a specific schoolName that matches a registered school, prefer it
+  if (currentUserSchoolName && !norm(currentUserSchoolName).includes('modelo central')) {
+    const byUser = schools.find((s) => norm(s.name) === norm(currentUserSchoolName));
+    if (byUser) return byUser;
+  }
+
+  // 2. Check active director school stored in localStorage
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const savedId = localStorage.getItem(ACTIVE_DIRECTOR_SCHOOL_KEY);
+      if (savedId) {
+        const byId = schools.find((s) => s.id === savedId || norm(s.name) === norm(savedId));
+        if (byId) return byId;
+      }
+    } catch {}
+  }
+
+  // 3. Default to the first registered school
+  return schools[0];
+}
+
+/**
+ * Reconciles the declared total students of a school (e.g. 567) against the
+ * students actually registered in the system for that school.
+ * - Declared students do NOT enter the spreadsheet directly; they remain as PENDING.
+ * - As each student is registered in the school, pendingCount decreases (e.g. 567 -> 566 -> ... -> 21 when 546 are registered)
+ *   and registeredCount enters the Instrumento Complementar 2026/2027 spreadsheet.
+ */
+export function getSchoolStudentQuotaStatus(
+  school: AdminSchool,
+  extraStudents?: Array<AdminStudent | StudentRegistrationData>
+): SchoolStudentQuotaStatus {
+  const norm = (str?: string) => (str || '').trim().toLowerCase();
+  const schoolNameNorm = norm(school.name);
+  const schoolCodeNorm = norm(school.codigoSIGE || school.registrationData?.codigoSIGE);
+
+  const storedDetailed = getStoredStudents();
+
+  // Match detailed students belonging to this school
+  const matchedDetailed = storedDetailed.filter((s) => {
+    const matchId = Boolean(s.schoolId && s.schoolId === school.id);
+    const sSchool = norm(s.escola || (s as any).nomeEscola);
+    const matchName = Boolean(schoolNameNorm && sSchool === schoolNameNorm);
+    const matchCode = Boolean(schoolCodeNorm && sSchool === schoolCodeNorm);
+    return matchId || matchName || matchCode;
+  });
+
+  const combinedMap = new Map<string, StudentRegistrationData>();
+  matchedDetailed.forEach((s) => {
+    const key = s.id || `${norm(s.nomeCompleto || s.name)}::${norm(s.escola)}`;
+    combinedMap.set(key, s);
+  });
+
+  if (extraStudents && extraStudents.length > 0) {
+    extraStudents.forEach((item) => {
+      const isDetailedItem = 'escola' in item || 'nomeCompleto' in item;
+      if (isDetailedItem) {
+        const s = item as StudentRegistrationData;
+        const matchId = Boolean(s.schoolId && s.schoolId === school.id);
+        const sSchool = norm(s.escola || (s as any).nomeEscola);
+        const matchName = Boolean(schoolNameNorm && sSchool === schoolNameNorm);
+        const matchCode = Boolean(schoolCodeNorm && sSchool === schoolCodeNorm);
+        if (matchId || matchName || matchCode) {
+          const alreadyById = s.id && combinedMap.has(s.id);
+          const alreadyByName = Array.from(combinedMap.values()).some(
+            (existing) => norm(existing.nomeCompleto || existing.name) === norm(s.nomeCompleto || s.name)
+          );
+          if (!alreadyById && !alreadyByName) {
+            combinedMap.set(s.id || `${norm(s.nomeCompleto || s.name)}::${schoolNameNorm}`, s);
+          }
+        }
+        return;
+      }
+
+      const ast = item as AdminStudent;
+      const d = ast.registrationData;
+      const matchId = Boolean((ast.schoolId && ast.schoolId === school.id) || (d?.schoolId && d.schoolId === school.id));
+      const astSchool = norm(d?.escola || (d as any)?.nomeEscola || ast.schoolName);
+      const matchName = Boolean(schoolNameNorm && (astSchool === schoolNameNorm || norm(ast.schoolName) === schoolNameNorm));
+      const matchCode = Boolean(schoolCodeNorm && (astSchool === schoolCodeNorm || norm(ast.schoolName) === schoolCodeNorm));
+
+      if (matchId || matchName || matchCode) {
+        const alreadyById = ast.id && combinedMap.has(ast.id);
+        const alreadyByName = Array.from(combinedMap.values()).some(
+          (existing) => norm(existing.nomeCompleto || existing.name) === norm(ast.name)
+        );
+        if (!alreadyById && !alreadyByName) {
+          const fallbackReg: StudentRegistrationData = d || {
+            id: ast.id,
+            name: ast.name,
+            nomeCompleto: ast.name,
+            genero: ast.gender === 'M' ? 'M' : 'F',
+            dataNascimento: ast.dataNascimento || '2016-05-10',
+            idade: ast.idade || ast.age || 9,
+            tipoDocumento: (ast.documentType as any) || (ast.hasDocuments ? 'BI' : 'sem Documento'),
+            numeroDocumento: ast.numeroDocumento,
+            naturezaEscola: (school.natureza as StudentNaturezaEscola) || 'Pública',
+            tipoEscolaModalidade: getSuggestedModalityForSchool(school),
+            classeEtapaModulo: ast.gradeClass || '1.ª Classe',
+            classe: ast.gradeClass || '1ª Classe',
+            turma: ast.turma || 'Turma A',
+            sala: ast.room || 'Sala 01',
+            escola: school.name,
+            schoolId: school.id,
+            condicaoMatricula: ast.condicaoMatricula || 'primeira_vez',
+            alunoRepetente: ast.condicaoMatricula === 'repetente',
+            encarregado: ast.guardianName || 'Encarregado de Educação',
+            telefone: '+244 923 000 000',
+          };
+          combinedMap.set(ast.id || `${norm(ast.name)}::${schoolNameNorm}`, fallbackReg);
+        }
+      }
+    });
+  }
+
+  const registeredStudents = Array.from(combinedMap.values());
+  const registeredCount = registeredStudents.length;
+
+  const declaredFromProp =
+    typeof school.declaredStudentsCount === 'number' && school.declaredStudentsCount > 0
+      ? school.declaredStudentsCount
+      : typeof school.registrationData?.pessoal?.totalAlunosDeclarados === 'number' &&
+        school.registrationData.pessoal.totalAlunosDeclarados > 0
+      ? school.registrationData.pessoal.totalAlunosDeclarados
+      : (school.studentsWithDocs || 0) + (school.studentsWithoutDocs || 0);
+
+  const declaredTotal = Math.max(declaredFromProp, 0);
+  const pendingCount = Math.max(0, declaredTotal - registeredCount);
+
+  const registeredFemaleCount = registeredStudents.filter(
+    (s) => s.genero === 'F' || (s as any).sexo === 'Feminino'
+  ).length;
+  const registeredMaleCount = Math.max(0, registeredCount - registeredFemaleCount);
+  const registeredWithDocs = registeredStudents.filter((s) => s.tipoDocumento !== 'sem Documento').length;
+  const registeredWithoutDocs = Math.max(0, registeredCount - registeredWithDocs);
+
+  const progressPercent =
+    declaredTotal > 0
+      ? Math.min(100, Math.round((registeredCount / declaredTotal) * 100))
+      : registeredCount > 0
+      ? 100
+      : 0;
+
+  return {
+    schoolId: school.id,
+    schoolName: school.name,
+    declaredTotal,
+    registeredCount,
+    registeredFemaleCount,
+    registeredMaleCount,
+    registeredWithDocs,
+    registeredWithoutDocs,
+    pendingCount,
+    progressPercent,
+    registeredStudents,
+  };
 }
 
 export function saveStudent(studentData: StudentRegistrationData): StudentRegistrationData {
@@ -462,6 +821,90 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
+
+      // Sync with ucore_admin_students so all admin & SIGE spreadsheets immediately include this student
+      const rawAdminStudents = localStorage.getItem('ucore_admin_students');
+      const adminStudentsList: AdminStudent[] = rawAdminStudents ? JSON.parse(rawAdminStudents) : [];
+      const hasDocs = ensuredData.tipoDocumento !== 'sem Documento';
+      const syncedAdminStudent: AdminStudent = {
+        id: ensuredData.id!,
+        name: ensuredData.nomeCompleto || ensuredData.name,
+        gender: ensuredData.genero === 'M' ? 'M' : 'F',
+        gradeClass: ensuredData.classeEtapaModulo || ensuredData.classe || '1.ª Classe',
+        room: ensuredData.sala || 'Sala 01',
+        turma: ensuredData.turma || 'Turma A',
+        guardianName: ensuredData.encarregado || 'Encarregado de Educação',
+        location: ensuredData.endereco || `${ensuredData.municipio || 'Quêssua'}, ${ensuredData.provincia || 'Malanje'}`,
+        presenceRate: 97.5,
+        hasDocuments: hasDocs,
+        documentType: ensuredData.tipoDocumento,
+        numeroDocumento: ensuredData.numeroDocumento,
+        dataNascimento: ensuredData.dataNascimento,
+        idade: ensuredData.idade,
+        condicaoMatricula: ensuredData.condicaoMatricula,
+        foto: ensuredData.foto,
+        anexoDocumentoNome: ensuredData.anexoDocumentoNome,
+        performanceScore: 8.5,
+        schoolName: ensuredData.escola || 'Escola Oficial',
+        schoolId: ensuredData.schoolId,
+        schoolType: ensuredData.naturezaEscola || 'Pública',
+        registrationData: ensuredData,
+      };
+
+      const existingAdminIdx = adminStudentsList.findIndex(
+        (s) => s.id === syncedAdminStudent.id || (s.name.toLowerCase() === syncedAdminStudent.name.toLowerCase() && s.schoolName === syncedAdminStudent.schoolName)
+      );
+      let nextAdminStudents: AdminStudent[];
+      if (existingAdminIdx >= 0) {
+        nextAdminStudents = [...adminStudentsList];
+        nextAdminStudents[existingAdminIdx] = {
+          ...nextAdminStudents[existingAdminIdx],
+          ...syncedAdminStudent,
+        };
+      } else {
+        nextAdminStudents = [syncedAdminStudent, ...adminStudentsList];
+      }
+      localStorage.setItem('ucore_admin_students', JSON.stringify(nextAdminStudents));
+
+      // Also sync school student counters in ucore_admin_schools
+      const rawSchools = localStorage.getItem('ucore_admin_schools');
+      if (rawSchools) {
+        const schoolsList: AdminSchool[] = JSON.parse(rawSchools);
+        if (Array.isArray(schoolsList) && schoolsList.length > 0) {
+          const updatedSchools = schoolsList.map((sc) => {
+            const belongsToSchool = nextAdminStudents.filter(
+              (st) =>
+                (st.schoolId && st.schoolId === sc.id) ||
+                st.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase() ||
+                (st.registrationData?.escola && st.registrationData.escola.trim().toLowerCase() === sc.name.trim().toLowerCase())
+            );
+            if (
+              (ensuredData.schoolId && ensuredData.schoolId === sc.id) ||
+              (ensuredData.escola && ensuredData.escola.trim().toLowerCase() === sc.name.trim().toLowerCase()) ||
+              belongsToSchool.length > 0
+            ) {
+              const preservedDeclared =
+                typeof sc.declaredStudentsCount === 'number'
+                  ? sc.declaredStudentsCount
+                  : typeof sc.registrationData?.pessoal?.totalAlunosDeclarados === 'number'
+                  ? sc.registrationData.pessoal.totalAlunosDeclarados
+                  : (sc.studentsWithDocs || 0) + (sc.studentsWithoutDocs || 0);
+              const withDocs = belongsToSchool.filter((st) => st.hasDocuments).length;
+              const withoutDocs = belongsToSchool.length - withDocs;
+              return {
+                ...sc,
+                declaredStudentsCount: preservedDeclared,
+                studentsWithDocs: withDocs,
+                studentsWithoutDocs: withoutDocs,
+              };
+            }
+            return sc;
+          });
+          localStorage.setItem('ucore_admin_schools', JSON.stringify(updatedSchools));
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch (err) {
       console.error('Error saving student in localStorage:', err);
     }
@@ -470,15 +913,143 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
   return ensuredData;
 }
 
-export function deleteStudent(id: string): boolean {
+export function deleteStudent(id: string, studentName?: string): boolean {
+  const normTargetName = (studentName || '').trim().toLowerCase();
   const currentList = getStoredStudents();
-  const filtered = currentList.filter((s) => s.id !== id);
+  const removedDetailed = currentList.find(
+    (s) =>
+      s.id === id ||
+      (normTargetName &&
+        ((s.name || '').trim().toLowerCase() === normTargetName ||
+          (s.nomeCompleto || '').trim().toLowerCase() === normTargetName))
+  );
+  const targetName = normTargetName || (removedDetailed?.nomeCompleto || removedDetailed?.name || '').trim().toLowerCase();
+
+  const filtered = currentList.filter(
+    (s) =>
+      s.id !== id &&
+      (!targetName ||
+        ((s.name || '').trim().toLowerCase() !== targetName &&
+          (s.nomeCompleto || '').trim().toLowerCase() !== targetName))
+  );
+
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+
+      // Remove from ucore_admin_students
+      const rawAdminStudents = localStorage.getItem('ucore_admin_students');
+      let nextAdminStudents: AdminStudent[] = [];
+      if (rawAdminStudents) {
+        const parsedAdmin: AdminStudent[] = JSON.parse(rawAdminStudents);
+        if (Array.isArray(parsedAdmin)) {
+          nextAdminStudents = parsedAdmin.filter(
+            (st) => st.id !== id && (!targetName || (st.name || '').trim().toLowerCase() !== targetName)
+          );
+          localStorage.setItem('ucore_admin_students', JSON.stringify(nextAdminStudents));
+        }
+      }
+
+      // Remove from ucore_director_students
+      const rawDirectorStudents = localStorage.getItem('ucore_director_students');
+      if (rawDirectorStudents) {
+        const parsedDir = JSON.parse(rawDirectorStudents);
+        if (Array.isArray(parsedDir)) {
+          const nextDir = parsedDir.filter(
+            (st: any) => st.id !== id && (!targetName || (st.name || '').trim().toLowerCase() !== targetName)
+          );
+          localStorage.setItem('ucore_director_students', JSON.stringify(nextDir));
+        }
+      }
+
+      // Remove from ucore_teacher_students
+      const rawTeacherStudents = localStorage.getItem('ucore_teacher_students');
+      if (rawTeacherStudents) {
+        const parsedTeacher = JSON.parse(rawTeacherStudents);
+        if (Array.isArray(parsedTeacher)) {
+          const nextTeacher = parsedTeacher.filter(
+            (st: any) => st.id !== id && (!targetName || (st.name || '').trim().toLowerCase() !== targetName)
+          );
+          localStorage.setItem('ucore_teacher_students', JSON.stringify(nextTeacher));
+        }
+      }
+
+      // Recalculate school student counters in ucore_admin_schools
+      const rawSchools = localStorage.getItem('ucore_admin_schools');
+      if (rawSchools) {
+        const schoolsList: AdminSchool[] = JSON.parse(rawSchools);
+        if (Array.isArray(schoolsList) && schoolsList.length > 0) {
+          const updatedSchools = schoolsList.map((sc) => {
+            const preservedDeclared =
+              typeof sc.declaredStudentsCount === 'number'
+                ? sc.declaredStudentsCount
+                : typeof sc.registrationData?.pessoal?.totalAlunosDeclarados === 'number'
+                ? sc.registrationData.pessoal.totalAlunosDeclarados
+                : (sc.studentsWithDocs || 0) + (sc.studentsWithoutDocs || 0);
+            const belongsToSchool = nextAdminStudents.filter(
+              (st) =>
+                (st.schoolId && st.schoolId === sc.id) ||
+                st.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase() ||
+                (st.registrationData?.escola &&
+                  st.registrationData.escola.trim().toLowerCase() === sc.name.trim().toLowerCase())
+            );
+            const withDocs = belongsToSchool.filter((st) => st.hasDocuments).length;
+            const withoutDocs = belongsToSchool.length - withDocs;
+            return {
+              ...sc,
+              declaredStudentsCount: preservedDeclared,
+              studentsWithDocs: withDocs,
+              studentsWithoutDocs: withoutDocs,
+            };
+          });
+          localStorage.setItem('ucore_admin_schools', JSON.stringify(updatedSchools));
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
       return true;
     } catch (err) {
       console.error('Error deleting student:', err);
+      return false;
+    }
+  }
+  return true;
+}
+
+export function deleteAllStudents(): boolean {
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+      localStorage.setItem('ucore_admin_students', JSON.stringify([]));
+      localStorage.setItem('ucore_director_students', JSON.stringify([]));
+      localStorage.setItem('ucore_teacher_students', JSON.stringify([]));
+
+      const rawSchools = localStorage.getItem('ucore_admin_schools');
+      if (rawSchools) {
+        const schoolsList: AdminSchool[] = JSON.parse(rawSchools);
+        if (Array.isArray(schoolsList)) {
+          const updatedSchools = schoolsList.map((sc) => {
+            const preservedDeclared =
+              typeof sc.declaredStudentsCount === 'number'
+                ? sc.declaredStudentsCount
+                : typeof sc.registrationData?.pessoal?.totalAlunosDeclarados === 'number'
+                ? sc.registrationData.pessoal.totalAlunosDeclarados
+                : (sc.studentsWithDocs || 0) + (sc.studentsWithoutDocs || 0);
+            return {
+              ...sc,
+              declaredStudentsCount: preservedDeclared,
+              studentsWithDocs: 0,
+              studentsWithoutDocs: 0,
+            };
+          });
+          localStorage.setItem('ucore_admin_schools', JSON.stringify(updatedSchools));
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+      return true;
+    } catch (err) {
+      console.error('Error deleting all students:', err);
       return false;
     }
   }

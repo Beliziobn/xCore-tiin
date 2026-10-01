@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   X,
   Printer,
@@ -54,29 +54,10 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
   const [pdfStatusMessage, setPdfStatusMessage] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const hasAutoExportedRef = useRef(false);
-
   const printableRef = useRef<HTMLDivElement>(null);
 
-  if (!isOpen || !student) return null;
-
-  const subjects = getCurricularSubjects(student.classeEtapaModulo || student.classe || '');
-  const dataExtensoEmissao = formatDataExtenso(new Date().toISOString().substring(0, 10));
-  const dataExtensoNasc = formatDataExtenso(student.dataNascimento);
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleCopyCode = () => {
-    if (student.codigoMatricula) {
-      navigator.clipboard.writeText(student.codigoMatricula);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    }
-  };
-
-  const handleExportPDF = async () => {
-    if (!printableRef.current || isExportingPdf) return;
+  const handleExportPDF = useCallback(async () => {
+    if (!printableRef.current || !student || isExportingPdf) return;
 
     setIsExportingPdf(true);
     setExportError(null);
@@ -97,10 +78,14 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
     } finally {
       setIsExportingPdf(false);
     }
-  };
+  }, [student, isExportingPdf]);
 
   // Efeito para acionar a exportação automática do PDF assim que o aluno for cadastrado
   useEffect(() => {
+    if (!isOpen || !student) {
+      hasAutoExportedRef.current = false;
+      return;
+    }
     if ((isJustRegistered || autoExportPdf) && !hasAutoExportedRef.current) {
       hasAutoExportedRef.current = true;
       // Pequeno timeout de 600ms para garantir renderização estável dos elementos visuais e fontes
@@ -111,7 +96,24 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
       }, 600);
       return () => clearTimeout(timer);
     }
-  }, [isJustRegistered, autoExportPdf]);
+  }, [isOpen, student, isJustRegistered, autoExportPdf, handleExportPDF]);
+
+  if (!isOpen || !student) return null;
+
+  const dataExtensoEmissao = formatDataExtenso(new Date().toISOString().substring(0, 10));
+  const dataExtensoNasc = formatDataExtenso(student.dataNascimento);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleCopyCode = () => {
+    if (student.codigoMatricula) {
+      navigator.clipboard.writeText(student.codigoMatricula);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200 print:p-0 print:bg-white print:static">
@@ -128,16 +130,14 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-black tracking-tight text-white">
-                  Boletim Oficial de Matrícula
+                  Boletim de Matrícula
                 </h2>
                 <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono shadow-xs">
-                  {student.codigoMatricula || 'MAT-2025'}
+                  {student.codigoMatricula || 'MAT-2026'}
                 </span>
               </div>
               <p className="text-xs text-cyan-200/80">
-                {isJustRegistered
-                  ? '✓ Aluno registado com sucesso! Emissão pronta com carimbo e assinatura digital.'
-                  : 'Documento oficial com certificação digital do Director • Ministério da Educação'}
+                Comprovativo simples e claro para o Encarregado de Educação
               </p>
             </div>
           </div>
@@ -148,7 +148,7 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
               type="button"
               onClick={handleExportPDF}
               disabled={isExportingPdf}
-              title="Exportar Boletim de Matrícula para PDF (Formato Oficial A4)"
+              title="Baixar Boletim de Matrícula em PDF"
               className="px-3.5 py-1.5 bg-[#f75142] hover:bg-[#e04436] disabled:opacity-60 text-white rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm border border-red-400 active:scale-95"
             >
               {isExportingPdf ? (
@@ -159,7 +159,7 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
               ) : (
                 <>
                   <FileDown className="w-3.5 h-3.5" />
-                  <span>Exportar PDF (A4)</span>
+                  <span>Baixar PDF</span>
                 </>
               )}
             </button>
@@ -168,33 +168,22 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              title="Imprimir boletim oficial em folha A4"
+              title="Imprimir boletim"
               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Imprimir</span>
             </button>
 
-            {/* BOTÃO BAIXAR HTML */}
-            <button
-              type="button"
-              onClick={() => downloadBoletimHTML(student)}
-              title="Baixar Boletim em formato Web / HTML"
-              className="px-3 py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Baixar HTML</span>
-            </button>
-
             {/* BOTÃO COPIAR CÓDIGO */}
             <button
               type="button"
               onClick={handleCopyCode}
-              title="Copiar código de matrícula"
+              title="Copiar número de matrícula"
               className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 border border-white/10"
             >
               {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-300" />}
-              <span className="hidden md:inline">{copiedCode ? 'Copiado' : 'Nº'}</span>
+              <span className="hidden md:inline">{copiedCode ? 'Copiado' : 'Copiar Nº'}</span>
             </button>
 
             {/* FECHAR */}
@@ -223,337 +212,283 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
-                <strong>Matrícula Registada com Sucesso!</strong> O Boletim Oficial foi gerado e o descarregamento do PDF inicia automaticamente.
+                <strong>Matrícula Confirmada!</strong> Guarde ou imprima este comprovativo para apresentar na escola.
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              {isExportingPdf && (
-                <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100 px-2.5 py-1 rounded-md font-semibold animate-pulse">
-                  <div className="w-2.5 h-2.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
-                  {pdfStatusMessage || 'A transferir PDF...'}
-                </span>
-              )}
-              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
-                Ano Lectivo 2026 / 2027
+            {isExportingPdf && (
+              <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100 px-2.5 py-1 rounded-md font-semibold animate-pulse">
+                <div className="w-2.5 h-2.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                {pdfStatusMessage || 'A transferir PDF...'}
               </span>
-            </div>
+            )}
           </div>
         )}
 
-        {/* ================= FOLHA OFICIAL DO BOLETIM (ÁREA EXPORTÁVEL E IMPRIMÍVEL A4) ================= */}
-        <div className="p-3 sm:p-6 md:p-7 overflow-y-auto max-h-[calc(88vh-80px)] print:max-h-none print:overflow-visible print:p-0 bg-slate-100/60 flex justify-center">
+        {/* ================= FOLHA A4 OFICIAL DO BOLETIM (ESTILO DOCUMENTO ESCOLAR) ================= */}
+        <div className="p-4 sm:p-8 overflow-y-auto max-h-[calc(90vh-80px)] print:max-h-none print:overflow-visible print:p-0 bg-slate-300/80 flex justify-center">
           <div
             ref={printableRef}
             id="boletim-a4-document"
-            className="bg-white border-2 border-[#0b3d5c] rounded-xl p-5 sm:p-6.5 shadow-sm print:shadow-none print:border-2 print:border-black print:rounded-none w-full max-w-[800px] text-slate-900 font-sans"
-            style={{ minHeight: '1050px' }}
+            className="bg-white border border-slate-400 rounded-none px-8 py-10 sm:px-14 sm:py-12 shadow-[0_12px_40px_rgba(0,0,0,0.22)] print:shadow-none print:border-none w-full max-w-[794px] min-h-[1020px] flex flex-col justify-between text-slate-950 font-serif"
           >
-            {/* 1. CABEÇALHO GOVERNAMENTAL E INSTITUCIONAL COM LOGOTIPOS */}
-            <div className="flex items-center justify-between gap-3 border-b-2 border-[#0b3d5c] pb-2.5 mb-2.5 text-center">
-              {/* INSÍGNIA NACIONAL DE ANGOLA */}
-              <div className="w-20 shrink-0 flex flex-col items-center justify-center">
-                <AngolaCoatOfArms size={56} />
-                <span className="text-[7.5px] font-black uppercase text-slate-500 tracking-tighter mt-0.5">
-                  Rep. de Angola
-                </span>
-              </div>
-
-              {/* TÍTULOS INSTITUCIONAIS */}
-              <div className="flex-1 px-1">
-                <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-600 m-0 leading-tight">
-                  República de Angola
-                </h4>
-                <h4 className="text-[10px] font-bold uppercase tracking-wide text-slate-500 m-0 leading-tight mt-0.5">
-                  Governo da Província de {student.provincia || 'Malanje'} • Direcção Municipal da Educação do Quéssua
-                </h4>
-                <h2 className="text-sm sm:text-base font-black uppercase tracking-tight text-[#0b3d5c] mt-1 mb-1 leading-tight">
-                  {student.escola || 'Escola Modelo Central de Quêssua'}
-                </h2>
-                <div className="inline-block bg-[#0b3d5c] text-white text-[11px] sm:text-xs font-black px-4 py-0.5 rounded-xs uppercase tracking-wider shadow-xs">
-                  Boletim Oficial de Matrícula e Confirmação
+            {/* 1. CABEÇALHO OFICIAL PADRÃO DOCUMENTO ESCOLAR A4 */}
+            <div className="border-b-2 border-black pb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-12 items-start gap-4">
+                {/* Canto Superior Esquerdo: Visto da Direcção (Padrão Documento Escolar) */}
+                <div className="hidden sm:flex sm:col-span-3 flex-col items-center justify-center text-center pt-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-black">
+                    Visto
+                  </p>
+                  <p className="text-[9px] font-semibold uppercase text-slate-800">
+                    O Director da Escola
+                  </p>
+                  <div className="w-32 border-b border-black mt-7 mb-1" />
+                  <span className="text-[9px] text-slate-600 italic">
+                    Assinatura e Carimbo
+                  </span>
                 </div>
-              </div>
 
-              {/* LOGÓTIPO DA INSTITUIÇÃO E FOTO DO ALUNO */}
-              <div className="w-24 shrink-0 flex flex-col items-end gap-1">
-                <InstitutionLogo
-                  schoolName={student.escola || 'Escola Central'}
-                  size={46}
-                  className="hidden sm:flex"
-                />
-                
-                {/* Foto 3x4 do Aluno */}
-                <div className="w-14 h-16 border border-dashed border-slate-400 bg-slate-50 rounded flex flex-col items-center justify-center p-0.5 text-center overflow-hidden">
-                  {student.foto ? (
-                    <img
-                      src={student.foto}
-                      alt={student.nomeCompleto || student.name}
-                      className="w-full h-full object-cover rounded-xs"
-                    />
-                  ) : (
-                    <>
-                      <User className="w-5 h-5 text-slate-400 mb-0.5" />
-                      <span className="text-[7px] font-bold text-slate-400 uppercase leading-none">
-                        Foto 3x4<br />Carimbo
+                {/* Centro: Insígnia e Cabeçalho Institucional da Escola */}
+                <div className="sm:col-span-6 flex flex-col items-center text-center">
+                  <AngolaCoatOfArms size={58} />
+                  <p className="text-xs font-bold uppercase tracking-widest text-black mt-2 leading-snug">
+                    República de Angola
+                  </p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-black leading-snug">
+                    Ministério da Educação
+                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-900 leading-snug">
+                    Governo Provincial de {student.provincia || 'Malanje'}
+                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-900 leading-snug">
+                    Direcção Municipal da Educação de {student.municipio || 'Quéssua'}
+                  </p>
+                  <h1 className="text-sm sm:text-base font-black uppercase tracking-wide text-black mt-2 pt-1 border-t border-slate-400 px-3">
+                    {student.escola || 'Escola Oficial'}
+                  </h1>
+                </div>
+
+                {/* Canto Superior Direito: Fotografia 3x4 Tipo Passe */}
+                <div className="sm:col-span-3 flex justify-center sm:justify-end pt-1">
+                  <div className="w-24 h-28 border border-black bg-white flex flex-col items-center justify-center p-1 text-center overflow-hidden shadow-2xs">
+                    {student.foto ? (
+                      <img
+                        src={student.foto}
+                        alt={student.nomeCompleto || student.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-[9px] font-sans font-semibold uppercase text-slate-500 leading-tight">
+                        Fotografia
+                        <br />
+                        Tipo Passe
+                        <br />
+                        (3x4)
                       </span>
-                    </>
-                  )}
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Título Oficial do Documento A4 */}
+              <div className="mt-5 text-center">
+                <div className="inline-block border-y-2 border-black py-1.5 px-8 bg-slate-50">
+                  <h2 className="text-sm sm:text-base font-black uppercase tracking-[0.18em] text-black">
+                    Boletim Oficial de Matrícula
+                  </h2>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 mt-2.5 text-xs font-sans text-black">
+                  <span>
+                    <strong>Ano Lectivo:</strong> 2026 / 2027
+                  </span>
+                  <span>•</span>
+                  <span>
+                    <strong>Processo / Matrícula Nº:</strong>{' '}
+                    <span className="font-mono font-black underline">
+                      {student.codigoMatricula || 'MAT-2026-0001'}
+                    </span>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    <strong>Estado:</strong> MATRÍCULA CONFIRMADA
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* 2. FAIXA META DE STATUS E NÚMERO DE MATRÍCULA */}
-            <div className="flex flex-wrap items-center justify-between gap-1.5 bg-slate-100 border border-slate-300 px-3 py-1 rounded text-xs font-semibold mb-2.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-500 font-bold uppercase text-[9.5px]">N.º de Matrícula:</span>
-                <span className="font-mono font-black text-[#0b3d5c] text-sm tracking-tight">{student.codigoMatricula || 'MAT-2026-0001'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold uppercase text-[9.5px]">Ano Lectivo:</span>{' '}
-                <span className="font-black text-slate-800">2026 / 2027</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold uppercase text-[9.5px]">Data de Emissão:</span>{' '}
-                <span className="font-bold text-slate-700">{dataExtensoEmissao}</span>
-              </div>
-              <div className="flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10.5px] font-black uppercase">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Matrícula Confirmada</span>
-              </div>
-            </div>
-
-            {/* SECTOR 1: IDENTIFICAÇÃO PESSOAL DO ALUNO */}
-            <div className="text-[10.5px] font-black uppercase tracking-wide bg-slate-200 text-[#0b3d5c] px-2.5 py-0.5 rounded-xs border-l-4 border-[#0891b2] mb-1.5">
-              1. Identificação Pessoal do Aluno
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs mb-2.5">
-              <div className="sm:col-span-2">
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Nome Completo do Aluno</span>
-                <div className="font-extrabold text-[#0b3d5c] bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.nomeCompleto || student.name}
+            {/* 2. QUADRO ÚNICO DE DADOS DO DOCUMENTO ESCOLAR */}
+            <div className="border border-slate-900 bg-white divide-y divide-slate-900 font-sans text-xs sm:text-sm">
+              {/* Nome Completo e Situação */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-900">
+                <div className="sm:col-span-3 p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Nome Completo do(a) Aluno(a)
+                  </span>
+                  <span className="text-sm sm:text-base font-black uppercase text-slate-950 mt-0.5 block">
+                    {student.nomeCompleto || student.name}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Sexo / Género</span>
-                <div className="font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.genero === 'F' ? 'Feminino' : student.genero === 'M' ? 'Masculino' : 'Outro'}
+                <div className="p-3 bg-slate-50">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Situação da Matrícula
+                  </span>
+                  <span className="text-xs sm:text-sm font-black uppercase text-slate-950 mt-0.5 block">
+                    Confirmada
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Data de Nascimento</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {dataExtensoNasc}
+              {/* Escolaridade: Classe, Turma, Sala e Turno */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-900 bg-slate-50/70">
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Classe / Nível
+                  </span>
+                  <span className="font-black text-slate-950 mt-0.5 block">
+                    {student.classeEtapaModulo || student.classe || '1.ª Classe'}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Idade</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.idade ? `${student.idade} Anos` : 'Não calculada'}
+
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Turma
+                  </span>
+                  <span className="font-black text-slate-950 mt-0.5 block">
+                    {student.turma || 'Turma A'}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Doc. de Identificação</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.tipoDocumento || 'B.I.'}: {student.numeroDocumento || 'Não informado'}
+
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Sala de Aula
+                  </span>
+                  <span className="font-black text-slate-950 mt-0.5 block">
+                    {student.sala || 'Sala 01'}
+                  </span>
+                </div>
+
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Período / Turno
+                  </span>
+                  <span className="font-black text-slate-950 mt-0.5 block">
+                    {student.periodo || student.turno || 'Manhã'}
+                  </span>
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Residência / Endereço</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.endereco || 'Quéssua'}, {student.municipio || 'Quéssua'} - {student.provincia || 'Malanje'}
+              {/* Dados Pessoais do Aluno */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-900">
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Data de Nascimento
+                  </span>
+                  <span className="font-semibold text-slate-900 mt-0.5 block">
+                    {dataExtensoNasc}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Nacionalidade</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  Angolana
-                </div>
-              </div>
-            </div>
 
-            {/* SECTOR 2: DADOS PEDAGÓGICOS E TURMA */}
-            <div className="text-[10.5px] font-black uppercase tracking-wide bg-slate-200 text-[#0b3d5c] px-2.5 py-0.5 rounded-xs border-l-4 border-[#0891b2] mb-1.5">
-              2. Dados Pedagógicos e Turma Atribuída
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs mb-2.5">
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Classe / Etapa</span>
-                <div className="font-black text-[#0891b2] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-center text-xs">
-                  {student.classeEtapaModulo || student.classe || '1.ª Classe'}
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Idade / Sexo
+                  </span>
+                  <span className="font-semibold text-slate-900 mt-0.5 block">
+                    {student.idade ? `${student.idade} Anos` : '---'} •{' '}
+                    {student.genero === 'F' ? 'Feminino' : student.genero === 'M' ? 'Masculino' : 'Outro'}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Turma Atribuída</span>
-                <div className="font-black text-slate-900 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-center text-xs">
-                  {student.turma || 'Turma A'}
+
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Documento de Identificação
+                  </span>
+                  <span className="font-semibold text-slate-900 mt-0.5 block">
+                    {student.tipoDocumento === 'sem Documento' || !student.numeroDocumento
+                      ? 'Sem documento'
+                      : `${student.tipoDocumento || 'B.I.'}: ${student.numeroDocumento}`}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Sala de Aula</span>
-                <div className="font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-center text-xs">
-                  {student.sala || 'Sala 01'}
-                </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Turno / Período</span>
-                <div className="font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-center text-xs">
-                  {student.periodo || student.turno || 'Manhã'}
+
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Residência Actual
+                  </span>
+                  <span className="font-semibold text-slate-900 mt-0.5 block">
+                    {student.endereco || 'Quéssua'}, {student.municipio || 'Quéssua'}
+                  </span>
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Natureza Institucional</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.naturezaEscola || 'Pública'} ({student.tipoEscolaNome || 'Ensino Primário'})
+              {/* Dados do Encarregado de Educação */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-900">
+                <div className="sm:col-span-2 p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Nome do(a) Encarregado(a) de Educação
+                  </span>
+                  <span className="font-bold text-slate-950 mt-0.5 block">
+                    {student.encarregado || 'Não informado'}
+                  </span>
                 </div>
-              </div>
-              <div className="sm:col-span-2">
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Condição de Matrícula</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.alunoRepetente
-                    ? 'Aluno Repetente'
-                    : student.transferido
-                    ? `Transferido (${student.escolaOrigem || 'Outra Escola'})`
-                    : 'Primeira Matrícula / Regular'}
-                </div>
-              </div>
-            </div>
 
-            {/* SECTOR 3: ENCARREGADO DE EDUCAÇÃO */}
-            <div className="text-[10.5px] font-black uppercase tracking-wide bg-slate-200 text-[#0b3d5c] px-2.5 py-0.5 rounded-xs border-l-4 border-[#0891b2] mb-1.5">
-              3. Encarregado de Educação e Contactos de Emergência
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs mb-2.5">
-              <div className="sm:col-span-2">
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Nome do Encarregado</span>
-                <div className="font-bold text-slate-900 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.encarregado || 'Não informado'}
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Grau de Parentesco
+                  </span>
+                  <span className="font-semibold text-slate-900 mt-0.5 block">
+                    {student.parentescoEncarregado || 'Responsável'}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Grau de Parentesco</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.parentescoEncarregado || 'Mãe / Pai / Tutor'}
-                </div>
-              </div>
 
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Telefone Principal</span>
-                <div className="font-mono font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.telefone || 'Não informado'}
-                </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Telefone Alternativo</span>
-                <div className="font-mono font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.telefoneAlternativo || 'Nenhum'}
-                </div>
-              </div>
-              <div>
-                <span className="block text-[9px] font-bold text-slate-500 uppercase">Ensino Especial / NEE</span>
-                <div className="font-semibold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded text-xs">
-                  {student.temNecessidadesEspeciais || student.isEnsinoEspecial
-                    ? `Sim (${student.tiposDeficiencia?.join(', ') || 'Inclusivo'})`
-                    : 'Não'}
+                <div className="p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Contacto Telefónico
+                  </span>
+                  <span className="font-mono font-bold text-slate-950 mt-0.5 block">
+                    {student.telefone || 'Não informado'}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* SECTOR 4: COMPONENTES CURRICULARES */}
-            <div className="text-[10.5px] font-black uppercase tracking-wide bg-slate-200 text-[#0b3d5c] px-2.5 py-0.5 rounded-xs border-l-4 border-[#0891b2] mb-1.5 flex items-center justify-between">
-              <span>4. Matriz Curricular e Disciplinas Obrigatórias da Classe</span>
-              <span className="text-[9px] font-semibold text-slate-600 lowercase">({subjects.length} disciplinas matriculadas)</span>
-            </div>
-            <div className="border border-slate-200 rounded overflow-hidden mb-2.5">
-              <table className="w-full text-[10.5px] text-left border-collapse">
-                <thead className="bg-[#0b3d5c] text-white">
-                  <tr>
-                    <th className="py-0.5 px-2 font-bold text-center w-8 border-r border-cyan-800">Nº</th>
-                    <th className="py-0.5 px-2 font-bold border-r border-cyan-800">Componente Curricular</th>
-                    <th className="py-0.5 px-2 font-bold text-center w-28 border-r border-cyan-800">Carga Horária</th>
-                    <th className="py-0.5 px-2 font-bold text-center w-20">Situação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {subjects.map((sub, i) => (
-                    <tr key={i} className={i % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
-                      <td className="py-0.5 px-2 text-center text-slate-500 font-mono text-[9.5px] border-r border-slate-200">{i + 1}</td>
-                      <td className="py-0.5 px-2 font-semibold text-slate-800 border-r border-slate-200">{sub.nome}</td>
-                      <td className="py-0.5 px-2 text-center text-slate-600 border-r border-slate-200 text-[10px]">{sub.cargaHoraria}</td>
-                      <td className="py-0.5 px-2 text-center font-bold text-emerald-600 text-[10px]">Inscrita</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* 3. DECLARAÇÃO FORMAL, DATA E ASSINATURAS DO DOCUMENTO A4 */}
+            <div className="pt-2 space-y-6 text-xs sm:text-sm text-slate-800">
+              <p className="leading-relaxed text-justify font-sans">
+                Declara-se, para os devidos efeitos, que o(a) aluno(a) acima identificado(a) encontra-se
+                regularmente matriculado(a) nesta instituição de ensino para o <strong>Ano Lectivo 2026 / 2027</strong>,
+                na classe, turma e período indicados neste boletim.
+              </p>
 
-            {/* SECTOR 5: DOCUMENTAÇÃO ENTREGUE */}
-            <div className="text-[10.5px] font-black uppercase tracking-wide bg-slate-200 text-[#0b3d5c] px-2.5 py-0.5 rounded-xs border-l-4 border-[#0891b2] mb-1.5">
-              5. Documentação Entregue na Secretaria Escolar
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-50 border border-slate-200 p-1.5 rounded text-[10px] mb-3">
-              <div className="flex items-center gap-1 font-bold text-slate-700">
-                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                <span>Cópia do B.I. / Cédula</span>
-              </div>
-              <div className="flex items-center gap-1 font-bold text-slate-700">
-                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                <span>2 Fotos Tipo Passe</span>
-              </div>
-              <div className="flex items-center gap-1 font-bold text-slate-700">
-                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                <span>Declaração c/ Notas</span>
-              </div>
-              <div className="flex items-center gap-1 font-bold text-slate-700">
-                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                <span>Ficha e Compromisso</span>
-              </div>
-            </div>
+              <p className="text-center font-semibold font-sans pt-1">
+                {student.municipio || 'Quéssua'}, aos {dataExtensoEmissao}.
+              </p>
 
-            {/* SECTOR 6: ASSINATURA DIGITAL DO DIRETOR E HOMOLOGAÇÃO */}
-            <div className="mb-3">
-              <div className="text-[10.5px] font-black uppercase tracking-wide bg-slate-200 text-[#0b3d5c] px-2.5 py-0.5 rounded-xs border-l-4 border-[#0891b2] mb-1.5">
-                6. Homologação e Assinatura Digital do Director Geral
-              </div>
-              <DirectorDigitalSignature
-                directorName="Prof. Dr. Mateus Domingos da Silva"
-                matriculaCode={student.codigoMatricula || student.id}
-              />
-            </div>
-
-            {/* SECTOR 7: ASSINATURAS DO ENCARREGADO E SECRETARIA + QR CODE */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-300 text-xs items-end">
-              {/* Assinatura Encarregado */}
-              <div className="sm:col-span-1 text-center">
-                <div className="border-t border-dashed border-slate-600 pt-1 font-bold text-slate-800 text-[10.5px]">
-                  Encarregado(a) de Educação
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 pt-8 text-center font-sans">
+                <div>
+                  <div className="border-t border-slate-900 pt-2 max-w-[260px] mx-auto">
+                    <span className="block text-xs font-bold uppercase text-slate-900">
+                      O(A) Encarregado(a) de Educação
+                    </span>
+                    <span className="block text-[11px] text-slate-600 mt-0.5">
+                      {student.encarregado || 'Assinatura do Responsável'}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[8px] text-slate-500">Assinatura por Extenso</span>
-              </div>
 
-              {/* Secretaria */}
-              <div className="sm:col-span-2 text-center">
-                <div className="border-t border-dashed border-slate-600 pt-1 font-bold text-slate-800 text-[10.5px]">
-                  Secretaria Pedagógica • Atendimento Oficial
+                <div>
+                  <div className="border-t border-slate-900 pt-2 max-w-[260px] mx-auto">
+                    <span className="block text-xs font-bold uppercase text-slate-900">
+                      A Direcção / Secretaria da Escola
+                    </span>
+                    <span className="block text-[11px] text-slate-600 mt-0.5">
+                      Assinatura e Carimbo Oficial
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[8px] text-slate-500">Rubrica e Validação Administrativa</span>
               </div>
 
-              {/* QR Code de Autenticação Digital */}
-              <div className="sm:col-span-1 flex justify-center">
-                <BoletimValidationQRCode
-                  matriculaCode={student.codigoMatricula || student.id}
-                  size={54}
-                />
+              <div className="pt-4 border-t border-slate-300 text-center text-[11px] text-slate-500 font-sans">
+                Nota: Conserve este boletim em bom estado e apresente-o na secretaria da escola sempre que solicitado.
               </div>
-            </div>
-
-            {/* RODAPÉ DO DOCUMENTO */}
-            <div className="mt-3 pt-2 border-t border-slate-200 text-center text-[8.5px] text-slate-400 leading-normal">
-              Documento emitido e autenticado digitalmente pelo <strong>Sigre • Sistema Integrado de Gestão Escolar</strong>.<br />
-              Código de Autenticidade Digital: <code className="font-mono text-slate-700 font-bold">VAL-{student.codigoMatricula || student.id}</code> • Válido perante as autoridades de ensino para o Ano Lectivo 2026 / 2027.
             </div>
           </div>
         </div>
@@ -561,8 +496,8 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
         {/* ================= RODAPÉ DA JANELA (ESCONDIDO NA IMPRESSÃO) ================= */}
         <div className="bg-slate-100 px-6 py-3 flex items-center justify-between border-t border-slate-200 print:hidden">
           <div className="text-xs text-slate-500 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#0891b2]" />
-            <span>Documento em tamanho padrão A4 (210 × 297 mm) com resolução de 300 DPI na exportação em PDF.</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Documento simplificado e pronto para impressão ou envio em PDF.</span>
           </div>
           <div className="flex items-center gap-2">
             <button

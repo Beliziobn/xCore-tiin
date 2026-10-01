@@ -49,7 +49,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   onAddTeacherGlobal,
   onNavigateToAttendance,
   onNavigateToApprovals,
-  schoolName = 'Escola Modelo Central',
+  schoolName = '',
   directorName = 'Carl Mendes',
 }) => {
   const [teachers, setTeachers] = useState<DirectorTeacher[]>(() => {
@@ -708,8 +708,16 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
               </table>
             </div>
           </div>
-        ) : (
+        ) : !currentTeacher ? (
           /* MODO 2: VISUALIZAÇÃO DETALHADA COM CHIPS E SEÇÃO DO DOCENTE SELECIONADO */
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center shadow-xs">
+            <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-700">Nenhum professor cadastrado no sistema</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Clique em &quot;Cadastrar&quot; acima para adicionar o primeiro docente ao quadro.
+            </p>
+          </div>
+        ) : (
           <>
         {/* Quick Teacher Selector Chips */}
         <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -783,10 +791,10 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Nome
               </span>
               <span className="text-sm font-bold text-slate-900 break-words">
-                {currentTeacher?.name || 'Prof. Santar Goes'}
+                {currentTeacher.name}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
-                {currentTeacher?.shift}
+                {currentTeacher.shift}
               </span>
             </div>
 
@@ -796,7 +804,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Nome da Escola
               </span>
               <span className="text-sm font-bold text-slate-900 leading-snug">
-                {currentTeacher?.schoolName || 'Escola Modelo Central'}
+                {currentTeacher.schoolName || schoolName}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
                 Rede Pública
@@ -809,7 +817,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Classe
               </span>
               <span className="text-sm font-black text-slate-900">
-                {currentTeacher?.gradeClass || '4ª Classe'}
+                {currentTeacher.gradeClass || '---'}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
                 Ensino Primário
@@ -822,10 +830,10 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Sala
               </span>
               <span className="text-sm font-black text-slate-900">
-                {currentTeacher?.room || 'Sala 03'}
+                {currentTeacher.room || '---'}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
-                Capacidade 46
+                Capacidade 45
               </span>
             </div>
 
@@ -835,7 +843,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Turma
               </span>
               <span className="text-sm font-black text-slate-900">
-                {currentTeacher?.turma || 'Turma A'}
+                {currentTeacher.turma || '---'}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
                 Ano Letivo 2026
@@ -848,7 +856,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Nome dos Directores
               </span>
               <span className="text-sm font-bold text-slate-900 leading-tight">
-                {currentTeacher?.directorName || 'Fert Horlan'}
+                {currentTeacher.directorName || directorName}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
                 Diretor Geral
@@ -861,10 +869,10 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Localização
               </span>
               <span className="text-sm font-bold text-slate-900 leading-tight">
-                {currentTeacher?.location || 'Pavilhão 1 - Bloco B'}
+                {currentTeacher.location || '---'}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
-                Ala Oeste
+                Unidade Escolar
               </span>
             </div>
           </div>
@@ -896,27 +904,27 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                   </span>
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight font-display">
-                      98.5%
+                      {currentTeacher.presenceRate || 0}%
                     </span>
-                    <span className="text-xs text-emerald-600 font-bold">Excelente</span>
+                    <span className="text-xs text-emerald-600 font-bold">Registado</span>
                   </div>
                   <p className="text-xs text-slate-500 mt-2">
-                    Assiduidade do Mês • {currentTeacher?.name.split(' ')[0]}
+                    Assiduidade do Mês • {currentTeacher.name.split(' ')[0]}
                   </p>
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-medium">Aulas Previstas:</span>
-                    <span className="font-bold text-slate-800">40 aulas</span>
+                    <span className="font-bold text-slate-800">{currentTeacher.schedule?.length || 0} aulas</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-medium">Aulas Ministradas:</span>
-                    <span className="font-bold text-emerald-700">39 aulas</span>
+                    <span className="font-bold text-emerald-700">{currentTeacher.schedule?.length || 0} aulas</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-medium">Faltas Justificadas:</span>
-                    <span className="font-bold text-slate-700">1 aula</span>
+                    <span className="font-bold text-slate-700">0 aulas</span>
                   </div>
                 </div>
               </div>
@@ -942,13 +950,13 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                       Horário das Aulas
                     </h4>
                     <p className="text-xs text-slate-500">
-                      Grade Semanal • {currentTeacher?.name} ({currentTeacher?.gradeClass})
+                      Grade Semanal • {currentTeacher.name} ({currentTeacher.gradeClass})
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-[#f75142] bg-[#fef2f1] border border-[#fee4e2] px-3 py-1 rounded-full">
-                    {currentTeacher?.room}
+                    {currentTeacher.room}
                   </span>
                   <button
                     type="button"
@@ -964,7 +972,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
               {/* Schedule Table/Grid - Limpo e com alta legibilidade */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {currentTeacher?.schedule?.map((item, idx) => (
+                {currentTeacher.schedule?.map((item, idx) => (
                   <div
                     key={idx}
                     className="bg-slate-50 hover:bg-[#fef2f1]/40 rounded-xl p-3.5 border border-slate-200/70 transition-colors"
@@ -989,15 +997,15 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
               <span className="font-medium">
-                Carga Horária: <strong className="text-slate-800">24 horas/semana</strong>
+                Carga Horária: <strong className="text-slate-800">{(currentTeacher.schedule?.length || 0) * 2} horas/semana</strong>
               </span>
               <span className="font-semibold text-slate-800">
-                Disciplina Principal: <strong className="text-[#f75142]">{currentTeacher?.subject}</strong>
+                Disciplina Principal: <strong className="text-[#f75142]">{currentTeacher.subject}</strong>
               </span>
             </div>
           </div>
         </div>
-        </>
+          </>
         )}
         </>
         )}

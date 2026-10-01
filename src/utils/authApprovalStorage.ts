@@ -130,17 +130,6 @@ export function searchPreRegisteredTeacher(
     }
   }
 
-  // 2. Check in global admin teachers list
-  const sampleMatch = normEmail.includes('prof') || normEmail.includes('santar');
-  if (sampleMatch) {
-    return {
-      found: true,
-      teacherName: 'Prof. Santar Goes',
-      id: 'prof-santar-01',
-      details: `Ficha pré-cadastrada encontrada na Escola Modelo Central do Quêssua (4ª Classe, Turno Manhã).`,
-    };
-  }
-
   return { found: false };
 }
 
@@ -224,6 +213,45 @@ export function approveApplication(
 
     const updatedList = applications.map((a) => (a.id === applicationId ? updatedApp : a));
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updatedList));
+
+    // If a School Director (Diretor Geral) is approved, update the school's directorName in storage
+    if (target.type === 'diretor' && target.schoolName) {
+      const normSchool = target.schoolName.trim().toLowerCase();
+      ['ucore_admin_schools', 'ucore_registered_schools_v1'].forEach((storageKey) => {
+        try {
+          const rawSchools = localStorage.getItem(storageKey);
+          if (rawSchools) {
+            const parsedSchools = JSON.parse(rawSchools);
+            if (Array.isArray(parsedSchools)) {
+              const nextSchools = parsedSchools.map((sc: any) => {
+                const scName = (sc.name || sc.nomeOficial || '').trim().toLowerCase();
+                if (scName && (scName === normSchool || scName.includes(normSchool) || normSchool.includes(scName))) {
+                  return {
+                    ...sc,
+                    directorName: target.fullName,
+                    registrationData: sc.registrationData
+                      ? {
+                          ...sc.registrationData,
+                          director: {
+                            ...(sc.registrationData.director || {}),
+                            nome: target.fullName,
+                            email: target.email || sc.registrationData.director?.email,
+                            contacto: target.phone || sc.registrationData.director?.contacto,
+                          },
+                        }
+                      : sc.registrationData,
+                  };
+                }
+                return sc;
+              });
+              localStorage.setItem(storageKey, JSON.stringify(nextSchools));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      });
+    }
 
     // Update active user in localStorage if matching
     let activatedUser: UserAccount | undefined;
@@ -327,10 +355,107 @@ export function checkUserApprovalStatus(
 }
 
 /**
+ * Resolves the active Director's name for a given school from approved applications,
+ * registered director dossiers, or the school record itself (e.g. "Carl").
+ */
+export function resolveSchoolDirectorName(
+  school?: AdminSchool | null,
+  fallbackSchoolName?: string
+): string {
+  const targetName = (school?.name || fallbackSchoolName || '').trim().toLowerCase();
+
+  if (targetName) {
+    // 1. Check approved director applications for this school
+    try {
+      const apps = getPendingApplications();
+      const approvedDir = apps.find(
+        (a) =>
+          a.type === 'diretor' &&
+          a.status === 'aprovado' &&
+          a.schoolName &&
+          (a.schoolName.trim().toLowerCase() === targetName ||
+            a.schoolName.trim().toLowerCase().includes(targetName) ||
+            targetName.includes(a.schoolName.trim().toLowerCase()))
+      );
+      if (approvedDir?.fullName) {
+        return approvedDir.fullName;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Check registered director dossiers in localStorage
+    for (const dirKey of ['ucore_admin_directors', 'ucore_registered_directors_v2']) {
+      try {
+        const rawDirs = localStorage.getItem(dirKey);
+        if (rawDirs) {
+          const parsedDirs = JSON.parse(rawDirs);
+          if (Array.isArray(parsedDirs)) {
+            const matchedDir = parsedDirs.find((d: any) => {
+              const dSchool = (d.schoolName || d.nomeEscola || d.registrationData?.nomeEscola || '')
+                .trim()
+                .toLowerCase();
+              return (
+                dSchool &&
+                (dSchool === targetName || dSchool.includes(targetName) || targetName.includes(dSchool))
+              );
+            });
+            const dName = matchedDir?.name || matchedDir?.nomeCompleto || matchedDir?.registrationData?.nomeCompleto;
+            if (dName && dName.trim()) {
+              return dName.trim();
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Check school object passed in
+    const fromSchoolObj =
+      school?.directorName ||
+      school?.registrationData?.director?.nome;
+    if (
+      fromSchoolObj &&
+      fromSchoolObj.trim() &&
+      !fromSchoolObj.toLowerCase().includes('a designar')
+    ) {
+      return fromSchoolObj.trim();
+    }
+
+    // 4. Check stored schools in localStorage
+    for (const scKey of ['ucore_admin_schools', 'ucore_registered_schools_v1']) {
+      try {
+        const rawSchools = localStorage.getItem(scKey);
+        if (rawSchools) {
+          const parsedSchools = JSON.parse(rawSchools);
+          if (Array.isArray(parsedSchools)) {
+            const matchedSc = parsedSchools.find((s: any) => {
+              const sName = (s.name || s.nomeOficial || '').trim().toLowerCase();
+              return sName && (sName === targetName || sName.includes(targetName) || targetName.includes(sName));
+            });
+            const sDir = matchedSc?.directorName || matchedSc?.registrationData?.director?.nome || matchedSc?.director?.nome;
+            if (sDir && sDir.trim()) {
+              return sDir.trim();
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (school?.directorName && school.directorName.trim()) {
+    return school.directorName.trim();
+  }
+
+  return 'Direção Geral da Escola';
+}
+
+/**
  * Helper to get the director's name for a given school name
  */
 export function getDirectorForSchool(schoolName: string): string {
-  const norm = schoolName.trim().toLowerCase();
-  const school = initialAdminSchools.find((s) => s.name.toLowerCase().includes(norm) || norm.includes(s.name.toLowerCase()));
-  return school ? school.directorName : 'Direção Geral da Escola';
+  return resolveSchoolDirectorName(null, schoolName);
 }

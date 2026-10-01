@@ -42,7 +42,7 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
   onClose,
   initialClass = '4ª Classe',
   initialTurma = 'Turma A',
-  schoolName = 'Escola Primária e Iº Ciclo Modelo Central de Quêssua',
+  schoolName = '',
 }) => {
   // 1. Unconditional Hooks
   const [selectedClass, setSelectedClass] = useState<string>(initialClass);

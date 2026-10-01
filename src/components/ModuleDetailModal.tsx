@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, CheckCircle, ArrowRight, Shield } from 'lucide-react';
+import { X, CheckCircle, ArrowRight } from 'lucide-react';
 import type { EducationalModule } from '../types';
+import { ComposablesLucideIcon } from './common/ComposablesLucideIcon';
 
 interface ModuleDetailModalProps {
   module: EducationalModule | null;
@@ -26,16 +27,28 @@ export const ModuleDetailModal: React.FC<ModuleDetailModalProps> = ({
             onClick={onClose}
             className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-200/50 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" strokeWidth={2} />
           </button>
 
-          <span className="text-[9px] uppercase font-black tracking-[0.25em] bg-[#fef2f1] border border-[#f75142]/30 px-2.5 py-1 rounded-full text-[#f75142] inline-block mb-2">
-            {module.subtitle}
-          </span>
-          <h3 className="text-2xl font-black uppercase tracking-tight text-[#002133]">{module.title}</h3>
-          <p className="text-xs uppercase tracking-[0.1em] text-slate-500 mt-1">
-            Módulo Integrado da Central Sigre
-          </p>
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-[#002133] shrink-0">
+              <ComposablesLucideIcon
+                name={module.icon}
+                titleFallback={module.title}
+                size={24}
+                strokeWidth={2}
+              />
+            </div>
+            <div>
+              <span className="text-[9px] uppercase font-black tracking-[0.25em] bg-[#fef2f1] border border-[#f75142]/30 px-2.5 py-1 rounded-full text-[#f75142] inline-block mb-1.5">
+                {module.subtitle}
+              </span>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-[#002133]">{module.title}</h3>
+              <p className="text-xs uppercase tracking-[0.1em] text-slate-500 mt-1">
+                Módulo Integrado da Central Sigre
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Content */}

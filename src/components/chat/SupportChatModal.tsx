@@ -108,20 +108,18 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
   // The user can ONLY see people from their school. No interaction with other schools.
   const userSchoolName = 
     currentUser?.schoolName || 
-    (activeRole === 'diretor' ? 'Escola Modelo Central' :
-     activeRole === 'professor' ? 'Escola Modelo Central' :
-     'Escola Modelo Central');
+    'Unidade Escolar Municipal';
 
-  const normalizedUserSchool = (userSchoolName || 'Escola Modelo Central').toLowerCase().trim();
+  const normalizedUserSchool = (userSchoolName || 'Unidade Escolar Municipal').toLowerCase().trim();
 
   // Filter channels strictly for the user's school with safe fallback
   const schoolChannels = (channels || [])
     .map((c) => ({
       ...c,
-      schoolName: c.schoolName || 'Escola Modelo Central',
+      schoolName: c.schoolName || 'Unidade Escolar Municipal',
     }))
     .filter((c) => {
-      const channelSchool = (c.schoolName || 'Escola Modelo Central').toLowerCase().trim();
+      const channelSchool = (c.schoolName || 'Unidade Escolar Municipal').toLowerCase().trim();
       return channelSchool === normalizedUserSchool;
     });
 

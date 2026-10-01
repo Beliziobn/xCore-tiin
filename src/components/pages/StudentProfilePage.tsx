@@ -105,30 +105,29 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
   allStudents = [],
   onSelectAnotherStudent,
 }) => {
-  // Fallback para Albert Golph caso student não seja fornecido
+  // Fallback neutro caso student não seja fornecido
   const currentStudent: StudentProfile = student || {
-    id: 'student-albert-golph',
-    numeroChamada: 1,
-    name: 'Albert Golph',
+    id: 'student-empty',
+    numeroChamada: 0,
+    name: 'Sem Aluno Selecionado',
     genero: 'M',
-    turma: '1',
-    periodo: 'Manhã',
-    classe: '4ª',
-    sala: 'Sala 04',
-    encarregado: 'Manuel Golph',
-    telefone: '+244 923 456 789',
-    temDocumentos: true,
-    presencaPercent: 94,
+    turma: '---',
+    periodo: '---',
+    classe: '---',
+    sala: '---',
+    encarregado: '---',
+    telefone: '---',
+    temDocumentos: false,
+    presencaPercent: 0,
     disciplinas: defaultDisciplinasList,
-    grades: [
-      { subject: 'Língua Portuguesa', p1: 8.5, p2: 9.0, trabalho: 9.0, media: 8.8, status: 'Aprovado' },
-      { subject: 'Matemática', p1: 9.0, p2: 8.5, trabalho: 9.5, media: 8.9, status: 'Aprovado' },
-      { subject: 'Ciências Naturais', p1: 8.0, p2: 8.5, trabalho: 8.5, media: 8.3, status: 'Aprovado' },
-      { subject: 'História', p1: 8.5, p2: 9.0, trabalho: 8.5, media: 8.7, status: 'Aprovado' },
-      { subject: 'Geografia', p1: 8.0, p2: 8.0, trabalho: 9.0, media: 8.2, status: 'Aprovado' },
-      { subject: 'Educação Física', p1: 9.5, p2: 10.0, trabalho: 10.0, media: 9.8, status: 'Aprovado' },
-      { subject: 'Educação Visual e Plástica', p1: 8.5, p2: 9.0, trabalho: 9.0, media: 8.8, status: 'Aprovado' },
-    ],
+    grades: defaultDisciplinasList.map((subject) => ({
+      subject,
+      p1: 0,
+      p2: 0,
+      trabalho: 0,
+      media: 0,
+      status: 'Reprovado',
+    })),
   };
 
   const detectedRegime = useMemo(() => getRegimeForClass(currentStudent.classe), [currentStudent.classe]);

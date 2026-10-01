@@ -7,6 +7,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type {
+  AdminSchool,
   TeacherRegistrationData,
   TeacherNaturezaEscola,
   TeacherTipoInstituicao,
@@ -21,8 +22,10 @@ import {
   calculateFaixaEtaria,
   computeClassificacaoPedagogica,
   saveTeacher,
+  getSchoolTeacherQuotaStatus,
   TEACHING_LEVELS_CATALOG,
 } from '../../utils/teacherStorage';
+import { initialAdminSchools } from '../../data/adminData';
 import {
   validateAngolaBI,
   validateAngolaPhone,
@@ -50,7 +53,7 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   onClose,
   onSuccess,
   initialData,
-  defaultSchoolName = 'Escola Modelo Central',
+  defaultSchoolName = '',
   defaultMunicipality = 'Quéssua',
   defaultProvince = 'Malanje',
   authorName = 'Administrador',
@@ -75,6 +78,7 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   const [municipioResidencia, setMunicipioResidencia] = useState(defaultMunicipality);
 
   // 2. Natureza e Tipo de Escola onde lecciona
+  const [escolaId, setEscolaId] = useState<string>('');
   const [naturezaEscola, setNaturezaEscola] = useState<TeacherNaturezaEscola>('Pública');
   const [nomeEscola, setNomeEscola] = useState(defaultSchoolName);
   const [codigoEscola, setCodigoEscola] = useState('');
@@ -82,6 +86,71 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   const [municipioEscola, setMunicipioEscola] = useState(defaultMunicipality);
   const [tipoInstituicao, setTipoInstituicao] = useState<TeacherTipoInstituicao>('Escola com classe de Iniciação');
   const [tipoInstituicaoOutro, setTipoInstituicaoOutro] = useState('');
+
+  // Lista de escolas cadastradas no sistema para alocação do docente e abatimento de pendentes
+  const availableSchools = useMemo<AdminSchool[]>(() => {
+    const map = new Map<string, AdminSchool>();
+    initialAdminSchools.forEach((s) => map.set(s.id, s));
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ucore_admin_schools');
+        if (raw) {
+          const parsed: AdminSchool[] = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            map.clear();
+            parsed.forEach((s) => map.set(s.id, s));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return Array.from(map.values());
+  }, [isOpen]);
+
+  const currentMatchedSchool = useMemo<AdminSchool | undefined>(() => {
+    if (escolaId) {
+      const byId = availableSchools.find((s) => s.id === escolaId);
+      if (byId) return byId;
+    }
+    if (nomeEscola.trim()) {
+      return availableSchools.find(
+        (s) => s.name.trim().toLowerCase() === nomeEscola.trim().toLowerCase()
+      );
+    }
+    return availableSchools[0];
+  }, [availableSchools, escolaId, nomeEscola]);
+
+  const selectedSchoolQuota = useMemo(() => {
+    if (!currentMatchedSchool) return null;
+    return getSchoolTeacherQuotaStatus(currentMatchedSchool);
+  }, [currentMatchedSchool, isOpen, nomeEscola, escolaId]);
+
+  const handleSelectSchoolFromList = (schoolIdVal: string) => {
+    const found = availableSchools.find((s) => s.id === schoolIdVal);
+    if (!found) {
+      setEscolaId('');
+      return;
+    }
+    setEscolaId(found.id);
+    setNomeEscola(found.name);
+    setNaturezaEscola(
+      (found.natureza as TeacherNaturezaEscola) ||
+        found.registrationData?.natureza ||
+        'Pública'
+    );
+    const code =
+      found.codigoSIGE ||
+      found.registrationData?.codigoSIGE ||
+      '';
+    if (code) setCodigoEscola(code);
+    if (found.registrationData?.endereco?.provincia) {
+      setProvinciaEscola(found.registrationData.endereco.provincia);
+    }
+    if (found.registrationData?.endereco?.municipio) {
+      setMunicipioEscola(found.registrationData.endereco.municipio);
+    }
+  };
 
   // 3. Níveis de Ensino em que lecciona (multi-select)
   const [selectedLevels, setSelectedLevels] = useState<Record<string, { selected: boolean; detalhe?: string }>>({
@@ -135,6 +204,7 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
       setProvinciaResidencia(initialData.provinciaResidencia || defaultProvince);
       setMunicipioResidencia(initialData.municipioResidencia || defaultMunicipality);
 
+      setEscolaId(initialData.escolaId || '');
       setNaturezaEscola(initialData.naturezaEscola);
       setNomeEscola(initialData.nomeEscola);
       setCodigoEscola(initialData.codigoEscola || '');
@@ -174,8 +244,27 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
       setTurnos(initialData.turnos);
       setNecessidadesFormacaoContinua(initialData.necessidadesFormacaoContinua || '');
       setDisponibilidadeOutrosNiveis(initialData.disponibilidadeOutrosNiveis || '');
+    } else if (availableSchools.length > 0) {
+      const matched =
+        availableSchools.find(
+          (s) => s.name.trim().toLowerCase() === defaultSchoolName.trim().toLowerCase()
+        ) || availableSchools[0];
+      if (matched) {
+        setEscolaId(matched.id);
+        setNomeEscola(matched.name);
+        setNaturezaEscola(
+          (matched.natureza as TeacherNaturezaEscola) ||
+            matched.registrationData?.natureza ||
+            'Pública'
+        );
+        const code =
+          matched.codigoSIGE ||
+          matched.registrationData?.codigoSIGE ||
+          '';
+        if (code) setCodigoEscola(code);
+      }
     }
-  }, [initialData, defaultProvince, defaultMunicipality, defaultSchoolName]);
+  }, [initialData, defaultProvince, defaultMunicipality, defaultSchoolName, availableSchools]);
 
   // Derived calculations
   const calculatedAge = useMemo(() => calculateAge(dataNascimento), [dataNascimento]);
@@ -252,7 +341,7 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
       setMorada('Bairro Central');
       setProvinciaResidencia('Malanje');
       setMunicipioResidencia('Quéssua');
-      setNomeEscola('Escola Modelo Central');
+      setNomeEscola(availableSchools[0]?.name || defaultSchoolName || '');
       setNaturezaEscola('Pública');
       setFuncaoCategoria('Docente / Professor');
       setNivelAcademico('Licenciado');
@@ -270,7 +359,7 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
       setMorada('Bairro Central');
       setProvinciaResidencia('Malanje');
       setMunicipioResidencia('Quéssua');
-      setNomeEscola('Escola Modelo Central');
+      setNomeEscola(availableSchools[0]?.name || defaultSchoolName || '');
       setNaturezaEscola('Pública');
       setFuncaoCategoria('Docente / Professor');
       setNivelAcademico('Licenciado');
@@ -417,8 +506,9 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
       morada: morada.trim(),
       provinciaResidencia,
       municipioResidencia,
+      escolaId: currentMatchedSchool?.id || escolaId || undefined,
       naturezaEscola,
-      nomeEscola: nomeEscola.trim(),
+      nomeEscola: currentMatchedSchool?.name || nomeEscola.trim(),
       codigoEscola: codigoEscola.trim(),
       provinciaEscola,
       municipioEscola,
@@ -654,6 +744,74 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
                 </div>
 
                 <div className="space-y-4">
+                  {/* Selector Oficial da Escola Cadastrada + Reconciliação de Pendentes */}
+                  <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-amber-900">
+                          Unidade Escolar de Alocação (Instrumento Complementar 2026/2027) <span className="text-rose-500">*</span>
+                        </label>
+                        <p className="text-[11px] text-amber-800 mt-0.5">
+                          Seleccione a escola onde o docente lecciona. Ao cadastrar o docente, o número de pendentes da escola diminui automaticamente e o registo entra na planilha oficial.
+                        </p>
+                      </div>
+                    </div>
+
+                    <select
+                      value={currentMatchedSchool?.id || escolaId || ''}
+                      onChange={(e) => handleSelectSchoolFromList(e.target.value)}
+                      className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
+                    >
+                      {availableSchools.map((sc) => {
+                        const q = getSchoolTeacherQuotaStatus(sc);
+                        return (
+                          <option key={sc.id} value={sc.id}>
+                            {sc.name} ({sc.natureza || 'Pública'}) — Declarados: {q.declaredTotal} | Cadastrados: {q.registeredCount} | Pendentes: {q.pendingCount}
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {selectedSchoolQuota && (
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        <div className="bg-white/90 border border-amber-200 rounded-lg px-3 py-2">
+                          <span className="block text-[10px] font-bold uppercase text-slate-500">
+                            Declarados na Escola
+                          </span>
+                          <span className="text-base font-black text-slate-900">
+                            {selectedSchoolQuota.declaredTotal}
+                          </span>
+                        </div>
+                        <div className="bg-emerald-50/90 border border-emerald-200 rounded-lg px-3 py-2">
+                          <span className="block text-[10px] font-bold uppercase text-emerald-700">
+                            Cadastrados (Na Planilha)
+                          </span>
+                          <span className="text-base font-black text-emerald-800">
+                            {selectedSchoolQuota.registeredCount}
+                            {!initialData && (
+                              <span className="text-xs font-bold text-emerald-600 ml-1">
+                                → {selectedSchoolQuota.registeredCount + 1}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="bg-amber-100/80 border border-amber-300 rounded-lg px-3 py-2">
+                          <span className="block text-[10px] font-bold uppercase text-amber-900">
+                            Docentes Pendentes
+                          </span>
+                          <span className="text-base font-black text-amber-900">
+                            {selectedSchoolQuota.pendingCount}
+                            {!initialData && selectedSchoolQuota.pendingCount > 0 && (
+                              <span className="text-xs font-bold text-emerald-700 ml-1">
+                                → {Math.max(0, selectedSchoolQuota.pendingCount - 1)}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                       Nome Completo <span className="text-rose-500">*</span>
@@ -811,6 +969,26 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
                     <h3 className="text-sm font-semibold text-slate-800">Natureza e Tipo de Escola onde Leciona</h3>
                     <p className="text-xs text-slate-500">Classificação institucional da unidade</p>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Seleccionar Escola Cadastrada no Sistema <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={currentMatchedSchool?.id || escolaId || ''}
+                    onChange={(e) => handleSelectSchoolFromList(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none mb-3"
+                  >
+                    {availableSchools.map((sc) => {
+                      const q = getSchoolTeacherQuotaStatus(sc);
+                      return (
+                        <option key={sc.id} value={sc.id}>
+                          {sc.name} — Declarados: {q.declaredTotal} | Cadastrados: {q.registeredCount} | Pendentes: {q.pendingCount}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
 
                 <div>

@@ -7,13 +7,121 @@ import type {
 } from '../types';
 import type { SystemDataset } from './excelExport';
 import { initialAdminSchools } from '../data/adminData';
-import { getStoredTeachers } from './teacherStorage';
-import { getStoredStudents } from './studentStorage';
+import { getStoredTeachers, getSchoolTeacherQuotaStatus } from './teacherStorage';
+import { getStoredStudents, getSchoolStudentQuotaStatus } from './studentStorage';
 import { SIGE_IDADES_COLUNAS, type SigeAggregatedReport, type GenderCount } from './sigeAggregation';
 
 function norm(str?: string): string {
   if (!str) return '';
   return str.trim().toLowerCase();
+}
+
+function normalizeClasseLabel(raw?: string): string {
+  if (!raw) return '1ª Classe';
+  const s = raw.trim();
+  const matchNum = s.match(/^(\d{1,2})\.?ª?\s*classe/i);
+  if (matchNum) {
+    return `${matchNum[1]}ª Classe`;
+  }
+  if (s.toLowerCase().includes('inicia')) return 'Classe de Iniciação';
+  return s;
+}
+
+export function mapStudentModalityToSigeNivel(
+  modalidadeKey?: string,
+  fallbackSchoolCategory?: string,
+  schoolName = ''
+): string {
+  switch (modalidadeKey) {
+    case 'pre_escolar':
+      return 'Educação Pré-Escolar';
+    case 'iniciacao':
+      return 'Educação Pré-Escolar';
+    case 'especial_pre_escolar':
+      return 'Educação Pré-Escolar Especial';
+    case 'primario_regular':
+      return 'Ensino Primário Regular';
+    case 'primario_especial':
+      return 'Ensino Primário Especial';
+    case 'praeer':
+      return 'Ensino Primário - PRAEER';
+    case 'primario_adultos':
+      return 'Ensino Primário - EJA';
+    case 'ciclo1_geral':
+      return 'Ensino Secundário I Ciclo Geral';
+    case 'ciclo1_especial':
+      return 'Ensino Secundário I Ciclo Especial';
+    case 'ciclo1_tecnico':
+      return 'Ensino Secundário I Ciclo Técnico-Profissional';
+    case 'ciclo1_adultos_eja':
+      return 'Ensino Secundário I Ciclo EJA';
+    case 'ciclo2_geral':
+      return 'Ensino Secundário II Ciclo Geral';
+    case 'ciclo2_especial':
+      return 'Ensino Secundário II Ciclo Especial';
+    case 'ciclo2_tecnico':
+      return 'Ensino Secundário II Ciclo Técnico';
+    case 'ciclo2_formacao_professores':
+      return 'Formação de Professores (Magistério)';
+    default:
+      break;
+  }
+
+  const cat = fallbackSchoolCategory || 'Ensino Primário';
+  if (cat === 'Iº Ciclo') return 'Ensino Secundário I Ciclo Geral';
+  if (cat === 'IIº Ciclo') {
+    const low = schoolName.toLowerCase();
+    if (low.includes('politécnico') || low.includes('técnico') || low.includes('instituto')) {
+      return 'Ensino Secundário II Ciclo Técnico';
+    }
+    if (low.includes('magistério') || low.includes('professores') || low.includes('pedagógico')) {
+      return 'Formação de Professores (Magistério)';
+    }
+    return 'Ensino Secundário II Ciclo Geral';
+  }
+  return 'Ensino Primário Regular';
+}
+
+function resolveStudentAgeColumn(
+  st: AdminStudent,
+  detail: StudentRegistrationData | undefined,
+  fallbackAgeCol: string
+): string {
+  let numAge: number | undefined =
+    typeof detail?.idadeCalculada === 'number' && detail.idadeCalculada > 0
+      ? detail.idadeCalculada
+      : typeof st.age === 'number' && st.age > 0
+      ? st.age
+      : undefined;
+
+  const bDateStr = detail?.dataNascimento || st.birthDate;
+  if (!numAge && bDateStr) {
+    const d = new Date(bDateStr);
+    if (!isNaN(d.getTime())) {
+      const now = new Date();
+      let a = now.getFullYear() - d.getFullYear();
+      const m = now.getMonth() - d.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+      if (a >= 0) numAge = a;
+    }
+  }
+
+  if (typeof numAge === 'number') {
+    if (numAge < 5) return '< 5 anos';
+    if (numAge > 18) return '> 18 anos';
+    return `${numAge} anos`;
+  }
+
+  const faixa = detail?.faixaEtariaSelecionada || '';
+  const m = faixa.match(/(\d{1,2})\s*anos/i);
+  if (m) {
+    const parsed = parseInt(m[1], 10);
+    if (parsed < 5) return '< 5 anos';
+    if (parsed > 18) return '> 18 anos';
+    return `${parsed} anos`;
+  }
+
+  return fallbackAgeCol;
 }
 
 /**
@@ -34,21 +142,28 @@ function norm(str?: string): string {
  * - Apenas o Nome Oficial da Escola como Provedora Estatística Institucional
  */
 export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset): SigeAggregatedReport {
-  const rawSchools = (dataset.schools && dataset.schools.length > 0) ? dataset.schools : initialAdminSchools;
+  const isModeloCentral = (name?: string) => Boolean(name && name.trim().toLowerCase().includes('modelo central'));
+  const rawSchools = ((dataset.schools && dataset.schools.length > 0) ? dataset.schools : initialAdminSchools).filter(
+    sc => !isModeloCentral(sc.name) && !isModeloCentral(sc.registrationData?.nomeOficial)
+  );
   const schools = rawSchools.map((sc, i) => ({
     ...sc,
     name: sc.name || `Escola Municipal Nº ${i + 1}`,
     natureza: sc.natureza || 'Pública',
     category: sc.category || 'Ensino Primário',
     location: sc.location || 'Quêssua, Malanje',
-    roomsCount: sc.roomsCount || 10,
-    turmasCount: sc.turmasCount || 12,
-    teachersCount: sc.teachersCount || 16,
+    roomsCount: typeof sc.roomsCount === 'number' ? sc.roomsCount : 10,
+    turmasCount: typeof sc.turmasCount === 'number' ? sc.turmasCount : 12,
+    teachersCount: typeof sc.teachersCount === 'number' ? sc.teachersCount : 16,
     performanceRate: sc.performanceRate || 84
   }));
 
-  const teachers = dataset.teachers || [];
-  const students = dataset.students || [];
+  const teachers = (dataset.teachers || []).filter(
+    t => !isModeloCentral(t.schoolName) && !isModeloCentral(t.registrationData?.nomeEscola)
+  );
+  const students = (dataset.students || []).filter(
+    s => !isModeloCentral(s.schoolName) && !isModeloCentral(s.registrationData?.escola)
+  );
 
   // Obter detalhes complementares de estudantes e professores
   const detailedTeachers = getStoredTeachers();
@@ -62,7 +177,77 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
   const detailedStudentMap = new Map<string, StudentRegistrationData>();
   detailedStudents.forEach(s => {
     if (s.id) detailedStudentMap.set(s.id, s);
-    detailedStudentMap.set(norm(s.name), s);
+    detailedStudentMap.set(norm(s.name || s.nomeCompleto), s);
+  });
+
+  // Unificar dataset.students com detailedStudents para garantir que nenhum aluno cadastrado fique de fora
+  const unifiedStudents: AdminStudent[] = [...students];
+  const seenStudentIds = new Set(unifiedStudents.map(s => s.id));
+  const seenStudentNames = new Set(unifiedStudents.map(s => `${norm(s.name)}::${norm(s.schoolName)}`));
+
+  detailedStudents.forEach(ds => {
+    const dsName = ds.nomeCompleto || ds.name || 'Aluno';
+    const dsSchool = ds.escola || ds.nomeEscola || '';
+    const key = `${norm(dsName)}::${norm(dsSchool)}`;
+    if (!seenStudentIds.has(ds.id) && !seenStudentNames.has(key)) {
+      unifiedStudents.push({
+        id: ds.id,
+        name: dsName,
+        gender: ds.genero === 'F' ? 'F' : 'M',
+        age: ds.idadeCalculada,
+        birthDate: ds.dataNascimento,
+        gradeClass: normalizeClasseLabel(ds.classeEtapaModulo || ds.classe),
+        room: ds.sala || 'Sala 01',
+        turma: ds.turma || 'Turma A',
+        schoolName: dsSchool,
+        hasDocuments: ds.possuiDocumento ?? true,
+        documentType: ds.documentType || 'Cédula Pessoal',
+        attendanceRate: ds.attendanceRate ?? 96,
+        averageGrade: ds.averageGrade ?? 15,
+        status: ds.statusAcademico || 'Aprovado',
+        registrationData: ds,
+      });
+      seenStudentIds.add(ds.id);
+      seenStudentNames.add(key);
+    }
+  });
+
+  // Apenas considerar escolas efectivamente cadastradas no sistema (e nunca criar escolas fantasma como "Escola Modelo Central")
+  const knownSchoolNames = new Set(schools.map(s => norm(s.name)));
+  const knownSchoolIds = new Set(schools.map(s => s.id));
+  unifiedStudents.forEach(st => {
+    const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+    const stSchoolName = (d?.escola || d?.nomeEscola || st.schoolName || '').trim();
+    const stSchoolId = d?.schoolId;
+    if (
+      stSchoolName &&
+      !isModeloCentral(stSchoolName) &&
+      !knownSchoolNames.has(norm(stSchoolName)) &&
+      (!stSchoolId || !knownSchoolIds.has(stSchoolId))
+    ) {
+      const inferredCat =
+        d?.categoriaEscola === 'Iº Ciclo' || d?.modalidadeKey?.startsWith('ciclo1')
+          ? 'Iº Ciclo'
+          : d?.categoriaEscola === 'IIº Ciclo' || d?.modalidadeKey?.startsWith('ciclo2')
+          ? 'IIº Ciclo'
+          : 'Ensino Primário';
+      schools.push({
+        id: stSchoolId || `sch-dyn-${schools.length + 1}`,
+        name: stSchoolName,
+        natureza: (d?.naturezaEscola as any) || 'Pública',
+        category: inferredCat as any,
+        location: d?.municipio || 'Quêssua, Malanje',
+        roomsCount: 6,
+        turmasCount: 6,
+        teachersCount: 8,
+        performanceRate: 85,
+        directorName: 'Direcção Escolar',
+        phone: '+244 923 000 000',
+        studentsWithDocs: 1,
+        studentsWithoutDocs: 0,
+      });
+      knownSchoolNames.add(norm(stSchoolName));
+    }
   });
 
   const provincia = 'MALANJE';
@@ -183,22 +368,42 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
       );
     }
 
-    // Identificar alunos cadastrados para esta escola
-    const realStudentsForSchool = students.filter(st => {
-      const matchName = norm(st.schoolName) === norm(schoolName);
-      const matchId = st.schoolName === sc.id || (sc.codigoSIGE && norm(st.schoolName) === norm(sc.codigoSIGE));
-      return matchName || matchId;
+    // Identificar alunos cadastrados para esta escola (por ID da escola, nome oficial ou código SIGE)
+    const realStudentsForSchool = unifiedStudents.filter(st => {
+      const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+      const matchSchoolId = Boolean(d?.schoolId && d.schoolId === sc.id);
+      const stSchool = d?.escola || d?.nomeEscola || st.schoolName || '';
+      const matchName = norm(stSchool) === norm(schoolName) || norm(st.schoolName) === norm(schoolName);
+      const matchCode =
+        st.schoolName === sc.id ||
+        Boolean(sc.codigoSIGE && (norm(stSchool) === norm(sc.codigoSIGE) || norm(st.schoolName) === norm(sc.codigoSIGE)));
+      return matchSchoolId || matchName || matchCode;
     });
 
-    const scDeclaredTotal = (sc.studentsWithDocs || 0) + (sc.studentsWithoutDocs || 0);
-    const scTotal = Math.max(
-      realStudentsForSchool.length,
-      scDeclaredTotal > 0 ? scDeclaredTotal : (sc.roomsCount ? sc.roomsCount * 38 : 280)
-    );
+    // Garantir que todas as categorias/modalidades (A-O) e classes dos alunos cadastrados nesta escola existam em schoolClasses
+    realStudentsForSchool.forEach(st => {
+      const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+      const studentNivel = mapStudentModalityToSigeNivel(
+        d?.modalidadeKey,
+        d?.categoriaEscola || cat,
+        schoolName
+      );
+      const studentClasse = normalizeClasseLabel(d?.classeEtapaModulo || d?.classe || st.gradeClass || '1ª Classe');
+      const alreadyExists = schoolClasses.some(
+        scCl => norm(scCl.nivel) === norm(studentNivel) && norm(scCl.classe) === norm(studentClasse)
+      );
+      if (!alreadyExists) {
+        schoolClasses.push({ nivel: studentNivel, classe: studentClasse });
+      }
+    });
 
-    const numClasses = Math.max(1, schoolClasses.length);
-    const basePerClass = Math.floor(scTotal / numClasses);
-    let remainder = scTotal % numClasses;
+    // Reconciliação de Quota de Alunos da Escola (Declarados vs Cadastrados vs Pendentes):
+    // Quando o diretor declara p.ex. 567 alunos no cadastro da escola, esses 567 alunos NÃO entram directamente na planilha.
+    // Eles ficam PENDENTES e vão sendo subtraídos à medida que cada aluno é cadastrado (ex: cadastrou 546 -> ficam pendentes 21).
+    const studentQuotaStatus = getSchoolStudentQuotaStatus(sc, unifiedStudents);
+    const quotaAlunosDeclarada = studentQuotaStatus.declaredTotal;
+    const alunosCadastradosEscola = studentQuotaStatus.registeredCount;
+    const alunosPendentesEscola = studentQuotaStatus.pendingCount;
 
     let schoolTotalMatMF = 0;
     let schoolTotalMatF = 0;
@@ -209,29 +414,28 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
     let schoolTotalDesMF = 0;
     let schoolTotalDesF = 0;
 
-    // Distribuir alunos pelas classes
-    schoolClasses.forEach((scClass, cIdx) => {
-      let classMF = basePerClass + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) remainder--;
-
-      const fRatio = 0.48 + ((scIndex + cIdx) % 5) * 0.01;
-      let classF = Math.min(classMF, Math.max(1, Math.round(classMF * fRatio)));
-
+    // Distribuir apenas os alunos EFECTIVAMENTE CADASTRADOS pelas classes e categorias da escola
+    schoolClasses.forEach((scClass) => {
+      // Alunos reais matriculados especificamente nesta categoria (nível) e classe desta escola
       const realInClass = realStudentsForSchool.filter(st => {
         const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
-        const rawC = norm(d?.classe || st.gradeClass || '');
-        return rawC.includes(norm(scClass.classe)) || (rawC.includes('1') && scClass.classe.includes('1'));
+        const stNivel = mapStudentModalityToSigeNivel(
+          d?.modalidadeKey,
+          d?.categoriaEscola || cat,
+          schoolName
+        );
+        const stClasse = normalizeClasseLabel(d?.classeEtapaModulo || d?.classe || st.gradeClass || '1ª Classe');
+        return norm(stNivel) === norm(scClass.nivel) && norm(stClasse) === norm(scClass.classe);
       });
-      if (realInClass.length > 0) {
-        const realF = realInClass.filter(st => {
-          const d = st.registrationData || detailedStudentMap.get(st.id);
-          return st.gender === 'F' || (d as any)?.sexo === 'Feminino' || norm(st.gender) === 'f';
-        }).length;
-        if (realInClass.length > classMF) {
-          classMF = realInClass.length;
-          classF = realF;
-        }
-      }
+
+      const realMF = realInClass.length;
+      const realF = realInClass.filter(st => {
+        const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+        return st.gender === 'F' || d?.genero === 'F' || (d as any)?.sexo === 'Feminino' || norm(st.gender) === 'f';
+      }).length;
+
+      const classMF = realMF;
+      const classF = realF;
 
       // Distribuição por idades
       const idadesObj: Record<string, GenderCount> = {};
@@ -243,78 +447,89 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
 
       const clName = scClass.classe;
       let primaryAge = '8 anos';
-      let secondaryAge = '9 anos';
-      let thirdAge = '7 anos';
 
       if (clName.includes('Creche')) {
-        primaryAge = '< 5 anos'; secondaryAge = '< 5 anos'; thirdAge = '< 5 anos';
+        primaryAge = '< 5 anos';
       } else if (clName.includes('Inicia') || clName.includes('Jardim')) {
-        primaryAge = '5 anos'; secondaryAge = '6 anos'; thirdAge = '< 5 anos';
+        primaryAge = '5 anos';
       } else if (clName.includes('1ª')) {
-        primaryAge = '6 anos'; secondaryAge = '7 anos'; thirdAge = '8 anos';
+        primaryAge = '6 anos';
       } else if (clName.includes('2ª')) {
-        primaryAge = '7 anos'; secondaryAge = '8 anos'; thirdAge = '9 anos';
+        primaryAge = '7 anos';
       } else if (clName.includes('3ª')) {
-        primaryAge = '8 anos'; secondaryAge = '9 anos'; thirdAge = '10 anos';
+        primaryAge = '8 anos';
       } else if (clName.includes('4ª')) {
-        primaryAge = '9 anos'; secondaryAge = '10 anos'; thirdAge = '11 anos';
+        primaryAge = '9 anos';
       } else if (clName.includes('5ª')) {
-        primaryAge = '10 anos'; secondaryAge = '11 anos'; thirdAge = '12 anos';
+        primaryAge = '10 anos';
       } else if (clName.includes('6ª')) {
-        primaryAge = '11 anos'; secondaryAge = '12 anos'; thirdAge = '13 anos';
+        primaryAge = '11 anos';
       } else if (clName.includes('7ª')) {
-        primaryAge = '12 anos'; secondaryAge = '13 anos'; thirdAge = '14 anos';
+        primaryAge = '12 anos';
       } else if (clName.includes('8ª')) {
-        primaryAge = '13 anos'; secondaryAge = '14 anos'; thirdAge = '15 anos';
+        primaryAge = '13 anos';
       } else if (clName.includes('9ª')) {
-        primaryAge = '14 anos'; secondaryAge = '15 anos'; thirdAge = '16 anos';
+        primaryAge = '14 anos';
       } else if (clName.includes('10ª')) {
-        primaryAge = '15 anos'; secondaryAge = '16 anos'; thirdAge = '17 anos';
+        primaryAge = '15 anos';
       } else if (clName.includes('11ª')) {
-        primaryAge = '16 anos'; secondaryAge = '17 anos'; thirdAge = '18 anos';
+        primaryAge = '16 anos';
       } else if (clName.includes('12ª')) {
-        primaryAge = '17 anos'; secondaryAge = '18 anos'; thirdAge = '> 18 anos';
+        primaryAge = '17 anos';
       } else if (clName.includes('13ª')) {
-        primaryAge = '18 anos'; secondaryAge = '> 18 anos'; thirdAge = '17 anos';
-      } else if (clName.includes('PRAEER')) {
-        primaryAge = '10 anos'; secondaryAge = '11 anos'; thirdAge = '12 anos';
-      } else if (clName.includes('EJA')) {
-        primaryAge = '17 anos'; secondaryAge = '18 anos'; thirdAge = '> 18 anos';
+        primaryAge = '18 anos';
+      } else if (clName.includes('PRAEER') || clName.includes('Etapa')) {
+        primaryAge = '10 anos';
+      } else if (clName.includes('EJA') || clName.includes('Módulo') || clName.includes('Ano')) {
+        primaryAge = '17 anos';
       }
 
-      const p1CountMF = Math.round(classMF * 0.62);
-      const p2CountMF = Math.round(classMF * 0.28);
-      const p3CountMF = Math.max(0, classMF - p1CountMF - p2CountMF);
+      // Contabilizar cada aluno efectivamente cadastrado na sua coluna de idade exacta e género exacto
+      let realRepMF = 0;
+      let realRepF = 0;
+      realInClass.forEach(st => {
+        const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+        const isFem = st.gender === 'F' || d?.genero === 'F' || (d as any)?.sexo === 'Feminino' || norm(st.gender) === 'f';
+        const ageCol = resolveStudentAgeColumn(st, d, primaryAge);
+        const targetCol = idadesObj[ageCol] ? ageCol : primaryAge;
+        idadesObj[targetCol].mf += 1;
+        if (isFem) idadesObj[targetCol].f += 1;
 
-      const p1CountF = Math.min(p1CountMF, Math.round(classF * 0.62));
-      const p2CountF = Math.min(p2CountMF, Math.round(classF * 0.28));
-      const p3CountF = Math.max(0, classF - p1CountF - p2CountF);
+        const isRep = Boolean(d?.alunoRepetente || d?.condicaoMatricula === 'repetente');
+        if (isRep) {
+          realRepMF += 1;
+          if (isFem) realRepF += 1;
+          repIdadesObj[targetCol].mf += 1;
+          if (isFem) repIdadesObj[targetCol].f += 1;
+        }
+      });
 
-      idadesObj[primaryAge] = { mf: (idadesObj[primaryAge]?.mf || 0) + p1CountMF, f: (idadesObj[primaryAge]?.f || 0) + p1CountF };
-      idadesObj[secondaryAge] = { mf: (idadesObj[secondaryAge]?.mf || 0) + p2CountMF, f: (idadesObj[secondaryAge]?.f || 0) + p2CountF };
-      idadesObj[thirdAge] = { mf: (idadesObj[thirdAge]?.mf || 0) + p3CountMF, f: (idadesObj[thirdAge]?.f || 0) + p3CountF };
-
-      // Repetentes (~10-12% da turma)
-      const repMF = Math.round(classMF * 0.11);
-      const repF = Math.min(repMF, Math.round(classF * 0.10));
-
-      const rep1MF = Math.round(repMF * 0.70);
-      const rep2MF = repMF - rep1MF;
-      const rep1F = Math.min(rep1MF, Math.round(repF * 0.70));
-      const rep2F = Math.min(rep2MF, repF - rep1F);
-
-      repIdadesObj[secondaryAge] = { mf: rep1MF, f: rep1F };
-      repIdadesObj[thirdAge] = { mf: rep2MF, f: rep2F };
+      const repMF = realRepMF;
+      const repF = realRepF;
 
       // Aproveitamento Escolar com regra estrita M = A + R + D e F <= MF (Zero resíduo)
-      const pRate = (sc.performanceRate || 84) / 100;
-      const aprMF = Math.round(classMF * pRate);
-      const repMF_aprov = Math.round(classMF * ((1 - pRate) * 0.70));
-      const desMF = classMF - aprMF - repMF_aprov; // Zero resíduo!
+      let aprMF = 0;
+      let repMF_aprov = 0;
+      let desMF = 0;
+      let aprF = 0;
+      let repF_aprov = 0;
+      let desF = 0;
 
-      const aprF = Math.min(aprMF, Math.round(classF * Math.min(0.98, pRate + 0.02)));
-      const repF_aprov = Math.min(repMF_aprov, Math.round(classF * ((1 - pRate) * 0.65)));
-      const desF = Math.max(0, classF - aprF - repF_aprov); // Zero resíduo e F <= MF!
+      realInClass.forEach(st => {
+        const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+        const isFem = st.gender === 'F' || d?.genero === 'F' || (d as any)?.sexo === 'Feminino' || norm(st.gender) === 'f';
+        const status = d?.statusAcademico || st.status || 'Aprovado';
+        if (status === 'Reprovado') {
+          repMF_aprov += 1;
+          if (isFem) repF_aprov += 1;
+        } else if (status === 'Transferido') {
+          desMF += 1;
+          if (isFem) desF += 1;
+        } else {
+          aprMF += 1;
+          if (isFem) aprF += 1;
+        }
+      });
 
       // Acumuladores da escola
       schoolTotalMatMF += classMF;
@@ -326,14 +541,17 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
       schoolTotalDesMF += desMF;
       schoolTotalDesF += desF;
 
-      // 1. Alunos Matriculados com NOME DA ESCOLA
+      // 1. Alunos Matriculados com NOME DA ESCOLA e Reconciliação de Quota (Declarados / Cadastrados / Pendentes)
       alunosMatriculados.push({
         escola: schoolName,
         nivel: scClass.nivel,
         classe: scClass.classe,
         natureza: schoolNatureza,
         total: { mf: classMF, f: classF },
-        idades: idadesObj
+        idades: idadesObj,
+        quotaDeclarada: quotaAlunosDeclarada,
+        cadastradosEscola: alunosCadastradosEscola,
+        pendentesEscola: alunosPendentesEscola,
       });
 
       // 2. Alunos Repetentes com NOME DA ESCOLA
@@ -362,44 +580,92 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
       });
     });
 
-    // 4. PESSOAL DOCENTE DA ESCOLA
-    const realTeachersForSchool = teachers.filter(t => {
-      const matchName = norm(t.schoolName) === norm(schoolName);
-      const matchId = t.schoolName === sc.id;
-      return matchName || matchId;
-    });
-
-    const docTotalMF = Math.max(realTeachersForSchool.length, sc.teachersCount || 16);
-    const docTotalF = Math.round(docTotalMF * 0.52);
-
-    const pedMF = Math.round(docTotalMF * 0.82);
-    const pedF = Math.min(docTotalF, Math.round(docTotalF * 0.82));
-    const nonPedMF = docTotalMF - pedMF;
-    const nonPedF = Math.max(0, docTotalF - pedF);
+    // 4. PESSOAL DOCENTE DA ESCOLA (Reconciliação de Quota: Declarados vs Cadastrados vs Pendentes)
+    // Os docentes declarados no cadastro da escola ficam como PENDENTES até que cada docente seja efectivamente cadastrado.
+    // À medida que cada docente é cadastrado na escola, o número de pendentes diminui (ex: 32 -> 31 -> 30...)
+    // e o docente entra imediatamente nos dados da planilha do Instrumento Complementar 2026/2027.
+    const quotaStatus = getSchoolTeacherQuotaStatus(sc, teachers);
+    const quotaDeclarada = quotaStatus.declaredTotal;
+    const cadastradosEscola = quotaStatus.registeredCount;
+    const pendentesEscola = quotaStatus.pendingCount;
+    const registeredTeachersList = quotaStatus.registeredTeachers;
 
     const docNivel = cat === 'Ensino Primário' ? 'Ensino Primário' :
                      cat === 'Iº Ciclo' ? 'Iº Ciclo do Ensino Secundário' :
                      cat === 'IIº Ciclo' ? 'IIº Ciclo do Ensino Secundário' : 'Ensino Primário e Secundário';
 
-    pessoalDocente.push({
-      escola: schoolName,
-      nivelEnsino: docNivel,
-      natureza: schoolNatureza,
-      formacaoPedagogica: 'Com Formação Pedagógica (Magistério)',
-      grauAcademico: 'Licenciatura em Ciências da Educação / Magistério',
-      total: { mf: pedMF, f: pedF }
-    });
+    if (registeredTeachersList.length > 0) {
+      // Agrupar os docentes efectivamente cadastrados por (formacaoPedagogica, grauAcademico, nivelEnsino)
+      const groupsMap = new Map<
+        string,
+        {
+          nivelEnsino: string;
+          formacaoPedagogica: string;
+          grauAcademico: string;
+          mf: number;
+          f: number;
+        }
+      >();
 
-    if (nonPedMF > 0) {
+      registeredTeachersList.forEach((rt) => {
+        const isFem = rt.sexo === 'Feminino';
+        const formLabel = rt.temFormacaoPedagogica
+          ? rt.classificacaoPedagogica || 'Com Formação Pedagógica (Magistério)'
+          : 'Sem Formação Pedagógica';
+        const grauLabel = rt.nivelAcademico || 'Licenciado';
+        const nivLabel =
+          rt.niveisLecciona && rt.niveisLecciona.length > 0
+            ? rt.niveisLecciona.map((n) => n.nome).join(' / ')
+            : docNivel;
+
+        const key = `${nivLabel}||${formLabel}||${grauLabel}`;
+        const existing = groupsMap.get(key);
+        if (existing) {
+          existing.mf += 1;
+          if (isFem) existing.f += 1;
+        } else {
+          groupsMap.set(key, {
+            nivelEnsino: nivLabel,
+            formacaoPedagogica: formLabel,
+            grauAcademico: grauLabel,
+            mf: 1,
+            f: isFem ? 1 : 0,
+          });
+        }
+      });
+
+      groupsMap.forEach((grp) => {
+        pessoalDocente.push({
+          escola: schoolName,
+          nivelEnsino: grp.nivelEnsino,
+          natureza: schoolNatureza,
+          formacaoPedagogica: grp.formacaoPedagogica,
+          grauAcademico: grp.grauAcademico,
+          total: { mf: grp.mf, f: grp.f },
+          quotaDeclarada,
+          cadastradosEscola,
+          pendentesEscola,
+        });
+      });
+    } else {
+      // Nenhum docente cadastrado ainda: exibe 0 na planilha e informa quantos estão pendentes de cadastro
       pessoalDocente.push({
         escola: schoolName,
         nivelEnsino: docNivel,
         natureza: schoolNatureza,
-        formacaoPedagogica: 'Sem Formação Pedagógica',
-        grauAcademico: 'Ensino Médio Técnico / Outro',
-        total: { mf: nonPedMF, f: nonPedF }
+        formacaoPedagogica: 'Aguardando Cadastro Nominal de Docentes',
+        grauAcademico:
+          pendentesEscola > 0
+            ? `Pendente (${pendentesEscola} de ${quotaDeclarada} docentes por cadastrar)`
+            : 'Sem Docentes Cadastrados',
+        total: { mf: 0, f: 0 },
+        quotaDeclarada,
+        cadastradosEscola: 0,
+        pendentesEscola,
       });
     }
+
+    const docTotalMF = cadastradosEscola;
 
     // 5. INFRAESTRUTURAS DA ESCOLA
     const salasTot = sc.roomsCount || 10;
@@ -424,16 +690,33 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
     });
 
     // 6. NECESSIDADES EDUCATIVAS ESPECIAIS (NEE) DA ESCOLA
-    deficienciasPadrao.forEach((def, dIdx) => {
-      let countMF = 0;
-      if (scTotal >= 400) {
-        countMF = dIdx % 2 === 0 ? 2 : 1;
-      } else if (scTotal >= 200) {
-        countMF = dIdx % 3 === 0 ? 1 : 0;
-      } else {
-        countMF = dIdx === 0 ? 1 : 0;
-      }
-      const countF = countMF > 0 ? Math.max(0, Math.round(countMF * 0.5)) : 0;
+    const realNeeStudents = realStudentsForSchool.filter(st => {
+      const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+      return Boolean(
+        d?.temNecessidadesEspeciais ||
+          (d?.tiposDeficiencia && d.tiposDeficiencia.length > 0) ||
+          d?.modalidadeKey?.includes('especial')
+      );
+    });
+
+    deficienciasPadrao.forEach((def) => {
+      const matchingNee = realNeeStudents.filter(st => {
+        const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+        const tipos = (d?.tiposDeficiencia || []).join(' ').toLowerCase();
+        if (def.includes('Visual') && (tipos.includes('visual') || tipos.includes('cegueira'))) return true;
+        if (def.includes('Auditiva') && (tipos.includes('auditiva') || tipos.includes('surdo'))) return true;
+        if (def.includes('Físico-Motora') && tipos.includes('físico')) return true;
+        if (def.includes('Intelectual') && tipos.includes('intelectual')) return true;
+        if (def.includes('Autista') && tipos.includes('autista')) return true;
+        if (def.includes('Múltipla') && (tipos.includes('múltipla') || tipos.includes('altas') || !tipos)) return true;
+        return false;
+      });
+
+      const countMF = matchingNee.length;
+      const countF = matchingNee.filter(st => {
+        const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
+        return st.gender === 'F' || d?.genero === 'F' || (d as any)?.sexo === 'Feminino' || norm(st.gender) === 'f';
+      }).length;
 
       necessidadesEspeciais.push({
         escola: schoolName,
@@ -481,25 +764,38 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
     escolasConsolidadas.push({
       escola: schoolName,
       categoria: `${cat} (${schoolNatureza})`,
-      abrangencia: `${sc.location} · ${salasTot} Salas · ${docTotalMF} Docentes`,
+      abrangencia: `${sc.location} · ${salasTot} Salas · Alunos: ${schoolTotalMatMF}/${quotaAlunosDeclarada} (${alunosPendentesEscola} Pend.) · Docentes: ${docTotalMF}/${quotaDeclarada} (${pendentesEscola} Pend.)`,
       natureza: schoolNatureza,
       matriculados: { mf: schoolTotalMatMF, f: schoolTotalMatF },
       aprovados: { mf: schoolTotalAprMF, f: schoolTotalAprF },
       reprovados: { mf: schoolTotalRepMF, f: schoolTotalRepF },
       desistidos: { mf: schoolTotalDesMF, f: schoolTotalDesF },
-      status: 'Dados Estatísticos Oficiais da Escola (Homologados)'
+      alunosDeclarados: quotaAlunosDeclarada,
+      alunosCadastrados: schoolTotalMatMF,
+      alunosPendentes: alunosPendentesEscola,
+      docentesDeclarados: quotaDeclarada,
+      docentesCadastrados: docTotalMF,
+      docentesPendentes: pendentesEscola,
+      status:
+        alunosPendentesEscola > 0 || pendentesEscola > 0
+          ? `Alunos Pend: ${alunosPendentesEscola} · Docentes Pend: ${pendentesEscola}`
+          : 'Quadro Discente & Docente Completo (Homologado)'
     });
   });
 
   // Totais Gerais Consolidados
   const totalAlunosMF = alunosMatriculados.reduce((acc, a) => acc + a.total.mf, 0);
   const totalAlunosF = alunosMatriculados.reduce((acc, a) => acc + a.total.f, 0);
+  const totalAlunosDeclarados = escolasConsolidadas.reduce((acc, e) => acc + (e.alunosDeclarados || 0), 0);
+  const totalAlunosPendentes = escolasConsolidadas.reduce((acc, e) => acc + (e.alunosPendentes || 0), 0);
 
   const totalRepMF = alunosRepetentes.reduce((acc, a) => acc + a.total.mf, 0);
   const totalRepF = alunosRepetentes.reduce((acc, a) => acc + a.total.f, 0);
 
   const totalDocMF = pessoalDocente.reduce((acc, d) => acc + d.total.mf, 0);
   const totalDocF = pessoalDocente.reduce((acc, d) => acc + d.total.f, 0);
+  const totalDocentesDeclarados = escolasConsolidadas.reduce((acc, e) => acc + (e.docentesDeclarados || 0), 0);
+  const totalDocentesPendentes = escolasConsolidadas.reduce((acc, e) => acc + (e.docentesPendentes || 0), 0);
 
   const totalNaoDocMF = pessoalNaoDocente.reduce((acc, n) => acc + n.total.mf, 0);
   const totalNaoDocF = pessoalNaoDocente.reduce((acc, n) => acc + n.total.f, 0);
@@ -529,8 +825,12 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
       totalSalas,
       totalTurmas,
       totalDocentes: { mf: totalDocMF, f: totalDocF },
+      totalDocentesDeclarados,
+      totalDocentesPendentes,
       totalNaoDocentes: { mf: totalNaoDocMF, f: totalNaoDocF },
       totalAlunosMatriculados: { mf: totalAlunosMF, f: totalAlunosF },
+      totalAlunosDeclarados,
+      totalAlunosPendentes,
       totalAlunosRepetentes: { mf: totalRepMF, f: totalRepF },
       totalAlunosNEE: { mf: totalNeeMF, f: totalNeeF }
     },

@@ -107,8 +107,10 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
 
   const loadApplications = () => {
     const all = getPendingApplications();
-    // In admin approval center, show all applications where target is admin (or director-level registrations)
-    const adminApps = all.filter((a) => a.targetApproverRole === 'admin' || a.type === 'diretor');
+    // In admin approval center, show all applications where target is admin (School General Directors + Municipal Direction DME members)
+    const adminApps = all.filter(
+      (a) => a.targetApproverRole === 'admin' || a.type === 'diretor' || a.type === 'membro_dme'
+    );
     setApplications(adminApps);
   };
 
@@ -159,7 +161,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   // Open approve modal
   const handleOpenApprove = (app: PendingApplication) => {
     setAppToApprove(app);
-    setTargetSchoolName(app.schoolName || (schools[0]?.name || 'Escola Modelo Central do Quêssua'));
+    setTargetSchoolName(app.schoolName || (schools[0]?.name || ''));
     setDispatchNumber(`Despacho de Homologação nº ${Math.floor(100 + Math.random() * 900)}/DME/2026`);
     setAppointmentYear(2026);
     setApprovalNotes(`Homologado e empossado pela Direção Municipal da Educação.`);
@@ -213,8 +215,8 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
         const updated = res.app;
         loadApplications();
 
-        // Add to global directors state if director
-        if (onAddDirectorGlobal) {
+        // Add to global directors state only if School General Director
+        if (onAddDirectorGlobal && updated.type === 'diretor') {
           const dirId = updated.userId || 'dir-' + Date.now();
           const targetSchool = schools.find((s) => s.name === (targetSchoolName || updated.schoolName)) || schools[0] || {
             id: 'sch-temp',
@@ -276,7 +278,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
         }
 
         const notify = showToast || alert;
-        notify(`Registo de "${updated.fullName}" homologado com sucesso com dados complementares no Sigre! Acesso liberado.`);
+        notify(`Registo de "${updated.fullName}" (${updated.roleRequested || 'Quadros DME'}) homologado com sucesso pelo Administrador Central (DME)! Acesso liberado.`);
       }
       setIsSubmitting(false);
       setIsApproveModalOpen(false);
@@ -347,9 +349,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       {/* Hero Header with refined typography */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
-        customTitle="Central de Homologações & Credenciação"
-        customSubtitle="Validação de despachos, homologação formal de Diretores de Escola e credenciação de acesso ao ecossistema Sigre SIGE."
-        badge="Administração Municipal da Educação"
+        customTitle="Central de Homologações & Credenciação (DME)"
+        customSubtitle="Validação de despachos, homologação de Membros da Direção Municipal (DME) e Diretores Gerais de Escola."
+        badge="Administrador Central (DME)"
         breadcrumbs={[
           { label: 'Início', onClick: () => window.location.reload() },
           { label: 'Administração Municipal' },
@@ -367,13 +369,13 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               <div className="space-y-1.5">
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Malanje • Município do Quêssua • Repartição de Quadros</span>
+                  <span>Malanje • Município do Quêssua • Homologação Central (DME)</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Quadro Oficial de Homologação de Diretores
+                  Homologação de Quadros da Direção Municipal & Diretores de Escola
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  Conforme o Estatuto da Carreira Docente e Dirigente de Angola. Todos os despachos conferem permissão imediata de gestão escolar no SIGE Sigre.
+                  Inscrições de outros membros da Direção Municipal (Inspetores, Chefes de Repartição, Técnicos de Estatística, Admin TI) e de Diretores Gerais de Escola enviadas ao Administrador Central (DME) para homologação.
                 </p>
               </div>
 
@@ -387,14 +389,6 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Sincronizar</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSimModal(true)}
-                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Nova Inscrição de Teste</span>
                 </button>
               </div>
             </div>

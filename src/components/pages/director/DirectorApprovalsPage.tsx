@@ -44,7 +44,8 @@ import {
   getPendingApplications,
   approveApplication,
   rejectApplication,
-  savePendingApplication
+  savePendingApplication,
+  resolveSchoolDirectorName
 } from '../../../utils/authApprovalStorage';
 import { Hero } from '../../Hero';
 
@@ -62,7 +63,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   onOpenGetStarted,
   isLoggedIn = true,
   directorName = 'Fert Horlan (Diretor Geral)',
-  schoolName = 'Escola Modelo Central do Quêssua',
+  schoolName = '',
   onAddTeacherGlobal,
   onAddStudentGlobal,
   showToast,
@@ -210,7 +211,11 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
     };
 
     setTimeout(() => {
-      const res = approveApplication(appToApprove.id, directorName, compData);
+      const effectiveDirectorName =
+        appToApprove.approverDirectorName ||
+        resolveSchoolDirectorName(null, appToApprove.schoolName || schoolName) ||
+        directorName;
+      const res = approveApplication(appToApprove.id, effectiveDirectorName, compData);
       if (res.success && res.app) {
         const updated = res.app;
         loadApplications();
@@ -395,9 +400,9 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       {/* Hero Header */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
-        customTitle="Aprovação de Inscrições Escolares"
-        customSubtitle={`Validação, homologação e admissão de novos professores, alunos e colaboradores dirigidos para a ${schoolName}.`}
-        badge="Direção Escolar"
+        customTitle="Homologação de Pessoal do Âmbito Escolar"
+        customSubtitle={`Aprovação pela Direção da escola selecionada (${schoolName || 'Unidade Escolar'}) para Subdiretor Pedagógico, Subdiretor Administrativo, Professor e Secretário Escolar.`}
+        badge="Direção da Escola"
         breadcrumbs={[
           { label: 'Início', onClick: () => window.location.reload() },
           { label: 'Direção Escolar' },
@@ -414,13 +419,13 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
               <div className="space-y-1.5">
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{schoolName} • Direção Geral • Ano Letivo 2026</span>
+                  <span>{schoolName || 'Unidades Escolares da Rede'} • Diretor(a): {resolveSchoolDirectorName(null, schoolName) || directorName}</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Quadro Oficial de Homologação & Matrículas Escolares
+                  Homologação pela Direção da Escola Selecionada
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  Validação documental presencial, enquadramento de corpo docente e admissão definitiva de alunos e colaboradores no ecossistema Sigre SIGE.
+                  As inscrições do pessoal do âmbito escolar (Subdiretor Pedagógico, Subdiretor Administrativo, Professor e Secretário Escolar) são enviadas diretamente ao Diretor da escola escolhida no registo para homologação.
                 </p>
               </div>
 
@@ -609,7 +614,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 }`}
               >
                 <Briefcase className="w-3.5 h-3.5" />
-                <span>Colaboradores ({applications.filter((a) => a.type === "funcionario").length})</span>
+                <span>Subdiretores & Secretaria ({applications.filter((a) => a.type === "funcionario").length})</span>
               </button>
             </div>
 
@@ -907,6 +912,16 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
 
                         {/* Details grid */}
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1.5">
+                          <span className="flex items-center gap-1 font-bold text-slate-900">
+                            <School className="w-3.5 h-3.5 text-[#f75142]" />
+                            <span>{app.schoolName || schoolName}</span>
+                          </span>
+                          <span className="flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            <span>
+                              Homologação: Diretor(a) {app.approverDirectorName || resolveSchoolDirectorName(null, app.schoolName || schoolName)}
+                            </span>
+                          </span>
                           <span className="flex items-center gap-1 font-mono text-slate-700">
                             <span className="font-sans text-slate-400 font-semibold">BI:</span> {app.biNumber}
                           </span>

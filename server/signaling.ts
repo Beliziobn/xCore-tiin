@@ -52,37 +52,14 @@ export function normalizeRoomId(rawId: string): string {
   return rawId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
 }
 
-// Seed default standard school meeting rooms
-const defaultRooms = [
-  {
-    id: 'ucore-conselho-geral',
-    title: 'Conselho Pedagógico Geral 2026',
-    hostId: 'dir-01',
-    hostName: 'Prof. Gabriel Santos (Diretor)',
-    schoolName: 'Complexo Escolar Quêssua Nº 44',
-  },
-  {
-    id: 'ucore-direcao-coordenacao',
-    title: 'Reunião de Direção & Coordenação Pedagógica',
-    hostId: 'dir-02',
-    hostName: 'Direção Geral de Ensino',
-    schoolName: 'Todas as Unidades',
-  },
-  {
-    id: 'ucore-atendimento-pais',
-    title: 'Atendimento a Encarregados de Educação',
-    hostId: 'coord-01',
-    hostName: 'Secretaria & Coordenação de Turno',
-    schoolName: 'Escola Primária Nº 12 - Malanje',
-  },
-  {
-    id: 'ucore-sala-estudo',
-    title: 'Sala Virtual de Aula & Plantão de Dúvidas',
-    hostId: 'prof-01',
-    hostName: 'Prof. António Silva (Matemática)',
-    schoolName: 'Liceu Comandante Dangereux',
-  },
-];
+// Seed default standard school meeting rooms (empty for clean slate)
+const defaultRooms: Array<{
+  id: string;
+  title: string;
+  hostId: string;
+  hostName: string;
+  schoolName: string;
+}> = [];
 
 for (const dr of defaultRooms) {
   rooms.set(dr.id, {

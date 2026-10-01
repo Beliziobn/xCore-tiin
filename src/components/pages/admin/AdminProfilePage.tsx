@@ -59,58 +59,8 @@ export interface DMEStaffMember {
   status: 'Ativo' | 'Em Exercício';
 }
 
-const DEFAULT_DME_STAFF: DMEStaffMember[] = [
-  {
-    id: 'dme-1',
-    name: 'Dr. Fred Silva',
-    role: 'diretor_municipal',
-    cargoTitle: 'Director(a) Municipal da Educação',
-    department: 'Gabinete do Director Municipal',
-    email: 'diretor.municipal@ucore.edu.ao',
-    phone: '+244 923 110 001',
-    status: 'Ativo',
-  },
-  {
-    id: 'dme-2',
-    name: 'Dr. Augusto Nvula',
-    role: 'chefe_reparticao',
-    cargoTitle: 'Chefe de Repartição do Ensino Geral',
-    department: 'Repartição do Ensino Primário e Secundário',
-    email: 'chefe.ensino@ucore.edu.ao',
-    phone: '+244 924 220 002',
-    status: 'Ativo',
-  },
-  {
-    id: 'dme-3',
-    name: 'Dra. Helena Manuel',
-    role: 'inspetor_escolar',
-    cargoTitle: 'Inspetora Escolar Municipal',
-    department: 'Gabinete de Inspecção e Supervisão Pedagógica',
-    email: 'inspecao.dme@ucore.edu.ao',
-    phone: '+244 925 330 003',
-    status: 'Ativo',
-  },
-  {
-    id: 'dme-4',
-    name: 'Eng. Marcos Dinis',
-    role: 'tecnico_estatistica',
-    cargoTitle: 'Técnico de Planeamento e Estatística',
-    department: 'Secção de Estatística e Censo Escolar',
-    email: 'estatistica.dme@ucore.edu.ao',
-    phone: '+244 926 440 004',
-    status: 'Ativo',
-  },
-  {
-    id: 'dme-5',
-    name: 'Dra. Teresa de Jesus Santos',
-    role: 'admin_sistema',
-    cargoTitle: 'Administradora de Sistema Sigre & RH',
-    department: 'Secção de Recursos Humanos e Tecnologia',
-    email: 'rh.ti.dme@sigre.edu.ao',
-    phone: '+244 927 550 005',
-    status: 'Ativo',
-  },
-];
+const DEFAULT_DME_STAFF: DMEStaffMember[] = [];
+
 
 const STORAGE_KEY_DME_STAFF = 'ucore_dme_staff_list';
 const STORAGE_KEY_ADMIN_AVATAR = 'ucore_admin_avatar';

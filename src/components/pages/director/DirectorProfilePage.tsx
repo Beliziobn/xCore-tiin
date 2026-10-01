@@ -414,7 +414,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                 Diretoria de Ensino • Central Sigre
               </h4>
               <p className="text-xs text-slate-500">
-                "Priorizamos a melhor organização da Educação" • Unidade Modelo Central
+                "Priorizamos a melhor organização da Educação" • Direcção Municipal do Quéssua
               </p>
             </div>
           </div>

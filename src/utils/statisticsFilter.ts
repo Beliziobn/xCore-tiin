@@ -296,7 +296,7 @@ export function applyAdvancedFilters(
     if (filters.schools.length === 1) {
       const scName = schoolNameMap.get(filters.schools[0]) || filters.schools[0];
       // Shorten name if needed
-      contextParts.push(scName.replace('Escola Modelo Central do Quêssua', 'Escola Central').replace('Colégio Esperança de Cassembele', 'Col. Cassembele'));
+      contextParts.push(scName.replace('Colégio Esperança de Cassembele', 'Col. Cassembele'));
     } else {
       contextParts.push(`${filters.schools.length} Escolas`);
     }

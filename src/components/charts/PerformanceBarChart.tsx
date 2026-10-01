@@ -35,30 +35,30 @@ interface PerformanceBarChartProps {
 }
 
 const DATA_SEMESTRES: PerformanceDataItem[] = [
-  { period: '1º Sem 24', aprovacao: 78, reprovacao: 22, distincao: 12, regular: 24, recuperacao: 10, totalAvaliados: 46 },
-  { period: '2º Sem 24', aprovacao: 82, reprovacao: 18, distincao: 15, regular: 23, recuperacao: 8, totalAvaliados: 46 },
-  { period: '1º Sem 25', aprovacao: 85, reprovacao: 15, distincao: 18, regular: 21, recuperacao: 7, totalAvaliados: 46 },
-  { period: '2º Sem 25', aprovacao: 89, reprovacao: 11, distincao: 20, regular: 21, recuperacao: 5, totalAvaliados: 46 },
-  { period: '1º Sem 26', aprovacao: 91, reprovacao: 9, distincao: 22, regular: 20, recuperacao: 4, totalAvaliados: 46 },
-  { period: '2º Sem 26', aprovacao: 93, reprovacao: 7, distincao: 24, regular: 19, recuperacao: 3, totalAvaliados: 46 },
+  { period: '1º Sem 24', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2º Sem 24', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '1º Sem 25', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2º Sem 25', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '1º Sem 26', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2º Sem 26', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
 ];
 
 const DATA_ANUAL: PerformanceDataItem[] = [
-  { period: '2021', aprovacao: 74, reprovacao: 26, distincao: 10, regular: 24, recuperacao: 12, totalAvaliados: 46 },
-  { period: '2022', aprovacao: 79, reprovacao: 21, distincao: 13, regular: 23, recuperacao: 10, totalAvaliados: 46 },
-  { period: '2023', aprovacao: 83, reprovacao: 17, distincao: 16, regular: 22, recuperacao: 8, totalAvaliados: 46 },
-  { period: '2024', aprovacao: 87, reprovacao: 13, distincao: 19, regular: 21, recuperacao: 6, totalAvaliados: 46 },
-  { period: '2025', aprovacao: 90, reprovacao: 10, distincao: 21, regular: 20, recuperacao: 5, totalAvaliados: 46 },
-  { period: '2026', aprovacao: 94, reprovacao: 6, distincao: 25, regular: 18, recuperacao: 3, totalAvaliados: 46 },
+  { period: '2021', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2022', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2023', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2024', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2025', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: '2026', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
 ];
 
 const DATA_DISCIPLINAS: PerformanceDataItem[] = [
-  { period: 'Português', aprovacao: 89, reprovacao: 11, distincao: 20, regular: 21, recuperacao: 5, totalAvaliados: 46 },
-  { period: 'Matemática', aprovacao: 83, reprovacao: 17, distincao: 16, regular: 22, recuperacao: 8, totalAvaliados: 46 },
-  { period: 'Ciências', aprovacao: 93, reprovacao: 7, distincao: 24, regular: 19, recuperacao: 3, totalAvaliados: 46 },
-  { period: 'História', aprovacao: 87, reprovacao: 13, distincao: 19, regular: 21, recuperacao: 6, totalAvaliados: 46 },
-  { period: 'Geografia', aprovacao: 91, reprovacao: 9, distincao: 22, regular: 20, recuperacao: 4, totalAvaliados: 46 },
-  { period: 'E. Visual', aprovacao: 98, reprovacao: 2, distincao: 30, regular: 15, recuperacao: 1, totalAvaliados: 46 },
+  { period: 'Português', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: 'Matemática', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: 'Ciências', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: 'História', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: 'Geografia', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
+  { period: 'E. Visual', aprovacao: 0, reprovacao: 0, distincao: 0, regular: 0, recuperacao: 0, totalAvaliados: 0 },
 ];
 
 export const PerformanceBarChart: React.FC<PerformanceBarChartProps> = ({

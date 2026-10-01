@@ -44,6 +44,11 @@ import {
   initialAdminStudents, 
   initialAdminDirectors 
 } from './data/adminData';
+import {
+  purgeModeloCentralData,
+  deleteSchoolAndRelatedData,
+  isModeloCentralSchool,
+} from './utils/schoolStorage';
 
 // Teacher & Student Pages
 import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
@@ -145,8 +150,8 @@ export default function App() {
     subtitle: 'A sua solicitação foi recebida e registada na plataforma Sigre.',
   });
 
-  // Ensure clean slate on first load if old demo mock caches existed
-  if (typeof window !== 'undefined' && localStorage.getItem('sigre_clean_slate_active_v1') !== 'true') {
+  // Ensure clean slate on first load so no pre-inserted or cached mock data exists
+  if (typeof window !== 'undefined' && localStorage.getItem('sigre_clean_slate_active_v3') !== 'true') {
     try {
       const keysToClean = [
         'ucore_admin_schools',
@@ -157,22 +162,41 @@ export default function App() {
         'ucore_teacher_profile',
         'ucore_attendance_records',
         'ucore_attendance_sessions',
+        'ucore_student_attendance_records_v2',
+        'ucore_teacher_attendance_records_v2',
+        'ucore_registered_teachers_v2',
+        'ucore_registered_students_v2',
+        'ucore_registered_directors_v2',
+        'ucore_school_announcements_v1',
+        'ucore_pending_applications',
+        'ucore_audit_logs_v1',
+        'ucore_attendance_diary_notes',
+        'ucore_dme_staff_members',
+        'ucore_director_profile',
+        'ucore_chat_channels',
+        'ucore_chat_messages',
         'sigre_school_registrations',
         'sigre_director_rooms',
         'sigre_director_classes',
       ];
       keysToClean.forEach((k) => localStorage.removeItem(k));
-      localStorage.setItem('sigre_clean_slate_active_v1', 'true');
+      localStorage.setItem('sigre_clean_slate_active_v3', 'true');
     } catch {
       // ignore
     }
+  }
+
+  // Purge any "Escola Modelo Central" and related records immediately on startup
+  if (typeof window !== 'undefined') {
+    purgeModeloCentralData();
   }
 
   // Admin dynamic state
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_schools');
-      return saved ? JSON.parse(saved) : initialAdminSchools;
+      const list: AdminSchool[] = saved ? JSON.parse(saved) : initialAdminSchools;
+      return Array.isArray(list) ? list.filter((s) => !isModeloCentralSchool(s.name)) : [];
     } catch {
       return initialAdminSchools;
     }
@@ -181,7 +205,8 @@ export default function App() {
   const [adminTeachers, setAdminTeachers] = useState<AdminTeacher[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_teachers');
-      return saved ? JSON.parse(saved) : initialAdminTeachers;
+      const list: AdminTeacher[] = saved ? JSON.parse(saved) : initialAdminTeachers;
+      return Array.isArray(list) ? list.filter((t) => !isModeloCentralSchool(t.schoolName)) : [];
     } catch {
       return initialAdminTeachers;
     }
@@ -190,7 +215,8 @@ export default function App() {
   const [adminStudents, setAdminStudents] = useState<AdminStudent[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_students');
-      return saved ? JSON.parse(saved) : initialAdminStudents;
+      const list: AdminStudent[] = saved ? JSON.parse(saved) : initialAdminStudents;
+      return Array.isArray(list) ? list.filter((st) => !isModeloCentralSchool(st.schoolName)) : [];
     } catch {
       return initialAdminStudents;
     }
@@ -199,7 +225,8 @@ export default function App() {
   const [adminDirectors, setAdminDirectors] = useState<AdminDirector[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_directors');
-      return saved ? JSON.parse(saved) : initialAdminDirectors;
+      const list: AdminDirector[] = saved ? JSON.parse(saved) : initialAdminDirectors;
+      return Array.isArray(list) ? list.filter((d) => !isModeloCentralSchool(d.schoolName)) : [];
     } catch {
       return initialAdminDirectors;
     }
@@ -268,6 +295,42 @@ export default function App() {
       // ignore
     }
   }, [adminStudents]);
+
+  // Listen for sigre-data-synced and ucore-teachers-updated events so adminStudents, adminTeachers, adminSchools, and teacherStudents stay in real-time sync
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const savedStudents = localStorage.getItem('ucore_admin_students');
+        if (savedStudents) {
+          setAdminStudents(JSON.parse(savedStudents));
+        }
+        const savedTeachers = localStorage.getItem('ucore_admin_teachers');
+        if (savedTeachers) {
+          setAdminTeachers(JSON.parse(savedTeachers));
+        }
+        const savedSchools = localStorage.getItem('ucore_admin_schools');
+        if (savedSchools) {
+          setAdminSchools(JSON.parse(savedSchools));
+        }
+        const savedDirectors = localStorage.getItem('ucore_admin_directors');
+        if (savedDirectors) {
+          setAdminDirectors(JSON.parse(savedDirectors));
+        }
+        const savedTeacherStudents = localStorage.getItem('ucore_teacher_students');
+        if (savedTeacherStudents) {
+          setTeacherStudents(JSON.parse(savedTeacherStudents));
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('ucore-teachers-updated', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('ucore-teachers-updated', handleSync);
+    };
+  }, []);
 
   // Teacher dynamic state
   const [teacherStudents, setTeacherStudents] = useState<StudentProfile[]>(() => {
@@ -1082,6 +1145,7 @@ export default function App() {
       return (
         <AuthPage
           initialMode={currentPage}
+          schools={adminSchools}
           onLoginSuccess={handleLoginSuccess}
           onBackToHome={() => {
             setCurrentPage('home');
@@ -1130,7 +1194,7 @@ export default function App() {
 
     // 0.2 Pending Approval Waiting Screen
     // "se um diretor de escola criar a conta dele , vai ficar pendente em uma tela de espera até o admin autorizar, se for o professor o director é quem deve autorizar"
-    if (currentUser.status === 'pendente') {
+    if (currentUser?.status === 'pendente') {
       return (
         <PendingApprovalPage
           currentUser={currentUser}
@@ -1210,6 +1274,11 @@ export default function App() {
             setAdminSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
             showToast(`Dados da escola "${updated.name}" atualizados com sucesso!`);
           }}
+          onDeleteSchool={(schoolId, schoolName) => {
+            const nextSchools = deleteSchoolAndRelatedData(schoolId, schoolName);
+            setAdminSchools(nextSchools);
+            showToast(`Escola "${schoolName}" e todos os dados relacionados foram apagados com sucesso!`);
+          }}
           isLoggedIn={isSessionStarted}
         />
       );
@@ -1256,7 +1325,16 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           students={adminStudents}
           schools={adminSchools}
-          onOpenRegisterModal={() => setAdminModalType('student')}
+          onSwitchToDirectorStudents={(_schoolId, schoolName) => {
+            setActiveRole('diretor');
+            setCurrentView('diretor-alunos');
+            if (schoolName) {
+              showToast(`Alternado para a Direção da escola "${schoolName}" para cadastro de alunos.`);
+            } else {
+              showToast('Alternado para o Painel do Director de Escola (Cadastro de Alunos).');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           isLoggedIn={isSessionStarted}
         />
       );
@@ -1320,6 +1398,18 @@ export default function App() {
           schools={adminSchools}
           onAddDirectorGlobal={(director) => {
             setAdminDirectors((prev) => [director, ...prev]);
+            if (director.schoolName) {
+              const normTarget = director.schoolName.trim().toLowerCase();
+              setAdminSchools((prev) =>
+                prev.map((sc) => {
+                  const scNorm = sc.name.trim().toLowerCase();
+                  if (scNorm === normTarget || scNorm.includes(normTarget) || normTarget.includes(scNorm)) {
+                    return { ...sc, directorName: director.name };
+                  }
+                  return sc;
+                })
+              );
+            }
             showToast(`Diretor(a) "${director.name}" homologado(a) no Sigre!`);
           }}
           showToast={showToast}
@@ -1334,7 +1424,7 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
           directorName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Fert Horlan (Diretor Geral)'}
-          schoolName={currentUser?.schoolName || 'Escola Modelo Central do Quêssua'}
+          schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
           onAddTeacherGlobal={(teacher) => {
             setAdminTeachers((prev) => [teacher, ...prev]);
             showToast(`Professor(a) "${teacher.name}" integrado(a) no quadro docente!`);
@@ -1380,6 +1470,8 @@ export default function App() {
         <DirectorStudentsPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          schools={adminSchools}
+          currentUser={currentUser}
           onAddStudentGlobal={(student) => {
             setAdminStudents((prev) => [student, ...prev]);
             showToast(`Aluno(a) "${student.name}" matriculado(a) pela Direção Escolar com sucesso!`);
@@ -2193,7 +2285,18 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenSettings={() => {
-          setSettingsModalOpen(true);
+          setCurrentPage('home');
+          setProfileInitialTab('configuracoes');
+          setProfileFocusZone(true);
+          setSettingsTriggerCount((c) => c + 1);
+          const ownProfile = getOwnProfileViewForUser(currentUser);
+          setCurrentView(ownProfile);
+          setTimeout(() => {
+            const el = document.getElementById('zona-dados-senha');
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 250);
         }}
         onOpenDemoModal={() => setIsDemoModalOpen(true)}
         onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
@@ -2221,31 +2324,33 @@ export default function App() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Organic Cloud Wave Footer */}
-      <CloudFooter
-        onOpenAbout={() => {
-          setCurrentView('sobre');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenTerms={() => {
-          setCurrentView('termos');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenPrivacy={() => {
-          setCurrentView('privacidade');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenSecurity={() => {
-          setCurrentView('seguranca');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenCases={() => {
-          setCurrentView('cases');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenCookieSettings={() => window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'))}
-        onOpenSupport={() => setInfoModalType('support')}
-      />
+      {/* Organic Cloud Wave Footer (only visible when session is started) */}
+      {isSessionStarted && (
+        <CloudFooter
+          onOpenAbout={() => {
+            setCurrentView('sobre');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenTerms={() => {
+            setCurrentView('termos');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenPrivacy={() => {
+            setCurrentView('privacidade');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenSecurity={() => {
+            setCurrentView('seguranca');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenCases={() => {
+            setCurrentView('cases');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenCookieSettings={() => window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'))}
+          onOpenSupport={() => setInfoModalType('support')}
+        />
+      )}
 
       {/* Cookie Consent Banner & Preferences Modal */}
       <CookieConsentBanner
@@ -2263,11 +2368,13 @@ export default function App() {
         }}
       />
 
-      {/* Floating Support Chat Button */}
-      <FloatingChatButton
-        onClick={() => setIsChatOpen(true)}
-        unreadCount={unreadChatCount}
-      />
+      {/* Floating Support Chat Button (only visible when session is started) */}
+      {isSessionStarted && (
+        <FloatingChatButton
+          onClick={() => setIsChatOpen(true)}
+          unreadCount={unreadChatCount}
+        />
+      )}
 
       {/* Demo Request Modal */}
       <DemoRequestModal
@@ -2326,8 +2433,33 @@ export default function App() {
           showToast(`Docente "${newTeacher.name}" registrado com sucesso!`);
         }}
         onAddStudent={(newStudent) => {
-          setAdminStudents((prev) => [newStudent, ...prev]);
-          showToast(`Aluno(a) "${newStudent.name}" cadastrado(a) com sucesso!`);
+          setAdminStudents((prev) => {
+            const existingIdx = prev.findIndex((s) => s.id === newStudent.id);
+            if (existingIdx >= 0) {
+              const copy = [...prev];
+              copy[existingIdx] = newStudent;
+              return copy;
+            }
+            return [newStudent, ...prev];
+          });
+          setAdminSchools((prevSchools) =>
+            prevSchools.map((sc) => {
+              const isMatch =
+                (newStudent.schoolId && newStudent.schoolId === sc.id) ||
+                newStudent.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase();
+              if (isMatch) {
+                return {
+                  ...sc,
+                  studentsWithDocs: sc.studentsWithDocs + (newStudent.hasDocuments ? 1 : 0),
+                  studentsWithoutDocs: sc.studentsWithoutDocs + (newStudent.hasDocuments ? 0 : 1),
+                };
+              }
+              return sc;
+            })
+          );
+          showToast(
+            `Aluno(a) "${newStudent.name}" cadastrado(a) na escola "${newStudent.schoolName}" (${newStudent.registrationData?.tipoEscolaNome || newStudent.gradeClass}) com sucesso!`
+          );
         }}
         onAddDirector={(newDirector) => {
           setAdminDirectors((prev) => [newDirector, ...prev]);

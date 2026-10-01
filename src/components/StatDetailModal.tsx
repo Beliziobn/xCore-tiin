@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, CheckCircle2, TrendingUp, Sparkles, Home, User, Users, Flag, ArrowRight } from 'lucide-react';
+import { X, CheckCircle2, TrendingUp, Sparkles } from 'lucide-react';
 import type { SessionCard } from '../types';
+import { ComposablesLucideIcon } from './common/ComposablesLucideIcon';
 
 interface StatDetailModalProps {
   card: SessionCard | null;
@@ -10,21 +11,6 @@ interface StatDetailModalProps {
 
 export const StatDetailModal: React.FC<StatDetailModalProps> = ({ card, onClose, roleTitle }) => {
   if (!card) return null;
-
-  const renderIcon = (icon: SessionCard['icon']) => {
-    switch (icon) {
-      case 'home':
-        return <Home className="w-5 h-5 text-slate-700" />;
-      case 'user':
-        return <User className="w-5 h-5 text-slate-700" />;
-      case 'users':
-        return <Users className="w-5 h-5 text-slate-700" />;
-      case 'flag':
-        return <Flag className="w-5 h-5 text-slate-700" />;
-      default:
-        return <Home className="w-5 h-5 text-slate-700" />;
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -41,8 +27,13 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({ card, onClose,
           </button>
 
           <div className="flex items-center gap-3 pr-8">
-            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-2xs shrink-0">
-              {renderIcon(card.icon)}
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-[#002133] flex items-center justify-center shadow-2xs shrink-0">
+              <ComposablesLucideIcon
+                name={card.icon}
+                titleFallback={card.title}
+                size={20}
+                strokeWidth={2}
+              />
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">

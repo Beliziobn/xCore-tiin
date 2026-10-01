@@ -159,9 +159,26 @@ export function saveDirector(
  * Seeds rich initial DirectorRegistrationData from existing schools if storage is empty
  */
 export function buildInitialDirectorDossier(
-  school: AdminSchool,
-  index: number
+  school?: AdminSchool,
+  index: number = 0
 ): DirectorRegistrationData {
+  const safeSchool: AdminSchool = school || {
+    id: 'esc-quessua-01',
+    name: 'Direcção Municipal da Educação de Quessua',
+    directorName: 'Director Municipal da Educação',
+    location: 'Quêssua - Zona Central',
+    category: 'Ensino Primário',
+    teachersCount: 0,
+    roomsCount: 0,
+    turmasCount: 0,
+    studentsWithDocs: 0,
+    studentsWithoutDocs: 0,
+    performanceRate: 0,
+    attendanceRate: 0,
+    phone: '+244 923 000 000',
+    email: 'dmedoquessua@gmail.com',
+  };
+
   const birthYear = 1970 + (index % 18);
   const birthMonth = String((index % 12) + 1).padStart(2, '0');
   const birthDay = String(((index * 3) % 25) + 1).padStart(2, '0');
@@ -185,23 +202,27 @@ export function buildInitialDirectorDossier(
     hasOutra
   );
 
+  const dirName = safeSchool.directorName || 'Director Municipal da Educação';
+  const schName = safeSchool.name || 'Direcção Municipal da Educação de Quessua';
+  const schId = safeSchool.id || 'esc-quessua-01';
+
   return {
-    id: `dir-${school.id}`,
-    nomeCompleto: school.directorName,
+    id: `dir-${schId}`,
+    nomeCompleto: dirName,
     biNif: `00${34500000 + index * 1234}LA04${(index % 9) + 1}`,
     sexo: isFemale ? 'Feminino' : 'Masculino',
     dataNascimento: birthDate,
     idade: calculateAge(birthDate),
     faixaEtaria: calculateFaixaEtaria(birthDate),
-    telefone: school.phone || `+244 923 ${String(100000 + index * 3333).slice(0, 6)}`,
-    emailPessoal: `${school.directorName.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-    emailInstitucional: school.email || `${school.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@ucore.edu.ao`,
+    telefone: safeSchool.phone || `+244 923 ${String(100000 + index * 3333).slice(0, 6)}`,
+    emailPessoal: `${dirName.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
+    emailInstitucional: safeSchool.email || `${schName.toLowerCase().replace(/[^a-z0-9]/g, '')}@ucore.edu.ao`,
     morada: `Bairro Central de Quêssua, Zona ${String.fromCharCode(65 + (index % 6))}`,
     provinciaResidencia: 'Malanje',
     municipioResidencia: 'Quêssua',
 
-    escolaId: school.id,
-    nomeEscola: school.name,
+    escolaId: schId,
+    nomeEscola: schName,
     codigoEscola: `ESC-QSS-${String(index + 1).padStart(3, '0')}`,
     naturezaEscola: index % 5 === 0 ? 'Público-Privada' : index % 7 === 0 ? 'Privada' : 'Pública',
     provinciaEscola: 'Malanje',
@@ -252,10 +273,10 @@ export function buildInitialDirectorDossier(
         data: '2016-11-20',
       },
     ],
-    observacoes: `Director(a) com excelente assiduidade institucional e forte liderança comunitária junto à comissão de pais de ${school.name}.`,
+    observacoes: `Director(a) com excelente assiduidade institucional e forte liderança comunitária junto à comissão de pais de ${schName}.`,
 
-    professoresSobDirecao: school.teachersCount,
-    alunosSobDirecao: school.studentsWithDocs + school.studentsWithoutDocs,
+    professoresSobDirecao: safeSchool.teachersCount || 0,
+    alunosSobDirecao: (safeSchool.studentsWithDocs || 0) + (safeSchool.studentsWithoutDocs || 0),
     desafiosGestao: [
       'Infra-estruturas e número insuficiente de salas',
       'Alunos sem certidão de nascimento / BI (registo civil)',
@@ -280,7 +301,7 @@ export function buildInitialDirectorDossier(
         data: `${appointmentYear}-02-01T08:30:00Z`,
         autor: 'Gabinete Municipal de Educação de Quêssua',
         acao: 'Homologação',
-        detalhes: `Homologação formal do mandato directivo na ${school.name}.`,
+        detalhes: `Homologação formal do mandato directivo na ${schName}.`,
       },
     ],
     criadoEm: `${appointmentYear}-02-01T08:30:00Z`,

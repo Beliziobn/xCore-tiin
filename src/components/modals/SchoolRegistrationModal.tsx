@@ -53,6 +53,8 @@ import {
   DEFICIENCIAS_DISPONIVEIS,
   calculateTotalClassesOffered,
 } from '../../utils/schoolStorage';
+import { getStoredTeachers } from '../../utils/teacherStorage';
+import { getStoredStudents } from '../../utils/studentStorage';
 import { SmartAutofillBar } from '../common/SmartAutofillBar';
 import type { AutofillProfile } from '../../utils/smartAutofill';
 
@@ -150,14 +152,15 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
   const [acessibilidadeDeficiencia, setAcessibilidadeDeficiencia] = useState(true);
   const [detalhesAcessibilidade, setDetalhesAcessibilidade] = useState('Rampas nas entradas e sanitários adaptados');
 
-  // 5. Pessoal da Escola
+  // 5. Pessoal e Quota de Alunos da Escola
+  const [totalAlunosDeclarados, setTotalAlunosDeclarados] = useState(567);
   const [totalEducadoresInfancia, setTotalEducadoresInfancia] = useState(2);
   const [totalAuxiliaresAccaoEducativa, setTotalAuxiliaresAccaoEducativa] = useState(2);
-  const [totalDocentesProfessores, setTotalDocentesProfessores] = useState(18);
+  const [totalDocentesProfessores, setTotalDocentesProfessores] = useState(32);
   const [totalAlfabetizadores, setTotalAlfabetizadores] = useState(0);
   const [totalPessoalNaoDocente, setTotalPessoalNaoDocente] = useState(6);
-  const [docentesComFormacao, setDocentesComFormacao] = useState(15);
-  const [docentesSemFormacao, setDocentesSemFormacao] = useState(3);
+  const [docentesComFormacao, setDocentesComFormacao] = useState(26);
+  const [docentesSemFormacao, setDocentesSemFormacao] = useState(6);
 
   // 6. Situação de Funcionamento
   const [emPlenoFuncionamento, setEmPlenoFuncionamento] = useState(true);
@@ -222,6 +225,12 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
       setTotalPessoalNaoDocente(initialData.pessoal.totalPessoalNaoDocente || 0);
       setDocentesComFormacao(initialData.pessoal.docentesComFormacaoPedagogica || 0);
       setDocentesSemFormacao(initialData.pessoal.docentesSemFormacaoPedagogica || 0);
+      setTotalAlunosDeclarados(
+        typeof initialData.pessoal.totalAlunosDeclarados === 'number'
+          ? initialData.pessoal.totalAlunosDeclarados
+          : existingSchool?.declaredStudentsCount ??
+            ((existingSchool?.studentsWithDocs || 0) + (existingSchool?.studentsWithoutDocs || 0) || 567)
+      );
 
       setEmPlenoFuncionamento(initialData.situacao.emPlenoFuncionamento);
       setEscolaNovaCriada(initialData.situacao.escolaNovaCriada);
@@ -245,6 +254,10 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
       setTotalDocentesProfessores(existingSchool.teachersCount);
       setDocentesComFormacao(Math.max(1, Math.round(existingSchool.teachersCount * 0.85)));
       setDocentesSemFormacao(Math.max(0, Math.round(existingSchool.teachersCount * 0.15)));
+      setTotalAlunosDeclarados(
+        existingSchool.declaredStudentsCount ??
+          ((existingSchool.studentsWithDocs || 0) + (existingSchool.studentsWithoutDocs || 0) || 567)
+      );
       setNatureza(existingSchool.natureza || 'Pública');
     } else {
       // Clean defaults
@@ -290,11 +303,12 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
       setDetalhesAcessibilidade('Rampas nas entradas e sanitários adaptados');
       setTotalEducadoresInfancia(2);
       setTotalAuxiliaresAccaoEducativa(2);
-      setTotalDocentesProfessores(18);
+      setTotalDocentesProfessores(32);
       setTotalAlfabetizadores(0);
       setTotalPessoalNaoDocente(6);
-      setDocentesComFormacao(15);
-      setDocentesSemFormacao(3);
+      setDocentesComFormacao(26);
+      setDocentesSemFormacao(6);
+      setTotalAlunosDeclarados(567);
       setEmPlenoFuncionamento(true);
       setEscolaNovaCriada(false);
       setRegimeComplexoEscolar(false);
@@ -470,6 +484,7 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
         totalPessoalNaoDocente: Number(totalPessoalNaoDocente) || 0,
         docentesComFormacaoPedagogica: Number(docentesComFormacao) || 0,
         docentesSemFormacaoPedagogica: Number(docentesSemFormacao) || 0,
+        totalAlunosDeclarados: Number(totalAlunosDeclarados) || 0,
       },
       situacao: {
         emPlenoFuncionamento,
@@ -573,7 +588,7 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
               { id: 2, label: 'Natureza', icon: ShieldCheck },
               { id: 3, label: 'Oferta Educativa', icon: GraduationCap },
               { id: 4, label: 'Instalações', icon: Building2 },
-              { id: 5, label: 'Professores', icon: Users },
+              { id: 5, label: 'Docentes & Alunos', icon: Users },
               { id: 6, label: 'Funcionamento', icon: Layers },
               { id: 7, label: 'Validação', icon: FileText },
             ].map((step) => {
@@ -620,12 +635,6 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
           {/* ================= STEP 1: IDENTIFICAÇÃO ================= */}
           {activeTab === 1 && (
             <div className="space-y-6 animate-in fade-in duration-150">
-              {/* Smart Autofill Bar */}
-              <SmartAutofillBar
-                context="school"
-                onApplyProfile={handleSmartAutofill}
-              />
-
               <div className="pb-3 border-b border-slate-100">
                 <h3 className="text-base font-bold text-slate-900">Identificação Oficial da Escola</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -1394,31 +1403,138 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
             </div>
           )}
 
-          {/* ================= STEP 5: PROFESSORES ================= */}
+          {/* ================= STEP 5: DOCENTES & ALUNOS ================= */}
           {activeTab === 5 && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="pb-3 border-b border-slate-100">
-                <h3 className="text-base font-bold text-slate-900">Corpo Docente & Funcionários</h3>
+                <h3 className="text-base font-bold text-slate-900">Quotas Declaradas: Pessoal Docente, Alunos & Funcionários</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Informe o número de professores e funcionários da instituição.
+                  Informe o efectivo declarado pelo diretor para professores e alunos. Ambos ficam pendentes e são subtraídos à medida que cada cadastro nominal é realizado.
                 </p>
               </div>
 
-              {/* Total Docentes com Quick Buttons */}
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 space-y-3">
-                <label className="block text-xs sm:text-sm font-bold text-slate-800 tracking-tight">
-                  Quantos professores leccionam nesta escola?
-                </label>
-                <div className="flex items-center gap-3">
+              {/* Total Alunos Declarados com Quick Buttons e Reconciliação de Pendentes */}
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 space-y-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 tracking-tight">
+                    Quantos alunos esta escola possui no total? (Quota de Alunos Declarada pelo Diretor)
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    O total de alunos informado (ex: <strong>567 alunos</strong>) não entra directamente na planilha: fica como <strong>Pendente</strong> e vai diminuindo à medida que cada aluno é cadastrado (ex: cadastrou 546, ficam pendentes 21).
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="number"
+                    min={0}
+                    value={totalAlunosDeclarados}
+                    onChange={(e) => setTotalAlunosDeclarados(parseInt(e.target.value, 10) || 0)}
+                    className="w-36 text-xl font-black text-slate-900 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white"
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[120, 250, 400, 567, 800].map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => setTotalAlunosDeclarados(count)}
+                        className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          totalAlunosDeclarados === count
+                            ? 'bg-zinc-900 text-white border-zinc-900'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {count} alunos
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Painel de Estado de Alunos Pendentes vs Cadastrados na Planilha */}
+                {(() => {
+                  const storedStudents = getStoredStudents();
+                  const normName = nomeOficial.trim().toLowerCase();
+                  const schId = existingSchool?.id || initialData?.id || '';
+                  const registeredStudentsForThisSchool = storedStudents.filter((s) => {
+                    const mId = Boolean(schId && s.schoolId === schId);
+                    const sSchool = (s.escola || (s as any).nomeEscola || '').trim().toLowerCase();
+                    const mName = Boolean(normName && sSchool === normName);
+                    return mId || mName;
+                  }).length;
+                  const pendingStudentsForThisSchool = Math.max(
+                    0,
+                    totalAlunosDeclarados - registeredStudentsForThisSchool
+                  );
+
+                  return (
+                    <div className="p-4 rounded-xl bg-cyan-50/80 border border-cyan-200 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-[#0b3d5c] flex items-center gap-1.5">
+                          <GraduationCap className="w-4 h-4 text-[#0b3d5c]" />
+                          Reconciliação de Alunos no Instrumento Complementar 2026/2027
+                        </span>
+                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-200/90 text-amber-950">
+                          {pendingStudentsForThisSchool} Alunos Pendentes
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-white rounded-lg p-2.5 border border-cyan-200">
+                          <span className="block text-[10px] font-bold uppercase text-slate-500">
+                            Alunos Declarados
+                          </span>
+                          <span className="text-lg font-black text-slate-900">
+                            {totalAlunosDeclarados}
+                          </span>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg p-2.5 border border-emerald-200">
+                          <span className="block text-[10px] font-bold uppercase text-emerald-700">
+                            Já Cadastrados (Na Planilha)
+                          </span>
+                          <span className="text-lg font-black text-emerald-800">
+                            {registeredStudentsForThisSchool}
+                          </span>
+                        </div>
+                        <div className="bg-amber-100/90 rounded-lg p-2.5 border border-amber-300">
+                          <span className="block text-[10px] font-bold uppercase text-amber-900">
+                            Ficam Pendentes
+                          </span>
+                          <span className="text-lg font-black text-amber-950">
+                            {pendingStudentsForThisSchool}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-[#0b3d5c] leading-relaxed">
+                        <strong>Como funciona:</strong> Ao informar <strong>{totalAlunosDeclarados}</strong> alunos, eles não entram directo na planilha: ficam <strong>{pendingStudentsForThisSchool} pendentes</strong>. À medida que começar a cadastrar os alunos, o saldo pendente vai sendo subtraído (exemplo: se declarou {totalAlunosDeclarados} e cadastrou {Math.max(1, totalAlunosDeclarados - 21)}, ficam pendentes <strong>{totalAlunosDeclarados >= 21 ? 21 : Math.max(0, totalAlunosDeclarados - 1)}</strong>).
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Total Docentes com Quick Buttons e Reconciliação de Pendentes */}
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 space-y-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 tracking-tight">
+                    Quantos professores compõem o quadro docente desta escola? (Quota Declarada)
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Este número define a meta total de docentes da escola. Os docentes informados ficam como <strong>Pendentes</strong> até que cada professor seja nominalmente cadastrado no sistema.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
                   <input
                     type="number"
                     min={0}
                     value={totalDocentesProfessores}
-                    onChange={(e) => setTotalDocentesProfessores(parseInt(e.target.value, 10) || 0)}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10) || 0;
+                      setTotalDocentesProfessores(val);
+                      setDocentesComFormacao(Math.round(val * 0.8));
+                      setDocentesSemFormacao(Math.max(0, val - Math.round(val * 0.8)));
+                    }}
                     className="w-36 text-xl font-black text-slate-900 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:bg-white"
                   />
-                  <div className="flex items-center gap-1.5">
-                    {[5, 10, 15, 20, 30].map((count) => (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[8, 16, 24, 32, 40].map((count) => (
                       <button
                         key={count}
                         type="button"
@@ -1434,6 +1550,62 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
                     ))}
                   </div>
                 </div>
+
+                {/* Painel de Estado de Pendentes vs Cadastrados na Planilha */}
+                {(() => {
+                  const storedTeachers = getStoredTeachers();
+                  const normName = nomeOficial.trim().toLowerCase();
+                  const schId = existingSchool?.id || initialData?.id || '';
+                  const registeredForThisSchool = storedTeachers.filter((t) => {
+                    const mId = Boolean(schId && t.escolaId === schId);
+                    const mName = Boolean(normName && t.nomeEscola.trim().toLowerCase() === normName);
+                    return mId || mName;
+                  }).length;
+                  const pendingForThisSchool = Math.max(0, totalDocentesProfessores - registeredForThisSchool);
+
+                  return (
+                    <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-amber-700" />
+                          Reconciliação com o Instrumento Complementar 2026/2027
+                        </span>
+                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-950">
+                          {pendingForThisSchool} Pendentes de Cadastro
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-white rounded-lg p-2.5 border border-amber-200">
+                          <span className="block text-[10px] font-bold uppercase text-slate-500">
+                            Quota Declarada
+                          </span>
+                          <span className="text-lg font-black text-slate-900">
+                            {totalDocentesProfessores}
+                          </span>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg p-2.5 border border-emerald-200">
+                          <span className="block text-[10px] font-bold uppercase text-emerald-700">
+                            Já Cadastrados (Na Planilha)
+                          </span>
+                          <span className="text-lg font-black text-emerald-800">
+                            {registeredForThisSchool}
+                          </span>
+                        </div>
+                        <div className="bg-amber-100/90 rounded-lg p-2.5 border border-amber-300">
+                          <span className="block text-[10px] font-bold uppercase text-amber-900">
+                            Ficam Pendentes
+                          </span>
+                          <span className="text-lg font-black text-amber-950">
+                            {pendingForThisSchool}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-amber-900 leading-relaxed">
+                        <strong>Como funciona:</strong> Ao declarar <strong>{totalDocentesProfessores}</strong> docentes, eles não entram directamente na planilha sem cadastro nominal. Ficam <strong>{pendingForThisSchool} pendentes</strong> e, à medida que cadastrar cada docente (1º, 2º, 3º...), o número de pendentes diminuirá ({pendingForThisSchool} → {Math.max(0, pendingForThisSchool - 1)} → {Math.max(0, pendingForThisSchool - 2)}...) e o docente entrará nos dados da planilha do Instrumento Complementar 2026/2027.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Formação Pedagógica dos Professores */}
@@ -1638,16 +1810,16 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
                     <span className="font-bold text-white">{directorNome || 'Não informado'}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Docentes</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Docentes Declarados</span>
                     <span className="font-bold text-white">{totalDocentesProfessores} Professores</span>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Salas de Aula</span>
-                    <span className="font-bold text-white">{totalSalas} Salas</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Alunos Declarados</span>
+                    <span className="font-bold text-amber-300">{totalAlunosDeclarados} Alunos</span>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Turnos</span>
-                    <span className="font-bold text-white">{turnos.join(', ')}</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Salas / Turnos</span>
+                    <span className="font-bold text-white">{totalSalas} Salas ({turnos.join(', ')})</span>
                   </div>
                 </div>
               </div>

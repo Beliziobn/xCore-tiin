@@ -63,207 +63,32 @@ export const CasesPage: React.FC<CasesPageProps> = ({
 
   const globalMetrics = [
     {
-      value: '420+',
+      value: '0',
       label: 'Escolas & Colégios Conectados',
       sub: 'Em 14 Províncias de Angola',
       icon: School,
     },
     {
-      value: '185.000+',
+      value: '0',
       label: 'Alunos com Processo Digital',
       sub: 'Histórico escolar protegido',
       icon: Users,
     },
     {
-      value: '98.4%',
+      value: '0%',
       label: 'Pontualidade Docente Auditada',
       sub: 'Via Livro de Ponto Biométrico',
       icon: TrendingUp,
     },
     {
-      value: '24h',
+      value: '0h',
       label: 'Geração de Mini-Pautas',
-      sub: 'Redução de 3 semanas para 1 dia',
+      sub: 'Automação de pautas',
       icon: Clock,
     },
   ];
 
-  const caseStudies: CaseStudy[] = [
-    {
-      id: 'dangereux-malanje',
-      schoolName: 'Liceu Provincial Comandante Dangereux',
-      province: 'Malanje',
-      municipality: 'Malanje Centro',
-      level: 'IIº Ciclo do Ensino Secundário',
-      studentsCount: 2450,
-      teachersCount: 78,
-      highlightMetric: '-85%',
-      metricLabel: 'tempo na publicação de pautas',
-      summary:
-        'Modernização de uma das instituições secundárias mais tradicionais de Malanje, eliminando erros de cálculo em médias e garantindo transparência nos exames nacionais.',
-      beforeSituation:
-        'Cálculo manual de médias em folhas soltas de papel, com atrasos sistemáticos na entrega de notas e filas de encarregados de educação no final de cada trimestre.',
-      afterSituation:
-        'Sistema integrado Sigre com lançamento automático de avaliações contínuas, cálculo instantâneo ponderado e publicação de pautas em conformidade com o MED.',
-      results: [
-        '1.420 pautas trimestrais processadas sem divergência de notas.',
-        'Assiduidade docente acompanhada em tempo real pelo Gabinete Provincial.',
-        'Acesso seguro para os encarregados consultarem as notas pelo telefone.',
-      ],
-      quote: {
-        author: 'Dra. Esperança Muquixe',
-        role: 'Directora Geral Pedagógica',
-        text: 'O Sigre devolveu a tranquilidade ao nosso conselho pedagógico. Antes levávamos semanas a conferir pautas manuais; hoje, com um clique, as notas estão auditadas e validadas.',
-      },
-      tags: ['Pautas Automáticas', 'Malanje', 'IIº Ciclo', 'Conselho de Notas'],
-      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
-    },
-    {
-      id: '4-fevereiro-luanda',
-      schoolName: 'Complexo Escolar 4 de Fevereiro',
-      province: 'Luanda',
-      municipality: 'Cazenga',
-      level: 'Ensino Primário e Iº Ciclo',
-      studentsCount: 3100,
-      teachersCount: 104,
-      highlightMetric: '99.2%',
-      metricLabel: 'assiduidade no livro de ponto',
-      summary:
-        'Superação de desafios de superlotação e controlo rigoroso de presenças de 104 professores através do Livro de Ponto Eletrónico e Ponto Biométrico integrado.',
-      beforeSituation:
-        'Livros de ponto físicos vulneráveis a rasuras e extravios, com dificuldades de controlo da carga horária efetiva entre os três turnos.',
-      afterSituation:
-        'Terminal de registo de ponto com autenticação biométrica e relatórios automáticos de assiduidade enviados semanalmente à Direcção Municipal de Educação.',
-      results: [
-        'Eliminação de rasuras e fraude nos registos de presença docente.',
-        'Poupança de mais de 80 resmas de papel por trimestre em fichas manuais.',
-        'Registo digital de 3.100 alunos com fotografia e dados de vacinação.',
-      ],
-      quote: {
-        author: 'Prof. Domingos Kapenda',
-        role: 'Coordenador do Turno da Manhã',
-        text: 'A precisão do livro de ponto Sigre acabou com as dúvidas e justificações tardias. Todos os professores sabem que o seu trabalho está devidamente registado e valorizado.',
-      },
-      tags: ['Livro de Ponto', 'Luanda', 'Cazenga', 'Biometria'],
-      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-    },
-    {
-      id: 'politecnico-huambo',
-      schoolName: 'Instituto Médio Politécnico do Huambo',
-      province: 'Huambo',
-      municipality: 'Huambo',
-      level: 'Ensino Técnico-Profissional',
-      studentsCount: 1850,
-      teachersCount: 62,
-      highlightMetric: '+42%',
-      metricLabel: 'aproveitamento em oficinas técnicas',
-      summary:
-        'Acompanhamento analítico de estudantes em cursos de Informática, Mecânica e Eletrónica com reuniões pedagógicas virtuais entre docentes e tutores de estágio.',
-      beforeSituation:
-        'Falta de acompanhamento individual das aulas de laboratório técnico e comunicação fragmentada com empresas parceiras de estágio.',
-      afterSituation:
-        'Ficha pedagógica digital completa para cada futuro técnico, permitindo aos professores registrar notas práticas e realizar videoconferências de alinhamento pelo Sigre Meet.',
-      results: [
-        'Realização de 48 reuniões pedagógicas virtuais sem custos de deslocação.',
-        'Controlo de frequência em 6 laboratórios especializados com QR code.',
-        'Emissão de certificados digitais com código de verificação anti-fraude.',
-      ],
-      quote: {
-        author: 'Eng. Mateus Tchissingui',
-        role: 'Director Técnico-Pedagógico',
-        text: 'O módulo de reuniões em tempo real do Sigre permitiu-nos coordenar estágios em várias províncias sem sair do gabinete. É uma revolução na educação técnica.',
-      },
-      tags: ['Ensino Técnico', 'Huambo', 'Videoconferência', 'Certificados'],
-      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    },
-    {
-      id: 'sagrada-esperanca-benguela',
-      schoolName: 'Colégio Sagrada Esperança',
-      province: 'Benguela',
-      municipality: 'Lobito',
-      level: 'Ensino Primário e Secundário',
-      studentsCount: 1400,
-      teachersCount: 46,
-      highlightMetric: '100%',
-      metricLabel: 'comunicação com encarregados',
-      summary:
-        'Aproximação histórica entre pais e a comunidade escolar com avisos de ocorrências pedagógicas imediatas e agendamento de atendimentos pelo portal da família.',
-      beforeSituation:
-        'Encarregados de educação só sabiam das notas ou faltas dos filhos quando eram convocados no fim do ano letivo.',
-      afterSituation:
-        'Canal direto no Sigre onde cada encarregado visualiza o comportamento, faltas justificadas e tarefas do aluno.',
-      results: [
-        'Redução de 65% em casos de indisciplina após notificação antecipada.',
-        'Adesão total de 1.400 famílias ao acompanhamento digital.',
-        'Zero perda de documentos no arquivo escolar histórico.',
-      ],
-      quote: {
-        author: 'D. Maria Joaquina Bento',
-        role: 'Encarregada de Educação e Presidente da Comissão de Pais',
-        text: 'Hoje recebo o aviso da presença do meu filho na sala de aula logo pela manhã. Sinto-me muito mais segura e participativa na educação dele.',
-      },
-      tags: ['Portal da Família', 'Benguela', 'Lobito', 'Inovação'],
-      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
-    },
-    {
-      id: 'rei-mandume-cunene',
-      schoolName: 'Escola Primária e Iº Ciclo Rei Mandume',
-      province: 'Cunene',
-      municipality: 'Ondjiva',
-      level: 'Ensino Primário e Iº Ciclo',
-      studentsCount: 920,
-      teachersCount: 34,
-      highlightMetric: '-50%',
-      metricLabel: 'abandono escolar no 1º trimestre',
-      summary:
-        'Implementação pioneira em zona de fronteira com suporte híbrido offline/online para garantia de frequência das crianças e alertas preventivos de evasão.',
-      beforeSituation:
-        'Altos índices de evasão sazonal com dificuldade em identificar precocemente as crianças em risco de desistência.',
-      afterSituation:
-        'Monitorização de frequência diária que alerta os coordenadores pedagógicos ao terceiro dia consecutivo de falta de qualquer estudante.',
-      results: [
-        'Reintegração escolar de 128 crianças através de busca ativa orientada.',
-        'Formação de todos os 34 professores locais em competências digitais básicas.',
-        'Sincronização de dados mesmo com instabilidade temporária de internet.',
-      ],
-      quote: {
-        author: 'Professor Bartolomeu Haufiku',
-        role: 'Director da Escola',
-        text: 'Mesmo nos pontos mais distantes de Ondjiva, o Sigre funciona. Conseguimos saber quais alunos faltaram e ir ao encontro das suas famílias antes que desistam da escola.',
-      },
-      tags: ['Inclusão Social', 'Cunene', 'Busca Ativa', 'Combate ao Abandono'],
-      badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
-    },
-    {
-      id: 'magisterio-huila',
-      schoolName: 'Instituto de Formação de Professores (Magistério do Lubango)',
-      province: 'Huíla',
-      municipality: 'Lubango',
-      level: 'Formação Inicial de Professores',
-      studentsCount: 1650,
-      teachersCount: 58,
-      highlightMetric: '2.100',
-      metricLabel: 'planos de aula digitais criados',
-      summary:
-        'Capacitação da próxima geração de docentes de Angola na utilização de diários de classe digitais, pautas interativas e metodologias pedagógicas modernas.',
-      beforeSituation:
-        'Estágios pedagógicos com diários manuscritos em papel, difíceis de orientar e corrigir pelos professores metodólogos.',
-      afterSituation:
-        'Ambiente Sigre onde os futuros professores criam, simulam e submetem planos de aula e mini-pautas para correção remota dos formadores.',
-      results: [
-        'Formação de mais de 450 novos docentes por ano já adaptados ao SIGE.',
-        'Biblioteca digital de 2.100 planos de aula para partilha nacional.',
-        'Avaliação em tempo real das práticas pedagógicas em escolas-anexas.',
-      ],
-      quote: {
-        author: 'Profª Dra. Teresa Caveto',
-        role: 'Coordenadora de Estágios Pedagógicos',
-        text: 'Os nossos estudantes de magistério já saem para as salas de aula de Angola preparados para o futuro digital. O Sigre é a ferramenta essencial dessa transição.',
-      },
-      tags: ['Magistério', 'Huíla', 'Lubango', 'Formação Docente'],
-      badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
-    },
-  ];
+  const caseStudies: CaseStudy[] = [];
 
   // Filtering
   const filteredCases = caseStudies.filter((c) => {

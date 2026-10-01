@@ -1,4 +1,7 @@
 import type {
+  AdminSchool,
+  AdminTeacher,
+  DirectorTeacher,
   TeacherRegistrationData,
   TeacherFaixaEtaria,
   TeacherNaturezaEscola,
@@ -132,7 +135,13 @@ export function getStoredTeachers(): TeacherRegistrationData[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      const filtered = parsed.filter(
+        (t: TeacherRegistrationData) => !String(t?.nomeEscola || '').trim().toLowerCase().includes('modelo central')
+      );
+      if (filtered.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(filtered));
+      }
+      return filtered;
     }
     return initialTeachersList;
   } catch {
@@ -204,6 +213,88 @@ export function saveTeacher(
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updatedList));
+
+      const savedRecord = updatedList.find((t) => t.id === teacher.id) || updatedList[0];
+
+      // 1) Sincronizar com ucore_admin_teachers
+      const rawAdminTeachers = localStorage.getItem('ucore_admin_teachers');
+      const adminTeachers: AdminTeacher[] = rawAdminTeachers ? JSON.parse(rawAdminTeachers) : [];
+      const adminEntry: AdminTeacher = {
+        id: savedRecord.id,
+        name: savedRecord.nomeCompleto,
+        phone: savedRecord.telefone || '+244 923 000 000',
+        gradeClass: savedRecord.niveisLecciona?.[0]?.nome || 'Ensino Primário',
+        room: 'Sala 01',
+        turma: 'Turma A',
+        category: savedRecord.funcaoCategoria || 'Docente / Professor',
+        location: `${savedRecord.municipioEscola || 'Quêssua'} (${savedRecord.provinciaEscola || 'Malanje'})`,
+        schoolName: savedRecord.nomeEscola,
+        schoolId: savedRecord.escolaId,
+        presenceRate: 99.0,
+        subject: savedRecord.disciplinas || 'Língua Portuguesa & Matemática',
+        gender: savedRecord.sexo === 'Feminino' ? 'F' : 'M',
+        qualification: savedRecord.nivelAcademico,
+        registrationData: savedRecord,
+      };
+      const existingAdminIdx = adminTeachers.findIndex(
+        (at) =>
+          at.id === savedRecord.id ||
+          at.name.trim().toLowerCase() === savedRecord.nomeCompleto.trim().toLowerCase()
+      );
+      if (existingAdminIdx >= 0) {
+        adminTeachers[existingAdminIdx] = {
+          ...adminTeachers[existingAdminIdx],
+          ...adminEntry,
+        };
+      } else {
+        adminTeachers.unshift(adminEntry);
+      }
+      localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
+
+      // 2) Sincronizar com ucore_director_teachers_v1
+      const rawDirTeachers = localStorage.getItem('ucore_director_teachers_v1');
+      const dirTeachers: DirectorTeacher[] = rawDirTeachers ? JSON.parse(rawDirTeachers) : [];
+      const shiftVal = savedRecord.turnos?.[0] === 'Tarde' ? 'Tarde' : 'Manhã';
+      const dirEntry: DirectorTeacher = {
+        id: savedRecord.id,
+        name: savedRecord.nomeCompleto,
+        schoolName: savedRecord.nomeEscola,
+        gradeClass: savedRecord.niveisLecciona?.[0]?.nome || 'Ensino Primário',
+        room: 'Sala 01',
+        turma: 'Turma A',
+        directorName: authorName,
+        location: `${savedRecord.municipioEscola || 'Quêssua'}`,
+        subject: savedRecord.disciplinas || 'Língua Portuguesa & Matemática',
+        presenceRate: 100,
+        shift: shiftVal,
+        phone: savedRecord.telefone,
+        email: savedRecord.email,
+        registrationData: savedRecord,
+        schedule: [
+          {
+            day: 'Segunda',
+            period: shiftVal === 'Tarde' ? '13h00 - 17h15' : '07h30 - 12h00',
+            subject: savedRecord.disciplinas || 'Língua Portuguesa & Matemática',
+            room: 'Sala 01',
+          },
+        ],
+      };
+      const existingDirIdx = dirTeachers.findIndex(
+        (dt) =>
+          dt.id === savedRecord.id ||
+          dt.name.trim().toLowerCase() === savedRecord.nomeCompleto.trim().toLowerCase()
+      );
+      if (existingDirIdx >= 0) {
+        dirTeachers[existingDirIdx] = {
+          ...dirTeachers[existingDirIdx],
+          ...dirEntry,
+        };
+      } else {
+        dirTeachers.unshift(dirEntry);
+      }
+      localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(dirTeachers));
+
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch (e) {
       console.error('Failed to persist teachers to localStorage', e);
     }
@@ -212,17 +303,208 @@ export function saveTeacher(
   return updatedList;
 }
 
-export function deleteTeacher(id: string): TeacherRegistrationData[] {
+export function deleteTeacher(id: string, teacherName?: string): TeacherRegistrationData[] {
+  const normTargetName = (teacherName || '').trim().toLowerCase();
   const current = getStoredTeachers();
-  const updated = current.filter((t) => t.id !== id);
+  const removed = current.find(
+    (t) =>
+      t.id === id ||
+      (normTargetName && t.nomeCompleto.trim().toLowerCase() === normTargetName)
+  );
+  const targetName = normTargetName || (removed?.nomeCompleto || '').trim().toLowerCase();
+
+  const updated = current.filter(
+    (t) =>
+      t.id !== id &&
+      (!targetName || t.nomeCompleto.trim().toLowerCase() !== targetName)
+  );
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updated));
+
+      // Remover de ucore_admin_teachers
+      const rawAdmin = localStorage.getItem('ucore_admin_teachers');
+      if (rawAdmin) {
+        const adminList: AdminTeacher[] = JSON.parse(rawAdmin);
+        const filteredAdmin = adminList.filter(
+          (at) =>
+            at.id !== id &&
+            (!targetName || at.name.trim().toLowerCase() !== targetName)
+        );
+        localStorage.setItem('ucore_admin_teachers', JSON.stringify(filteredAdmin));
+      }
+
+      // Remover de ucore_director_teachers_v1
+      const rawDir = localStorage.getItem('ucore_director_teachers_v1');
+      if (rawDir) {
+        const dirList: DirectorTeacher[] = JSON.parse(rawDir);
+        const filteredDir = dirList.filter(
+          (dt) =>
+            dt.id !== id &&
+            (!targetName || dt.name.trim().toLowerCase() !== targetName)
+        );
+        localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(filteredDir));
+      }
+
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch (e) {
       console.error('Failed to delete teacher from localStorage', e);
     }
   }
   return updated;
+}
+
+export function deleteAllTeachers(): void {
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify([]));
+      localStorage.setItem('ucore_admin_teachers', JSON.stringify([]));
+      localStorage.setItem('ucore_director_teachers_v1', JSON.stringify([]));
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    } catch (e) {
+      console.error('Failed to clear all teachers', e);
+    }
+  }
+}
+
+export interface SchoolTeacherQuotaStatus {
+  schoolId: string;
+  schoolName: string;
+  declaredTotal: number;
+  registeredCount: number;
+  pendingCount: number;
+  progressPercent: number;
+  declaredComFormacao: number;
+  declaredSemFormacao: number;
+  registeredComFormacao: number;
+  registeredSemFormacao: number;
+  declaredNaoDocentes: number;
+  registeredNaoDocentes: number;
+  pendingNaoDocentes: number;
+  registeredTeachers: TeacherRegistrationData[];
+}
+
+export function getSchoolTeacherQuotaStatus(
+  school: AdminSchool,
+  overrideAdminTeachers?: AdminTeacher[]
+): SchoolTeacherQuotaStatus {
+  const allDetailed = getStoredTeachers();
+  const normSchoolName = (school.name || '').trim().toLowerCase();
+  const normCodigoSige = (school.codigoSIGE || school.registrationData?.codigoSIGE || '').trim().toLowerCase();
+
+  // Também verificar ucore_admin_teachers caso haja docentes registados apenas lá
+  let adminList: AdminTeacher[] = Array.isArray(overrideAdminTeachers) ? overrideAdminTeachers : [];
+  if (adminList.length === 0 && typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('ucore_admin_teachers');
+      if (raw) adminList = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+  }
+
+  const unifiedMap = new Map<string, TeacherRegistrationData>();
+  allDetailed.forEach((t) => {
+    unifiedMap.set(t.id, t);
+  });
+  adminList.forEach((at) => {
+    const alreadyByName = Array.from(unifiedMap.values()).some(
+      (t) => t.nomeCompleto.trim().toLowerCase() === at.name.trim().toLowerCase()
+    );
+    if (!unifiedMap.has(at.id) && !alreadyByName) {
+      if (at.registrationData) {
+        unifiedMap.set(at.id, at.registrationData);
+      } else {
+        unifiedMap.set(
+          at.id,
+          getRegistrationDataFromDirectorTeacher(
+            {
+              id: at.id,
+              name: at.name,
+              schoolName: at.schoolName,
+              gradeClass: at.gradeClass,
+              room: at.room,
+              turma: at.turma,
+              subject: at.subject,
+              phone: at.phone,
+            },
+            at.schoolName
+          )
+        );
+      }
+    }
+  });
+
+  const matchedTeachers = Array.from(unifiedMap.values()).filter((t) => {
+    const matchId = Boolean(t.escolaId && t.escolaId === school.id);
+    const tName = (t.nomeEscola || '').trim().toLowerCase();
+    const matchName = Boolean(normSchoolName && tName === normSchoolName);
+    const tCode = (t.codigoEscola || '').trim().toLowerCase();
+    const matchCode = Boolean(normCodigoSige && tCode && tCode === normCodigoSige);
+    return matchId || matchName || matchCode;
+  });
+
+  // Separar pessoal docente vs não-docente/auxiliar se necessário, ou contabilizar todos os docentes cadastrados para a escola
+  const docentesCadastradosList = matchedTeachers.filter(
+    (t) => t.funcaoCategoria !== 'Auxiliar de Acção Educativa'
+  );
+  const naoDocentesCadastradosList = matchedTeachers.filter(
+    (t) => t.funcaoCategoria === 'Auxiliar de Acção Educativa'
+  );
+
+  // Caso o utilizador cadastre todos pelo formulário de professor esperando abater da meta de docentes:
+  const effectiveRegisteredTeachers = matchedTeachers;
+
+  const declaredTotal =
+    school.registrationData?.pessoal?.totalDocentesProfessores ??
+    school.teachersCount ??
+    0;
+
+  const registeredCount = effectiveRegisteredTeachers.length;
+  // Se o diretor declarou 32 docentes, começa com 32 pendentes; cadastrou 1 -> 31 pendentes; cadastrou 2 -> 30 pendentes...
+  const pendingCount = Math.max(0, declaredTotal - registeredCount);
+
+  const declaredComFormacao =
+    school.registrationData?.pessoal?.docentesComFormacaoPedagogica ??
+    Math.round(declaredTotal * 0.85);
+  const declaredSemFormacao =
+    school.registrationData?.pessoal?.docentesSemFormacaoPedagogica ??
+    Math.max(0, declaredTotal - declaredComFormacao);
+
+  const registeredComFormacao = effectiveRegisteredTeachers.filter(
+    (t) => t.temFormacaoPedagogica
+  ).length;
+  const registeredSemFormacao = Math.max(0, registeredCount - registeredComFormacao);
+
+  const declaredNaoDocentes =
+    (school.registrationData?.pessoal?.totalPessoalNaoDocente || 0) +
+    (school.registrationData?.pessoal?.totalAuxiliaresAccaoEducativa || 0);
+  const registeredNaoDocentes = naoDocentesCadastradosList.length;
+  const pendingNaoDocentes = Math.max(0, declaredNaoDocentes - registeredNaoDocentes);
+
+  const progressPercent =
+    declaredTotal > 0
+      ? Math.min(100, Math.round((registeredCount / declaredTotal) * 100))
+      : registeredCount > 0
+      ? 100
+      : 0;
+
+  return {
+    schoolId: school.id,
+    schoolName: school.name,
+    declaredTotal,
+    registeredCount,
+    pendingCount,
+    progressPercent,
+    declaredComFormacao,
+    declaredSemFormacao,
+    registeredComFormacao,
+    registeredSemFormacao,
+    declaredNaoDocentes,
+    registeredNaoDocentes,
+    pendingNaoDocentes,
+    registeredTeachers: effectiveRegisteredTeachers,
+  };
 }
 
 // Analytical Cross-Tabulation Matrix
@@ -441,7 +723,7 @@ export function getRegistrationDataFromDirectorTeacher(
     email?: string;
     registrationData?: TeacherRegistrationData;
   },
-  defaultSchoolName: string = 'Escola Modelo Central',
+  defaultSchoolName: string = '',
   defaultDirectorName: string = 'Diretor de Escola'
 ): TeacherRegistrationData {
   if (dt.registrationData) {

@@ -79,7 +79,7 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
   teacher,
   onSave,
   onOpenFullDossier,
-  schoolName = 'Escola Modelo Central',
+  schoolName = '',
   directorName = 'Diretor de Escola',
   initialTab = 'alocacao',
 }) => {

@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import { verifyPassword, updatePassword } from '../../utils/passwordService';
-import type { UserAccount, SchoolStaffRole, AdminStaffRole } from '../../types';
+import type { UserAccount, SchoolStaffRole, AdminStaffRole, AdminSchool } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
 import { googleSignIn } from '../../utils/googleAuth';
 import { 
@@ -40,9 +40,11 @@ import {
   searchPreRegisteredTeacher, 
   searchPreRegisteredDirector,
   savePendingApplication,
-  checkUserApprovalStatus
+  checkUserApprovalStatus,
+  resolveSchoolDirectorName
 } from '../../utils/authApprovalStorage';
 import { initialAdminSchools } from '../../data/adminData';
+import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -50,6 +52,7 @@ interface AuthPageProps {
   onBackToHome: () => void;
   hideHeader?: boolean;
   onAuthLoadingChange?: (loading: boolean, action?: 'login' | 'register') => void;
+  schools?: AdminSchool[];
 }
 
 export const SCHOOL_ROLES_CONFIG: {
@@ -76,7 +79,7 @@ export const SCHOOL_ROLES_CONFIG: {
     defaultEmail: 'diretor.carl@ucore.edu.br',
     defaultFirst: 'Carl',
     defaultLast: 'Mendes',
-    cargoFull: 'Diretor Geral da Escola Modelo Central',
+    cargoFull: 'Diretor Geral da Unidade Escolar',
   },
   {
     id: 'subdiretor_pedagogico',
@@ -218,10 +221,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   onBackToHome,
   hideHeader = false,
   onAuthLoadingChange,
+  schools: propSchools,
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Escolas já cadastradas no sistema (prop + localStorage + initialAdminSchools)
+  const registeredSchools = React.useMemo(() => {
+    const fromStorage = getRegisteredSchoolsFromStorage();
+    const combined = [...(propSchools || []), ...fromStorage, ...initialAdminSchools];
+    const uniqueMap = new Map<string, AdminSchool>();
+    combined.forEach((sc) => {
+      if (sc && sc.name) {
+        uniqueMap.set(sc.name.trim().toLowerCase(), sc);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [propSchools, mode]);
 
   // Form fields
   const [firstName, setFirstName] = useState('');
@@ -248,7 +265,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   
   // Sigre Predefined System Selection Options
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>(UCORE_MUNICIPALITIES[0]);
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>(initialAdminSchools[0]?.id || 'esc-01');
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>(() => registeredSchools[0]?.id || '');
   const [biNumber, setBiNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>(UCORE_DISCIPLINAS[0]);
@@ -258,13 +275,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  // Keep selectedSchoolId synced with registeredSchools
+  useEffect(() => {
+    if (registeredSchools.length > 0) {
+      const exists = registeredSchools.some((s) => s.id === selectedSchoolId);
+      if (!exists) {
+        setSelectedSchoolId(registeredSchools[0].id);
+        setSchoolOrUnitName(registeredSchools[0].name);
+      } else {
+        const current = registeredSchools.find((s) => s.id === selectedSchoolId);
+        if (current) setSchoolOrUnitName(current.name);
+      }
+    } else {
+      setSelectedSchoolId('');
+      setSchoolOrUnitName('');
+    }
+  }, [registeredSchools, selectedSchoolId]);
+
   // Real-time pre-registration search across Sigre roster
   useEffect(() => {
     if (mode !== 'register') {
       setPreRegResult(null);
       return;
     }
-    const currentSchool = initialAdminSchools.find((s) => s.id === selectedSchoolId)?.name || initialAdminSchools[0]?.name || '';
+    const currentSchool = registeredSchools.find((s) => s.id === selectedSchoolId)?.name || registeredSchools[0]?.name || '';
     const fullName = `${firstName} ${lastName}`.trim();
 
     if (institutionalScope === 'escola') {
@@ -281,7 +315,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       const res = searchPreRegisteredDirector(email, biNumber, fullName, selectedMunicipality);
       setPreRegResult(res.found ? res : null);
     }
-  }, [mode, email, biNumber, firstName, lastName, selectedSchoolId, selectedMunicipality, schoolRole, institutionalScope]);
+  }, [mode, email, biNumber, firstName, lastName, selectedSchoolId, selectedMunicipality, schoolRole, institutionalScope, registeredSchools]);
 
   const [showGoogleChooser, setShowGoogleChooser] = useState(false);
   const [customGoogleEmail, setCustomGoogleEmail] = useState('');
@@ -369,7 +403,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setPassword('Ucore@2026');
     setFirstName(config.defaultFirst);
     setLastName(config.defaultLast);
-    setSchoolOrUnitName('Escola Modelo Central');
+    setSchoolOrUnitName('Unidade Escolar Municipal');
     setAgreeTerms(true);
   };
 
@@ -487,8 +521,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           : firstName.trim() || (resolvedRole === 'admin' ? 'Administrador' : resolvedRole === 'diretor' ? 'Director' : 'Professor');
         const resolvedLast = isDirectorMunicipal ? 'da Educação' : (lastName.trim() || 'Sigre');
         
-        const matchedSchool = (initialAdminSchools && initialAdminSchools.length > 0)
-          ? (initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0])
+        const matchedSchool = registeredSchools.length > 0
+          ? (registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0])
           : null;
 
         const loggedUser: UserAccount = {
@@ -511,6 +545,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         // Check if this account is pending approval
         const approvalCheck = checkUserApprovalStatus(loggedUser.id, email.trim());
+        if (approvalCheck.app) {
+          const app = approvalCheck.app;
+          const nameParts = (app.fullName || '').trim().split(' ');
+          loggedUser.id = app.userId || loggedUser.id;
+          if (nameParts[0]) loggedUser.firstName = nameParts[0];
+          if (nameParts.length > 1) loggedUser.lastName = nameParts.slice(1).join(' ');
+          if (app.scope) loggedUser.scope = app.scope;
+          if (app.schoolRole) loggedUser.schoolRole = app.schoolRole;
+          if (app.adminRole) loggedUser.adminRole = app.adminRole;
+          if (app.roleRequested) loggedUser.cargoTitle = app.roleRequested;
+          if (app.schoolName) loggedUser.schoolName = app.schoolName;
+          if (app.schoolId) loggedUser.schoolId = app.schoolId;
+          if (app.biNumber) loggedUser.biNumber = app.biNumber;
+          if (app.phone) loggedUser.phone = app.phone;
+          if (app.subject) loggedUser.subject = app.subject;
+          if (app.gradeClass) loggedUser.gradeClass = app.gradeClass;
+          loggedUser.approverTargetRole = app.targetApproverRole;
+          loggedUser.approverTargetSchoolName = app.schoolName;
+        }
         if (approvalCheck.status === 'pendente') {
           loggedUser.status = 'pendente';
           setSuccessMsg(`A sua candidatura continua em análise aguardando despacho. Redirecionando para a tela de espera...`);
@@ -521,7 +574,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           return;
         } else {
           loggedUser.status = 'ativo';
-          setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para o ambiente de ${resolvedCargoTitle}...`);
+          setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para o ambiente de ${loggedUser.cargoTitle || resolvedCargoTitle}...`);
         }
 
         setTimeout(() => {
@@ -551,6 +604,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setErrorMsg('As senhas digitadas não coincidem.');
         return;
       }
+      if (institutionalScope === 'escola' && (!selectedSchoolId || registeredSchools.length === 0)) {
+        setErrorMsg('Por favor, selecione uma Unidade Escolar já cadastrada no sistema.');
+        return;
+      }
       if (!agreeTerms) {
         setErrorMsg('É necessário aceitar os Termos de Uso e a Política de Privacidade.');
         return;
@@ -569,15 +626,45 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const prefix = chosenConfig.prefix;
         const baseRole = chosenConfig.baseRole;
         const cargoTitle = chosenConfig.label;
-        const matchedSchool = (initialAdminSchools && initialAdminSchools.length > 0)
-          ? (initialAdminSchools.find((s) => s.id === selectedSchoolId) || initialAdminSchools[0])
+        const matchedSchool = registeredSchools.length > 0
+          ? (registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0])
           : null;
-        const resolvedSchoolName = matchedSchool?.name || schoolOrUnitName || 'Unidade Escolar Municipal';
-        const resolvedSchoolId = matchedSchool?.id || 'esc-default';
+        const resolvedSchoolName = institutionalScope === 'escola'
+          ? (matchedSchool?.name || schoolOrUnitName || 'Unidade Escolar Municipal')
+          : `Direcção Municipal da Educação (${selectedMunicipality})`;
+        const resolvedSchoolId = institutionalScope === 'escola'
+          ? (matchedSchool?.id || 'esc-default')
+          : undefined;
+        const resolvedSchoolDirector = institutionalScope === 'escola'
+          ? resolveSchoolDirectorName(matchedSchool, resolvedSchoolName)
+          : 'Administrador Central (DME)';
 
-        const isDirectorCandidate = baseRole === 'diretor';
-        const isTeacherCandidate = baseRole === 'professor';
-        const isPending = isDirectorCandidate || isTeacherCandidate;
+        // Regras de Homologação:
+        // 1. Outros membros da Direção Municipal (ou qualquer inscrição em Administração exceto a conta oficial DME master) -> Enviados ao Administrador Central (DME)
+        // 2. Diretor Geral da Escola ('diretor_geral') -> Enviado ao Administrador Central (DME)
+        // 3. Pessoal do Âmbito Escolar (Subdiretor Pedagógico, Subdiretor Administrativo, Professor, Secretário Escolar) -> Enviados à Direção da Escola selecionada (ex: Escola X -> Diretor Carl)
+        const isOfficialDmeMaster =
+          institutionalScope === 'administracao' &&
+          adminRole === 'diretor_municipal' &&
+          email.trim().toLowerCase() === 'dmedoquessua@gmail.com';
+
+        const isAdminScopeMember = institutionalScope === 'administracao' && !isOfficialDmeMaster;
+        const isSchoolGeneralDirector = institutionalScope === 'escola' && schoolRole === 'diretor_geral';
+        const isSchoolStaffForDirectorApproval = institutionalScope === 'escola' && schoolRole !== 'diretor_geral';
+        const isTeacherCandidate = institutionalScope === 'escola' && schoolRole === 'professor';
+
+        const isPending = isAdminScopeMember || isSchoolGeneralDirector || isSchoolStaffForDirectorApproval;
+        const targetApproverRole: 'admin' | 'diretor' =
+          isAdminScopeMember || isSchoolGeneralDirector ? 'admin' : 'diretor';
+
+        const appType = isAdminScopeMember
+          ? 'membro_dme'
+          : isSchoolGeneralDirector
+          ? 'diretor'
+          : isTeacherCandidate
+          ? 'professor'
+          : 'funcionario';
+
         const newUserId = 'usr_' + Date.now();
 
         // Save custom password in storage
@@ -585,11 +672,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         // Create pending application record
         if (isPending) {
-          const appId = `app-${baseRole}-${Date.now()}`;
+          const appId = `app-${appType}-${Date.now()}`;
           savePendingApplication({
             id: appId,
             userId: newUserId,
-            type: isDirectorCandidate ? 'diretor' : 'professor',
+            type: appType,
+            scope: institutionalScope,
+            schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
+            adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
+            roleRequested: cargoTitle,
             fullName: `${userFirst} ${lastName.trim() || 'Sigre'}`.trim(),
             email: email.trim(),
             phone: phone.trim() || '+244 923 000 000',
@@ -597,17 +688,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             schoolName: resolvedSchoolName,
             schoolId: resolvedSchoolId,
             municipality: selectedMunicipality,
-            targetApproverRole: isDirectorCandidate ? 'admin' : 'diretor',
-            approverDirectorName: isTeacherCandidate ? (matchedSchool?.directorName || 'Direção Geral') : undefined,
+            targetApproverRole,
+            approverDirectorName:
+              targetApproverRole === 'diretor'
+                ? resolvedSchoolDirector
+                : 'Administrador Central (DME)',
             subject: isTeacherCandidate ? selectedSubject : undefined,
             gradeClass: isTeacherCandidate ? selectedGradeClass : undefined,
             status: 'pendente',
             isPreRegistered: Boolean(preRegResult?.found),
             preRegisteredDetails: preRegResult?.details,
             createdAt: new Date().toLocaleString('pt-AO'),
-            notes: preRegResult?.found 
-              ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.` 
-              : `Nova candidatura institucional para ${resolvedSchoolName}.`,
+            notes: preRegResult?.found
+              ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.`
+              : targetApproverRole === 'diretor'
+              ? `Inscrição de ${cargoTitle} enviada à Direção da escola "${resolvedSchoolName}" (Diretor(a): ${resolvedSchoolDirector}) para homologação.`
+              : `Inscrição de ${cargoTitle} enviada ao Administrador Central (DME) para homologação.`,
           });
         }
 
@@ -621,8 +717,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
           adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
           cargoTitle: cargoTitle,
-          schoolName: institutionalScope === 'escola' ? resolvedSchoolName : undefined,
-          schoolId: institutionalScope === 'escola' ? resolvedSchoolId : undefined,
+          schoolName: resolvedSchoolName,
+          schoolId: resolvedSchoolId,
           municipalityOrDepartment: selectedMunicipality,
           titlePrefix: prefix,
           greeting: `Olá ${prefix} ${userFirst}`,
@@ -634,13 +730,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           gradeClass: isTeacherCandidate ? selectedGradeClass : undefined,
           isPreRegistered: Boolean(preRegResult?.found),
           submittedAt: new Date().toLocaleString('pt-AO'),
+          approverTargetRole: targetApproverRole,
+          approverTargetSchoolName: resolvedSchoolName,
         };
 
         if (isPending) {
           setSuccessMsg(
-            isDirectorCandidate
-              ? `Candidatura enviada! A sua conta de Diretor aguarda validação do Administrador Central.`
-              : `Inscrição submetida! A sua conta de Professor aguarda validação da Direção da ${resolvedSchoolName}.`
+            targetApproverRole === 'admin'
+              ? `Inscrição submetida! A sua conta de ${cargoTitle} foi enviada ao Administrador Central (DME) para homologação.`
+              : `Inscrição submetida! A sua conta de ${cargoTitle} foi enviada à Direção da escola "${resolvedSchoolName}" (Diretor(a): ${resolvedSchoolDirector}) para aprovação.`
           );
         } else {
           setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${cargoTitle} (${userFirst})...`);
@@ -858,167 +956,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     <span>{successMsg}</span>
                   </div>
                 )}
-
-                {/* Profile Demo Selector with Scope Switcher */}
-                <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-3.5 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                      <Briefcase className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Acesso rápido por perfil:</span>
-                    </span>
-                    {/* Scope Tabs in Login */}
-                    <div className="flex bg-slate-200/70 p-0.5 rounded-lg text-[10px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setLoginPresetTab('escola')}
-                        className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                          loginPresetTab === 'escola'
-                            ? 'bg-white text-[#002133] shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Escola
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLoginPresetTab('administracao')}
-                        className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                          loginPresetTab === 'administracao'
-                            ? 'bg-white text-[#002133] shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Administração (DME)
-                      </button>
-                    </div>
-                  </div>
-
-                  {loginPresetTab === 'escola' ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      <button
-                        type="button"
-                        id="preset-diretor-geral-btn"
-                        onClick={() => handleFillSchoolPreset('diretor_geral')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'escola' && schoolRole === 'diretor_geral'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <Building2 className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Diretor Geral</span>
-                        <span className="text-[9px] opacity-75 font-normal">Carl Mendes</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="preset-subdir-pedagogico-btn"
-                        onClick={() => handleFillSchoolPreset('subdiretor_pedagogico')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'escola' && schoolRole === 'subdiretor_pedagogico'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <GraduationCap className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Subdir. Pedagógico</span>
-                        <span className="text-[9px] opacity-75 font-normal">Carlos Silva</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="preset-subdir-adm-btn"
-                        onClick={() => handleFillSchoolPreset('subdiretor_administrativo')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'escola' && schoolRole === 'subdiretor_administrativo'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Subdir. Adm.</span>
-                        <span className="text-[9px] opacity-75 font-normal">Teresa Santos</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="preset-professor-btn"
-                        onClick={() => handleFillSchoolPreset('professor')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'escola' && schoolRole === 'professor'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <BookOpen className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Professor(a)</span>
-                        <span className="text-[9px] opacity-75 font-normal">Santar Goes</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      <button
-                        type="button"
-                        id="preset-diretor-municipal-btn"
-                        onClick={() => handleFillAdminPreset('diretor_municipal')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'administracao' && adminRole === 'diretor_municipal'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <Landmark className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Diretor Municipal</span>
-                        <span className="text-[9px] opacity-75 font-normal truncate max-w-[90px]">dmedoquessua</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="preset-inspetor-escolar-btn"
-                        onClick={() => handleFillAdminPreset('inspetor_escolar')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'administracao' && adminRole === 'inspetor_escolar'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <Eye className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Inspetor Escolar</span>
-                        <span className="text-[9px] opacity-75 font-normal">Marcos Dinis</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="preset-chefe-reparticao-btn"
-                        onClick={() => handleFillAdminPreset('chefe_reparticao')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'administracao' && adminRole === 'chefe_reparticao'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <Award className="w-3.5 h-3.5 text-teal-500 shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Chefe Repartição</span>
-                        <span className="text-[9px] opacity-75 font-normal">Augusto Nvula</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="preset-admin-sistema-btn"
-                        onClick={() => handleFillAdminPreset('admin_sistema')}
-                        className={`py-2 px-2 rounded-xl text-xs transition-all border cursor-pointer flex flex-col items-center justify-center text-center gap-0.5 ${
-                          institutionalScope === 'administracao' && adminRole === 'admin_sistema'
-                            ? 'bg-[#002133] text-white border-[#002133] font-bold shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
-                        }`}
-                      >
-                        <Settings className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span className="font-bold text-[11px] leading-tight">Admin Sistema</span>
-                        <span className="text-[9px] opacity-75 font-normal">Super TI</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
 
                 {/* Login Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -1370,39 +1307,65 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     {institutionalScope === 'escola' && (
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
-                          <span>Unidade Escolar de Lotação</span>
-                          <span className="text-[10px] text-slate-400 font-normal">
-                            {initialAdminSchools.length > 0 ? `${initialAdminSchools.length} escolas municipais` : 'Registo direto'}
+                          <span>Unidade Escolar de Lotação (Cadastrada no Sistema) *</span>
+                          <span className="text-[10px] text-emerald-700 font-semibold">
+                            {registeredSchools.length > 0
+                              ? `${registeredSchools.length} escola(s) cadastrada(s)`
+                              : 'Aguardando cadastro de escolas'}
                           </span>
                         </label>
                         <div className="relative">
                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                             <School className="w-4 h-4" />
                           </div>
-                          {initialAdminSchools.length > 0 ? (
-                            <select
-                              id="register-school-select"
-                              value={selectedSchoolId}
-                              onChange={(e) => setSelectedSchoolId(e.target.value)}
-                              className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer truncate"
-                            >
-                              {initialAdminSchools.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.name} ({s.category})
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              id="register-school-input"
-                              type="text"
-                              value={schoolOrUnitName}
-                              onChange={(e) => setSchoolOrUnitName(e.target.value)}
-                              placeholder="Nome da escola (ex: Escola Primária de Quêssua Nº 1)"
-                              className="w-full h-[44px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs"
-                            />
-                          )}
+                          <select
+                            id="register-school-input"
+                            value={selectedSchoolId}
+                            onChange={(e) => {
+                              const nextId = e.target.value;
+                              setSelectedSchoolId(nextId);
+                              const sc = registeredSchools.find((s) => s.id === nextId);
+                              if (sc) setSchoolOrUnitName(sc.name);
+                            }}
+                            className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer truncate"
+                          >
+                            {registeredSchools.length > 0 ? (
+                              registeredSchools.map((s) => {
+                                const dirName = resolveSchoolDirectorName(s, s.name);
+                                return (
+                                  <option key={s.id} value={s.id}>
+                                    {s.name} ({s.category}) — Diretor(a): {dirName}
+                                  </option>
+                                );
+                              })
+                            ) : (
+                              <option value="">
+                                Nenhuma escola cadastrada no sistema — solicite o cadastro à DME
+                              </option>
+                            )}
+                          </select>
                         </div>
+                        {(() => {
+                          const currentSc = registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0];
+                          if (!currentSc) {
+                            return (
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                Selecione exclusivamente uma escola já cadastrada no sistema para evitar erros de digitação.
+                              </p>
+                            );
+                          }
+                          const dirName = resolveSchoolDirectorName(currentSc, currentSc.name);
+                          return (
+                            <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 text-[11px] text-slate-600 flex items-center justify-between gap-2">
+                              <span>
+                                Escola: <strong className="text-slate-900">{currentSc.name}</strong>
+                              </span>
+                              <span className="text-emerald-700 font-bold">
+                                Diretor(a): {dirName}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -1507,16 +1470,59 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       </div>
                     </div>
                   ) : (
-                    (schoolRole.includes('diretor') || schoolRole === 'professor') && (
-                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-[11px] text-slate-500">
-                        <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span>
-                          {schoolRole.includes('diretor')
-                            ? 'A candidatura de Diretor será enviada ao Administrador Central (DME) para homologação.'
-                            : 'A inscrição docente será enviada à Direção da escola selecionada para aprovação.'}
-                        </span>
-                      </div>
-                    )
+                    (() => {
+                      const currentSc = registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0];
+                      const currentScName = currentSc?.name || 'escola selecionada';
+                      const currentDirName = resolveSchoolDirectorName(currentSc, currentScName);
+                      const activeSchoolRoleLabel = SCHOOL_ROLES_CONFIG.find((r) => r.id === schoolRole)?.label || 'Pessoal Escolar';
+                      const activeAdminRoleLabel = ADMIN_ROLES_CONFIG.find((r) => r.id === adminRole)?.label || 'Membro da Direção Municipal';
+
+                      if (institutionalScope === 'administracao') {
+                        return (
+                          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start gap-2.5 text-[11px] text-amber-900">
+                            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block text-amber-950">
+                                Homologação pela Direção Municipal (DME)
+                              </span>
+                              <span>
+                                A inscrição de <strong>{activeAdminRoleLabel}</strong> será enviada ao <strong>Administrador Central (DME)</strong> para homologação.
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (schoolRole === 'diretor_geral') {
+                        return (
+                          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start gap-2.5 text-[11px] text-amber-900">
+                            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block text-amber-950">
+                                Homologação Central (DME)
+                              </span>
+                              <span>
+                                A candidatura de <strong>Diretor(a) Geral</strong> para a escola <strong>{currentScName}</strong> será enviada ao <strong>Administrador Central (DME)</strong> para homologação.
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-start gap-2.5 text-[11px] text-blue-900">
+                          <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold block text-blue-950">
+                              Aprovação pela Direção da Escola Selecionada
+                            </span>
+                            <span>
+                              A inscrição de <strong>{activeSchoolRoleLabel}</strong> será enviada à <strong>Direção da escola selecionada ({currentScName})</strong> — Diretor(a): <strong>{currentDirName}</strong> — para aprovação e homologação.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()
                   )}
 
                   {/* Nome e Sobrenome lado a lado no desktop */}

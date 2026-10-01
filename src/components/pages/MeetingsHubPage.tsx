@@ -28,40 +28,8 @@ interface MeetingsHubPageProps {
   onJoinMeeting: (roomId: string, title?: string, initialVideo?: boolean) => void;
 }
 
-const INITIAL_OFFICIAL_ROOMS: MeetingRoomSummary[] = [
-  {
-    id: 'ucore-conselho-geral',
-    title: 'Conselho Pedagógico Geral 2026',
-    schoolName: 'Complexo Escolar Quêssua Nº 44',
-    hostName: 'Prof. Gabriel Santos (Diretor)',
-    createdAt: new Date().toISOString(),
-    participantCount: 0,
-  },
-  {
-    id: 'ucore-direcao-coordenacao',
-    title: 'Reunião de Direção & Coordenação Pedagógica',
-    schoolName: 'Todas as Unidades',
-    hostName: 'Direção Geral de Ensino',
-    createdAt: new Date().toISOString(),
-    participantCount: 0,
-  },
-  {
-    id: 'ucore-atendimento-pais',
-    title: 'Atendimento a Encarregados de Educação',
-    schoolName: 'Escola Primária Nº 12 – Malanje',
-    hostName: 'Secretaria & Coordenação de Turno',
-    createdAt: new Date().toISOString(),
-    participantCount: 0,
-  },
-  {
-    id: 'ucore-sala-estudo',
-    title: 'Sala Virtual de Aula & Plantão de Dúvidas',
-    schoolName: 'Liceu Comandante Dangereux',
-    hostName: 'Prof. António Silva (Matemática)',
-    createdAt: new Date().toISOString(),
-    participantCount: 0,
-  },
-];
+const INITIAL_OFFICIAL_ROOMS: MeetingRoomSummary[] = [];
+
 
 type RoomFilterCategory = 'all' | 'live' | 'conselho' | 'atendimento';
 

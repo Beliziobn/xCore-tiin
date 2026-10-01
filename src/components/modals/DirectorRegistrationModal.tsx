@@ -74,7 +74,7 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
     defaultSchoolId || schools[0]?.id || ''
   );
   const [nomeEscola, setNomeEscola] = useState(
-    schools[0]?.name || 'Escola Modelo Central do Quéssua'
+    schools[0]?.name || ''
   );
   const [codigoEscola, setCodigoEscola] = useState('ESC-QSS-001');
   const [naturezaEscola, setNaturezaEscola] = useState<TeacherNaturezaEscola>('Pública');

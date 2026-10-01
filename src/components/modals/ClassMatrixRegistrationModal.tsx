@@ -12,7 +12,7 @@ export const ClassMatrixRegistrationModal: React.FC<ClassMatrixRegistrationModal
   isOpen,
   onClose,
   onSuccess,
-  schoolName = 'Escola Modelo Central',
+  schoolName = '',
   directorName = 'Fert Horlan',
 }) => {
   const [fullName, setFullName] = useState('');

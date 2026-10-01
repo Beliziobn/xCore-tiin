@@ -30,31 +30,31 @@ interface AttendanceAreaChartProps {
   onOpenDrillDown?: (period: string) => void;
 }
 
-// Conjuntos de dados dinâmicos reais para cada período selecionável
+// Conjuntos de dados iniciais zerados (folha em branco)
 const DATA_SEMANAL: AttendanceTrendItem[] = [
-  { year: 'Seg', presencial: 97, ead: 72, totalPresentes: 45, totalFaltas: 1, detalhe: '45 alunos presentes • 1 falta justificada' },
-  { year: 'Ter', presencial: 98, ead: 75, totalPresentes: 45, totalFaltas: 1, detalhe: '45 alunos presentes • Participação plena' },
-  { year: 'Qua', presencial: 95, ead: 80, totalPresentes: 44, totalFaltas: 2, detalhe: '44 alunos presentes • Atividade de campo' },
-  { year: 'Qui', presencial: 99, ead: 84, totalPresentes: 46, totalFaltas: 0, detalhe: 'Turma completa (100% de assiduidade presencial)' },
-  { year: 'Sex', presencial: 96, ead: 78, totalPresentes: 44, totalFaltas: 2, detalhe: '44 alunos presentes • 2 faltas de apoio' },
+  { year: 'Seg', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Ter', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Qua', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Qui', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Sex', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
 ];
 
 const DATA_MENSAL: AttendanceTrendItem[] = [
-  { year: 'Jan', presencial: 94, ead: 65, totalPresentes: 43, totalFaltas: 3, detalhe: 'Início do período lectivo e acolhimento' },
-  { year: 'Fev', presencial: 95, ead: 70, totalPresentes: 44, totalFaltas: 2, detalhe: 'Consolidação das turmas e horários' },
-  { year: 'Mar', presencial: 96, ead: 76, totalPresentes: 44, totalFaltas: 2, detalhe: 'Avaliações contínuas do 1º trimestre' },
-  { year: 'Abr', presencial: 98, ead: 81, totalPresentes: 45, totalFaltas: 1, detalhe: 'Pico de aproveitamento e projetos' },
-  { year: 'Mai', presencial: 97, ead: 79, totalPresentes: 45, totalFaltas: 1, detalhe: 'Apoio pedagógico com alto retorno' },
-  { year: 'Jun', presencial: 98, ead: 83, totalPresentes: 45, totalFaltas: 1, detalhe: 'Fecho trimestral e conselhos de notas' },
+  { year: 'Jan', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Fev', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Mar', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Abr', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Mai', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: 'Jun', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
 ];
 
 const DATA_ANUAL: AttendanceTrendItem[] = [
-  { year: '2021', presencial: 91, ead: 70, totalPresentes: 42, totalFaltas: 4, detalhe: 'Média anual consolidada' },
-  { year: '2022', presencial: 93, ead: 72, totalPresentes: 43, totalFaltas: 3, detalhe: 'Evolução na transição curricular' },
-  { year: '2023', presencial: 95, ead: 74, totalPresentes: 44, totalFaltas: 2, detalhe: 'Reforço do acompanhamento tutorial' },
-  { year: '2024', presencial: 96, ead: 77, totalPresentes: 44, totalFaltas: 2, detalhe: 'Integração de suporte digital Sigre' },
-  { year: '2025', presencial: 97, ead: 75, totalPresentes: 45, totalFaltas: 1, detalhe: 'Atingimento das metas do ministério' },
-  { year: '2026', presencial: 98, ead: 80, totalPresentes: 45, totalFaltas: 1, detalhe: 'Ciclo letivo em curso (alta performance)' },
+  { year: '2021', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: '2022', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: '2023', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: '2024', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: '2025', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
+  { year: '2026', presencial: 0, ead: 0, totalPresentes: 0, totalFaltas: 0, detalhe: 'Sem registos de presença' },
 ];
 
 // Estilo visual moderno inspirado nos gráficos das capturas (Violeta / Cyan Glow)

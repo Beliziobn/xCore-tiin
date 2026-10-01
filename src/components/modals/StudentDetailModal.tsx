@@ -17,7 +17,8 @@ import {
   FileCheck,
   Clock,
   Download,
-  Share2
+  Share2,
+  Trash2
 } from 'lucide-react';
 import type { StudentRegistrationData } from '../../types';
 import { BoletimMatriculaModal } from './BoletimMatriculaModal';
@@ -27,6 +28,7 @@ interface StudentDetailModalProps {
   onClose: () => void;
   student: StudentRegistrationData | null;
   onEdit?: (student: StudentRegistrationData) => void;
+  onDelete?: (student: StudentRegistrationData) => void;
 }
 
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
@@ -34,8 +36,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   onClose,
   student,
   onEdit,
+  onDelete,
 }) => {
   const [isBoletimOpen, setIsBoletimOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!isOpen || !student) return null;
 
@@ -101,6 +105,17 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 <span>Editar</span>
               </button>
             )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="px-3 py-1.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                title="Apagar cadastro deste aluno"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Apagar</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -110,6 +125,34 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             </button>
           </div>
         </div>
+
+        {confirmDelete && onDelete && (
+          <div className="bg-rose-50 border-b border-rose-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs font-bold text-rose-900">
+              Tem a certeza que deseja apagar o cadastro de <span className="underline">{student.nomeCompleto || student.name}</span>?
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="px-3 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDelete(false);
+                  onClose();
+                  onDelete(student);
+                }}
+                className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Sim, Apagar Cadastro
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
@@ -276,7 +319,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                   Escola / Instituição
                 </span>
                 <span className="text-xs font-bold text-slate-900 mt-0.5 block">
-                  {student.escola || 'Escola Modelo Central de Quêssua'}
+                  {student.escola || 'Não atribuída'}
                 </span>
               </div>
 
@@ -344,11 +387,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       </div>
 
       {/* Modal do Boletim Oficial de Matrícula */}
-      <BoletimMatriculaModal
-        isOpen={isBoletimOpen}
-        onClose={() => setIsBoletimOpen(false)}
-        student={student}
-      />
+      {isBoletimOpen && student && (
+        <BoletimMatriculaModal
+          isOpen={isBoletimOpen}
+          onClose={() => setIsBoletimOpen(false)}
+          student={student}
+        />
+      )}
     </div>
   );
 };

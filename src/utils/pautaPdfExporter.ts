@@ -88,7 +88,7 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
   const COLOR_SUCCESS = [16, 149, 106]; // emerald-600 for passing marks
 
   const defaultMeta: Required<PautaMetadata> = {
-    escola: metadata.escola || 'Complexo Escolar Modelo Central de Quêssua',
+    escola: metadata.escola || 'Direcção Municipal da Educação do Quéssua',
     turma: metadata.turma || 'Turma 1',
     classe: metadata.classe || '4ª Classe',
     turno: metadata.turno || 'Manhã',

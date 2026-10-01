@@ -136,7 +136,22 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
     );
     if (found) return found;
 
-    const matchedSchool = schools.find((s) => s.name === d.schoolName) || schools[0];
+    const matchedSchool: AdminSchool = schools.find((s) => s.name === d.schoolName) || schools[0] || {
+      id: d.id || 'esc-quessua-01',
+      name: d.schoolName || 'Direcção Municipal da Educação de Quessua',
+      directorName: d.name || 'Director Municipal da Educação',
+      location: d.location || 'Município de Quessua',
+      category: 'Ensino Primário',
+      teachersCount: d.teachersCount || 0,
+      roomsCount: 0,
+      turmasCount: 0,
+      studentsWithDocs: d.studentsCount || 0,
+      studentsWithoutDocs: 0,
+      performanceRate: (d.performanceRating || 0) * 10,
+      attendanceRate: 100,
+      phone: d.phone || '+244 923 000 000',
+      email: d.email || 'dmedoquessua@gmail.com',
+    };
     return buildInitialDirectorDossier(matchedSchool, 0);
   };
 

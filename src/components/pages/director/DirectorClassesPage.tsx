@@ -459,7 +459,7 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
         onClose={() => setIsPdfModalOpen(false)}
         initialClass={pdfModalClass}
         initialTurma={pdfModalTurma}
-        schoolName="Escola Primária e Iº Ciclo Modelo Central de Quêssua"
+        schoolName="Unidade Escolar Municipal de Quêssua"
       />
     </div>
   );

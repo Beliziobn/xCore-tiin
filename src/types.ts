@@ -148,7 +148,10 @@ export interface PendingApprovalComplementaryData {
 export interface PendingApplication {
   id: string;
   userId: string;
-  type: 'diretor' | 'professor' | 'aluno' | 'funcionario' | string;
+  type: 'diretor' | 'professor' | 'aluno' | 'funcionario' | 'membro_dme' | string;
+  scope?: 'escola' | 'administracao';
+  schoolRole?: SchoolStaffRole;
+  adminRole?: AdminStaffRole;
   fullName: string;
   email: string;
   phone: string;
@@ -281,6 +284,8 @@ export interface StudentRegistrationData {
   turno?: 'Manhã' | 'Tarde' | 'Noite' | 'Integral';
   sala?: string; // "Sala 03"
   escola?: string;
+  schoolId?: string;
+  categoriaEscola?: string;
 
   // Additional data
   condicaoMatricula: 'primeira_vez' | 'repetente';
@@ -459,6 +464,7 @@ export interface SchoolPessoal {
   totalPessoalNaoDocente: number;
   docentesComFormacaoPedagogica: number;
   docentesSemFormacaoPedagogica: number;
+  totalAlunosDeclarados?: number;
 }
 
 export interface SchoolSituacaoFuncionamento {
@@ -544,6 +550,7 @@ export interface AdminSchool {
   location: string;
   studentsWithDocs: number;
   studentsWithoutDocs: number;
+  declaredStudentsCount?: number;
   performanceRate: number; // e.g. 79
   attendanceRate: number; // e.g. 96.2
   category: 'Ensino Primário' | 'Iº Ciclo' | 'IIº Ciclo' | 'Polivalente';
@@ -889,6 +896,7 @@ export interface TeacherRegistrationData {
   municipioResidencia: string;
 
   // 2. Natureza e Tipo de Escola onde lecciona
+  escolaId?: string;
   naturezaEscola: TeacherNaturezaEscola;
   nomeEscola: string;
   codigoEscola?: string;

@@ -83,8 +83,12 @@ export interface SigeAggregatedReport {
     totalSalas: number;
     totalTurmas: number;
     totalDocentes: GenderCount;
+    totalDocentesDeclarados?: number;
+    totalDocentesPendentes?: number;
     totalNaoDocentes: GenderCount;
     totalAlunosMatriculados: GenderCount;
+    totalAlunosDeclarados?: number;
+    totalAlunosPendentes?: number;
     totalAlunosRepetentes: GenderCount;
     totalAlunosNEE: GenderCount;
   };
@@ -96,6 +100,9 @@ export interface SigeAggregatedReport {
     natureza: string;
     total: GenderCount;
     idades: Record<string, GenderCount>;
+    quotaDeclarada?: number;
+    cadastradosEscola?: number;
+    pendentesEscola?: number;
   }[];
   pessoalDocente: {
     escola: string;
@@ -104,6 +111,9 @@ export interface SigeAggregatedReport {
     formacaoPedagogica: string;
     grauAcademico: string;
     total: GenderCount;
+    quotaDeclarada?: number;
+    cadastradosEscola?: number;
+    pendentesEscola?: number;
   }[];
   infraestruturas: {
     escola: string;
@@ -159,6 +169,12 @@ export interface SigeAggregatedReport {
     aprovados: GenderCount;
     reprovados: GenderCount;
     desistidos: GenderCount;
+    alunosDeclarados?: number;
+    alunosCadastrados?: number;
+    alunosPendentes?: number;
+    docentesDeclarados?: number;
+    docentesCadastrados?: number;
+    docentesPendentes?: number;
     status: string;
   }[];
 }
@@ -207,10 +223,10 @@ export function buildSigeCapaRows(report: SigeAggregatedReport): Record<string, 
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Unidades Escolares', 'VALOR / DADO ESTATÍSTICO': t.totalEscolas, 'NOTA DE VALIDAÇÃO': 'Escolas activas na rede' },
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Salas de Aula', 'VALOR / DADO ESTATÍSTICO': t.totalSalas, 'NOTA DE VALIDAÇÃO': 'Salas definitivas e provisórias' },
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Turmas em Funcionamento', 'VALOR / DADO ESTATÍSTICO': t.totalTurmas, 'NOTA DE VALIDAÇÃO': 'Turnos manhã, tarde e noite' },
-    { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Alunos Matriculados (MF)', 'VALOR / DADO ESTATÍSTICO': t.totalAlunosMatriculados.mf, 'NOTA DE VALIDAÇÃO': 'Feminino: ' + t.totalAlunosMatriculados.f },
+    { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Alunos Matriculados Cadastrados na Planilha (MF)', 'VALOR / DADO ESTATÍSTICO': t.totalAlunosMatriculados.mf, 'NOTA DE VALIDAÇÃO': `Feminino: ${t.totalAlunosMatriculados.f} | Declarados: ${t.totalAlunosDeclarados ?? t.totalAlunosMatriculados.mf} | Pendentes de Cadastro: ${t.totalAlunosPendentes ?? 0}` },
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Alunos Repetentes (MF)', 'VALOR / DADO ESTATÍSTICO': t.totalAlunosRepetentes.mf, 'NOTA DE VALIDAÇÃO': 'Feminino: ' + t.totalAlunosRepetentes.f },
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Alunos com Necessidades Especiais (NEE)', 'VALOR / DADO ESTATÍSTICO': t.totalAlunosNEE.mf, 'NOTA DE VALIDAÇÃO': 'Feminino: ' + t.totalAlunosNEE.f },
-    { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Pessoal Docente (Professores)', 'VALOR / DADO ESTATÍSTICO': t.totalDocentes.mf, 'NOTA DE VALIDAÇÃO': 'Feminino: ' + t.totalDocentes.f },
+    { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Pessoal Docente Cadastrado na Planilha', 'VALOR / DADO ESTATÍSTICO': t.totalDocentes.mf, 'NOTA DE VALIDAÇÃO': `Feminino: ${t.totalDocentes.f} | Declarados: ${t.totalDocentesDeclarados ?? t.totalDocentes.mf} | Pendentes de Cadastro: ${t.totalDocentesPendentes ?? 0}` },
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Pessoal Não Docente (Apoio/Admin)', 'VALOR / DADO ESTATÍSTICO': t.totalNaoDocentes.mf, 'NOTA DE VALIDAÇÃO': 'Feminino: ' + t.totalNaoDocentes.f },
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Conformidade de Privacidade SIGE', 'VALOR / DADO ESTATÍSTICO': 'ESTRITAMENTE AGREGADO', 'NOTA DE VALIDAÇÃO': 'Zero nomes, Zero BI, Zero e-mails pessoais' },
   ];
@@ -260,6 +276,9 @@ export function buildSigeAlunosMatriculadosRows(report: SigeAggregatedReport): R
       '18 ANOS (F)': item.idades['18 anos']?.f || 0,
       '> 18 ANOS (MF)': (item.idades['> 18 anos']?.mf || 0) + (item.idades['> 13 anos']?.mf || 0),
       '> 18 ANOS (F)': (item.idades['> 18 anos']?.f || 0) + (item.idades['> 13 anos']?.f || 0),
+      'QUOTA DECLARADA PELA ESCOLA': item.quotaDeclarada ?? item.total.mf,
+      'ALUNOS CADASTRADOS NA ESCOLA': item.cadastradosEscola ?? item.total.mf,
+      'ALUNOS PENDENTES DE CADASTRO': item.pendentesEscola ?? 0,
       'VALIDAÇÃO GÊNERO': item.total.f <= item.total.mf ? 'Válido (F ≤ MF)' : 'Inconsistente'
     };
     return row;
@@ -276,8 +295,11 @@ export function buildSigePessoalDocenteRows(report: SigeAggregatedReport): Recor
     'NATUREZA DA INSTITUIÇÃO': item.natureza,
     'QUALIFICAÇÃO ACADÉMICA': item.grauAcademico,
     'FORMAÇÃO PEDAGÓGICA': item.formacaoPedagogica,
-    'TOTAL DOCENTES (MF)': item.total.mf,
-    'TOTAL DOCENTES (F)': item.total.f,
+    'TOTAL DOCENTES CADASTRADOS (MF)': item.total.mf,
+    'TOTAL DOCENTES CADASTRADOS (F)': item.total.f,
+    'QUOTA DECLARADA PELA ESCOLA': item.quotaDeclarada ?? item.total.mf,
+    'CADASTRADOS NA ESCOLA': item.cadastradosEscola ?? item.total.mf,
+    'PENDENTES DE CADASTRO': item.pendentesEscola ?? 0,
     'PERCENTAGEM FEMININA': item.total.mf > 0 ? ((item.total.f / item.total.mf) * 100).toFixed(1) + '%' : '0.0%',
     'DADOS NOMINAIS': 'NENHUM (Apenas Contagem Estatística)'
   }));
@@ -423,12 +445,14 @@ export function buildSigePessoalNaoDocenteRows(report: SigeAggregatedReport): Re
 export function buildSigeConsolidadoRows(report: SigeAggregatedReport): Record<string, any>[] {
   const t = report.totaisGerais;
 
-  // Filtros de alunos por subsistema
-  const preEscolarAlunos = report.alunosMatriculados.filter(a => a.nivel.includes('Pré-Escolar'));
+  // Filtros de alunos por subsistema (abrangendo todas as modalidades A a O)
+  const preEscolarAlunos = report.alunosMatriculados.filter(a => a.nivel.includes('Pré-Escolar') || a.nivel.includes('Iniciação'));
   const preEscolarMF = preEscolarAlunos.reduce((acc, a) => acc + a.total.mf, 0);
   const preEscolarF = preEscolarAlunos.reduce((acc, a) => acc + a.total.f, 0);
 
-  const primarioRegAlunos = report.alunosMatriculados.filter(a => a.nivel === 'Ensino Primário Regular');
+  const primarioRegAlunos = report.alunosMatriculados.filter(
+    a => a.nivel === 'Ensino Primário Regular' || a.nivel === 'Ensino Primário Especial'
+  );
   const primarioRegMF = primarioRegAlunos.reduce((acc, a) => acc + a.total.mf, 0);
   const primarioRegF = primarioRegAlunos.reduce((acc, a) => acc + a.total.f, 0);
 
@@ -436,7 +460,9 @@ export function buildSigeConsolidadoRows(report: SigeAggregatedReport): Record<s
   const praeerMF = praeerAlunos.reduce((acc, a) => acc + a.total.mf, 0);
   const praeerF = praeerAlunos.reduce((acc, a) => acc + a.total.f, 0);
 
-  const ejaAlunos = report.alunosMatriculados.filter(a => a.nivel.includes('EJA'));
+  const ejaAlunos = report.alunosMatriculados.filter(
+    a => a.nivel.includes('Primário - EJA') || (a.nivel.includes('EJA') && !a.nivel.includes('Secundário'))
+  );
   const ejaMF = ejaAlunos.reduce((acc, a) => acc + a.total.mf, 0);
   const ejaF = ejaAlunos.reduce((acc, a) => acc + a.total.f, 0);
 
@@ -444,7 +470,9 @@ export function buildSigeConsolidadoRows(report: SigeAggregatedReport): Record<s
   const secIMF = secIAlunos.reduce((acc, a) => acc + a.total.mf, 0);
   const secIF = secIAlunos.reduce((acc, a) => acc + a.total.f, 0);
 
-  const secIIAlunos = report.alunosMatriculados.filter(a => a.nivel.includes('Secundário II') || a.nivel.includes('Professores'));
+  const secIIAlunos = report.alunosMatriculados.filter(
+    a => a.nivel.includes('Secundário II') || a.nivel.includes('Professores') || a.nivel.includes('Magistério')
+  );
   const secIIMF = secIIAlunos.reduce((acc, a) => acc + a.total.mf, 0);
   const secIIF = secIIAlunos.reduce((acc, a) => acc + a.total.f, 0);
 
@@ -458,12 +486,12 @@ export function buildSigeConsolidadoRows(report: SigeAggregatedReport): Record<s
     return { mat, apr, rep, des };
   };
 
-  const aprPre = calcAprov(c => c.includes('Pré-Escolar'));
-  const aprPrimReg = calcAprov(c => c === 'Ensino Primário Regular');
+  const aprPre = calcAprov(c => c.includes('Pré-Escolar') || c.includes('Iniciação'));
+  const aprPrimReg = calcAprov(c => c === 'Ensino Primário Regular' || c === 'Ensino Primário Especial');
   const aprPraeer = calcAprov(c => c.includes('PRAEER'));
-  const aprEja = calcAprov(c => c.includes('EJA'));
+  const aprEja = calcAprov(c => c.includes('Primário - EJA') || (c.includes('EJA') && !c.includes('Secundário')));
   const aprSecI = calcAprov(c => c.includes('Secundário I'));
-  const aprSecII = calcAprov(c => c.includes('Secundário II') || c.includes('Professores'));
+  const aprSecII = calcAprov(c => c.includes('Secundário II') || c.includes('Professores') || c.includes('Magistério'));
 
   const totalAprMF = report.aproveitamento.reduce((acc, a) => acc + a.aprovados.mf, 0);
   const totalRepMF = report.aproveitamento.reduce((acc, a) => acc + a.reprovados.mf, 0);

@@ -46,7 +46,7 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
   onNavigateToDashboard,
   teachers = directorTeachersData,
   directorName = 'Fert Horlan',
-  schoolName = 'Escola Modelo Central',
+  schoolName = '',
 }) => {
   // Default date: 2026-09-07 or today
   const [selectedDate, setSelectedDate] = useState<string>('2026-09-07');
@@ -103,10 +103,7 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
   const [diaryNotes, setDiaryNotes] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_attendance_diary_notes');
-      return saved ? JSON.parse(saved) : [
-        'Despacho: Turno matutino com 100% de regência cumprida em todas as turmas.',
-        'Nota Pedagógica: Reunião extraordinária de alinhamento curricular agendada para sexta-feira.'
-      ];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }

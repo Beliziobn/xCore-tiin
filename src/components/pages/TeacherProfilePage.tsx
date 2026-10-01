@@ -150,14 +150,15 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   const totalAlunos = students.length > 0 ? students.length : teacher.totalAlunos;
   const countMeninas = students.length > 0
     ? students.filter((s) => s.genero === 'F').length
-    : 26;
+    : 0;
   const countMeninos = students.length > 0
     ? students.filter((s) => s.genero === 'M').length
-    : 20;
+    : 0;
 
-  const averageAssiduidade = students.length > 0
-    ? (students.reduce((acc, curr) => acc + (curr.presencaPercent || 0), 0) / students.length).toFixed(1).replace('.', ',')
-    : '96,4';
+  const averageAssiduidadeNum = students.length > 0
+    ? students.reduce((acc, curr) => acc + (curr.presencaPercent || 0), 0) / students.length
+    : 0;
+  const averageAssiduidade = averageAssiduidadeNum.toFixed(1).replace('.', ',');
 
   const currentSchedule = teacher.horario.find((h) => h.dia === selectedDay) || teacher.horario[0];
   const scheduleSlots = [

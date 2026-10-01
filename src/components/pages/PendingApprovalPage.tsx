@@ -15,7 +15,7 @@ import {
   Loader2
 } from 'lucide-react';
 import type { UserAccount, PendingApplication } from '../../types';
-import { checkUserApprovalStatus, approveApplication, getPendingApplications } from '../../utils/authApprovalStorage';
+import { checkUserApprovalStatus, approveApplication, getPendingApplications, resolveSchoolDirectorName } from '../../utils/authApprovalStorage';
 import { SectionShader } from '../SectionShader';
 
 interface PendingApprovalPageProps {
@@ -38,13 +38,41 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
   const [simulating, setSimulating] = useState(false);
   const [lastCheckedTime, setLastCheckedTime] = useState<string>('há instantes');
 
-  const isDirector =
-    currentUser.role === 'diretor' ||
-    currentUser.schoolRole?.includes('diretor') ||
-    currentUser.schoolRole === 'secretario_escolar';
+  const matchedApp = React.useMemo(() => {
+    const apps = getPendingApplications();
+    return apps.find(
+      (a) => a.userId === currentUser.id || a.email.toLowerCase() === currentUser.email.toLowerCase()
+    );
+  }, [currentUser.id, currentUser.email]);
 
-  const approverRole = isDirector ? 'Administrador Central (DME)' : 'Direção da Escola';
-  const targetSchool = currentUser.schoolName || 'Escola Modelo Central';
+  const isAdminScopeMember =
+    currentUser.scope === 'administracao' ||
+    matchedApp?.scope === 'administracao' ||
+    matchedApp?.type === 'membro_dme';
+
+  const isTargetAdmin = matchedApp
+    ? matchedApp.targetApproverRole === 'admin'
+    : currentUser.approverTargetRole
+    ? currentUser.approverTargetRole === 'admin'
+    : isAdminScopeMember || currentUser.schoolRole === 'diretor_geral';
+
+  const targetSchool =
+    matchedApp?.schoolName ||
+    currentUser.schoolName ||
+    'Direcção Municipal da Educação do Quéssua';
+
+  const schoolDirectorName = !isTargetAdmin
+    ? matchedApp?.approverDirectorName || resolveSchoolDirectorName(null, targetSchool)
+    : 'Administrador Central (DME)';
+
+  const approverRole = isTargetAdmin
+    ? 'Administrador Central (DME)'
+    : `Direção da ${targetSchool} (Diretor(a): ${schoolDirectorName})`;
+
+  const cargoDisplay =
+    currentUser.cargoTitle ||
+    matchedApp?.roleRequested ||
+    (isTargetAdmin ? 'Diretor(a) Geral' : 'Pessoal do Âmbito Escolar');
 
   const handleCheckStatus = () => {
     if (checking) return;
@@ -81,16 +109,19 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       const targetApp = apps.find(
         (a) => a.userId === currentUser.id || a.email.toLowerCase() === currentUser.email.toLowerCase()
       );
+      const approverLabel = isTargetAdmin
+        ? 'Administrador Central (DME)'
+        : `${schoolDirectorName} (Direção da ${targetSchool})`;
       if (targetApp) {
-        approveApplication(targetApp.id, isDirector ? 'Super Admin Sigre (Simulado)' : 'Diretor da Escola (Simulado)');
+        approveApplication(targetApp.id, approverLabel);
       }
       const approvedUser: UserAccount = {
         ...currentUser,
         status: 'ativo',
         approvedAt: new Date().toLocaleString('pt-AO'),
-        approvedBy: isDirector ? 'Super Admin Sigre' : 'Diretor Escolar',
+        approvedBy: approverLabel,
       };
-      showToast?.(`Conta homologada com sucesso! Bem-vindo(a) à plataforma Sigre, ${currentUser.firstName}.`);
+      showToast?.(`Conta homologada com sucesso por ${approverLabel}! Bem-vindo(a) à plataforma Sigre, ${currentUser.firstName}.`);
       onApprovalConfirmed(approvedUser);
     }, 700);
   };
@@ -487,20 +518,28 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             </div>
             <h2 className="text-sm font-bold text-slate-900">
-              {isDirector ? 'Candidatura de Direção Escolar' : 'Candidatura Docente'}
+              {isAdminScopeMember
+                ? `Inscrição da Direção Municipal — ${cargoDisplay}`
+                : isTargetAdmin
+                ? 'Candidatura de Diretor(a) Geral Escolar'
+                : `Inscrição do Âmbito Escolar — ${cargoDisplay}`}
             </h2>
           </div>
           <p className="text-xs font-semibold text-amber-800 pl-6">
-            Encaminhada ao {approverRole}
+            Encaminhada a: {approverRole}
           </p>
           <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal pl-6">
-            {isDirector ? (
+            {isAdminScopeMember ? (
               <>
-                Por critérios de segurança institucional da rede Sigre, a credenciação de <strong>Diretores de Escola</strong> é homologada pelo Administrador Municipal / Central (DME). A sua inscrição já consta na lista de despacho.
+                A sua conta como membro da Direção Municipal (<strong>{cargoDisplay}</strong>) foi enviada ao <strong>Administrador Central (DME)</strong> para homologação oficial.
+              </>
+            ) : isTargetAdmin ? (
+              <>
+                Por critérios de segurança institucional da rede Sigre, a credenciação de <strong>Diretor(a) Geral</strong> da escola <strong>{targetSchool}</strong> é enviada ao <strong>Administrador Central (DME)</strong> para homologação.
               </>
             ) : (
               <>
-                A sua inscrição foi direcionada para a Direção da <strong>{targetSchool}</strong>. O Diretor irá validar o seu vínculo funcional e atribuir a sua turma e horário.
+                A sua inscrição como <strong>{cargoDisplay}</strong> foi enviada à Direção da escola selecionada (<strong>{targetSchool}</strong>), onde o(a) Diretor(a) responsável é <strong>{schoolDirectorName}</strong>, para aprovação e homologação.
               </>
             )}
           </p>
@@ -532,7 +571,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
             </div>
 
             <span className="self-start sm:self-auto text-xs font-bold px-3.5 py-1.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200/60">
-              {currentUser.cargoTitle || (isDirector ? 'Diretor Escolar' : 'Professor Docente')}
+              {cargoDisplay}
             </span>
           </div>
 
@@ -540,7 +579,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6 pt-3 pb-2 border-t border-slate-100 text-xs">
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
-                Unidade de Ensino
+                {isAdminScopeMember ? 'Órgão / Repartição Municipal' : 'Unidade Escolar Selecionada'}
               </span>
               <span className="font-bold text-slate-800 flex items-center gap-1.5 mt-1 text-sm">
                 <School className="w-4 h-4 text-slate-400 shrink-0" />
@@ -550,10 +589,12 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
 
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
-                Município / Província
+                Responsável pela Homologação
               </span>
-              <span className="font-bold text-slate-800 mt-1 text-sm block">
-                {currentUser.municipalityOrDepartment || 'Quêssua (Malanje)'}
+              <span className="font-bold text-emerald-800 mt-1 text-sm block">
+                {isTargetAdmin
+                  ? 'Administrador Central (DME)'
+                  : `Diretor(a): ${schoolDirectorName} (${targetSchool})`}
               </span>
             </div>
 

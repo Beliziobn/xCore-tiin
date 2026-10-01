@@ -118,19 +118,6 @@ export function computeAdminStats(
   };
 }
 
-// Initial Municipal Director - The only municipal director
-export const initialAdminDirectors: AdminDirector[] = [
-  {
-    id: 'dir-municipal-quessua',
-    name: 'Director Municipal da Educação',
-    schoolName: 'Direcção Municipal da Educação de Quessua',
-    phone: '+244 923 000 000',
-    email: 'dmedoquessua@gmail.com',
-    appointmentYear: 2026,
-    status: 'Ativo',
-    performanceRating: 100,
-    teachersCount: 0,
-    studentsCount: 0,
-    location: 'Quessua - Sede Municipal',
-  },
-];
+// Initialized empty for clean slate
+export const initialAdminDirectors: AdminDirector[] = [];
+

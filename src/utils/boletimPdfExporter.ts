@@ -63,9 +63,23 @@ export async function exportBoletimToPDF(
 
     const pageWidth = 210;
     const pageHeight = 297;
+    const margin = 10;
+    const maxW = pageWidth - margin * 2;
+    const maxH = pageHeight - margin * 2;
 
-    // Adiciona a imagem capturada ocupando a página inteira A4
-    pdf.addImage(dataUrl, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+    const elW = element.offsetWidth || 760;
+    const elH = element.offsetHeight || 900;
+    const ratio = elH / elW;
+
+    let renderW = maxW;
+    let renderH = renderW * ratio;
+    if (renderH > maxH) {
+      renderH = maxH;
+      renderW = renderH / ratio;
+    }
+    const offsetX = (pageWidth - renderW) / 2;
+
+    pdf.addImage(dataUrl, 'PNG', offsetX, margin, renderW, renderH, undefined, 'FAST');
 
     const safeName = studentName.trim().replace(/[^a-zA-Z0-9À-ÿ_-]/g, '_') || 'Aluno';
     const safeMatricula = matriculaCode.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 'MAT';

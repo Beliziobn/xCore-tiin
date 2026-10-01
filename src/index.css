@@ -109,6 +109,29 @@
     -ms-user-select: none;
     -webkit-touch-callout: none;
   }
+
+  /* Estilo Global de Ícones Lucide (Composables.com / Lucide Specification: 24x24, 2px stroke, round caps & joins) */
+  svg.lucide,
+  .lucide-composable-icon {
+    stroke-width: 2px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    shape-rendering: geometricPrecision;
+    flex-shrink: 0;
+  }
+}
+
+/* Composables.com Lucide Icon Tile Container */
+.composable-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Optional utilities kept for explicit use */

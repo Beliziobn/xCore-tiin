@@ -391,7 +391,7 @@ export function generateBoletimHTML(student: StudentRegistrationData): string {
       <div class="header-text" style="flex: 1;">
         <h4>República de Angola</h4>
         <h4>Governo da Província de ${student.provincia || 'Malanje'} • Direcção Municipal da Educação do Quéssua</h4>
-        <h2>${student.escola || 'Escola Modelo Central de Quêssua'}</h2>
+        <h2>${student.escola || 'Unidade Escolar Registada'}</h2>
         <div class="header-badge">Boletim Oficial de Matrícula e Confirmação</div>
       </div>
 
