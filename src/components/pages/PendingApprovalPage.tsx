@@ -648,19 +648,6 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
                 </>
               )}
             </button>
-
-            {/* Botão secundário: apenas transição suave de cor e borda */}
-            <button
-              id="btn-simular-aprovacao"
-              type="button"
-              onClick={handleSimulateInstantApproval}
-              disabled={simulating}
-              className="w-full sm:w-auto py-3.5 sm:py-4 px-5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 font-bold text-xs uppercase tracking-wider rounded-2xl transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-              title="Aprovação instantânea para avaliação rápida do sistema"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>{simulating ? 'Aprovando...' : 'Aprovar de Imediato (Demonstração)'}</span>
-            </button>
           </div>
 
           {/* Sincronização ativa */}

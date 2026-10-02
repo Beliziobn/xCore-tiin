@@ -47,252 +47,152 @@ export async function exportTurmaStudentListToPDF(
   const marginX = 12;
   const contentWidth = 186;
 
-  // Colors
-  const COLOR_PRIMARY = [0, 33, 51]; // #002133 deep navy
-  const COLOR_ACCENT = [247, 81, 66]; // #f75142 crimson coral
-  const COLOR_GOLD = [202, 138, 4]; // #ca8a04
-  const COLOR_TEXT = [15, 23, 42]; // #0f172a slate-900
-  const COLOR_MUTED = [100, 116, 139]; // #64748b slate-500
-  const COLOR_BORDER = [203, 213, 225]; // #cbd5e1 slate-300
-  const COLOR_ROW_ALT = [248, 250, 252]; // #f8fafc slate-50
-  const COLOR_HEADER_BG = [241, 245, 249]; // #f1f5f9 slate-100
+  // Colors (Clean Official School Document Black/Slate)
+  const COLOR_PRIMARY = [15, 23, 42]; // #0f172a
+  const COLOR_TEXT = [15, 23, 42]; // #0f172a
+  const COLOR_MUTED = [71, 85, 105]; // #475569
+  const COLOR_BORDER = [30, 41, 59]; // #1e293b formal grid border
+  const COLOR_HEADER_BG = [241, 245, 249]; // #f1f5f9
 
-  // Column definitions (Sum = 186mm) - Estritamente: Nome, Sexo, Idade, Situação (+ Nº)
+  // Column definitions (Sum = 186mm)
   const columns: { key: string; title: string; width: number; align: 'left' | 'center' | 'right' }[] = [
     { key: 'ordem', title: 'Nº', width: 12, align: 'center' },
-    { key: 'nome', title: 'Nome do Aluno (Ordem A-Z)', width: 92, align: 'left' },
-    { key: 'genero', title: 'Sexo', width: 26, align: 'center' },
-    { key: 'idade', title: 'Idade', width: 24, align: 'center' },
-    { key: 'situacao', title: 'Situação', width: 32, align: 'center' },
+    { key: 'nome', title: 'NOME COMPLETO DO ALUNO', width: 104, align: 'left' },
+    { key: 'genero', title: 'SEXO', width: 18, align: 'center' },
+    { key: 'idade', title: 'IDADE', width: 18, align: 'center' },
+    { key: 'situacao', title: 'OBSERVAÇÃO', width: 34, align: 'center' },
   ];
 
   const students = data.students;
   const totalStudents = students.length;
 
   // Determine row count per page
-  // If total <= 24, single page layout
-  // Otherwise split across 2 pages
-  const isSinglePage = totalStudents <= 24;
-  const maxRowsPage1 = isSinglePage ? 24 : 25;
+  const isSinglePage = totalStudents <= 28;
+  const maxRowsPage1 = isSinglePage ? 28 : 30;
   const page1Students = students.slice(0, maxRowsPage1);
   const page2Students = isSinglePage ? [] : students.slice(maxRowsPage1);
   const totalPages = isSinglePage ? 1 : 2;
 
   const renderHeader = (pageNumber: number) => {
     if (pageNumber === 1) {
-      // Top National Stripe
-      pdf.setFillColor(COLOR_ACCENT[0], COLOR_ACCENT[1], COLOR_ACCENT[2]);
-      pdf.rect(marginX, 10, contentWidth, 2, 'F');
-
-      // Emblem / Crest Mockup (Star & Book Motif in Vector)
-      const crestX = marginX + 6;
-      const crestY = 17;
-      pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.circle(crestX, crestY, 4, 'F');
-      pdf.setFillColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-      pdf.circle(crestX, crestY, 2, 'F');
-
-      // Right Crest
-      const rightCrestX = marginX + contentWidth - 6;
-      pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.circle(rightCrestX, crestY, 4, 'F');
-      pdf.setFillColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-      pdf.circle(rightCrestX, crestY, 2, 'F');
-
-      // Official Institution Titles
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
+      pdf.setFontSize(9.5);
       pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(data.metadata.pais, pageWidth / 2, 16, { align: 'center' });
-
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text(data.metadata.ministerio, pageWidth / 2, 20.5, { align: 'center' });
+      pdf.text('REPÚBLICA DE ANGOLA', pageWidth / 2, 14, { align: 'center' });
+      pdf.text('MINISTÉRIO DA EDUCAÇÃO', pageWidth / 2, 18.5, { align: 'center' });
 
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7.5);
-      pdf.text(`${data.metadata.provincia} • ${data.metadata.direccao}`, pageWidth / 2, 24.5, { align: 'center' });
+      pdf.setFontSize(8);
+      pdf.text(`${data.metadata.provincia.toUpperCase()} • ${data.metadata.direccao.toUpperCase()}`, pageWidth / 2, 23, { align: 'center' });
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(data.metadata.escola.toUpperCase(), pageWidth / 2, 29, { align: 'center' });
+      pdf.setFontSize(10);
+      pdf.text(data.metadata.escola.toUpperCase(), pageWidth / 2, 28, { align: 'center' });
 
-      // Title Banner
-      pdf.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
+      pdf.setFontSize(9.5);
+      pdf.text('LISTA NOMINAL DOS ALUNOS', pageWidth / 2, 34.5, { align: 'center' });
+
+      // Metadata Line
+      const metaY = 38.5;
       pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-      pdf.rect(marginX, 32, contentWidth, 7, 'FD');
-
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(
-        'PAUTA / LISTA NOMINAL DOS ALUNOS POR TURMA (ORDEM ALFABÉTICA DE A A Z)',
-        pageWidth / 2,
-        36.8,
-        { align: 'center' }
-      );
-
-      // Turma Metadata Box (2 Rows of information)
-      const metaBoxY = 41;
-      const metaBoxHeight = 15;
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(marginX, metaBoxY, contentWidth, metaBoxHeight, 'D');
-
-      // Left Column Metadata
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text('ANO LECTIVO:', marginX + 3, metaBoxY + 4.5);
-      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-      pdf.text(data.metadata.anoLectivo, marginX + 24, metaBoxY + 4.5);
-
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text('CLASSE / TURMA:', marginX + 3, metaBoxY + 9.5);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(`${data.metadata.classe} • ${data.metadata.turma}`, marginX + 27, metaBoxY + 9.5);
-
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text('TURNO / SALA:', marginX + 3, metaBoxY + 13.5);
-      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-      pdf.text(`${data.metadata.turno} • ${data.metadata.sala}`, marginX + 24, metaBoxY + 13.5);
-
-      // Right Column Metadata
-      const rightMetaX = marginX + 105;
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text('PROF. TITULAR:', rightMetaX, metaBoxY + 4.5);
-      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-      pdf.text(data.metadata.professorTitular, rightMetaX + 21, metaBoxY + 4.5);
-
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text('TOTAL DE ALUNOS:', rightMetaX, metaBoxY + 9.5);
-      pdf.setTextColor(COLOR_ACCENT[0], COLOR_ACCENT[1], COLOR_ACCENT[2]);
-      pdf.text(
-        `${data.stats.total} Estudantes (${data.stats.meninas} Feminino / ${data.stats.meninos} Masculino)`,
-        rightMetaX + 26,
-        metaBoxY + 9.5
-      );
-
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text('DATA DE EMISSÃO:', rightMetaX, metaBoxY + 13.5);
-      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-      pdf.text(data.metadata.dataEmissao, rightMetaX + 26, metaBoxY + 13.5);
-
-      return metaBoxY + metaBoxHeight + 2; // Returns Y for table header
-    } else {
-      // Continuation Header for Page 2
-      pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.rect(marginX, 10, contentWidth, 1.5, 'F');
+      pdf.line(marginX, metaY, marginX + contentWidth, metaY);
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
+      const cleanTurma = data.metadata.turma.replace(/^Turma\s+/i, '');
+      const cleanSala = data.metadata.sala.replace(/^Sala\s+/i, '');
+      pdf.text(`Ano Lectivo: ${data.metadata.anoLectivo}`, marginX, metaY + 4.5);
+      pdf.text(`Classe: ${data.metadata.classe}`, marginX + 44, metaY + 4.5);
+      pdf.text(`Turma: ${cleanTurma}`, marginX + 82, metaY + 4.5);
+      pdf.text(`Período: ${data.metadata.turno}`, marginX + 114, metaY + 4.5);
+      pdf.text(`Sala: ${cleanSala}`, marginX + 158, metaY + 4.5);
+
+      pdf.line(marginX, metaY + 6.5, marginX + contentWidth, metaY + 6.5);
+
+      return metaY + 9;
+    } else {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
       pdf.text(
-        `${data.metadata.pais} • ${data.metadata.escola.toUpperCase()}`,
+        `${data.metadata.escola.toUpperCase()} — LISTA NOMINAL: ${data.metadata.classe} (${data.metadata.turma})`,
         marginX,
         15
       );
-
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(
-        `PAUTA DA TURMA: ${data.metadata.classe} - ${data.metadata.turma} (CONTINUAÇÃO A-Z)`,
-        marginX,
-        19.5
-      );
-
       pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-      pdf.line(marginX, 21.5, marginX + contentWidth, 21.5);
-
-      return 23;
+      pdf.line(marginX, 17, marginX + contentWidth, 17);
+      return 20;
     }
   };
 
   const renderTableHeader = (startY: number) => {
     const headerHeight = 6.5;
-    pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.rect(marginX, startY, contentWidth, headerHeight, 'F');
+    pdf.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
+    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+    pdf.rect(marginX, startY, contentWidth, headerHeight, 'FD');
 
     let currentX = marginX;
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7);
-    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
 
-    columns.forEach((col) => {
-      let textX = currentX + 1.5;
+    columns.forEach((col, i) => {
+      let textX = currentX + 2;
       if (col.align === 'center') {
         textX = currentX + col.width / 2;
       } else if (col.align === 'right') {
-        textX = currentX + col.width - 1.5;
+        textX = currentX + col.width - 2;
       }
 
       pdf.text(col.title, textX, startY + 4.5, { align: col.align });
+      if (i < columns.length - 1) {
+        pdf.line(currentX + col.width, startY, currentX + col.width, startY + headerHeight);
+      }
       currentX += col.width;
     });
 
     return startY + headerHeight;
   };
 
-  const renderStudentRow = (student: TurmaStudentItem, y: number, isAlt: boolean) => {
-    const rowHeight = 6.8;
+  const renderStudentRow = (student: TurmaStudentItem, y: number, _isAlt: boolean) => {
+    const rowHeight = 6.4;
 
-    // Background fill
-    if (isAlt) {
-      pdf.setFillColor(COLOR_ROW_ALT[0], COLOR_ROW_ALT[1], COLOR_ROW_ALT[2]);
-      pdf.rect(marginX, y, contentWidth, rowHeight, 'F');
-    }
-
-    // Row bottom border
     pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-    pdf.line(marginX, y + rowHeight, marginX + contentWidth, y + rowHeight);
+    pdf.rect(marginX, y, contentWidth, rowHeight, 'D');
 
     let currentX = marginX;
-    const textY = y + 4.7;
+    const textY = y + 4.4;
 
-    columns.forEach((col) => {
+    columns.forEach((col, i) => {
       let val = '';
       let isBold = false;
-      let textColor = COLOR_TEXT;
 
       if (col.key === 'ordem') {
-        val = String(student.numeroOrdem);
+        val = String(student.numeroOrdem).padStart(2, '0');
         isBold = true;
-        textColor = COLOR_PRIMARY;
       } else if (col.key === 'nome') {
         val = student.nomeCompleto;
-        isBold = true;
-        textColor = COLOR_TEXT;
       } else if (col.key === 'genero') {
-        val = student.genero === 'F' ? 'Feminino' : 'Masculino';
-        textColor = student.genero === 'F' ? [190, 24, 93] : [3, 105, 161];
-        isBold = true;
+        val = student.genero;
       } else if (col.key === 'idade') {
-        val = `${student.idade} anos`;
-        textColor = COLOR_TEXT;
+        val = String(student.idade);
       } else if (col.key === 'situacao') {
-        val = student.condicaoMatricula;
-        textColor = student.condicaoMatricula === 'Repetente'
-          ? [180, 83, 9]
-          : student.condicaoMatricula === 'Transferido'
-          ? [109, 40, 217]
-          : [4, 120, 87];
-        isBold = true;
+        val = student.condicaoMatricula === 'Matriculado' ? '' : student.condicaoMatricula;
       }
 
       pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
-      pdf.setFontSize(6.8);
-      pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
 
-      let textX = currentX + 1.5;
+      let textX = currentX + 2;
       if (col.align === 'center') {
         textX = currentX + col.width / 2;
       } else if (col.align === 'right') {
-        textX = currentX + col.width - 1.5;
+        textX = currentX + col.width - 2;
       }
 
-      // Truncate text if exceeds column width
-      const maxColTextWidth = col.width - 3;
+      const maxColTextWidth = col.width - 4;
       let printVal = val;
       if (pdf.getTextWidth(printVal) > maxColTextWidth) {
         while (pdf.getTextWidth(printVal + '..') > maxColTextWidth && printVal.length > 3) {
@@ -303,9 +203,9 @@ export async function exportTurmaStudentListToPDF(
 
       pdf.text(printVal, textX, textY, { align: col.align });
 
-      // Column vertical subtle divider
-      pdf.setDrawColor(235, 240, 245);
-      pdf.line(currentX + col.width, y, currentX + col.width, y + rowHeight);
+      if (i < columns.length - 1) {
+        pdf.line(currentX + col.width, y, currentX + col.width, y + rowHeight);
+      }
 
       currentX += col.width;
     });
@@ -315,23 +215,13 @@ export async function exportTurmaStudentListToPDF(
 
   const renderFooter = (pageNumber: number) => {
     const footerY = 289;
-    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-    pdf.line(marginX, footerY - 2, marginX + contentWidth, footerY - 2);
-
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(6.5);
+    pdf.setFontSize(7);
     pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
     pdf.text(
-      `Autenticação SIGE / Sigre Angola • Cód: ${data.metadata.codigoAutenticacao}`,
-      marginX,
-      footerY + 1.5
-    );
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(
-      `Página ${pageNumber} de ${totalPages} • Ordem Alfabética A-Z`,
+      `Página ${pageNumber} de ${totalPages}`,
       pageWidth - marginX,
-      footerY + 1.5,
+      footerY,
       { align: 'right' }
     );
   };
@@ -387,94 +277,43 @@ function renderStatsAndSignatures(
   marginX: number,
   contentWidth: number
 ): void {
-  const COLOR_PRIMARY = [0, 33, 51];
   const COLOR_TEXT = [15, 23, 42];
-  const COLOR_MUTED = [100, 116, 139];
-  const COLOR_BORDER = [203, 213, 225];
-  const COLOR_HEADER_BG = [241, 245, 249];
+  const COLOR_BORDER = [100, 116, 139];
 
-  // 1. Resumo Estatístico Box
-  const statsBoxHeight = 14;
-  pdf.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
+  // 1. Summary Line
+  const lineY1 = startY + 2;
   pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-  pdf.rect(marginX, startY, contentWidth, statsBoxHeight, 'FD');
+  pdf.line(marginX, lineY1, marginX + contentWidth, lineY1);
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(7.5);
-  pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-  pdf.text('RESUMO ESTATÍSTICO DA TURMA:', marginX + 4, startY + 4.5);
-
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(7);
   pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
 
-  const statsY = startY + 9.5;
-  const colWidth = contentWidth / 4;
+  const statsY = lineY1 + 4.5;
+  pdf.text(`Total de Alunos: ${data.stats.total}`, marginX, statsY);
+  pdf.text(`Masculinos (M): ${data.stats.meninos}`, marginX + 50, statsY);
+  pdf.text(`Femininos (F): ${data.stats.meninas}`, marginX + 100, statsY);
+  pdf.text(`Data: ${data.metadata.dataEmissao}`, marginX + contentWidth, statsY, { align: 'right' });
 
-  pdf.text(`Total Matriculados: ${data.stats.total} alunos`, marginX + 4, statsY);
-  pdf.text(`Meninas: ${data.stats.meninas} (${data.stats.percentualF})`, marginX + colWidth + 2, statsY);
-  pdf.text(`Meninos: ${data.stats.meninos} (${data.stats.percentualM})`, marginX + colWidth * 2 + 2, statsY);
-  pdf.text(
-    `Regularizados: ${data.stats.comDocumentos} | Pendentes: ${data.stats.semDocumentos}`,
-    marginX + colWidth * 3 + 2,
-    statsY
-  );
+  pdf.line(marginX, lineY1 + 6.5, marginX + contentWidth, lineY1 + 6.5);
 
-  // 2. Termo de Homologação e Assinaturas (3 columns)
-  const signY = startY + statsBoxHeight + 6;
+  // 2. Classic 2-Column Signature Lines
+  const signTop = lineY1 + 15;
+  const colCenter1 = marginX + contentWidth * 0.25;
+  const colCenter2 = marginX + contentWidth * 0.75;
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(7.5);
-  pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-  pdf.text('TERMO DE CONFERÊNCIA E HOMOLOGAÇÃO DA LISTA NOMINAL:', marginX, signY);
+  pdf.text('O(A) PROFESSOR(A) / DIRECTOR(A) DE TURMA', colCenter1, signTop, { align: 'center' });
+  pdf.text('O(A) SUBDIRECTOR(A) PEDAGÓGICO(A)', colCenter2, signTop, { align: 'center' });
 
-  const blockWidth = (contentWidth - 8) / 3;
-  const blockTop = signY + 3;
-  const blockHeight = 26;
+  const sigLineY = signTop + 12;
+  pdf.setDrawColor(15, 23, 42);
+  pdf.line(colCenter1 - 35, sigLineY, colCenter1 + 35, sigLineY);
+  pdf.line(colCenter2 - 35, sigLineY, colCenter2 + 35, sigLineY);
 
-  const signatures = [
-    {
-      title: 'O(A) PROFESSOR(A) TITULAR',
-      name: data.metadata.professorTitular,
-      role: 'Regência e Gestão de Turma',
-    },
-    {
-      title: 'O(A) SUBDIRECTOR(A) PEDAGÓGICO(A)',
-      name: data.metadata.subdiretorPedagogico,
-      role: 'Supervisão Pedagógica',
-    },
-    {
-      title: 'O(A) DIRECTOR(A) DA ESCOLA',
-      name: data.metadata.diretorEscola,
-      role: 'Homologação e Carimbo Oficial',
-    },
-  ];
-
-  signatures.forEach((sig, idx) => {
-    const blockX = marginX + idx * (blockWidth + 4);
-
-    pdf.setFillColor(255, 255, 255);
-    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-    pdf.rect(blockX, blockTop, blockWidth, blockHeight, 'D');
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(6.5);
-    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.text(sig.title, blockX + blockWidth / 2, blockTop + 4.5, { align: 'center' });
-
-    // Dotted signature line
-    const lineY = blockTop + 16;
-    pdf.setDrawColor(148, 163, 184);
-    pdf.line(blockX + 6, lineY, blockX + blockWidth - 6, lineY);
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7);
-    pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-    pdf.text(sig.name, blockX + blockWidth / 2, lineY + 4, { align: 'center' });
-
-    pdf.setFont('helvetica', 'italic');
-    pdf.setFontSize(6);
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text(sig.role, blockX + blockWidth / 2, lineY + 7.5, { align: 'center' });
-  });
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.text(data.metadata.professorTitular, colCenter1, sigLineY + 4.5, { align: 'center' });
+  pdf.text(data.metadata.subdiretorPedagogico, colCenter2, sigLineY + 4.5, { align: 'center' });
 }

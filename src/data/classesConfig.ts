@@ -59,13 +59,22 @@ export const CLASS_GROUPS = [
   },
 ];
 
+export const SCHOOL_ROOM_NUMBERS = Array.from({ length: 19 }, (_, idx) => idx + 1);
+
+export const SCHOOL_TURMA_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+
+export const STANDARD_ROOMS = Array.from(
+  { length: 19 },
+  (_, idx) => `Sala ${String(idx + 1).padStart(2, '0')}`
+);
+
 export const STANDARD_TURMAS = [
   'Turma A',
   'Turma B',
   'Turma C',
   'Turma D',
-  'Turma 1',
-  'Turma 2',
+  'Turma E',
+  'Turma F',
 ];
 
 /**

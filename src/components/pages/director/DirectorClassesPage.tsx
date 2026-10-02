@@ -7,15 +7,18 @@ import { TurmaStudentListPdfModal } from '../../modals/TurmaStudentListPdfModal'
 import type { DirectorClass } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
+import { getDisciplinasForClass, getGradingScaleForClass } from '../../../utils/miniPautaStorage';
 
 interface DirectorClassesPageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
+  onNavigateToPautas?: (classe?: string, turma?: string) => void;
 }
 
 export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
+  onNavigateToPautas,
 }) => {
   const [classesList, setClassesList] = useState<DirectorClass[]>(initialClasses);
   const [selectedClassId, setSelectedClassId] = useState<string>(classesList[0]?.id || '');
@@ -167,8 +170,25 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
             />
           </div>
 
-          {/* Actions: Baixar Listas PDF & Cadastrar Button */}
-          <div className="flex items-center gap-2">
+          {/* Actions: Aba de Mini-Pautas & Pauta Final, Baixar Listas PDF & Cadastrar Button */}
+          <div className="flex flex-wrap items-center gap-2">
+            {onNavigateToPautas && (
+              <button
+                id="btn-abrir-central-pautas-director"
+                onClick={() =>
+                  onNavigateToPautas(
+                    currentClass?.name || '4ª Classe',
+                    currentClass?.turmas?.[0] || 'Turma A'
+                  )
+                }
+                className="bg-[#002133] hover:bg-[#00314d] text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
+                title="Abrir aba de Mini-Pautas dos Professores (Iº, IIº, IIIº Trimestre) e Pauta Final por Turma"
+              >
+                <Award className="w-4 h-4 text-[#f75142]" />
+                <span>Mini-Pautas & Pauta Final</span>
+              </button>
+            )}
+
             <button
               id="btn-baixar-listas-pdf-director"
               onClick={() => {
@@ -311,10 +331,30 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Metodologia e Avaliação</span>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Escala e Avaliação</span>
                   <p className="font-semibold text-slate-800">
-                    Avaliação contínua por projetos, frequência controlada diariamente e relatório trimestral aos encarregados.
+                    {getGradingScaleForClass(currentClass.name).badgeLabel}
                   </p>
+                </div>
+              </div>
+
+              {/* Grelha Oficial de Disciplinas da Classe */}
+              <div className="mt-6 pt-5 border-t border-slate-100">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Disciplinas Curriculares de {currentClass.name} ({getDisciplinasForClass(currentClass.name).length} disciplinas)
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {getDisciplinasForClass(currentClass.name).map((disc) => (
+                    <span
+                      key={disc}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
+                      <span>{disc}</span>
+                    </span>
+                  ))}
                 </div>
               </div>
 
@@ -408,24 +448,42 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                           )}
                         </p>
 
-                        {/* Button: Baixar Lista em PDF (A-Z) */}
-                        <div className="mt-3 pt-3 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                        {/* Button: Baixar Lista em PDF (A-Z) & Gerar Pauta da Turma */}
+                        <div className="mt-3 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
                           <span className="text-[10px] font-bold text-slate-400">
-                            Pauta Nominal A-Z
+                            Pautas & Listas da Turma
                           </span>
-                          <button
-                            id={`btn-baixar-lista-turma-${turmaItem.name.replace(/\s+/g, '-').toLowerCase()}`}
-                            onClick={() => {
-                              setPdfModalClass(currentClass.name || 'Classe');
-                              setPdfModalTurma(turmaItem.name);
-                              setIsPdfModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 bg-[#002133] hover:bg-[#00314d] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-2xs hover:shadow active:scale-95 cursor-pointer"
-                            title="Baixar lista completa de alunos da turma em PDF organizada de A a Z"
-                          >
-                            <FileDown className="w-3.5 h-3.5 text-[#f75142]" />
-                            <span>Baixar Lista em PDF (A-Z)</span>
-                          </button>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {onNavigateToPautas && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onNavigateToPautas(
+                                    currentClass.name || '4ª Classe',
+                                    turmaItem.name
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 bg-[#f75142] hover:bg-[#d93f31] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-2xs hover:shadow active:scale-95 cursor-pointer"
+                                title="Ver Mini-Pautas dos Professores e Gerar Mini-Pauta (Iº, IIº, IIIº Trim.) ou Pauta Final desta Turma"
+                              >
+                                <Award className="w-3.5 h-3.5 text-white" />
+                                <span>Mini-Pautas & Pauta Final</span>
+                              </button>
+                            )}
+                            <button
+                              id={`btn-baixar-lista-turma-${turmaItem.name.replace(/\s+/g, '-').toLowerCase()}`}
+                              onClick={() => {
+                                setPdfModalClass(currentClass.name || 'Classe');
+                                setPdfModalTurma(turmaItem.name);
+                                setIsPdfModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 bg-[#002133] hover:bg-[#00314d] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-2xs hover:shadow active:scale-95 cursor-pointer"
+                              title="Baixar lista completa de alunos da turma em PDF organizada de A a Z"
+                            >
+                              <FileDown className="w-3.5 h-3.5 text-[#f75142]" />
+                              <span>Lista A-Z</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

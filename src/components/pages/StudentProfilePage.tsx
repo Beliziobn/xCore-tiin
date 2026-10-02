@@ -47,14 +47,50 @@ export const QUALITATIVE_RATINGS: {
 ];
 
 export function getRegimeForClass(classeStr: string = ''): EducationalRegime {
-  const norm = classeStr.toLowerCase().trim();
-  if (norm.includes('iniciação') || norm.includes('iniciacao') || norm.includes('pre-escolar')) {
+  const norm = classeStr
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  // Iniciação, 1ª Classe, 2ª Classe -> Avaliação Qualitativa (Muito Bom, Bom, Suficiente, Mau, Péssimo)
+  if (
+    norm.includes('iniciacao') ||
+    norm.includes('pre-escolar') ||
+    norm.includes('creche') ||
+    norm.includes('jardim') ||
+    norm === '1a classe' ||
+    norm === '1.a classe' ||
+    norm.startsWith('1a ') ||
+    norm.startsWith('1.a ') ||
+    norm === '1' ||
+    norm === '2a classe' ||
+    norm === '2.a classe' ||
+    norm.startsWith('2a ') ||
+    norm.startsWith('2.a ') ||
+    norm === '2'
+  ) {
     return 'iniciacao';
   }
-  if (norm.includes('7ª') || norm.includes('8ª') || norm.includes('9ª') || norm.startsWith('7') || norm.startsWith('8') || norm.startsWith('9')) {
+
+  // 7ª, 8ª, 9ª Classe e Módulo 1, 2, 3 -> Escala 0 a 20
+  if (
+    norm.includes('7') ||
+    norm.includes('8') ||
+    norm.includes('9') ||
+    norm.includes('modulo 1') ||
+    norm.includes('modulo 2') ||
+    norm.includes('modulo 3') ||
+    norm.includes('modulo') ||
+    norm.includes('10') ||
+    norm.includes('11') ||
+    norm.includes('12') ||
+    norm.includes('13')
+  ) {
     return 'secundario_7_9';
   }
-  // Padrão: 1ª a 6ª classe, PRAEER (Etapa 1, 2, 3), Módulo 1, 2, 3 (Escala 0 a 10)
+
+  // 3ª, 4ª, 5ª, 6ª Classe e PRAEER Etapa 1, 2, 3 -> Escala 0 a 10
   return 'primario_1_6';
 }
 
@@ -507,17 +543,27 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
           3. Indicadores Acadêmicos Rápidos (Linha de 4 Cartões)
           ------------------------------------------------------------- */}
       <div className="summary-metrics">
-        {/* 1. Média Geral */}
+          {/* 1. Média Geral */}
         <div className="metric-card highlight">
           <div className="label">Média Geral</div>
           <div className="value">
-            {overallAverage.toFixed(1).replace('.', ',')}
-            <span className="text-xs font-bold uppercase tracking-wider text-[#ff5148] ml-1.5">
-              {activeRegime === 'iniciacao' ? 'pts' : 'val'}
-            </span>
+            {activeRegime === 'iniciacao' ? (
+              <span>{numberToQualitativeGrade(overallAverage, 10)}</span>
+            ) : (
+              <>
+                {overallAverage.toFixed(1).replace('.', ',')}
+                <span className="text-xs font-bold uppercase tracking-wider text-[#ff5148] ml-1.5">
+                  {activeRegime === 'primario_1_6' ? '/ 10 val' : '/ 20 val'}
+                </span>
+              </>
+            )}
           </div>
           <div className="text-xs text-[#7c8fa3] mt-2">
-            Desempenho consolidado
+            {activeRegime === 'iniciacao'
+              ? 'Escala Qualitativa (MB, B, S, M, P)'
+              : activeRegime === 'primario_1_6'
+              ? 'Escala 0 a 10 valores'
+              : 'Escala 0 a 20 valores'}
           </div>
         </div>
 
@@ -686,9 +732,9 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                   Pauta de Avaliação Curricular
                 </span>
                 <span className="text-[10px] font-bold text-[#5c7285] bg-white border border-[#e1e8ef] px-2 py-0.5 rounded-md">
-                  {activeRegime === 'primario_1_6' && 'Escala 0 a 10 valores (Aprovação ≥ 5.0)'}
-                  {activeRegime === 'secundario_7_9' && 'Escala 0 a 20 valores (Aprovação ≥ 10.0)'}
-                  {activeRegime === 'iniciacao' && 'Iniciação • Avaliação Qualitativa'}
+                  {activeRegime === 'primario_1_6' && '3ª, 4ª, 5ª, 6ª Classe & PRAEER Etapa 1, 2, 3 • Escala 0 a 10 (Aprovação ≥ 5.0)'}
+                  {activeRegime === 'secundario_7_9' && '7ª, 8ª, 9ª Classe & Módulo 1, 2, 3 • Escala 0 a 20 (Aprovação ≥ 10.0)'}
+                  {activeRegime === 'iniciacao' && 'Iniciação, 1ª e 2ª Classe • Muito Bom, Bom, Suficiente, Mau, Péssimo'}
                 </span>
               </div>
 
@@ -702,9 +748,9 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
                     className="text-xs font-bold text-[#06283a] bg-transparent border-none focus:outline-none cursor-pointer py-0.5 pr-1"
                     title="Alterar regime avaliativo"
                   >
-                    <option value="primario_1_6">1ª a 6ª / PRAEER / Módulos (0 a 10)</option>
-                    <option value="secundario_7_9">7ª a 9ª Classe (0 a 20)</option>
-                    <option value="iniciacao">Iniciação (Qualitativa)</option>
+                    <option value="iniciacao">Iniciação, 1ª e 2ª Classe (Muito Bom a Péssimo)</option>
+                    <option value="primario_1_6">3ª, 4ª, 5ª, 6ª e PRAEER Etapa 1, 2, 3 (0 a 10)</option>
+                    <option value="secundario_7_9">7ª, 8ª, 9ª e Módulo 1, 2, 3 (0 a 20)</option>
                   </select>
                 </div>
               </div>
@@ -904,7 +950,14 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({
             <div className="px-5 py-4 bg-slate-50/70 border-t border-[#e1e8ef] flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4 text-xs">
                 <span className="text-[#5c7285]">Total: <strong className="text-[#06283a]">{grades.length}</strong> disciplinas</span>
-                <span className="text-[#5c7285]">Média Geral: <strong className="text-[#ff5148] text-sm">{overallAverage.toFixed(1).replace('.', ',')} val</strong></span>
+                <span className="text-[#5c7285]">
+                  Média Geral:{' '}
+                  <strong className="text-[#ff5148] text-sm">
+                    {activeRegime === 'iniciacao'
+                      ? numberToQualitativeGrade(overallAverage, 10)
+                      : `${overallAverage.toFixed(1).replace('.', ',')} / ${activeRegime === 'primario_1_6' ? '10' : '20'} val`}
+                  </strong>
+                </span>
               </div>
 
               <div className="flex items-center gap-3">

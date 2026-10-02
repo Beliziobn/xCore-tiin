@@ -15,7 +15,18 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
 }) => {
-  const [rooms, setRooms] = useState<DirectorRoom[]>(initialRooms);
+  const [rooms, setRooms] = useState<DirectorRoom[]>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_director_rooms');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return initialRooms;
+  });
   const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -40,22 +51,64 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
     rooms.find((r) => r.id === selectedRoomId) || filteredRooms[0] || rooms[0] || null;
 
   const handleCreateSuccess = (newRoom: any) => {
-    const formatted: DirectorRoom = {
-      id: newRoom.id,
-      roomNumber: newRoom.name.startsWith('Sala') ? newRoom.name : `Sala ${newRoom.name}`,
-      name: `Sala de Aula ${newRoom.gradeClass || ''}`,
-      turmasCount: 0,
-      turmas: newRoom.turma ? [`${newRoom.gradeClass || ''} ${newRoom.turma}`] : [],
-      period: newRoom.period === 'Tarde' ? 'Tarde' : 'Manhã / Tarde',
-      classes: newRoom.gradeClass ? [newRoom.gradeClass] : [],
-      teachers: [],
-      capacity: newRoom.studentCount || 0,
-      currentStudents: 0,
-      status: 'Ativa',
-      type: newRoom.type || 'Regular',
-    };
-    setRooms((prev) => [formatted, ...prev]);
-    setSelectedRoomId(formatted.id);
+    const resolvedRoomNum =
+      newRoom.room ||
+      (newRoom.name?.startsWith('Sala') ? newRoom.name : `Sala ${newRoom.name || '01'}`);
+    const turmaLabel = newRoom.turma
+      ? `${newRoom.gradeClass || ''} — ${newRoom.turma} (${newRoom.period || 'Manhã'})`.trim()
+      : '';
+
+    setRooms((prev) => {
+      const existingIdx = prev.findIndex(
+        (r) => r.roomNumber.trim().toLowerCase() === resolvedRoomNum.trim().toLowerCase()
+      );
+      let next: DirectorRoom[];
+      if (existingIdx >= 0) {
+        const existing = prev[existingIdx];
+        const nextTurmas = turmaLabel && !existing.turmas.includes(turmaLabel)
+          ? [...existing.turmas, turmaLabel]
+          : existing.turmas;
+        const nextClasses =
+          newRoom.gradeClass && !existing.classes.includes(newRoom.gradeClass)
+            ? [...existing.classes, newRoom.gradeClass]
+            : existing.classes;
+        const updatedRoom: DirectorRoom = {
+          ...existing,
+          name: newRoom.name || existing.name,
+          turmas: nextTurmas,
+          turmasCount: nextTurmas.length,
+          classes: nextClasses,
+          capacity: newRoom.studentCount || existing.capacity || 45,
+          type: newRoom.type || existing.type,
+        };
+        next = [...prev];
+        next[existingIdx] = updatedRoom;
+        setSelectedRoomId(updatedRoom.id);
+      } else {
+        const formatted: DirectorRoom = {
+          id: newRoom.id || `room-${Date.now()}`,
+          roomNumber: resolvedRoomNum,
+          name: newRoom.name || `Sala de Aula ${newRoom.gradeClass || ''}`.trim(),
+          turmasCount: turmaLabel ? 1 : 0,
+          turmas: turmaLabel ? [turmaLabel] : [],
+          period: newRoom.period === 'Tarde' ? 'Tarde' : newRoom.period === 'Noite' ? 'Noite' : 'Manhã / Tarde',
+          classes: newRoom.gradeClass ? [newRoom.gradeClass] : [],
+          teachers: [],
+          capacity: newRoom.studentCount || 45,
+          currentStudents: 0,
+          status: 'Ativa',
+          type: newRoom.type || 'Regular',
+        };
+        next = [formatted, ...prev];
+        setSelectedRoomId(formatted.id);
+      }
+      try {
+        localStorage.setItem('ucore_director_rooms', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   return (

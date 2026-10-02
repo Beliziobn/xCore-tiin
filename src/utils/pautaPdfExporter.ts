@@ -1,5 +1,11 @@
 import jsPDF from 'jspdf';
-import { StudentProfile, StudentGrade, defaultDisciplinasList } from '../data/teacherData';
+import { StudentProfile, StudentGrade } from '../data/teacherData';
+import {
+  getGradingScaleForClass,
+  getDisciplinasForClass,
+  formatGradeForClass,
+  isPassingGradeForClass,
+} from './miniPautaStorage';
 
 function getJsPDFConstructor(): any {
   if (typeof (jsPDF as any)?.jsPDF === 'function') {
@@ -22,6 +28,7 @@ export interface PautaMetadata {
   sala?: string;
   anoLectivo?: string;
   trimestre?: string;
+  periodo?: 'I' | 'II' | 'III' | 'FINAL';
   professorTitular?: string;
   dataEmissao?: string;
 }
@@ -30,6 +37,7 @@ export interface ExportPautaOptions {
   students: StudentProfile[];
   metadata?: PautaMetadata;
   mode?: 'geral' | 'disciplina';
+  periodo?: 'I' | 'II' | 'III' | 'FINAL';
   selectedDiscipline?: string;
   onProgress?: (message: string) => void;
   openInNewTab?: boolean;
@@ -39,11 +47,23 @@ export interface ExportPautaOptions {
 const DISCIPLINE_ABBR: Record<string, string> = {
   'Língua Portuguesa': 'L. PORT',
   'Matemática': 'MAT',
+  'Estudo do Meio': 'EST. MEIO',
+  'Educação Manual e Plástica': 'E.M.P',
+  'Educação Musical': 'ED. MUS',
+  'Educação Física': 'ED. FÍS',
+  'Ciências da Natureza': 'C. NAT',
   'Ciências Naturais': 'C. NAT',
   'História': 'HIST',
   'Geografia': 'GEOG',
-  'Educação Física': 'ED. FÍS',
+  'Educação Moral e Cívica': 'E.M.C',
+  'Educação Visual e Plástica (EVP)': 'E.V.P',
   'Educação Visual e Plástica': 'E.V.P',
+  'Língua Estrangeira (Inglês)': 'INGLÊS',
+  'Biologia': 'BIOL',
+  'Física': 'FÍS',
+  'Química': 'QUÍM',
+  'Educação Laboral': 'ED. LAB',
+  'História e Geografia': 'HIST/GEO',
 };
 
 export async function exportPautaToPDF(options: ExportPautaOptions): Promise<void> {
@@ -51,6 +71,7 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
     students,
     metadata = {},
     mode = 'geral',
+    periodo = 'I',
     selectedDiscipline = 'Língua Portuguesa',
     onProgress,
   } = options;
@@ -59,9 +80,11 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
 
   const Ctor = getJsPDFConstructor();
 
-  // Mode 'geral' uses Landscape A4 to comfortably display all 7 subjects + overall average
-  // Mode 'disciplina' uses Portrait A4 to display P1, P2, Trabalho, Média
-  const isLandscape = mode === 'geral';
+  const isAllDisciplines = mode === 'geral' || selectedDiscipline === 'TODAS';
+  const isFinal = periodo === 'FINAL';
+
+  // Landscape when showing all disciplines OR when showing Pauta Final of 1 discipline (to fit Iº, IIº, IIIº Trimestres + MFD)
+  const isLandscape = isAllDisciplines || isFinal;
   const pdf = new Ctor({
     orientation: isLandscape ? 'landscape' : 'portrait',
     unit: 'mm',
@@ -87,47 +110,113 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
   const COLOR_HONOR = [109, 40, 217]; // purple-700 for honor roll
   const COLOR_SUCCESS = [16, 149, 106]; // emerald-600 for passing marks
 
-  const defaultMeta: Required<PautaMetadata> = {
+  const periodoLabel =
+    periodo === 'FINAL'
+      ? 'PAUTA FINAL (Iº, IIº E IIIº TRIMESTRE)'
+      : `${periodo}º TRIMESTRE`;
+
+  const defaultMeta = {
     escola: metadata.escola || 'Direcção Municipal da Educação do Quéssua',
-    turma: metadata.turma || 'Turma 1',
+    turma: metadata.turma || 'Turma A',
     classe: metadata.classe || '4ª Classe',
     turno: metadata.turno || 'Manhã',
     sala: metadata.sala || 'Sala 04',
     anoLectivo: metadata.anoLectivo || '2026',
-    trimestre: metadata.trimestre || '1º Trimestre',
+    trimestre: metadata.trimestre || periodoLabel,
     professorTitular: metadata.professorTitular || 'Santar Goes',
-    dataEmissao: metadata.dataEmissao || new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    dataEmissao:
+      metadata.dataEmissao ||
+      new Date().toLocaleDateString('pt-PT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }),
   };
 
-  // Pre-calculate statistics
+  const classScale = getGradingScaleForClass(defaultMeta.classe);
+  const classDisciplinas = getDisciplinasForClass(defaultMeta.classe);
+  const normValForClass = (raw: number) =>
+    classScale.maxNumeric === 10 && raw > 10
+      ? Number((raw / 2).toFixed(1))
+      : classScale.maxNumeric === 20 && raw <= 10 && raw > 0
+      ? Number((raw * 2).toFixed(1))
+      : Number(raw.toFixed(1));
+
+  // Helper to get trimester-specific or final values for a student & discipline (sem notas fictícias)
+  const getStudentDisciplineMetrics = (student: StudentProfile, subj: string) => {
+    const g = (student.grades || []).find((x) => x.subject === subj);
+    if (!g) {
+      return null;
+    }
+    const baseMac = normValForClass(g.p1);
+    const baseNpp = normValForClass(g.p2);
+    const baseNpt = normValForClass(g.trabalho);
+    const mt1 = Number(((baseMac + baseNpp + baseNpt) / 3).toFixed(1));
+
+    const t2Mac = baseMac;
+    const t2Npp = baseNpp;
+    const t2Npt = baseNpt;
+    const mt2 = mt1;
+
+    const t3Mac = baseMac;
+    const t3Npp = baseNpp;
+    const t3Npt = baseNpt;
+    const mt3 = mt1;
+
+    const mfd = Number(((mt1 + mt2 + mt3) / 3).toFixed(1));
+
+    return {
+      t1: { mac: baseMac, npp: baseNpp, npt: baseNpt, mt: mt1 },
+      t2: { mac: t2Mac, npp: t2Npp, npt: t2Npt, mt: mt2 },
+      t3: { mac: t3Mac, npp: t3Npp, npt: t3Npt, mt: mt3 },
+      mfd,
+    };
+  };
+
+  const getActivePeriodScore = (student: StudentProfile, subj: string): number | null => {
+    const m = getStudentDisciplineMetrics(student, subj);
+    if (!m) return null;
+    if (periodo === 'I') return m.t1.mt;
+    if (periodo === 'II') return m.t2.mt;
+    if (periodo === 'III') return m.t3.mt;
+    return m.mfd;
+  };
+
+  // Pre-calculate statistics strictly for the chosen period and discipline filter
   const totalStudents = students.length;
+  let evaluatedCount = 0;
   let aprovadosCount = 0;
   let honraCount = 0;
   let riscoCount = 0;
   let reprovadosCount = 0;
   let somaMedias = 0;
-  let somaPresencas = 0;
 
   const sortedStudents = [...students].sort((a, b) => (a.numeroChamada || 0) - (b.numeroChamada || 0));
 
   sortedStudents.forEach((st) => {
-    let studentMedia = 14.0;
-    if (st.grades && st.grades.length > 0) {
-      if (mode === 'disciplina') {
-        const g = st.grades.find((x) => x.subject === selectedDiscipline);
-        studentMedia = g ? g.media : 14.0;
-      } else {
-        studentMedia = st.grades.reduce((acc, g) => acc + g.media, 0) / st.grades.length;
+    let studentMedia: number | null = null;
+    if (!isAllDisciplines) {
+      studentMedia = getActivePeriodScore(st, selectedDiscipline);
+    } else {
+      const validScores = classDisciplinas
+        .map((subj) => getActivePeriodScore(st, subj))
+        .filter((v): v is number => v !== null);
+      if (validScores.length > 0) {
+        studentMedia = validScores.reduce((a, b) => a + b, 0) / validScores.length;
       }
     }
+    if (studentMedia === null) return;
+    evaluatedCount++;
     somaMedias += studentMedia;
-    somaPresencas += (st.presencaPercent ?? 95);
 
-    if (studentMedia >= 16) {
+    const honraCut = classScale.maxNumeric === 10 ? 8 : 16;
+    const riscoCut = classScale.maxNumeric === 10 ? 5.4 : 10.5;
+
+    if (studentMedia >= honraCut) {
       honraCount++;
       aprovadosCount++;
-    } else if (studentMedia >= 10) {
-      if (studentMedia < 10.5 || (st.presencaPercent ?? 100) < 75) {
+    } else if (isPassingGradeForClass(studentMedia, defaultMeta.classe)) {
+      if (studentMedia < riscoCut || (st.presencaPercent ?? 100) < 75) {
         riscoCount++;
       }
       aprovadosCount++;
@@ -136,163 +225,136 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
     }
   });
 
-  const mediaGeralTurma = totalStudents > 0 ? (somaMedias / totalStudents).toFixed(1) : '14.0';
-  const presencaMediaTurma = totalStudents > 0 ? (somaPresencas / totalStudents).toFixed(1) : '95.0';
-  const taxaAprovacao = totalStudents > 0 ? ((aprovadosCount / totalStudents) * 100).toFixed(1) : '100.0';
+  const mediaGeralTurmaNum = evaluatedCount > 0 ? somaMedias / evaluatedCount : 0;
+  const mediaGeralTurma =
+    evaluatedCount > 0 ? formatGradeForClass(mediaGeralTurmaNum, defaultMeta.classe, 'compact') : '—';
+  const taxaAprovacao =
+    evaluatedCount > 0 ? ((aprovadosCount / evaluatedCount) * 100).toFixed(1) : '0.0';
 
   onProgress?.('Formatando grelha curricular e notas dos alunos...');
 
-  // Columns definition for Landscape General Pauta (Sum = 277mm)
+  const mtHeaderLabel = periodo === 'FINAL' ? 'MFD' : `MT${periodo === 'I' ? '1' : periodo === 'II' ? '2' : '3'}`;
+  const isManySubjects = classDisciplinas.length > 7;
+  const fixedNumW = 8;
+  const fixedNameW = isManySubjects ? 44 : 56;
+  const fixedSexoW = 9;
+  const fixedMediaW = isManySubjects ? 16 : 21;
+  const fixedObsW = isManySubjects ? 24 : 34;
+  const availSubjW = contentWidth - (fixedNumW + fixedNameW + fixedSexoW + fixedMediaW + fixedObsW);
+  const dynamicSubjW = Number((availSubjW / Math.max(1, classDisciplinas.length)).toFixed(2));
+
+  // Columns definition for Landscape All Disciplines (Sum = 277mm)
   const columnsGeneral = [
-    { key: 'num', title: 'Nº', width: 9, align: 'center' as const },
-    { key: 'nome', title: 'Nome Completo do Aluno', width: 56, align: 'left' as const },
-    { key: 'sexo', title: 'Sexo', width: 10, align: 'center' as const },
-    { key: 'lp', title: 'L. PORT', width: 18, align: 'center' as const },
-    { key: 'mat', title: 'MAT', width: 18, align: 'center' as const },
-    { key: 'cn', title: 'C. NAT', width: 18, align: 'center' as const },
-    { key: 'hist', title: 'HIST', width: 18, align: 'center' as const },
-    { key: 'geog', title: 'GEOG', width: 18, align: 'center' as const },
-    { key: 'ef', title: 'ED. FÍS', width: 18, align: 'center' as const },
-    { key: 'evp', title: 'E.V.P', width: 18, align: 'center' as const },
-    { key: 'media', title: 'MÉDIA', width: 19, align: 'center' as const },
-    { key: 'presenca', title: 'PRES.', width: 17, align: 'center' as const },
-    { key: 'resultado', title: 'RESULTADO', width: 40, align: 'center' as const },
+    { key: 'num', title: 'Nº', width: fixedNumW, align: 'center' as const },
+    { key: 'nome', title: 'Nome Completo do Aluno', width: fixedNameW, align: 'left' as const },
+    { key: 'sexo', title: 'Sexo', width: fixedSexoW, align: 'center' as const },
+    ...classDisciplinas.map((subj, idx) => ({
+      key: `subj_${idx}`,
+      title: `${DISCIPLINE_ABBR[subj] || subj.slice(0, 7).toUpperCase()} (${mtHeaderLabel})`,
+      width: dynamicSubjW,
+      align: 'center' as const,
+    })),
+    { key: 'media', title: isFinal ? 'MÉDIA FINAL' : `MÉDIA ${periodo}º T`, width: fixedMediaW, align: 'center' as const },
+    { key: 'resultado', title: 'OBSERVAÇÃO', width: fixedObsW, align: 'center' as const },
   ];
 
-  // Columns definition for Single Subject Pauta (Portrait Sum = 190mm)
-  const columnsSingleDiscipline = [
+  // Columns definition for Single Discipline - Single Trimester (Portrait Sum = 190mm)
+  // ONLY shows the selected trimester!
+  const columnsSingleDisciplineTrimester = [
     { key: 'num', title: 'Nº', width: 10, align: 'center' as const },
-    { key: 'nome', title: 'Nome Completo do Aluno', width: 70, align: 'left' as const },
+    { key: 'nome', title: 'Nome Completo do Aluno', width: 72, align: 'left' as const },
     { key: 'sexo', title: 'Sexo', width: 12, align: 'center' as const },
-    { key: 'p1', title: 'P1', width: 16, align: 'center' as const },
-    { key: 'p2', title: 'P2', width: 16, align: 'center' as const },
-    { key: 'trabalho', title: 'TRABALHO', width: 20, align: 'center' as const },
-    { key: 'media', title: 'MÉDIA', width: 18, align: 'center' as const },
-    { key: 'resultado', title: 'SITUAÇÃO', width: 28, align: 'center' as const },
+    { key: 'p1', title: `MAC (${periodo}ºT)`, width: 17, align: 'center' as const },
+    { key: 'p2', title: `NPP (${periodo}ºT)`, width: 17, align: 'center' as const },
+    { key: 'trabalho', title: `NPT (${periodo}ºT)`, width: 17, align: 'center' as const },
+    { key: 'media', title: `MT${periodo === 'I' ? '1' : periodo === 'II' ? '2' : '3'}`, width: 18, align: 'center' as const },
+    { key: 'resultado', title: 'OBSERVAÇÃO', width: 27, align: 'center' as const },
   ];
 
-  const columns: { key: string; title: string; width: number; align: 'left' | 'center' | 'right' }[] = isLandscape
+  // Columns definition for Single Discipline - Pauta Final (Landscape Sum = 277mm)
+  // Shows Iº Trimestre, IIº Trimestre, IIIº Trimestre and MFD for ONLY the chosen discipline!
+  const columnsSingleDisciplineFinal = [
+    { key: 'num', title: 'Nº', width: 9, align: 'center' as const },
+    { key: 'nome', title: 'Nome Completo do Aluno', width: 58, align: 'left' as const },
+    { key: 'sexo', title: 'Sexo', width: 10, align: 'center' as const },
+    { key: 't1_mac', title: 'T1 MAC', width: 13, align: 'center' as const },
+    { key: 't1_npp', title: 'T1 NPP', width: 13, align: 'center' as const },
+    { key: 't1_npt', title: 'T1 NPT', width: 13, align: 'center' as const },
+    { key: 't1_mt', title: 'MT1', width: 14, align: 'center' as const },
+    { key: 't2_mac', title: 'T2 MAC', width: 13, align: 'center' as const },
+    { key: 't2_npp', title: 'T2 NPP', width: 13, align: 'center' as const },
+    { key: 't2_npt', title: 'T2 NPT', width: 13, align: 'center' as const },
+    { key: 't2_mt', title: 'MT2', width: 14, align: 'center' as const },
+    { key: 't3_mac', title: 'T3 MAC', width: 13, align: 'center' as const },
+    { key: 't3_npp', title: 'T3 NPP', width: 13, align: 'center' as const },
+    { key: 't3_npt', title: 'T3 NPT', width: 13, align: 'center' as const },
+    { key: 't3_mt', title: 'MT3', width: 14, align: 'center' as const },
+    { key: 'mfd', title: 'MFD', width: 15, align: 'center' as const },
+    { key: 'resultado', title: 'OBS.', width: 26, align: 'center' as const },
+  ];
+
+  const columns = isAllDisciplines
     ? columnsGeneral
-    : columnsSingleDiscipline;
+    : isFinal
+    ? columnsSingleDisciplineFinal
+    : columnsSingleDisciplineTrimester;
 
-  // Pagination logic:
-  // In Landscape, header takes ~46mm, bottom summary + signatures takes ~38mm.
-  // Each student row takes 6.2mm.
-  // With 210mm height, page 1 can fit up to 16 rows if summary is on page 1, or 22 rows if summary goes to page 2.
-  const rowsPerPage = isLandscape ? 16 : 22;
-  const totalPages = Math.ceil(totalStudents / rowsPerPage) || 1;
+  const renderHeader = (_pageNumber: number) => {
+    pdf.setFont('times', 'normal');
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('REPÚBLICA DE ANGOLA', pageWidth / 2, 12, { align: 'center' });
+    pdf.text('ADMINISTRAÇÃO MUNICIPAL DO QUÉSSUA', pageWidth / 2, 16, { align: 'center' });
+    pdf.text('DIRECÇÃO MUNICIPAL DA EDUCAÇÃO DO QUÉSSUA', pageWidth / 2, 20, { align: 'center' });
 
-  const renderHeader = (pageNumber: number) => {
-    // Top National Banner Stripe
-    pdf.setFillColor(COLOR_ACCENT[0], COLOR_ACCENT[1], COLOR_ACCENT[2]);
-    pdf.rect(marginX, 7, contentWidth, 1.8, 'F');
+    pdf.setFont('times', 'bold');
+    pdf.setFontSize(10);
+    pdf.text(isFinal ? 'PAUTA FINAL' : 'MINI-PAUTA', pageWidth / 2, 24.5, {
+      align: 'center',
+    });
+    pdf.text(defaultMeta.escola.toUpperCase(), pageWidth / 2, 29, { align: 'center' });
 
-    // Crests on left & right
-    const crestLeftX = marginX + 6;
-    const crestY = 13.5;
-    pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.circle(crestLeftX, crestY, 3.5, 'F');
-    pdf.setFillColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-    pdf.circle(crestLeftX, crestY, 1.8, 'F');
-
-    const crestRightX = marginX + contentWidth - 6;
-    pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.circle(crestRightX, crestY, 3.5, 'F');
-    pdf.setFillColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-    pdf.circle(crestRightX, crestY, 1.8, 'F');
-
-    // Official titles
-    pdf.setFont('helvetica', 'bold');
+    // Single identification line above table
+    const lineY = 35;
+    pdf.setFont('times', 'bold');
     pdf.setFontSize(8.5);
-    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.text('REPÚBLICA DE ANGOLA', pageWidth / 2, 11.5, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
+    const discLabel = isAllDisciplines ? 'TODAS AS DISCIPLINAS' : selectedDiscipline.toUpperCase();
+    const cleanTurma = defaultMeta.turma.replace(/^Turma\s+/i, '').toUpperCase();
 
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text('MINISTÉRIO DA EDUCAÇÃO · DIRECÇÃO MUNICIPAL DA EDUCAÇÃO', pageWidth / 2, 15, { align: 'center' });
+    pdf.text(`DISCIPLINA: ${discLabel}`, marginX, lineY);
+    pdf.text(
+      `CLASSE: ${defaultMeta.classe.toUpperCase()}      TURMA: ${cleanTurma}      ANO LECTIVO: ${defaultMeta.anoLectivo}`,
+      marginX + contentWidth,
+      lineY,
+      { align: 'right' }
+    );
 
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8.5);
-    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.text(defaultMeta.escola.toUpperCase(), pageWidth / 2, 18.5, { align: 'center' });
-
-    // Document Title Box
-    pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.rect(marginX, 21, contentWidth, 6, 'F');
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8);
-    pdf.setTextColor(255, 255, 255);
-    const titleText = isLandscape
-      ? `PAUTA OFICIAL DE AVALIAÇÃO E APROVEITAMENTO ESCOLAR · ${defaultMeta.trimestre.toUpperCase()} / ANO LECTIVO ${defaultMeta.anoLectivo}`
-      : `PAUTA PARCELAR DE AVALIAÇÃO · ${selectedDiscipline.toUpperCase()} · ${defaultMeta.trimestre.toUpperCase()} / ${defaultMeta.anoLectivo}`;
-    pdf.text(titleText, pageWidth / 2, 25, { align: 'center' });
-
-    // Metadata Bar (2 columns)
-    const metaY = 28.5;
-    const metaHeight = 11;
-    pdf.setFillColor(255, 255, 255);
-    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-    pdf.rect(marginX, metaY, contentWidth, metaHeight, 'D');
-
-    pdf.setFontSize(7);
-    // Col 1
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text('CLASSE / TURMA:', marginX + 3, metaY + 4);
-    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.text(`${defaultMeta.classe} · ${defaultMeta.turma}`, marginX + 27, metaY + 4);
-
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text('TURNO / SALA:', marginX + 3, metaY + 8.5);
-    pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-    pdf.text(`${defaultMeta.turno} · ${defaultMeta.sala}`, marginX + 24, metaY + 8.5);
-
-    // Col 2
-    const midX = isLandscape ? marginX + 100 : marginX + 75;
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text('PROF. TITULAR:', midX, metaY + 4);
-    pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-    pdf.text(defaultMeta.professorTitular, midX + 22, metaY + 4);
-
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text('DATA EMISSÃO:', midX, metaY + 8.5);
-    pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-    pdf.text(defaultMeta.dataEmissao, midX + 22, metaY + 8.5);
-
-    // Col 3
-    const rightX = isLandscape ? marginX + 200 : marginX + 135;
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text('TOTAL ALUNOS:', rightX, metaY + 4);
-    pdf.setTextColor(COLOR_ACCENT[0], COLOR_ACCENT[1], COLOR_ACCENT[2]);
-    pdf.text(`${totalStudents} matriculados`, rightX + 22, metaY + 4);
-
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text('APROVEITAMENTO:', rightX, metaY + 8.5);
-    pdf.setTextColor(COLOR_SUCCESS[0], COLOR_SUCCESS[1], COLOR_SUCCESS[2]);
-    pdf.text(`${taxaAprovacao}% aprovação`, rightX + 26, metaY + 8.5);
-
-    return metaY + metaHeight + 2.5;
+    return lineY + 2;
   };
 
   const renderTableHeader = (startY: number) => {
-    const hHeight = 6.2;
-    pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.rect(marginX, startY, contentWidth, hHeight, 'F');
+    const hHeight = 6.5;
+    pdf.setFillColor(217, 234, 211); // #d9ead3 classic school green header
+    pdf.setDrawColor(0, 0, 0);
+    pdf.rect(marginX, startY, contentWidth, hHeight, 'FD');
 
-    pdf.setFont('helvetica', 'bold');
+    pdf.setFont('times', 'bold');
     pdf.setFontSize(6.5);
-    pdf.setTextColor(255, 255, 255);
+    pdf.setTextColor(0, 0, 0);
 
     let currX = marginX;
-    columns.forEach((col) => {
+    columns.forEach((col, idx) => {
       let tX = currX + 1.5;
       if (col.align === 'center') {
         tX = currX + col.width / 2;
       } else if (col.align === 'right') {
         tX = currX + col.width - 1.5;
       }
-      pdf.text(col.title, tX, startY + 4.2, { align: col.align });
+      pdf.text(col.title, tX, startY + 4.3, { align: col.align });
+      if (idx < columns.length - 1) {
+        pdf.line(currX + col.width, startY, currX + col.width, startY + hHeight);
+      }
       currX += col.width;
     });
 
@@ -300,92 +362,54 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
   };
 
   const renderSummaryAndSignatures = (startY: number) => {
-    // 1. Statistics Box
-    const boxHeight = 12;
-    pdf.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
-    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-    pdf.rect(marginX, startY, contentWidth, boxHeight, 'FD');
+    const sigY = startY + 8;
+    pdf.setFont('times', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('O Professor', pageWidth / 2, sigY, { align: 'center' });
 
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7);
-    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    pdf.text('RESUMO ESTATÍSTICO DE APROVEITAMENTO PEDAGÓGICO:', marginX + 3, startY + 4.5);
-
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(6.8);
-    pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-
-    const statLineY = startY + 8.5;
-    if (isLandscape) {
-      pdf.text(`Total Avaliados: ${totalStudents}`, marginX + 3, statLineY);
-      pdf.setTextColor(COLOR_SUCCESS[0], COLOR_SUCCESS[1], COLOR_SUCCESS[2]);
-      pdf.text(`Aprovados: ${aprovadosCount} (${taxaAprovacao}%)`, marginX + 42, statLineY);
-      pdf.setTextColor(COLOR_HONOR[0], COLOR_HONOR[1], COLOR_HONOR[2]);
-      pdf.text(`Quadro de Honra (≥16): ${honraCount}`, marginX + 90, statLineY);
-      pdf.setTextColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-      pdf.text(`Em Risco (10-10.4): ${riscoCount}`, marginX + 145, statLineY);
-      pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
-      pdf.text(`Abaixo da Média (<10): ${reprovadosCount}`, marginX + 195, statLineY);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(`Média Geral Turma: ${mediaGeralTurma} val.`, marginX + 242, statLineY);
-    } else {
-      pdf.text(`Avaliados: ${totalStudents} | Aprovados: ${aprovadosCount} (${taxaAprovacao}%) | Honra: ${honraCount} | Risco: ${riscoCount} | Abaixo: ${reprovadosCount}`, marginX + 3, statLineY);
-    }
-
-    // 2. Signatures Block (3 signatories)
-    const sigY = startY + boxHeight + 3;
-    const colWidth = contentWidth / 3;
-
-    // Helper for signature slot
-    const drawSigLine = (colIndex: number, role: string, name: string) => {
-      const x0 = marginX + colIndex * colWidth + 8;
-      const x1 = marginX + (colIndex + 1) * colWidth - 8;
-      const lineY = sigY + 12;
-
-      pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-      pdf.setLineDashPattern([1, 1], 0);
-      pdf.line(x0, lineY, x1, lineY);
-      pdf.setLineDashPattern([], 0); // reset to solid
-
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(6.5);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(role, (x0 + x1) / 2, lineY + 3.5, { align: 'center' });
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(6);
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text(name, (x0 + x1) / 2, lineY + 6.8, { align: 'center' });
-    };
-
-    drawSigLine(0, 'O PROFESSOR TITULAR', defaultMeta.professorTitular);
-    drawSigLine(1, 'O COORDENADOR PEDAGÓGICO', 'Conselho de Disciplina / Coordenação');
-    drawSigLine(2, 'O DIRECTOR DA ESCOLA', 'Direcção Geral do Complexo Escolar');
-
-    // 3. Security Watermark & Timestamp footer
-    const footerY = pageHeight - 5;
-    pdf.setFont('helvetica', 'italic');
-    pdf.setFontSize(5.5);
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    const hashSignature = `SIGRE-SEC-${Math.random().toString(36).substring(2, 9).toUpperCase()}-${defaultMeta.anoLectivo}`;
-    pdf.text(
-      `Documento oficial gerado via Plataforma Educativa Sigre · Homologação SIGE Angola · Código de Autenticidade: ${hashSignature}`,
-      marginX,
-      footerY
-    );
-    pdf.text(`Página 1 de 1`, marginX + contentWidth, footerY, { align: 'right' });
+    pdf.setDrawColor(0, 0, 0);
+    pdf.line(pageWidth / 2 - 35, sigY + 9, pageWidth / 2 + 35, sigY + 9);
   };
 
-  // Render first page header
   let currentY = renderHeader(1);
   currentY = renderTableHeader(currentY);
 
-  // Render Student Rows
   const rowHeight = 6.2;
+  const minPass = classScale.minPassNumeric;
+  const honraCut = classScale.maxNumeric === 10 ? 8 : 16;
+
+  if (sortedStudents.length === 0) {
+    const emptyRowsCount = isLandscape ? 20 : 25;
+    for (let i = 0; i < emptyRowsCount; i++) {
+      let cx = marginX;
+      columns.forEach((col, cIdx) => {
+        const isShaded =
+          col.key === 'media' ||
+          col.key === 'mfd' ||
+          col.key === 'resultado' ||
+          col.key === 't1_mt' ||
+          col.key === 't2_mt' ||
+          col.key === 't3_mt';
+        if (isShaded) {
+          pdf.setFillColor(198, 224, 180); // #c6e0b4
+          pdf.rect(cx, currentY, col.width, rowHeight, 'F');
+        }
+        pdf.setDrawColor(0, 0, 0);
+        pdf.rect(cx, currentY, col.width, rowHeight, 'D');
+        if (cIdx === 0) {
+          pdf.setFont('times', 'normal');
+          pdf.setFontSize(7);
+          pdf.setTextColor(0, 0, 0);
+          pdf.text(`${i + 1}.`, cx + 1.5, currentY + 4.2);
+        }
+        cx += col.width;
+      });
+      currentY += rowHeight;
+    }
+  }
 
   sortedStudents.forEach((student, index) => {
-    // Check if we need a new page
-    // If remaining space is too small for row + summary
     const isLastItem = index === sortedStudents.length - 1;
     const neededBottomSpace = isLastItem ? 38 : rowHeight + 5;
 
@@ -401,189 +425,251 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
       pdf.rect(marginX, currentY, contentWidth, rowHeight, 'F');
     }
 
-    // Row bottom border
     pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
     pdf.line(marginX, currentY + rowHeight, marginX + contentWidth, currentY + rowHeight);
 
-    // Calculate student metrics
-    const studentGrades = student.grades || [];
-    const mediaGeralNum = studentGrades.length > 0
-      ? studentGrades.reduce((acc, g) => acc + g.media, 0) / studentGrades.length
-      : 14.0;
-    const mediaGeralStr = mediaGeralNum.toFixed(1);
-    const presencaNum = student.presencaPercent ?? 95;
-
-    let situacao = 'Aprovado';
-    if (mediaGeralNum >= 16) {
-      situacao = 'Quadro de Honra';
-    } else if (mediaGeralNum < 10) {
-      situacao = 'Reprovado';
-    } else if (mediaGeralNum < 10.5 || presencaNum < 75) {
-      situacao = 'Em Risco';
-    }
-
     let colX = marginX;
 
-    if (isLandscape) {
-      // Landscape: Nº, Nome, Sexo, LP, MAT, CN, HIST, GEO, EF, EVP, Média, Pres., Resultado
-      // 1. Nº
+    if (isAllDisciplines) {
+      // All disciplines for the chosen periodo (I, II, III, or FINAL)
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(6.5);
+      pdf.setFontSize(isManySubjects ? 5.8 : 6.5);
       pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(String(student.numeroChamada || index + 1), colX + 4.5, currentY + 4.2, { align: 'center' });
-      colX += 9;
+      pdf.text(String(student.numeroChamada || index + 1), colX + fixedNumW / 2, currentY + 4.2, { align: 'center' });
+      colX += fixedNumW;
 
-      // 2. Nome
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(6.8);
+      pdf.setFontSize(isManySubjects ? 5.8 : 6.8);
       pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-      const truncatedName = student.name.length > 34 ? student.name.substring(0, 32) + '…' : student.name;
+      const maxNameChars = isManySubjects ? 26 : 34;
+      const truncatedName = student.name.length > maxNameChars ? student.name.substring(0, maxNameChars - 2) + '…' : student.name;
       pdf.text(truncatedName, colX + 1.5, currentY + 4.2);
-      colX += 56;
+      colX += fixedNameW;
 
-      // 3. Sexo
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(6.5);
+      pdf.setFontSize(isManySubjects ? 5.8 : 6.5);
       pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text(student.genero || 'M', colX + 5, currentY + 4.2, { align: 'center' });
-      colX += 10;
+      pdf.text(student.genero || 'M', colX + fixedSexoW / 2, currentY + 4.2, { align: 'center' });
+      colX += fixedSexoW;
 
-      // 4. Seven Subjects: LP, MAT, CN, HIST, GEO, EF, EVP
-      const subjectsOrder = [
-        'Língua Portuguesa',
-        'Matemática',
-        'Ciências Naturais',
-        'História',
-        'Geografia',
-        'Educação Física',
-        'Educação Visual e Plástica',
-      ];
+      let sumSubj = 0;
+      let validSubjCount = 0;
+      classDisciplinas.forEach((subj) => {
+        const val = getActivePeriodScore(student, subj);
+        if (val === null) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(isManySubjects ? 5.6 : 6.5);
+          pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+          pdf.text('—', colX + dynamicSubjW / 2, currentY + 4.2, { align: 'center' });
+          colX += dynamicSubjW;
+          return;
+        }
+        sumSubj += val;
+        validSubjCount++;
+        const valStr = formatGradeForClass(val, defaultMeta.classe, 'compact');
 
-      subjectsOrder.forEach((subj) => {
-        const gradeObj = studentGrades.find((g) => g.subject === subj);
-        const val = gradeObj ? gradeObj.media : 14.0;
-        const valStr = val.toFixed(1);
-
-        pdf.setFont('helvetica', val < 10 ? 'bold' : 'normal');
-        pdf.setFontSize(6.5);
-        if (val < 10) {
+        pdf.setFont('helvetica', val < minPass ? 'bold' : 'normal');
+        pdf.setFontSize(isManySubjects ? 5.6 : 6.5);
+        if (val < minPass) {
           pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
-        } else if (val >= 16) {
+        } else if (val >= honraCut) {
           pdf.setTextColor(COLOR_HONOR[0], COLOR_HONOR[1], COLOR_HONOR[2]);
         } else {
           pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
         }
-        pdf.text(valStr, colX + 9, currentY + 4.2, { align: 'center' });
-        colX += 18;
+        pdf.text(valStr, colX + dynamicSubjW / 2, currentY + 4.2, { align: 'center' });
+        colX += dynamicSubjW;
       });
 
-      // 5. Média Geral
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7);
-      if (mediaGeralNum < 10) {
-        pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
-      } else if (mediaGeralNum >= 16) {
-        pdf.setTextColor(COLOR_HONOR[0], COLOR_HONOR[1], COLOR_HONOR[2]);
+      if (validSubjCount === 0) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(isManySubjects ? 5.8 : 6.5);
+        pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+        pdf.text('—', colX + fixedMediaW / 2, currentY + 4.2, { align: 'center' });
+        colX += fixedMediaW;
+        pdf.text('—', colX + fixedObsW / 2, currentY + 4.2, { align: 'center' });
       } else {
-        pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+        const avgVal = Number((sumSubj / validSubjCount).toFixed(1));
+        const avgStr = formatGradeForClass(avgVal, defaultMeta.classe, 'compact');
+        const passed = isPassingGradeForClass(avgVal, defaultMeta.classe);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(isManySubjects ? 6.2 : 7);
+        if (!passed) {
+          pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
+        } else {
+          pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+        }
+        pdf.text(avgStr, colX + fixedMediaW / 2, currentY + 4.2, { align: 'center' });
+        colX += fixedMediaW;
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(isManySubjects ? 5.8 : 6.5);
+        if (passed) {
+          pdf.setTextColor(COLOR_SUCCESS[0], COLOR_SUCCESS[1], COLOR_SUCCESS[2]);
+        } else {
+          pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
+        }
+        const obsLabel = isFinal ? (passed ? 'TRANSITA' : 'NÃO TRANSITA') : (passed ? 'POSITIVA' : 'NEGATIVA');
+        pdf.text(obsLabel, colX + fixedObsW / 2, currentY + 4.2, { align: 'center' });
       }
-      pdf.text(mediaGeralStr, colX + 9.5, currentY + 4.2, { align: 'center' });
-      colX += 19;
+    } else if (!isFinal) {
+      // Single Discipline + Single Trimester (I, II, or III): ONLY that trimester's MAC, NPP, NPT, MT
+      const m = getStudentDisciplineMetrics(student, selectedDiscipline);
 
-      // 6. Presença
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(6.5);
-      pdf.setTextColor(presencaNum < 75 ? COLOR_DANGER[0] : COLOR_TEXT[0], presencaNum < 75 ? COLOR_DANGER[1] : COLOR_TEXT[1], presencaNum < 75 ? COLOR_DANGER[2] : COLOR_TEXT[2]);
-      pdf.text(`${presencaNum}%`, colX + 8.5, currentY + 4.2, { align: 'center' });
-      colX += 17;
-
-      // 7. Resultado
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(6.5);
-      if (situacao === 'Quadro de Honra') {
-        pdf.setTextColor(COLOR_HONOR[0], COLOR_HONOR[1], COLOR_HONOR[2]);
-      } else if (situacao === 'Reprovado') {
-        pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
-      } else if (situacao === 'Em Risco') {
-        pdf.setTextColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-      } else {
-        pdf.setTextColor(COLOR_SUCCESS[0], COLOR_SUCCESS[1], COLOR_SUCCESS[2]);
-      }
-      pdf.text(situacao.toUpperCase(), colX + 20, currentY + 4.2, { align: 'center' });
-    } else {
-      // Portrait Single Subject: Nº, Nome, Sexo, P1, P2, Trabalho, Média, Situação
-      const gObj = studentGrades.find((g) => g.subject === selectedDiscipline) || {
-        p1: 14,
-        p2: 15,
-        trabalho: 15,
-        media: 14.6,
-        status: 'Aprovado' as const,
-      };
-
-      // 1. Nº
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(7);
       pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
       pdf.text(String(student.numeroChamada || index + 1), colX + 5, currentY + 4.2, { align: 'center' });
       colX += 10;
 
-      // 2. Nome
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(7);
       pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
       pdf.text(student.name, colX + 2, currentY + 4.2);
-      colX += 70;
+      colX += 72;
 
-      // 3. Sexo
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
       pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
       pdf.text(student.genero || 'M', colX + 6, currentY + 4.2, { align: 'center' });
       colX += 12;
 
-      // 4. P1
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
-      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-      pdf.text(gObj.p1.toFixed(1), colX + 8, currentY + 4.2, { align: 'center' });
-      colX += 16;
-
-      // 5. P2
-      pdf.text(gObj.p2.toFixed(1), colX + 8, currentY + 4.2, { align: 'center' });
-      colX += 16;
-
-      // 6. Trabalho
-      pdf.text(gObj.trabalho.toFixed(1), colX + 10, currentY + 4.2, { align: 'center' });
-      colX += 20;
-
-      // 7. Média
-      pdf.setFont('helvetica', 'bold');
-      if (gObj.media < 10) {
-        pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
-      } else if (gObj.media >= 16) {
-        pdf.setTextColor(COLOR_HONOR[0], COLOR_HONOR[1], COLOR_HONOR[2]);
+      if (!m) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+        pdf.text('—', colX + 8.5, currentY + 4.2, { align: 'center' });
+        colX += 17;
+        pdf.text('—', colX + 8.5, currentY + 4.2, { align: 'center' });
+        colX += 17;
+        pdf.text('—', colX + 8.5, currentY + 4.2, { align: 'center' });
+        colX += 17;
+        pdf.text('—', colX + 9, currentY + 4.2, { align: 'center' });
+        colX += 18;
+        pdf.text('—', colX + 13.5, currentY + 4.2, { align: 'center' });
       } else {
-        pdf.setTextColor(COLOR_SUCCESS[0], COLOR_SUCCESS[1], COLOR_SUCCESS[2]);
-      }
-      pdf.text(gObj.media.toFixed(1), colX + 9, currentY + 4.2, { align: 'center' });
-      colX += 18;
+        const triObj = periodo === 'I' ? m.t1 : periodo === 'II' ? m.t2 : m.t3;
+        const passed = isPassingGradeForClass(triObj.mt, defaultMeta.classe);
 
-      // 8. Situação
-      pdf.text(gObj.status.toUpperCase(), colX + 14, currentY + 4.2, { align: 'center' });
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7);
+        pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
+        pdf.text(formatGradeForClass(triObj.mac, defaultMeta.classe, 'compact'), colX + 8.5, currentY + 4.2, { align: 'center' });
+        colX += 17;
+
+        pdf.text(formatGradeForClass(triObj.npp, defaultMeta.classe, 'compact'), colX + 8.5, currentY + 4.2, { align: 'center' });
+        colX += 17;
+
+        pdf.text(formatGradeForClass(triObj.npt, defaultMeta.classe, 'compact'), colX + 8.5, currentY + 4.2, { align: 'center' });
+        colX += 17;
+
+        pdf.setFont('helvetica', 'bold');
+        if (!passed) {
+          pdf.setTextColor(COLOR_DANGER[0], COLOR_DANGER[1], COLOR_DANGER[2]);
+        } else {
+          pdf.setTextColor(COLOR_SUCCESS[0], COLOR_SUCCESS[1], COLOR_SUCCESS[2]);
+        }
+        pdf.text(formatGradeForClass(triObj.mt, defaultMeta.classe, 'compact'), colX + 9, currentY + 4.2, { align: 'center' });
+        colX += 18;
+
+        const sitLabel = passed ? 'POSITIVA' : 'NEGATIVA';
+        pdf.text(sitLabel, colX + 13.5, currentY + 4.2, { align: 'center' });
+      }
+    } else {
+      // Single Discipline + Pauta Final: Iº, IIº, IIIº Trimestre + MFD of ONLY selectedDiscipline
+      const m = getStudentDisciplineMetrics(student, selectedDiscipline);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+      pdf.text(String(student.numeroChamada || index + 1), colX + 4.5, currentY + 4.2, { align: 'center' });
+      colX += 9;
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.8);
+      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
+      const truncatedName = student.name.length > 34 ? student.name.substring(0, 32) + '…' : student.name;
+      pdf.text(truncatedName, colX + 1.5, currentY + 4.2);
+      colX += 58;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+      pdf.text(student.genero || 'M', colX + 5, currentY + 4.2, { align: 'center' });
+      colX += 10;
+
+      if (!m) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6.2);
+        pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+        for (let b = 0; b < 3; b++) {
+          pdf.text('—', colX + 6.5, currentY + 4.2, { align: 'center' });
+          colX += 13;
+          pdf.text('—', colX + 6.5, currentY + 4.2, { align: 'center' });
+          colX += 13;
+          pdf.text('—', colX + 6.5, currentY + 4.2, { align: 'center' });
+          colX += 13;
+          pdf.text('—', colX + 7, currentY + 4.2, { align: 'center' });
+          colX += 14;
+        }
+        pdf.text('—', colX + 7.5, currentY + 4.2, { align: 'center' });
+        colX += 15;
+        pdf.text('—', colX + 13, currentY + 4.2, { align: 'center' });
+      } else {
+        const passed = isPassingGradeForClass(m.mfd, defaultMeta.classe);
+
+        const drawTriBlock = (tri: { mac: number; npp: number; npt: number; mt: number }) => {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(6.2);
+          pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
+          pdf.text(formatGradeForClass(tri.mac, defaultMeta.classe, 'compact'), colX + 6.5, currentY + 4.2, { align: 'center' });
+          colX += 13;
+          pdf.text(formatGradeForClass(tri.npp, defaultMeta.classe, 'compact'), colX + 6.5, currentY + 4.2, { align: 'center' });
+          colX += 13;
+          pdf.text(formatGradeForClass(tri.npt, defaultMeta.classe, 'compact'), colX + 6.5, currentY + 4.2, { align: 'center' });
+          colX += 13;
+
+          pdf.setFont('helvetica', 'bold');
+          const triPass = isPassingGradeForClass(tri.mt, defaultMeta.classe);
+          pdf.setTextColor(
+            triPass ? COLOR_PRIMARY[0] : COLOR_DANGER[0],
+            triPass ? COLOR_PRIMARY[1] : COLOR_DANGER[1],
+            triPass ? COLOR_PRIMARY[2] : COLOR_DANGER[2]
+          );
+          pdf.text(formatGradeForClass(tri.mt, defaultMeta.classe, 'compact'), colX + 7, currentY + 4.2, { align: 'center' });
+          colX += 14;
+        };
+
+        drawTriBlock(m.t1);
+        drawTriBlock(m.t2);
+        drawTriBlock(m.t3);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(
+          passed ? COLOR_SUCCESS[0] : COLOR_DANGER[0],
+          passed ? COLOR_SUCCESS[1] : COLOR_DANGER[1],
+          passed ? COLOR_SUCCESS[2] : COLOR_DANGER[2]
+        );
+        pdf.text(formatGradeForClass(m.mfd, defaultMeta.classe, 'compact'), colX + 7.5, currentY + 4.2, { align: 'center' });
+        colX += 15;
+
+        pdf.setFontSize(6.2);
+        pdf.text(passed ? 'TRANSITA' : 'NÃO TRANSITA', colX + 13, currentY + 4.2, { align: 'center' });
+      }
     }
 
     currentY += rowHeight;
   });
 
-  // Render bottom summary and signatures
   currentY += 2;
   renderSummaryAndSignatures(currentY);
 
   onProgress?.('Concluindo exportação e descarregando ficheiro...');
 
-  const filename = mode === 'geral'
-    ? `Pauta_Geral_${defaultMeta.classe.replace(/\s+/g, '_')}_${defaultMeta.turma.replace(/\s+/g, '_')}_${defaultMeta.anoLectivo}.pdf`
-    : `Pauta_${selectedDiscipline.replace(/\s+/g, '_')}_${defaultMeta.classe.replace(/\s+/g, '_')}_${defaultMeta.turma.replace(/\s+/g, '_')}_${defaultMeta.anoLectivo}.pdf`;
+  const periodSlug = periodo === 'FINAL' ? 'Pauta_Final' : `Mini_Pauta_${periodo}_Trimestre`;
+  const discSlug = isAllDisciplines ? 'Todas_Disciplinas' : selectedDiscipline.replace(/\s+/g, '_');
+  const filename = `${periodSlug}_${discSlug}_${defaultMeta.classe.replace(/\s+/g, '_')}_${defaultMeta.turma.replace(/\s+/g, '_')}.pdf`;
 
   pdf.save(filename);
 }

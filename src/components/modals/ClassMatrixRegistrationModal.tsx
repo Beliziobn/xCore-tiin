@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { STANDARD_ROOMS, STANDARD_TURMAS, ALL_SCHOOL_CLASSES } from '../../data/classesConfig';
 
 interface ClassMatrixRegistrationModalProps {
   isOpen: boolean;
@@ -113,25 +114,25 @@ export const ClassMatrixRegistrationModal: React.FC<ClassMatrixRegistrationModal
                   onChange={(e) => setGradeClass(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 >
-                  <option>4ª Classe</option>
-                  <option>1ª Classe</option>
-                  <option>2ª Classe</option>
-                  <option>3ª Classe</option>
-                  <option>5ª Classe</option>
-                  <option>6ª Classe</option>
+                  {ALL_SCHOOL_CLASSES.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala (1 a 19)</label>
                 <select
                   value={roomNumber}
                   onChange={(e) => setRoomNumber(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 >
-                  <option>Sala 03</option>
-                  <option>Sala 01</option>
-                  <option>Sala 02</option>
-                  <option>Sala 04</option>
+                  {STANDARD_ROOMS.map((rm) => (
+                    <option key={rm} value={rm}>
+                      {rm}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -151,15 +152,17 @@ export const ClassMatrixRegistrationModal: React.FC<ClassMatrixRegistrationModal
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma (A até F)</label>
                 <select
                   value={turma}
                   onChange={(e) => setTurma(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 >
-                  <option>Turma A</option>
-                  <option>Turma B</option>
-                  <option>Turma C</option>
+                  {STANDARD_TURMAS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

@@ -13,6 +13,20 @@ import { PautaPdfExportModal } from '../modals/PautaPdfExportModal';
 import type { StudentRegistrationData, SchoolAnnouncement } from '../../types';
 import { getStoredAnnouncements, isAnnouncementExpired } from '../../utils/announcementStorage';
 import { deleteStudent } from '../../utils/studentStorage';
+import {
+  saveTeacherMiniPauta,
+  calcMT,
+  calcMFD,
+  getGradingScaleForClass,
+  getDisciplinasForClass,
+  formatGradeForClass,
+  isPassingGradeForClass,
+  QUALITATIVE_SCALE_OPTIONS,
+  numericToQualitativeLabel,
+  qualitativeLabelToNumeric,
+  QualitativeRatingLabel,
+} from '../../utils/miniPautaStorage';
+import { SCHOOL_TURMA_LETTERS } from '../../data/classesConfig';
 
 interface TeacherClassPageProps {
   onBackToStats: () => void;
@@ -45,6 +59,9 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
   const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
   const [selectedDiscipline, setSelectedDiscipline] = useState('Língua Portuguesa');
   const [selectedEvaluation, setSelectedEvaluation] = useState<'p1' | 'p2' | 'trabalho'>('p1');
+  const [selectedMiniPautaTurma, setSelectedMiniPautaTurma] = useState('Turma A');
+  const [selectedMiniPautaClasse, setSelectedMiniPautaClasse] = useState('4ª Classe');
+  const [gradeInputs, setGradeInputs] = useState<Record<string, number>>({});
   const [gradeSaveNotification, setGradeSaveNotification] = useState<string | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<{ id: string; name: string } | null>(null);
 
@@ -54,33 +71,69 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
     setStudentToDelete(null);
   };
 
-  // Helper para calcular média de um aluno
+  // Helper para calcular média de um aluno ajustada à escala da sua classe
   const getStudentMediaNum = (student: StudentProfile): number => {
+    const scale = getGradingScaleForClass(student.classe || '4ª Classe');
     if (student.grades && student.grades.length > 0) {
-      return student.grades.reduce((acc, g) => acc + g.media, 0) / student.grades.length;
+      const rawAvg = student.grades.reduce((acc, g) => acc + g.media, 0) / student.grades.length;
+      if (scale.maxNumeric === 10 && rawAvg > 10) {
+        return Number((rawAvg / 2).toFixed(1));
+      }
+      return Number(rawAvg.toFixed(1));
     }
     return 0;
   };
 
   const getStudentMedia = (student: StudentProfile): string => {
-    return getStudentMediaNum(student).toFixed(1);
+    const num = getStudentMediaNum(student);
+    return formatGradeForClass(num, student.classe || '4ª Classe');
   };
 
-  // Helper de diagnóstico de situação de aprovação
+  // Helper de diagnóstico de situação de aprovação de acordo com a escala da classe
   const getStudentStatusInfo = (student: StudentProfile) => {
+    const classeName = student.classe || '4ª Classe';
+    const scale = getGradingScaleForClass(classeName);
     const mediaNum = getStudentMediaNum(student);
     const presenca = student.presencaPercent ?? 100;
 
-    if (mediaNum < 10) {
+    if (scale.scaleType === 'qualitativo') {
+      const qualLabel = numericToQualitativeLabel(mediaNum, 10);
+      const isPass = isPassingGradeForClass(mediaNum, classeName);
+      if (!isPass) {
+        return {
+          status: 'reprovado' as const,
+          label: `Aproveitamento ${qualLabel} (Não Transita)`,
+          shortLabel: qualLabel,
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          icon: AlertCircle,
+        };
+      }
+      return {
+        status: 'aprovado' as const,
+        label: `Aproveitamento ${qualLabel}`,
+        shortLabel: qualLabel,
+        badgeClass:
+          qualLabel === 'Muito Bom'
+            ? 'bg-purple-50 text-purple-700 border-purple-200/80'
+            : 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+        icon: qualLabel === 'Muito Bom' ? Award : CheckCircle2,
+      };
+    }
+
+    const minPass = scale.minPassNumeric; // 5 para 3ª-6ª/PRAEER, 10 para 7ª-9ª/Módulos
+    const honraCut = scale.maxNumeric === 10 ? 8 : 16;
+    const riscoCut = scale.maxNumeric === 10 ? 5.4 : 10.5;
+
+    if (mediaNum < minPass) {
       return {
         status: 'reprovado' as const,
-        label: 'Abaixo da Média (< 10)',
+        label: `Abaixo da Média (< ${minPass} / ${scale.maxNumeric})`,
         shortLabel: 'Abaixo',
         badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
         icon: AlertCircle,
       };
     }
-    if (mediaNum < 10.5 || presenca < 75) {
+    if (mediaNum < riscoCut || presenca < 75) {
       return {
         status: 'risco' as const,
         label: presenca < 75 ? 'Risco por faltas (< 75%)' : 'Em Risco / Apoio Pedagógico',
@@ -91,16 +144,16 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
     }
     return {
       status: 'aprovado' as const,
-      label: mediaNum >= 16 ? 'Quadro de Honra (≥ 16)' : 'Aprovado (≥ 10)',
-      shortLabel: mediaNum >= 16 ? 'Honra' : 'Aprovado',
-      badgeClass: mediaNum >= 16 
+      label: mediaNum >= honraCut ? `Quadro de Honra (≥ ${honraCut}/${scale.maxNumeric})` : `Aprovado (≥ ${minPass}/${scale.maxNumeric})`,
+      shortLabel: mediaNum >= honraCut ? 'Honra' : 'Aprovado',
+      badgeClass: mediaNum >= honraCut 
         ? 'bg-purple-50 text-purple-700 border-purple-200/80' 
         : 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
-      icon: mediaNum >= 16 ? Award : CheckCircle2,
+      icon: mediaNum >= honraCut ? Award : CheckCircle2,
     };
   };
 
-  // Quick statistics calculated dynamically with the class data
+  // Quick statistics calculated dynamically with the class data (4ª Classe = 0 a 10)
   const stats = useMemo(() => {
     const total = students.length;
     const meninas = students.filter((s) => s.genero === 'F').length;
@@ -120,15 +173,22 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
     let criticaPresencaCount = 0;
 
     students.forEach((s) => {
-      const m = s.grades && s.grades.length > 0
+      const scale = getGradingScaleForClass(s.classe || '4ª Classe');
+      const rawM = s.grades && s.grades.length > 0
         ? s.grades.reduce((acc, g) => acc + g.media, 0) / s.grades.length
         : 0;
+      const m = scale.maxNumeric === 10 && rawM > 10 ? rawM / 2 : rawM;
       const p = s.presencaPercent ?? 0;
 
+      const minPass = scale.minPassNumeric;
+      const honraCut = scale.maxNumeric === 10 ? 8 : 16;
+      const bomCut = scale.maxNumeric === 10 ? 7 : 14;
+      const riscoCut = scale.maxNumeric === 10 ? 5.4 : 10.5;
+
       // Faixas de média
-      if (m >= 16) excelenteCount++;
-      else if (m >= 14) bomCount++;
-      else if (m >= 10) suficienteCount++;
+      if (m >= honraCut) excelenteCount++;
+      else if (m >= bomCut) bomCount++;
+      else if (m >= minPass) suficienteCount++;
       else if (m > 0) insuficienteCount++;
 
       // Assiduidade
@@ -139,8 +199,8 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
       // Status de aprovação
       if (m === 0) {
         // Sem notas ainda
-      } else if (m < 10) reprovadosCount++;
-      else if (m < 10.5 || p < 75) riscoCount++;
+      } else if (m < minPass) reprovadosCount++;
+      else if (m < riscoCut || p < 75) riscoCount++;
       else aprovadosCount++;
     });
 
@@ -151,9 +211,11 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
 
     const avgGeralRaw = total > 0
       ? students.reduce((acc, s) => {
-          const sAvg = s.grades && s.grades.length > 0
+          const scale = getGradingScaleForClass(s.classe || '4ª Classe');
+          const rawAvg = s.grades && s.grades.length > 0
             ? s.grades.reduce((a, g) => a + g.media, 0) / s.grades.length
             : 0;
+          const sAvg = scale.maxNumeric === 10 && rawAvg > 10 ? rawAvg / 2 : rawAvg;
           return acc + sAvg;
         }, 0) / total
       : 0;
@@ -393,16 +455,6 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
             <span>Exportar Pauta</span>
           </button>
 
-          <button
-            id="btn-baixar-lista-turma-teacher"
-            onClick={() => setIsTurmaPdfModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95 flex-1 md:flex-initial"
-            title="Baixar lista completa de alunos da turma em PDF organizada de A a Z"
-          >
-            <FileDown className="w-4 h-4 text-slate-600" />
-            <span>Lista Nominal (A-Z)</span>
-          </button>
-
           {onNavigateToAttendance && (
             <button
               id="btn-fazer-chamada-principal"
@@ -414,13 +466,6 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
               <span>Fazer chamada</span>
             </button>
           )}
-          <button
-            onClick={() => setIsRegisterModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 px-4 py-2.5 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95 flex-1 md:flex-initial"
-          >
-            <Plus className="w-4 h-4 text-slate-600" />
-            <span>Matricular aluno</span>
-          </button>
         </div>
       </div>
 
@@ -1285,16 +1330,64 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
               </button>
             </div>
 
-            {/* Controles de Disciplina e Tipo */}
+            {/* Controles de Disciplina, Turma e Tipo */}
             <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-600">Classe:</span>
+                <select
+                  value={selectedMiniPautaClasse}
+                  onChange={(e) => {
+                    const nextC = e.target.value;
+                    setSelectedMiniPautaClasse(nextC);
+                    const nextDiscs = getDisciplinasForClass(nextC);
+                    if (!nextDiscs.includes(selectedDiscipline)) {
+                      setSelectedDiscipline(nextDiscs[0] || 'Língua Portuguesa');
+                    }
+                  }}
+                  className="text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-2xs outline-none"
+                >
+                  <optgroup label="Qualitativa (Muito Bom a Péssimo)">
+                    <option value="Iniciação">Iniciação</option>
+                    <option value="1ª Classe">1ª Classe</option>
+                    <option value="2ª Classe">2ª Classe</option>
+                  </optgroup>
+                  <optgroup label="Escala de 0 até 10 valores">
+                    <option value="3ª Classe">3ª Classe</option>
+                    <option value="4ª Classe">4ª Classe</option>
+                    <option value="5ª Classe">5ª Classe</option>
+                    <option value="6ª Classe">6ª Classe</option>
+                    <option value="PRAEER - Etapa 1">PRAEER - Etapa 1</option>
+                    <option value="PRAEER - Etapa 2">PRAEER - Etapa 2</option>
+                    <option value="PRAEER - Etapa 3">PRAEER - Etapa 3</option>
+                  </optgroup>
+                  <optgroup label="Escala de 0 até 20 valores">
+                    <option value="7ª Classe">7ª Classe</option>
+                    <option value="8ª Classe">8ª Classe</option>
+                    <option value="9ª Classe">9ª Classe</option>
+                    <option value="Módulo 1">Módulo 1</option>
+                    <option value="Módulo 2">Módulo 2</option>
+                    <option value="Módulo 3">Módulo 3</option>
+                  </optgroup>
+                </select>
+
+                <span className="text-xs font-bold text-slate-600">Turma:</span>
+                <select
+                  value={selectedMiniPautaTurma}
+                  onChange={(e) => setSelectedMiniPautaTurma(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-2xs outline-none"
+                >
+                  {SCHOOL_TURMA_LETTERS.map((l) => (
+                    <option key={l} value={`Turma ${l}`}>Turma {l}</option>
+                  ))}
+                </select>
+
                 <span className="text-xs font-bold text-slate-600">Disciplina:</span>
                 <select
                   value={selectedDiscipline}
                   onChange={(e) => setSelectedDiscipline(e.target.value)}
                   className="text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-2xs outline-none"
                 >
-                  {defaultDisciplinasList.map((d) => (
+                  {getDisciplinasForClass(selectedMiniPautaClasse).map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -1307,7 +1400,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                     selectedEvaluation === 'p1' ? 'bg-[#002133] text-white' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Prova 1 (P1)
+                  MAC / P1
                 </button>
                 <button
                   onClick={() => setSelectedEvaluation('p2')}
@@ -1315,7 +1408,7 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                     selectedEvaluation === 'p2' ? 'bg-[#002133] text-white' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Prova 2 (P2)
+                  NPP / P2
                 </button>
                 <button
                   onClick={() => setSelectedEvaluation('trabalho')}
@@ -1323,10 +1416,24 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                     selectedEvaluation === 'trabalho' ? 'bg-[#002133] text-white' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Trabalho
+                  NPT / Trim.
                 </button>
               </div>
             </div>
+
+            {/* Banner informativo da escala da classe selecionada */}
+            {(() => {
+              const modalScale = getGradingScaleForClass(selectedMiniPautaClasse);
+              return (
+                <div className="px-5 py-2 bg-slate-100/80 border-b border-slate-200 text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                  <span>
+                    Escala de Avaliação ({selectedMiniPautaClasse}):{' '}
+                    <strong className="text-[#002133]">{modalScale.badgeText}</strong>
+                  </span>
+                  <span className="text-slate-500">{modalScale.description}</span>
+                </div>
+              );
+            })()}
 
             {gradeSaveNotification && (
               <div className="px-5 py-2.5 bg-emerald-50 border-b border-emerald-100 text-xs font-bold text-emerald-700 flex items-center gap-2">
@@ -1338,13 +1445,28 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
             {/* Lista de Alunos para Lançamento */}
             <div className="p-5 overflow-y-auto divide-y divide-slate-100 flex-1">
               {students.map((student) => {
-                const gradeObj = student.grades?.find((g) => g.subject === selectedDiscipline) || {
-                  p1: 16,
-                  p2: 17,
-                  trabalho: 18,
-                  media: 16.8,
+                const modalScale = getGradingScaleForClass(selectedMiniPautaClasse);
+                const rawGradeObj = student.grades?.find((g) => g.subject === selectedDiscipline) || {
+                  p1: modalScale.maxNumeric === 10 ? 8 : 16,
+                  p2: modalScale.maxNumeric === 10 ? 8.5 : 17,
+                  trabalho: modalScale.maxNumeric === 10 ? 9 : 18,
+                  media: modalScale.maxNumeric === 10 ? 8.4 : 16.8,
                 };
-                const val = gradeObj[selectedEvaluation];
+                const defaultVal =
+                  modalScale.maxNumeric === 10 && rawGradeObj[selectedEvaluation] > 10
+                    ? Number((rawGradeObj[selectedEvaluation] / 2).toFixed(1))
+                    : modalScale.maxNumeric === 20 && rawGradeObj[selectedEvaluation] <= 10
+                    ? Number((rawGradeObj[selectedEvaluation] * 2).toFixed(1))
+                    : rawGradeObj[selectedEvaluation];
+                const defaultMedia =
+                  modalScale.maxNumeric === 10 && rawGradeObj.media > 10
+                    ? Number((rawGradeObj.media / 2).toFixed(1))
+                    : modalScale.maxNumeric === 20 && rawGradeObj.media <= 10
+                    ? Number((rawGradeObj.media * 2).toFixed(1))
+                    : rawGradeObj.media;
+
+                const inputKey = `${student.id}::${selectedMiniPautaClasse}::${selectedDiscipline}::${selectedEvaluation}`;
+                const val = gradeInputs[inputKey] ?? defaultVal;
 
                 return (
                   <div key={student.id} className="py-2.5 flex items-center justify-between gap-3">
@@ -1357,21 +1479,55 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
                           {student.name}
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          Média atual: {gradeObj.media.toFixed(1).replace('.', ',')} val
+                          Aproveitamento atual:{' '}
+                          {modalScale.scaleType === 'qualitativo'
+                            ? numericToQualitativeLabel(defaultMedia, 10)
+                            : `${defaultMedia.toFixed(1).replace('.', ',')} / ${modalScale.maxNumeric} val`}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="20"
-                        step="0.5"
-                        defaultValue={val}
-                        className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-center text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#002133]"
-                      />
-                      <span className="text-xs font-semibold text-slate-400">/ 20</span>
+                      {modalScale.scaleType === 'qualitativo' ? (
+                        <select
+                          value={numericToQualitativeLabel(val, 10)}
+                          onChange={(e) => {
+                            const num = qualitativeLabelToNumeric(
+                              e.target.value as QualitativeRatingLabel,
+                              10
+                            );
+                            setGradeInputs((prev) => ({ ...prev, [inputKey]: num }));
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#002133]"
+                        >
+                          {QUALITATIVE_SCALE_OPTIONS.map((opt) => (
+                            <option key={opt.label} value={opt.label}>
+                              {opt.label} ({opt.shortLabel})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <input
+                            type="number"
+                            min="0"
+                            max={modalScale.maxNumeric}
+                            step="0.5"
+                            value={val}
+                            onChange={(e) => {
+                              const num = Math.max(
+                                0,
+                                Math.min(modalScale.maxNumeric, Number(e.target.value))
+                              );
+                              setGradeInputs((prev) => ({ ...prev, [inputKey]: num }));
+                            }}
+                            className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-center text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#002133]"
+                          />
+                          <span className="text-xs font-semibold text-slate-400">
+                            / {modalScale.maxNumeric}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -1388,16 +1544,91 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
               </button>
               <button
                 onClick={() => {
-                  setGradeSaveNotification(`Notas de ${selectedDiscipline} (${selectedEvaluation.toUpperCase()}) guardadas com sucesso no sistema!`);
+                  const modalScale = getGradingScaleForClass(selectedMiniPautaClasse);
+                  const rows = students.map((st, idx) => {
+                    const g = st.grades?.find((x) => x.subject === selectedDiscipline) || {
+                      p1: modalScale.maxNumeric === 10 ? 7.5 : 15,
+                      p2: modalScale.maxNumeric === 10 ? 7.5 : 15,
+                      trabalho: modalScale.maxNumeric === 10 ? 8 : 16,
+                      media: modalScale.maxNumeric === 10 ? 7.6 : 15.3,
+                    };
+                    const normGrade = (v: number) =>
+                      modalScale.maxNumeric === 10 && v > 10
+                        ? Number((v / 2).toFixed(1))
+                        : modalScale.maxNumeric === 20 && v <= 10
+                        ? Number((v * 2).toFixed(1))
+                        : v;
+
+                    const mac =
+                      gradeInputs[`${st.id}::${selectedMiniPautaClasse}::${selectedDiscipline}::p1`] ??
+                      normGrade(g.p1);
+                    const npp =
+                      gradeInputs[`${st.id}::${selectedMiniPautaClasse}::${selectedDiscipline}::p2`] ??
+                      normGrade(g.p2);
+                    const npt =
+                      gradeInputs[`${st.id}::${selectedMiniPautaClasse}::${selectedDiscipline}::trabalho`] ??
+                      normGrade(g.trabalho);
+                    const mt1 = calcMT(mac, npp, npt);
+                    const mt2 = calcMT(mac, npp, npt);
+                    const mt3 = calcMT(mac, npp, npt);
+                    const mfd = calcMFD(mt1, mt2, mt3);
+                    const passed = isPassingGradeForClass(mfd, selectedMiniPautaClasse);
+                    return {
+                      studentId: st.id,
+                      numero: idx + 1,
+                      codigo: `${2700 + idx + 1}`,
+                      nomeCompleto: st.name,
+                      genero: st.genero,
+                      t1: { mac, npp, npt, mt: mt1 },
+                      t2: { mac, npp, npt, mt: mt2 },
+                      t3: { mac, npp, npt, mt: mt3 },
+                      mfd,
+                      observacao: (passed ? 'Transita' : 'Não Transita') as 'Transita' | 'Não Transita',
+                    };
+                  });
+
+                  saveTeacherMiniPauta({
+                    id: `mp-teacher-${selectedMiniPautaClasse}-${selectedMiniPautaTurma}-${selectedDiscipline}`
+                      .replace(/\s+/g, '_')
+                      .toLowerCase(),
+                    teacherId: 'prof-titular-1',
+                    teacherName: 'Prof. Santar Manuel Goes',
+                    schoolName: 'Complexo Escolar Nº 1024 - Quêssua',
+                    classe: selectedMiniPautaClasse,
+                    turma: selectedMiniPautaTurma,
+                    sala: 'Sala 04',
+                    turno: 'Manhã',
+                    anoLectivo: '2026/2027',
+                    regimeClasse: [
+                      '5ª Classe',
+                      '7ª Classe',
+                      '8ª Classe',
+                      '9ª Classe',
+                      'Módulo 1',
+                      'Módulo 2',
+                      'Módulo 3',
+                    ].includes(selectedMiniPautaClasse)
+                      ? 'pluridocente'
+                      : 'monodocente',
+                    disciplina: selectedDiscipline,
+                    trimestresSubmetidos: ['I', 'II', 'III'],
+                    status: 'submetida',
+                    updatedAt: new Date().toLocaleString('pt-AO'),
+                    rows,
+                  });
+
+                  setGradeSaveNotification(
+                    `Mini-Pauta de ${selectedDiscipline} (${selectedMiniPautaClasse} - ${selectedMiniPautaTurma} · ${modalScale.badgeText}) enviada para a Aba de Pautas do Director!`
+                  );
                   setTimeout(() => {
                     setGradeSaveNotification(null);
                     setIsGradeModalOpen(false);
-                  }, 1200);
+                  }, 1500);
                 }}
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#002133] hover:bg-[#00314d] px-4 py-2 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
               >
                 <Save className="w-3.5 h-3.5 text-[#f75142]" />
-                <span>Guardar pauta de notas</span>
+                <span>Guardar Mini-Pauta & Enviar ao Director</span>
               </button>
             </div>
           </div>
@@ -1433,12 +1664,12 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         onClose={() => setIsPautaPdfModalOpen(false)}
         students={students}
         metadata={{
-          escola: 'Escola Primária Nº 1024 - Luanda Sul',
-          turma: 'Turma 1',
+          escola: 'Escola Primária do Quéssua',
+          turma: 'Turma A',
           classe: '4ª Classe',
           turno: 'Manhã',
           sala: 'Sala 04',
-          anoLectivo: '2026',
+          anoLectivo: '2025/2026',
           trimestre: '1º Trimestre',
           professorTitular: 'Santar Goes',
         }}

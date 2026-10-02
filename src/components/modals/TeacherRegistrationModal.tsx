@@ -28,8 +28,6 @@ import {
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
 import {
-  getSchoolRegistrationData,
-  getOfferedLevelsBadges,
   syncSchoolsFromServer,
 } from '../../utils/schoolStorage';
 import {
@@ -67,10 +65,6 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   // Step navigation: 1 to 8
   const [activeTab, setActiveTab] = useState<number>(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Smart Autofill state
-  const [isAutofillMinimized, setIsAutofillMinimized] = useState(false);
-  const [selectedProfileOption, setSelectedProfileOption] = useState<string>('carlos');
 
   // 1. Identificação do Professor
   const [nomeCompleto, setNomeCompleto] = useState('');
@@ -132,11 +126,6 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
     }
     return availableSchools[0];
   }, [availableSchools, escolaId, nomeEscola]);
-
-  const selectedSchoolQuota = useMemo(() => {
-    if (!currentMatchedSchool) return null;
-    return getSchoolTeacherQuotaStatus(currentMatchedSchool);
-  }, [currentMatchedSchool, isOpen, nomeEscola, escolaId]);
 
   const handleSelectSchoolFromList = (schoolIdVal: string) => {
     const found = availableSchools.find((s) => s.id === schoolIdVal);
@@ -340,65 +329,6 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
 
   const handleRemoveDoc = (id: string) => {
     setDocumentosAnexos((prev) => prev.filter((d) => d.id !== id));
-  };
-
-  const handleApplySmartAutofill = () => {
-    if (selectedProfileOption === 'carlos') {
-      setNomeCompleto('Carlos Alberto Silva');
-      setBiNif('002918274ME039');
-      setSexo('Masculino');
-      setDataNascimento('1982-04-18');
-      setTelefone('+244 923 110 001');
-      setEmail('carlos.silva@ucore.edu.ao');
-      setMorada('Bairro Central');
-      setProvinciaResidencia('Malanje');
-      setMunicipioResidencia('Quéssua');
-      setNomeEscola(availableSchools[0]?.name || defaultSchoolName || '');
-      setNaturezaEscola('Pública');
-      setFuncaoCategoria('Docente / Professor');
-      setNivelAcademico('Licenciado');
-      setRegimeTrabalho('Efectivo');
-      setAnosServico(12);
-      setDisciplinas('Matemática & Física');
-      setErrorMessage(null);
-    } else if (selectedProfileOption === 'santar') {
-      setNomeCompleto('Santar Manuel Goes');
-      setBiNif('004928172ME041');
-      setSexo('Masculino');
-      setDataNascimento('1992-06-15');
-      setTelefone('+244 923 000 000');
-      setEmail('santar.goes@ucore.edu.ao');
-      setMorada('Bairro Central');
-      setProvinciaResidencia('Malanje');
-      setMunicipioResidencia('Quéssua');
-      setNomeEscola(availableSchools[0]?.name || defaultSchoolName || '');
-      setNaturezaEscola('Pública');
-      setFuncaoCategoria('Docente / Professor');
-      setNivelAcademico('Licenciado');
-      setRegimeTrabalho('Efectivo');
-      setAnosServico(5);
-      setDisciplinas('Língua Portuguesa & Matemática');
-      setErrorMessage(null);
-    } else if (selectedProfileOption === 'teresa') {
-      setNomeCompleto('Teresa Manuel Quessua');
-      setBiNif('007812934ME042');
-      setSexo('Feminino');
-      setDataNascimento('1995-11-20');
-      setTelefone('+244 931 552 114');
-      setEmail('teresa.quessua@ucore.edu.ao');
-      setMorada('Bairro Vila Matilde');
-      setProvinciaResidencia('Malanje');
-      setMunicipioResidencia('Quéssua');
-      setNomeEscola('Jardim de Infância Municipal de Quéssua');
-      setNaturezaEscola('Pública');
-      setFuncaoCategoria('Educador(a) de Infância');
-      setTipoInstituicao('Jardim de Infância');
-      setNivelAcademico('Bacharelato');
-      setRegimeTrabalho('Contratado');
-      setAnosServico(4);
-      setDisciplinas('Expressão Plástica & Psicomotricidade');
-      setErrorMessage(null);
-    }
   };
 
   const handleNextStep = () => {
@@ -698,53 +628,6 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
             ======================================================== */}
             {activeTab === 1 && (
               <div className="space-y-6 animate-in fade-in duration-150">
-                {/* Preenchimento Inteligente */}
-                <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">
-                          Preenchimento Inteligente <span className="text-xs font-normal text-indigo-600 ml-1 font-semibold">AUXILIAR</span>
-                        </p>
-                        <p className="text-xs text-slate-500">Carregue os dados a partir de um perfil registado.</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAutofillMinimized(!isAutofillMinimized)}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 cursor-pointer"
-                    >
-                      {isAutofillMinimized ? 'Expandir' : 'Minimizar'}
-                    </button>
-                  </div>
-
-                  {!isAutofillMinimized && (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <select
-                        value={selectedProfileOption}
-                        onChange={(e) => setSelectedProfileOption(e.target.value)}
-                        className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="carlos">Sua Conta Ativa (Carlos Silva) — Sessão iniciada como DIRETOR</option>
-                        <option value="santar">Perfil Demonstrativo (Santar Manuel Goes) — Docente Efectivo</option>
-                        <option value="teresa">Perfil de Educador(a) (Teresa Manuel) — Educação Pré-Escolar</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleApplySmartAutofill}
-                        className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs"
-                      >
-                        Preencher com este Perfil
-                      </button>
-                    </div>
-                  )}
-                </div>
-
                 <div className="flex items-center gap-2">
                   <span className="w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
                     1
@@ -756,107 +639,6 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
                 </div>
 
                 <div className="space-y-4">
-                  {/* Selector Oficial da Escola Cadastrada + Reconciliação de Pendentes */}
-                  <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-amber-900">
-                          Unidade Escolar de Alocação (Instrumento Complementar 2026/2027) <span className="text-rose-500">*</span>
-                        </label>
-                        <p className="text-[11px] text-amber-800 mt-0.5">
-                          Seleccione a escola onde o docente lecciona. Ao cadastrar o docente, o número de pendentes da escola diminui automaticamente e o registo entra na planilha oficial.
-                        </p>
-                      </div>
-                    </div>
-
-                    <select
-                      value={currentMatchedSchool?.id || escolaId || ''}
-                      onChange={(e) => handleSelectSchoolFromList(e.target.value)}
-                      className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
-                    >
-                      {availableSchools.map((sc) => {
-                        const q = getSchoolTeacherQuotaStatus(sc);
-                        const reg = getSchoolRegistrationData(sc);
-                        return (
-                          <option key={sc.id} value={sc.id}>
-                            {sc.name} [{reg.codigoSIGE || sc.codigoSIGE || 'SIGE'}] ({reg.natureza || sc.natureza || 'Pública'} • {sc.category}) — Declarados: {q.declaredTotal} | Cadastrados: {q.registeredCount} | Pendentes: {q.pendingCount}
-                          </option>
-                        );
-                      })}
-                    </select>
-
-                    {currentMatchedSchool && (() => {
-                      const reg = getSchoolRegistrationData(currentMatchedSchool);
-                      const offered = getOfferedLevelsBadges(reg.oferta);
-                      return (
-                        <div className="p-2.5 rounded-lg bg-white/95 border border-amber-200/90 text-[11px] text-slate-700 space-y-1.5">
-                          <div className="flex flex-wrap items-center justify-between gap-1.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-black uppercase">
-                                {reg.codigoSIGE || currentMatchedSchool.codigoSIGE || 'SIGE'}
-                              </span>
-                              <span className="font-bold text-slate-900">{currentMatchedSchool.name}</span>
-                              <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-bold">
-                                {reg.natureza || currentMatchedSchool.natureza || 'Pública'} • {currentMatchedSchool.category}
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-semibold text-slate-500">
-                              Local: {currentMatchedSchool.location} • Salas: {currentMatchedSchool.roomsCount || reg.infraestrutura.totalSalas || 0} • Turmas: {currentMatchedSchool.turmasCount || reg.infraestrutura.turmasFuncionamento || 0}
-                            </span>
-                          </div>
-                          {offered.length > 0 && (
-                            <div className="flex flex-wrap gap-1 pt-0.5">
-                              {offered.map((b, idx) => (
-                                <span key={idx} className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-semibold">
-                                  {b}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {selectedSchoolQuota && (
-                      <div className="grid grid-cols-3 gap-2 pt-1">
-                        <div className="bg-white/90 border border-amber-200 rounded-lg px-3 py-2">
-                          <span className="block text-[10px] font-bold uppercase text-slate-500">
-                            Declarados na Escola
-                          </span>
-                          <span className="text-base font-black text-slate-900">
-                            {selectedSchoolQuota.declaredTotal}
-                          </span>
-                        </div>
-                        <div className="bg-emerald-50/90 border border-emerald-200 rounded-lg px-3 py-2">
-                          <span className="block text-[10px] font-bold uppercase text-emerald-700">
-                            Cadastrados (Na Planilha)
-                          </span>
-                          <span className="text-base font-black text-emerald-800">
-                            {selectedSchoolQuota.registeredCount}
-                            {!initialData && (
-                              <span className="text-xs font-bold text-emerald-600 ml-1">
-                                → {selectedSchoolQuota.registeredCount + 1}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <div className="bg-amber-100/80 border border-amber-300 rounded-lg px-3 py-2">
-                          <span className="block text-[10px] font-bold uppercase text-amber-900">
-                            Docentes Pendentes
-                          </span>
-                          <span className="text-base font-black text-amber-900">
-                            {selectedSchoolQuota.pendingCount}
-                            {!initialData && selectedSchoolQuota.pendingCount > 0 && (
-                              <span className="text-xs font-bold text-emerald-700 ml-1">
-                                → {Math.max(0, selectedSchoolQuota.pendingCount - 1)}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                       Nome Completo <span className="text-rose-500">*</span>

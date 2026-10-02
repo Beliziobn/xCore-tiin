@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { STANDARD_ROOMS, STANDARD_TURMAS, ALL_SCHOOL_CLASSES } from '../../data/classesConfig';
 
 interface RoomRegistrationModalProps {
   isOpen: boolean;
@@ -16,8 +17,8 @@ export const RoomRegistrationModal: React.FC<RoomRegistrationModalProps> = ({
   directorName = 'Fert Horlan',
 }) => {
   const [roomName, setRoomName] = useState('');
-  const [gradeClass, setGradeClass] = useState('4ª Classe');
-  const [roomNumber, setRoomNumber] = useState('Sala 03');
+  const [gradeClass, setGradeClass] = useState('1ª Classe');
+  const [roomNumber, setRoomNumber] = useState('Sala 01');
   const [period, setPeriod] = useState('Manhã (07h30 – 12h00)');
   const [turma, setTurma] = useState('Turma A');
   const [capacity, setCapacity] = useState<number | string>(45);
@@ -28,16 +29,16 @@ export const RoomRegistrationModal: React.FC<RoomRegistrationModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomName.trim()) return;
+    const resolvedName = roomName.trim() || `${roomNumber} – ${gradeClass} (${turma})`;
 
     setIsSubmitting(true);
     const createdItem = {
       id: 'room-' + Date.now(),
-      name: roomName.trim(),
+      name: resolvedName,
       gradeClass,
       room: roomNumber,
       turma,
-      period: period.includes('Tarde') ? 'Tarde' : 'Manhã',
+      period: period.includes('Tarde') ? 'Tarde' : period.includes('Noite') ? 'Noite' : 'Manhã',
       studentCount: parseInt(String(capacity), 10) || 45,
       capacity: parseInt(String(capacity), 10) || 45,
       type: roomType,
@@ -97,18 +98,17 @@ export const RoomRegistrationModal: React.FC<RoomRegistrationModalProps> = ({
           <div className="px-6 py-5 space-y-5">
             {/* Nome da Sala */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Número / Nome da Sala</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Designação / Bloco da Sala (Opcional)</label>
               <input
                 type="text"
-                required
-                placeholder="Ex: Sala 12 – Bloco C"
+                placeholder="Ex: Sala 01 – Bloco A (ou deixe em branco para gerar automaticamente)"
                 value={roomName}
                 onChange={(e) => setRoomName(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
               />
             </div>
 
-            {/* Classe + Sala */}
+            {/* Classe + Sala (1 a 19) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Classe</label>
@@ -117,30 +117,30 @@ export const RoomRegistrationModal: React.FC<RoomRegistrationModalProps> = ({
                   onChange={(e) => setGradeClass(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 >
-                  <option>4ª Classe</option>
-                  <option>1ª Classe</option>
-                  <option>2ª Classe</option>
-                  <option>3ª Classe</option>
-                  <option>5ª Classe</option>
-                  <option>6ª Classe</option>
+                  {ALL_SCHOOL_CLASSES.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala (1 a 19)</label>
                 <select
                   value={roomNumber}
                   onChange={(e) => setRoomNumber(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 >
-                  <option>Sala 03</option>
-                  <option>Sala 01</option>
-                  <option>Sala 02</option>
-                  <option>Sala 04</option>
+                  {STANDARD_ROOMS.map((rm) => (
+                    <option key={rm} value={rm}>
+                      {rm}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
-            {/* Período + Turma */}
+            {/* Período + Turma (A até F) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Período / Turno</label>
@@ -155,15 +155,17 @@ export const RoomRegistrationModal: React.FC<RoomRegistrationModalProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma (A até F)</label>
                 <select
                   value={turma}
                   onChange={(e) => setTurma(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 >
-                  <option>Turma A</option>
-                  <option>Turma B</option>
-                  <option>Turma C</option>
+                  {STANDARD_TURMAS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

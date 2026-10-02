@@ -31,6 +31,8 @@ import {
 } from '../../utils/studentStorage';
 import {
   incrementTurmaOccupancy,
+  STANDARD_ROOMS,
+  STANDARD_TURMAS,
 } from '../../data/classesConfig';
 import {
   getSchoolRegistrationData,
@@ -1694,22 +1696,32 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma (A até F)</label>
+                    <select
                       value={turma}
                       onChange={(e) => setTurma(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                    >
+                      {STANDARD_TURMAS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala (1 a 19)</label>
+                    <select
                       value={sala}
                       onChange={(e) => setSala(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                    >
+                      {STANDARD_ROOMS.map((rm) => (
+                        <option key={rm} value={rm}>
+                          {rm}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

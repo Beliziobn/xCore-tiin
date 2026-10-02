@@ -24,6 +24,7 @@ import { DirectorClassesPage } from './components/pages/director/DirectorClasses
 import { DirectorProfilePage } from './components/pages/director/DirectorProfilePage';
 import { DirectorAttendancePage } from './components/pages/director/DirectorAttendancePage';
 import { DirectorApprovalsPage } from './components/pages/director/DirectorApprovalsPage';
+import { DirectorPautasPage } from './components/pages/director/DirectorPautasPage';
 
 // Admin Pages & Components
 import { AdminStatisticsPage } from './components/pages/admin/AdminStatisticsPage';
@@ -241,6 +242,10 @@ export default function App() {
   const [isRagModalOpen, setIsRagModalOpen] = useState(false);
   const [ragInitialQuery, setRagInitialQuery] = useState('');
   const [homeAIResponse, setHomeAIResponse] = useState<string | null>(null);
+  const [directorPautaTarget, setDirectorPautaTarget] = useState<{ classe: string; turma: string }>({
+    classe: '4ª Classe',
+    turma: 'Turma A',
+  });
 
   const handleHomeAICommand = (prompt: string) => {
     if (!prompt.trim()) return;
@@ -1097,12 +1102,21 @@ export default function App() {
       pageId === 'diretor-alunos' ||
       pageId === 'diretor-salas' ||
       pageId === 'diretor-classes' ||
+      pageId === 'diretor-pautas' ||
       pageId === 'diretor-aprovacoes' ||
       pageId === 'diretor-inscricoes' ||
       pageId === 'diretor-perfil' ||
       pageId === 'diretor-presenca'
     ) {
       setCurrentView(pageId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (
+      activeRole === 'diretor' &&
+      (pageId === 'pautas' || pageId === 'mini-pautas' || pageId === 'pauta-final')
+    ) {
+      setCurrentView('diretor-pautas');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -1518,6 +1532,28 @@ export default function App() {
         <DirectorClassesPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          onNavigateToPautas={(classe, turma) => {
+            if (classe || turma) {
+              setDirectorPautaTarget({
+                classe: classe || '4ª Classe',
+                turma: turma || 'Turma A',
+              });
+            }
+            setCurrentView('diretor-pautas');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+    if (currentView === 'diretor-pautas') {
+      return (
+        <DirectorPautasPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          schoolName={currentUser?.schoolName || adminSchools[0]?.name || 'Complexo Escolar Nº 1024 - Quêssua'}
+          directorName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Fert Horlan (Director da Escola)'}
+          initialClasse={directorPautaTarget.classe}
+          initialTurma={directorPautaTarget.turma}
         />
       );
     }
@@ -2163,6 +2199,18 @@ export default function App() {
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                   <span>🧠 Pareceres & RAG Inteligente MED</span>
                 </button>
+                {activeRole === 'diretor' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentView('diretor-pautas');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-xs font-black bg-[#fef2f1] hover:bg-[#fee4e2] text-[#f75142] px-3.5 py-1.5 rounded-full border border-[#f75142]/30 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    📋 Aba de Mini-Pautas & Pauta Final (Por Turma)
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {

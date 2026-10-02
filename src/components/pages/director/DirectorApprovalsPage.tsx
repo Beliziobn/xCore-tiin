@@ -440,14 +440,6 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                   <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
                   <span>Sincronizar</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSimulateModal(true)}
-                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Simular Inscrição</span>
-                </button>
               </div>
             </div>
           </div>

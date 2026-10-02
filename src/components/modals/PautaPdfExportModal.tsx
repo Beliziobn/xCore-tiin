@@ -7,17 +7,18 @@ import {
   BookOpen,
   Calendar,
   CheckCircle2,
-  AlertCircle,
-  Clock,
-  Sparkles,
   Loader2,
   Check,
   GraduationCap,
-  Users,
-  LayoutList
 } from 'lucide-react';
-import { StudentProfile, defaultDisciplinasList } from '../../data/teacherData';
+import { StudentProfile } from '../../data/teacherData';
 import { exportPautaToPDF, PautaMetadata } from '../../utils/pautaPdfExporter';
+import {
+  getGradingScaleForClass,
+  getDisciplinasForClass,
+  formatGradeForClass,
+  isPassingGradeForClass,
+} from '../../utils/miniPautaStorage';
 
 export interface PautaPdfExportModalProps {
   isOpen: boolean;
@@ -33,37 +34,97 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
   metadata,
 }) => {
   const safeMetadata: PautaMetadata = metadata || {};
-  const [mode, setMode] = useState<'geral' | 'disciplina'>('geral');
-  const [selectedDiscipline, setSelectedDiscipline] = useState<string>('Língua Portuguesa');
+  const [selectedClasse, setSelectedClasse] = useState<string>(safeMetadata.classe || '4ª Classe');
+  const [selectedPeriodo, setSelectedPeriodo] = useState<'I' | 'II' | 'III' | 'FINAL'>('I');
+  const [selectedDisciplineFilter, setSelectedDisciplineFilter] = useState<string>('Matemática');
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState(false);
 
-  // Statistics
+  const isAllDisciplines = selectedDisciplineFilter === 'TODAS';
+  const isFinal = selectedPeriodo === 'FINAL';
+  const classScale = useMemo(() => getGradingScaleForClass(selectedClasse), [selectedClasse]);
+  const classDisciplinas = useMemo(() => getDisciplinasForClass(selectedClasse), [selectedClasse]);
+
+  const normGradeForSelectedClass = (raw: number): number => {
+    if (classScale.maxNumeric === 10 && raw > 10) return Number((raw / 2).toFixed(1));
+    if (classScale.maxNumeric === 20 && raw <= 10 && raw > 0) return Number((raw * 2).toFixed(1));
+    return Number(raw.toFixed(1));
+  };
+
+  // Helper to compute trimester-specific and final metrics per discipline (sem notas fictícias)
+  const getStudentDisciplineMetrics = (student: StudentProfile, subj: string) => {
+    const g = (student.grades || []).find((x) => x.subject === subj);
+    if (!g) {
+      return null;
+    }
+    const baseMac = normGradeForSelectedClass(g.p1);
+    const baseNpp = normGradeForSelectedClass(g.p2);
+    const baseNpt = normGradeForSelectedClass(g.trabalho);
+    const mt1 = Number(((baseMac + baseNpp + baseNpt) / 3).toFixed(1));
+
+    const t2Mac = baseMac;
+    const t2Npp = baseNpp;
+    const t2Npt = baseNpt;
+    const mt2 = mt1;
+
+    const t3Mac = baseMac;
+    const t3Npp = baseNpp;
+    const t3Npt = baseNpt;
+    const mt3 = mt1;
+
+    const mfd = Number(((mt1 + mt2 + mt3) / 3).toFixed(1));
+
+    return {
+      t1: { mac: baseMac, npp: baseNpp, npt: baseNpt, mt: mt1 },
+      t2: { mac: t2Mac, npp: t2Npp, npt: t2Npt, mt: mt2 },
+      t3: { mac: t3Mac, npp: t3Npp, npt: t3Npt, mt: mt3 },
+      mfd,
+    };
+  };
+
+  const getActivePeriodScore = (student: StudentProfile, subj: string): number | null => {
+    const m = getStudentDisciplineMetrics(student, subj);
+    if (!m) return null;
+    if (selectedPeriodo === 'I') return m.t1.mt;
+    if (selectedPeriodo === 'II') return m.t2.mt;
+    if (selectedPeriodo === 'III') return m.t3.mt;
+    return m.mfd;
+  };
+
+  // Statistics strictly for the chosen period and discipline filter
   const stats = useMemo(() => {
     const total = students.length;
+    let evaluatedCount = 0;
     let aprovados = 0;
     let honra = 0;
     let risco = 0;
     let reprovados = 0;
     let somaMedias = 0;
+    const minPass = classScale.minPassNumeric;
+    const honraCut = classScale.maxNumeric === 10 ? 8 : 16;
+    const riscoCut = classScale.maxNumeric === 10 ? 5.4 : 10.5;
 
     students.forEach((st) => {
-      let m = 14.0;
-      if (st.grades && st.grades.length > 0) {
-        if (mode === 'disciplina') {
-          const g = st.grades.find((x) => x.subject === selectedDiscipline);
-          m = g ? g.media : 14.0;
-        } else {
-          m = st.grades.reduce((acc, g) => acc + g.media, 0) / st.grades.length;
+      let m: number | null = null;
+      if (!isAllDisciplines) {
+        m = getActivePeriodScore(st, selectedDisciplineFilter);
+      } else {
+        const validScores = classDisciplinas
+          .map((subj) => getActivePeriodScore(st, subj))
+          .filter((v): v is number => v !== null);
+        if (validScores.length > 0) {
+          m = validScores.reduce((a, b) => a + b, 0) / validScores.length;
         }
       }
+      if (m === null) return;
+      evaluatedCount++;
       somaMedias += m;
-      if (m >= 16) {
+      if (m >= honraCut) {
         honra++;
         aprovados++;
-      } else if (m >= 10) {
-        if (m < 10.5 || (st.presencaPercent ?? 100) < 75) {
+      } else if (isPassingGradeForClass(m, selectedClasse)) {
+        if (m < riscoCut || (st.presencaPercent ?? 100) < 75) {
           risco++;
         }
         aprovados++;
@@ -72,11 +133,24 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
       }
     });
 
-    const mediaTurma = total > 0 ? (somaMedias / total).toFixed(1) : '14.0';
-    const taxaAprovacao = total > 0 ? Math.round((aprovados / total) * 100) : 100;
+    const avgNum = evaluatedCount > 0 ? somaMedias / evaluatedCount : 0;
+    const mediaTurma =
+      evaluatedCount > 0 ? formatGradeForClass(avgNum, selectedClasse) : '—';
+    const taxaAprovacao =
+      evaluatedCount > 0 ? Math.round((aprovados / evaluatedCount) * 100) : 0;
 
-    return { total, aprovados, honra, risco, reprovados, mediaTurma, taxaAprovacao };
-  }, [students, mode, selectedDiscipline]);
+    return { total, aprovados, honra, risco, reprovados, mediaTurma, taxaAprovacao, minPass, honraCut };
+  }, [students, isAllDisciplines, selectedDisciplineFilter, selectedPeriodo, selectedClasse, classScale, classDisciplinas]);
+
+  const periodoFullTitle =
+    selectedPeriodo === 'FINAL'
+      ? 'PAUTA FINAL (Iº, IIº E IIIº TRIMESTRE)'
+      : `MINI-PAUTA DO ${selectedPeriodo}º TRIMESTRE`;
+
+  const resolvedSchoolName =
+    safeMetadata.escola && !safeMetadata.escola.toLowerCase().includes('luanda')
+      ? safeMetadata.escola
+      : 'Escola Primária do Quéssua';
 
   const handleDownload = async () => {
     setIsExporting(true);
@@ -87,17 +161,19 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
       await exportPautaToPDF({
         students,
         metadata: {
-          escola: safeMetadata.escola || 'Escola Primária Nº 1024 - Luanda Sul',
-          turma: safeMetadata.turma || 'Turma 1',
-          classe: safeMetadata.classe || '4ª Classe',
+          escola: resolvedSchoolName,
+          turma: safeMetadata.turma || 'Turma A',
+          classe: selectedClasse,
           turno: safeMetadata.turno || 'Manhã',
           sala: safeMetadata.sala || 'Sala 04',
-          anoLectivo: safeMetadata.anoLectivo || '2026',
-          trimestre: safeMetadata.trimestre || '1º Trimestre',
+          anoLectivo: safeMetadata.anoLectivo || '2025/2026',
+          trimestre: periodoFullTitle,
+          periodo: selectedPeriodo,
           professorTitular: safeMetadata.professorTitular || 'Santar Goes',
         },
-        mode,
-        selectedDiscipline,
+        mode: isAllDisciplines ? 'geral' : 'disciplina',
+        periodo: selectedPeriodo,
+        selectedDiscipline: selectedDisciplineFilter,
         onProgress: (msg) => setExportMessage(msg),
       });
 
@@ -127,7 +203,7 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
       id="pauta-pdf-export-modal"
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200"
     >
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header Bar */}
         <div className="bg-[#002133] text-white px-5 sm:px-6 py-4 flex items-center justify-between gap-4 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -137,14 +213,14 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
-                  Exportar Pauta de Avaliação
+                  Gerar Mini-Pauta / Pauta Final (PDF)
                 </h3>
                 <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  PDF Vetorial (jsPDF)
+                  Filtro por Trimestre e Disciplina
                 </span>
               </div>
               <p className="text-xs text-slate-300">
-                Pauta curricular oficial com notas, médias trimestrais e parecer de aprovação
+                Escolha o período (Iº, IIº, IIIº Trimestre ou Pauta Final) e a disciplina específica ou todas as disciplinas
               </p>
             </div>
           </div>
@@ -159,51 +235,91 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Toolbar: Configuração do Relatório */}
-        <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 shrink-0">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Seletor de Modelo de Pauta */}
+        {/* Modal Toolbar: Configuração Independente de Período, Disciplina e Classe */}
+        <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* 1. Seletor de Período (Iº, IIº, IIIº Trimestre ou Pauta Final) */}
             <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-2xs">
-              <button
-                onClick={() => setMode('geral')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  mode === 'geral'
-                    ? 'bg-[#002133] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Pauta Geral (Todas as Disciplinas)
-              </button>
-              <button
-                onClick={() => setMode('disciplina')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  mode === 'disciplina'
-                    ? 'bg-[#002133] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Pauta por Disciplina
-              </button>
+              {(
+                [
+                  { id: 'I', label: 'Iº Trimestre' },
+                  { id: 'II', label: 'IIº Trimestre' },
+                  { id: 'III', label: 'IIIº Trimestre' },
+                  { id: 'FINAL', label: 'Pauta Final' },
+                ] as const
+              ).map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPeriodo(p.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedPeriodo === p.id
+                      ? 'bg-[#002133] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
 
-            {/* Dropdown de Disciplina (quando em modo por disciplina) */}
-            {mode === 'disciplina' && (
-              <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs">
-                <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
-                <span className="text-xs font-bold text-slate-500">Disciplina:</span>
-                <select
-                  value={selectedDiscipline}
-                  onChange={(e) => setSelectedDiscipline(e.target.value)}
-                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
-                >
-                  {defaultDisciplinasList.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* 2. Seletor de Disciplina (Independente: mantém a disciplina ao trocar de trimestre!) */}
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs">
+              <BookOpen className="w-3.5 h-3.5 text-[#f75142]" />
+              <span className="text-xs font-bold text-slate-500">Disciplina:</span>
+              <select
+                value={selectedDisciplineFilter}
+                onChange={(e) => setSelectedDisciplineFilter(e.target.value)}
+                className="text-xs font-bold text-slate-900 bg-transparent outline-none cursor-pointer"
+              >
+                <option value="TODAS">Todas as Disciplinas ({classDisciplinas.length})</option>
+                {classDisciplinas.map((d) => (
+                  <option key={d} value={d}>
+                    Apenas {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Seletor de Classe e Escala */}
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs">
+              <GraduationCap className="w-3.5 h-3.5 text-[#f75142]" />
+              <span className="text-xs font-bold text-slate-500">Classe:</span>
+              <select
+                value={selectedClasse}
+                onChange={(e) => {
+                  const nextC = e.target.value;
+                  setSelectedClasse(nextC);
+                  const nextDiscs = getDisciplinasForClass(nextC);
+                  if (selectedDisciplineFilter !== 'TODAS' && !nextDiscs.includes(selectedDisciplineFilter)) {
+                    setSelectedDisciplineFilter(nextDiscs[0] || 'Língua Portuguesa');
+                  }
+                }}
+                className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+              >
+                <optgroup label="Qualitativa (Muito Bom a Péssimo)">
+                  <option value="Iniciação">Iniciação</option>
+                  <option value="1ª Classe">1ª Classe</option>
+                  <option value="2ª Classe">2ª Classe</option>
+                </optgroup>
+                <optgroup label="Escala 0 até 10">
+                  <option value="3ª Classe">3ª Classe</option>
+                  <option value="4ª Classe">4ª Classe</option>
+                  <option value="5ª Classe">5ª Classe</option>
+                  <option value="6ª Classe">6ª Classe</option>
+                  <option value="PRAEER - Etapa 1">PRAEER - Etapa 1</option>
+                  <option value="PRAEER - Etapa 2">PRAEER - Etapa 2</option>
+                  <option value="PRAEER - Etapa 3">PRAEER - Etapa 3</option>
+                </optgroup>
+                <optgroup label="Escala 0 até 20">
+                  <option value="7ª Classe">7ª Classe</option>
+                  <option value="8ª Classe">8ª Classe</option>
+                  <option value="9ª Classe">9ª Classe</option>
+                  <option value="Módulo 1">Módulo 1</option>
+                  <option value="Módulo 2">Módulo 2</option>
+                  <option value="Módulo 3">Módulo 3</option>
+                </optgroup>
+              </select>
+            </div>
           </div>
 
           {/* Botões de Ação de Download e Impressão */}
@@ -242,7 +358,10 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
               ) : (
                 <>
                   <FileDown className="w-4 h-4" />
-                  <span>Baixar Pauta em PDF</span>
+                  <span>
+                    Baixar {selectedPeriodo === 'FINAL' ? 'Pauta Final' : `Mini-Pauta ${selectedPeriodo}º Trim.`} (
+                    {isAllDisciplines ? 'Todas' : selectedDisciplineFilter})
+                  </span>
                 </>
               )}
             </button>
@@ -267,249 +386,363 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
           </div>
         )}
 
-        {/* Modal Body: Pré-visualização da Pauta */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {/* Cabeçalho da Pauta Estilizada (Padrão MED Angola) */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
-            <div className="text-center space-y-0.5 border-b border-slate-100 pb-3">
-              <div className="text-[11px] font-black text-slate-800 tracking-wider">
-                REPÚBLICA DE ANGOLA · MINISTÉRIO DA EDUCAÇÃO
+        {/* Modal Body: Documento Escolar Único (Folha de Mini-Pauta / Pauta) */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-200/80">
+          <div className="bg-white w-full max-w-4xl mx-auto shadow-md border border-slate-300 p-4 sm:p-8 text-black overflow-hidden box-border">
+            {/* Cabeçalho Institucional Simples — Município do Quéssua */}
+            <div className="text-center font-serif space-y-0.5 mb-4">
+              <p className="text-xs sm:text-sm font-normal uppercase tracking-wide text-black">
+                REPÚBLICA DE ANGOLA
+              </p>
+              <p className="text-xs sm:text-sm font-normal uppercase tracking-wide text-black">
+                ADMINISTRAÇÃO MUNICIPAL DO QUÉSSUA
+              </p>
+              <p className="text-xs sm:text-sm font-normal uppercase tracking-wide text-black">
+                DIRECÇÃO MUNICIPAL DA EDUCAÇÃO DO QUÉSSUA
+              </p>
+              <p className="text-xs sm:text-sm font-bold uppercase tracking-wide text-black pt-0.5">
+                {isFinal ? 'PAUTA FINAL' : 'MINI-PAUTA'}
+              </p>
+              <p className="text-xs sm:text-sm font-bold uppercase tracking-wide text-black">
+                {resolvedSchoolName.toUpperCase()}
+              </p>
+            </div>
+
+            {/* Linha de Identificação Acima da Grelha */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs font-serif font-bold uppercase text-black mb-1.5">
+              <div className="truncate max-w-full">
+                <span>DISCIPLINA: </span>
+                <span className="font-normal">
+                  {isAllDisciplines ? 'TODAS AS DISCIPLINAS' : selectedDisciplineFilter.toUpperCase()}
+                </span>
               </div>
-              <div className="text-xs text-slate-500 font-semibold">
-                GOVERNO PROVINCIAL DE LUANDA · DIRECÇÃO MUNICIPAL DA EDUCAÇÃO
-              </div>
-              <div className="text-sm font-black text-[#002133] pt-0.5">
-                ESCOLA PRIMÁRIA Nº 1024 - LUANDA SUL
-              </div>
-              <div className="inline-block mt-1.5 px-3 py-1 bg-[#002133] text-white text-xs font-black rounded-lg uppercase tracking-wide">
-                {mode === 'geral'
-                  ? 'PAUTA OFICIAL DE AVALIAÇÃO E APROVEITAMENTO ESCOLAR · 1º TRIMESTRE / 2026'
-                  : `PAUTA PARCELAR · ${selectedDiscipline.toUpperCase()} · 1º TRIMESTRE / 2026`}
+              <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+                <div>
+                  <span>CLASSE: </span>
+                  <span className="font-normal">{selectedClasse.toUpperCase()}</span>
+                </div>
+                <div>
+                  <span>TURMA: </span>
+                  <span className="font-normal">
+                    {(safeMetadata.turma || 'A').replace(/^Turma\s+/i, '').toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <span>ANO LECTIVO: </span>
+                  <span className="text-red-700 font-bold">{safeMetadata.anoLectivo || '2025/2026'}</span>
+                </div>
               </div>
             </div>
 
-            {/* Metadados da Turma */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Turma / Classe:</span>
-                <span className="font-bold text-slate-800">4ª Classe · Turma 1</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Turno / Sala:</span>
-                <span className="font-bold text-slate-800">Manhã · Sala 04</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Docente Titular:</span>
-                <span className="font-bold text-slate-800">Santar Goes</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Alunos Avaliados:</span>
-                <span className="font-bold text-[#f75142]">{stats.total} Estudantes</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Mini Indicadores de Aproveitamento */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-            <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-3 text-center">
-              <span className="text-[11px] font-bold text-emerald-800 block">Aprovados</span>
-              <span className="text-xl font-black text-emerald-700">{stats.aprovados}</span>
-              <span className="text-[10px] font-semibold text-emerald-600 block">{stats.taxaAprovacao}% taxa</span>
-            </div>
-            <div className="bg-purple-50/80 border border-purple-200/80 rounded-xl p-3 text-center">
-              <span className="text-[11px] font-bold text-purple-800 block">Quadro de Honra</span>
-              <span className="text-xl font-black text-purple-700">{stats.honra}</span>
-              <span className="text-[10px] font-semibold text-purple-600 block">Média ≥ 16</span>
-            </div>
-            <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 text-center">
-              <span className="text-[11px] font-bold text-amber-800 block">Em Risco</span>
-              <span className="text-xl font-black text-amber-700">{stats.risco}</span>
-              <span className="text-[10px] font-semibold text-amber-600 block">Apoio Pedagógico</span>
-            </div>
-            <div className="bg-rose-50/80 border border-rose-200/80 rounded-xl p-3 text-center">
-              <span className="text-[11px] font-bold text-rose-800 block">Abaixo da Média</span>
-              <span className="text-xl font-black text-rose-700">{stats.reprovados}</span>
-              <span className="text-[10px] font-semibold text-rose-600 block">Média &lt; 10</span>
-            </div>
-            <div className="bg-[#fef2f1] border border-[#fee4e2] rounded-xl p-3 text-center col-span-2 sm:col-span-1">
-              <span className="text-[11px] font-bold text-[#f75142] block">Média da Turma</span>
-              <span className="text-xl font-black text-[#f75142]">{stats.mediaTurma}</span>
-              <span className="text-[10px] font-semibold text-slate-500 block">Valores (0 a 20)</span>
-            </div>
-          </div>
-
-          {/* Tabela de Pré-visualização das Notas */}
-          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-            <div className="overflow-x-auto max-h-[380px]">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="sticky top-0 bg-[#002133] text-white z-10">
-                  <tr className="text-[11px] font-bold uppercase tracking-wider">
-                    <th className="py-2.5 px-3 text-center w-12">Nº</th>
-                    <th className="py-2.5 px-3 min-w-[180px]">Nome do Aluno</th>
-                    <th className="py-2.5 px-2 text-center w-14">Sexo</th>
-                    {mode === 'geral' ? (
-                      <>
-                        <th className="py-2.5 px-2 text-center" title="Língua Portuguesa">L. Port</th>
-                        <th className="py-2.5 px-2 text-center" title="Matemática">Mat</th>
-                        <th className="py-2.5 px-2 text-center" title="Ciências Naturais">C. Nat</th>
-                        <th className="py-2.5 px-2 text-center" title="História">Hist</th>
-                        <th className="py-2.5 px-2 text-center" title="Geografia">Geog</th>
-                        <th className="py-2.5 px-2 text-center" title="Educação Física">Ed. Fís</th>
-                        <th className="py-2.5 px-2 text-center" title="Educação Visual e Plástica">E.V.P</th>
-                        <th className="py-2.5 px-3 text-center bg-slate-800">Média Geral</th>
-                        <th className="py-2.5 px-2 text-center">Pres.</th>
-                        <th className="py-2.5 px-3 text-center min-w-[110px]">Resultado</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="py-2.5 px-3 text-center">Prova 1 (P1)</th>
-                        <th className="py-2.5 px-3 text-center">Prova 2 (P2)</th>
-                        <th className="py-2.5 px-3 text-center">Trabalho</th>
-                        <th className="py-2.5 px-3 text-center bg-slate-800">Média</th>
-                        <th className="py-2.5 px-3 text-center">Situação</th>
-                      </>
-                    )}
-                  </tr>
+            {/* Tabela Escolar Tradicional Contida na Div */}
+            <div className="w-full overflow-x-auto">
+              <table className="w-full table-fixed border-collapse border border-black text-[10px] sm:text-[11px] font-serif text-black">
+                <thead>
+                  {isAllDisciplines ? (
+                    <tr className="bg-[#d9ead3] text-black font-bold uppercase text-[9px] sm:text-[10px]">
+                      <th className="border border-black py-1 px-1 text-center w-[5%] bg-white">Nº</th>
+                      <th className="border border-black py-1 px-1.5 text-left w-[25%] bg-white truncate">
+                        NOME COMPLETO
+                      </th>
+                      {classDisciplinas.map((subj) => (
+                        <th
+                          key={subj}
+                          className="border border-black py-1 px-0.5 text-center truncate"
+                          title={subj}
+                        >
+                          {subj.length > 8 ? subj.slice(0, 6) + '.' : subj}
+                        </th>
+                      ))}
+                      <th className="border border-black py-1 px-1 text-center bg-[#c6e0b4] w-[8%]">
+                        {isFinal ? 'MFD' : `MT${selectedPeriodo === 'I' ? '1' : selectedPeriodo === 'II' ? '2' : '3'}`}
+                      </th>
+                      <th className="border border-black py-1 px-1 text-center bg-[#c6e0b4] w-[12%] truncate">
+                        OBSERVAÇÃO
+                      </th>
+                    </tr>
+                  ) : !isFinal ? (
+                    <>
+                      <tr className="font-bold uppercase">
+                        <th
+                          rowSpan={2}
+                          className="border border-black py-1 px-1 text-center w-[6%] bg-white align-middle"
+                        >
+                          Nº
+                        </th>
+                        <th
+                          rowSpan={2}
+                          className="border border-black py-1 px-2 text-center w-[42%] bg-white align-middle"
+                        >
+                          NOME COMPLETO
+                        </th>
+                        <th
+                          colSpan={4}
+                          className="border border-black py-1 px-1 text-center w-[36%] bg-[#d9ead3]"
+                        >
+                          {selectedPeriodo === 'I'
+                            ? '1º TRIMESTRE'
+                            : selectedPeriodo === 'II'
+                            ? '2º TRIMESTRE'
+                            : '3º TRIMESTRE'}
+                        </th>
+                        <th
+                          rowSpan={2}
+                          className="border border-black py-1 px-1 text-center w-[16%] bg-[#c6e0b4] align-middle truncate"
+                        >
+                          OBSERVAÇÃO
+                        </th>
+                      </tr>
+                      <tr className="font-bold uppercase text-[10px]">
+                        <th className="border border-black py-1 px-1 text-center bg-[#d9ead3]">MAC</th>
+                        <th className="border border-black py-1 px-1 text-center bg-[#d9ead3]">NPP</th>
+                        <th className="border border-black py-1 px-1 text-center bg-[#d9ead3]">NPT</th>
+                        <th className="border border-black py-1 px-1 text-center bg-[#c6e0b4]">
+                          MT{selectedPeriodo === 'I' ? '1' : selectedPeriodo === 'II' ? '2' : '3'}
+                        </th>
+                      </tr>
+                    </>
+                  ) : (
+                    <>
+                      <tr className="font-bold uppercase text-[9px] sm:text-[10px]">
+                        <th
+                          rowSpan={2}
+                          className="border border-black py-1 px-0.5 text-center w-[4%] bg-white align-middle"
+                        >
+                          Nº
+                        </th>
+                        <th
+                          rowSpan={2}
+                          className="border border-black py-1 px-1.5 text-center w-[24%] bg-white align-middle truncate"
+                        >
+                          NOME COMPLETO
+                        </th>
+                        <th colSpan={4} className="border border-black py-1 px-0.5 text-center w-[19%] bg-[#d9ead3]">
+                          1º TRIMESTRE
+                        </th>
+                        <th colSpan={4} className="border border-black py-1 px-0.5 text-center w-[19%] bg-[#d9ead3]">
+                          2º TRIMESTRE
+                        </th>
+                        <th colSpan={4} className="border border-black py-1 px-0.5 text-center w-[19%] bg-[#d9ead3]">
+                          3º TRIMESTRE
+                        </th>
+                        <th
+                          rowSpan={2}
+                          className="border border-black py-1 px-0.5 text-center w-[5%] bg-[#c6e0b4] align-middle"
+                        >
+                          MFD
+                        </th>
+                        <th
+                          rowSpan={2}
+                          className="border border-black py-1 px-1 text-center w-[10%] bg-[#c6e0b4] align-middle truncate"
+                        >
+                          OBSERVAÇÃO
+                        </th>
+                      </tr>
+                      <tr className="font-bold uppercase text-[8px] sm:text-[9px]">
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">MAC</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">NPP</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">NPT</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#c6e0b4]">MT1</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">MAC</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">NPP</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">NPT</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#c6e0b4]">MT2</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">MAC</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">NPP</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#d9ead3]">NPT</th>
+                        <th className="border border-black py-0.5 px-0.5 text-center bg-[#c6e0b4]">MT3</th>
+                      </tr>
+                    </>
+                  )}
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {students.map((st, idx) => {
-                    const stGrades = st.grades || [];
-                    const mediaGeral = stGrades.length > 0
-                      ? stGrades.reduce((acc, g) => acc + g.media, 0) / stGrades.length
-                      : 14.0;
-                    const presenca = st.presencaPercent ?? 95;
-
-                    let situacaoBadge = {
-                      label: 'Aprovado',
-                      class: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    };
-                    if (mediaGeral >= 16) {
-                      situacaoBadge = {
-                        label: 'Quadro Honra',
-                        class: 'bg-purple-50 text-purple-700 border-purple-200',
-                      };
-                    } else if (mediaGeral < 10) {
-                      situacaoBadge = {
-                        label: 'Reprovado',
-                        class: 'bg-rose-50 text-rose-700 border-rose-200',
-                      };
-                    } else if (mediaGeral < 10.5 || presenca < 75) {
-                      situacaoBadge = {
-                        label: 'Em Risco',
-                        class: 'bg-amber-50 text-amber-700 border-amber-200',
-                      };
+                <tbody>
+                  {Array.from({ length: Math.max(25, students.length) }, (_, idx) => {
+                    const st = students[idx];
+                    if (!st) {
+                      return (
+                        <tr key={`empty-line-${idx}`} className="h-5">
+                          <td className="border border-black px-1 text-left">{idx + 1}.</td>
+                          <td className="border border-black px-1.5 truncate"></td>
+                          {isAllDisciplines ? (
+                            <>
+                              {classDisciplinas.map((subj) => (
+                                <td key={subj} className="border border-black px-0.5 text-center"></td>
+                              ))}
+                              <td className="border border-black px-0.5 text-center bg-[#c6e0b4]/70"></td>
+                              <td className="border border-black px-1 text-center bg-[#c6e0b4]/70"></td>
+                            </>
+                          ) : !isFinal ? (
+                            <>
+                              <td className="border border-black px-1 text-center"></td>
+                              <td className="border border-black px-1 text-center"></td>
+                              <td className="border border-black px-1 text-center"></td>
+                              <td className="border border-black px-1 text-center bg-[#c6e0b4]/70"></td>
+                              <td className="border border-black px-1 text-center bg-[#c6e0b4]/70"></td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center bg-[#c6e0b4]/70"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center bg-[#c6e0b4]/70"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center"></td>
+                              <td className="border border-black px-0.5 text-center bg-[#c6e0b4]/70"></td>
+                              <td className="border border-black px-0.5 text-center bg-[#c6e0b4]/70"></td>
+                              <td className="border border-black px-1 text-center bg-[#c6e0b4]/70"></td>
+                            </>
+                          )}
+                        </tr>
+                      );
                     }
 
+                    if (isAllDisciplines) {
+                      const scores = classDisciplinas.map((subj) => ({
+                        subj,
+                        val: getActivePeriodScore(st, subj),
+                      }));
+                      const validVals = scores
+                        .map((x) => x.val)
+                        .filter((v): v is number => v !== null);
+                      const mediaPeriodo =
+                        validVals.length > 0
+                          ? validVals.reduce((acc, v) => acc + v, 0) / validVals.length
+                          : null;
+                      const pass =
+                        mediaPeriodo !== null &&
+                        isPassingGradeForClass(mediaPeriodo, selectedClasse);
+
+                      return (
+                        <tr key={st.id} className="h-5">
+                          <td className="border border-black px-1 text-left">
+                            {st.numeroChamada || idx + 1}.
+                          </td>
+                          <td className="border border-black px-1.5 font-medium truncate">{st.name}</td>
+                          {scores.map(({ subj, val }) => (
+                            <td key={subj} className="border border-black px-0.5 text-center truncate">
+                              {val === null ? '' : formatGradeForClass(val, selectedClasse, 'compact')}
+                            </td>
+                          ))}
+                          <td className="border border-black px-0.5 text-center font-bold bg-[#c6e0b4]/70 truncate">
+                            {mediaPeriodo === null ? '' : formatGradeForClass(mediaPeriodo, selectedClasse, 'compact')}
+                          </td>
+                          <td className="border border-black px-1 text-center bg-[#c6e0b4]/70 truncate">
+                            {mediaPeriodo === null
+                              ? ''
+                              : isFinal
+                              ? pass
+                                ? 'Transita'
+                                : 'Não Transita'
+                              : pass
+                              ? 'Positiva'
+                              : 'Negativa'}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const m = getStudentDisciplineMetrics(st, selectedDisciplineFilter);
+
+                    if (!isFinal) {
+                      const tri = m
+                        ? selectedPeriodo === 'I'
+                          ? m.t1
+                          : selectedPeriodo === 'II'
+                          ? m.t2
+                          : m.t3
+                        : null;
+                      const pass = tri ? isPassingGradeForClass(tri.mt, selectedClasse) : false;
+                      return (
+                        <tr key={st.id} className="h-5">
+                          <td className="border border-black px-1 text-left">
+                            {st.numeroChamada || idx + 1}.
+                          </td>
+                          <td className="border border-black px-1.5 font-medium truncate">{st.name}</td>
+                          <td className="border border-black px-1 text-center">
+                            {tri ? formatGradeForClass(tri.mac, selectedClasse, 'compact') : ''}
+                          </td>
+                          <td className="border border-black px-1 text-center">
+                            {tri ? formatGradeForClass(tri.npp, selectedClasse, 'compact') : ''}
+                          </td>
+                          <td className="border border-black px-1 text-center">
+                            {tri ? formatGradeForClass(tri.npt, selectedClasse, 'compact') : ''}
+                          </td>
+                          <td className="border border-black px-1 text-center font-bold bg-[#c6e0b4]/70">
+                            {tri ? formatGradeForClass(tri.mt, selectedClasse, 'compact') : ''}
+                          </td>
+                          <td className="border border-black px-1 text-center bg-[#c6e0b4]/70 truncate">
+                            {tri ? (pass ? 'Positiva' : 'Negativa') : ''}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const pass = m ? isPassingGradeForClass(m.mfd, selectedClasse) : false;
                     return (
-                      <tr key={st.id} className={idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
-                        <td className="py-2 px-3 text-center font-bold text-slate-600">
-                          {st.numeroChamada || idx + 1}
+                      <tr key={st.id} className="h-5">
+                        <td className="border border-black px-0.5 text-left">
+                          {st.numeroChamada || idx + 1}.
                         </td>
-                        <td className="py-2 px-3 font-bold text-slate-900">
-                          {st.name}
+                        <td className="border border-black px-1.5 font-medium truncate">{st.name}</td>
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t1.mac, selectedClasse, 'compact') : ''}
                         </td>
-                        <td className="py-2 px-2 text-center text-slate-500 font-semibold">
-                          {st.genero}
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t1.npp, selectedClasse, 'compact') : ''}
                         </td>
-                        {mode === 'geral' ? (
-                          <>
-                            {defaultDisciplinasList.map((subj) => {
-                              const g = stGrades.find((x) => x.subject === subj);
-                              const val = g ? g.media : 14.0;
-                              return (
-                                <td
-                                  key={subj}
-                                  className={`py-2 px-2 text-center font-medium ${
-                                    val < 10
-                                      ? 'text-rose-600 font-bold'
-                                      : val >= 16
-                                      ? 'text-purple-700 font-bold'
-                                      : 'text-slate-700'
-                                  }`}
-                                >
-                                  {val.toFixed(1)}
-                                </td>
-                              );
-                            })}
-                            <td className="py-2 px-3 text-center font-black bg-slate-50 text-[#002133]">
-                              {mediaGeral.toFixed(1)}
-                            </td>
-                            <td className="py-2 px-2 text-center font-medium text-slate-600">
-                              {presenca}%
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${situacaoBadge.class}`}
-                              >
-                                {situacaoBadge.label}
-                              </span>
-                            </td>
-                          </>
-                        ) : (
-                          (() => {
-                            const g = stGrades.find((x) => x.subject === selectedDiscipline) || {
-                              p1: 14,
-                              p2: 15,
-                              trabalho: 15,
-                              media: 14.6,
-                              status: 'Aprovado',
-                            };
-                            return (
-                              <>
-                                <td className="py-2 px-3 text-center text-slate-700">{g.p1.toFixed(1)}</td>
-                                <td className="py-2 px-3 text-center text-slate-700">{g.p2.toFixed(1)}</td>
-                                <td className="py-2 px-3 text-center text-slate-700">{g.trabalho.toFixed(1)}</td>
-                                <td className="py-2 px-3 text-center font-black bg-slate-50 text-[#002133]">
-                                  {g.media.toFixed(1)}
-                                </td>
-                                <td className="py-2 px-3 text-center">
-                                  <span
-                                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                      g.media >= 10
-                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                        : 'bg-rose-50 text-rose-700 border-rose-200'
-                                    }`}
-                                  >
-                                    {g.status}
-                                  </span>
-                                </td>
-                              </>
-                            );
-                          })()
-                        )}
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t1.npt, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center font-bold bg-[#c6e0b4]/70">
+                          {m ? formatGradeForClass(m.t1.mt, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t2.mac, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t2.npp, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t2.npt, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center font-bold bg-[#c6e0b4]/70">
+                          {m ? formatGradeForClass(m.t2.mt, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t3.mac, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t3.npp, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center">
+                          {m ? formatGradeForClass(m.t3.npt, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center font-bold bg-[#c6e0b4]/70">
+                          {m ? formatGradeForClass(m.t3.mt, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-0.5 text-center font-bold bg-[#c6e0b4]/70">
+                          {m ? formatGradeForClass(m.mfd, selectedClasse, 'compact') : ''}
+                        </td>
+                        <td className="border border-black px-1 text-center bg-[#c6e0b4]/70 truncate">
+                          {m ? (pass ? 'Transita' : 'Não Transita') : ''}
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
-          <span className="text-xs text-slate-500 font-medium hidden sm:inline">
-            Formato oficial A4 em conformidade com o Ministério da Educação (MED Angola).
-          </span>
-
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-            <button
-              onClick={onClose}
-              className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-2xs"
-            >
-              Fechar
-            </button>
-
-            <button
-              onClick={handleDownload}
-              disabled={isExporting}
-              className={`inline-flex items-center gap-2 text-xs font-bold text-white px-5 py-2.5 rounded-xl transition-all shadow-2xs cursor-pointer ${
-                isExporting ? 'bg-slate-400' : 'bg-[#002133] hover:bg-[#00314d]'
-              }`}
-            >
-              <FileDown className="w-4 h-4 text-[#f75142]" />
-              <span>Baixar Pauta em PDF</span>
-            </button>
+            {/* Rodapé Simples com Assinatura do Professor */}
+            <div className="pt-8 pb-2 text-center font-serif text-xs text-black">
+              <p className="mb-6">O Professor</p>
+              <div className="w-64 max-w-full mx-auto border-b border-black"></div>
+            </div>
           </div>
         </div>
       </div>

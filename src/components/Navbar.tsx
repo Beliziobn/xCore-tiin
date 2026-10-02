@@ -357,6 +357,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                       <button
                         onClick={() => {
+                          onSelectPage('diretor-pautas');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-[#f75142] bg-rose-50/60 hover:bg-rose-50 transition-colors uppercase tracking-wider font-black cursor-pointer flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <ClipboardCheck className="w-4 h-4 text-[#f75142]" strokeWidth={2} />
+                          <span>Mini-Pautas & Pauta Final</span>
+                        </span>
+                        <span className="text-[9px] bg-[#002133] text-white font-black px-1.5 py-0.5 rounded">Turmas</span>
+                      </button>
+                      <button
+                        onClick={() => {
                           onSelectPage('diretor-perfil');
                           setShowPagesDropdown(false);
                         }}
@@ -504,24 +517,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             <>
               {/* Quick Approvals Button for Director */}
               {activeRole === 'diretor' && (
-                <button
-                  id="navbar-director-quick-approvals-btn"
-                  onClick={() => onSelectPage('diretor-aprovacoes')}
-                  className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                    currentView === 'diretor-aprovacoes' || currentView === 'diretor-inscricoes'
-                      ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
-                      : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
-                  }`}
-                  title="Aprovação de Inscrições da Escola"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Inscrições</span>
-                  {pendingAppsCount.director > 0 && (
-                    <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
-                      {pendingAppsCount.director}
-                    </span>
-                  )}
-                </button>
+                <>
+                  <button
+                    id="navbar-director-quick-approvals-btn"
+                    onClick={() => onSelectPage('diretor-aprovacoes')}
+                    className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      currentView === 'diretor-aprovacoes' || currentView === 'diretor-inscricoes'
+                        ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                        : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                    }`}
+                    title="Aprovação de Inscrições da Escola"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Inscrições</span>
+                    {pendingAppsCount.director > 0 && (
+                      <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                        {pendingAppsCount.director}
+                      </span>
+                    )}
+                  </button>
+                </>
               )}
 
               {/* Quick Approvals Button for Admin */}
@@ -865,6 +880,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
                 >
                   Minhas Classes
+                </button>
+                <button
+                  onClick={() => {
+                    onSelectPage('diretor-pautas');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-left py-2 px-3 text-[#f75142] bg-rose-50/60 hover:bg-rose-50 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer flex items-center justify-between"
+                >
+                  <span>Mini-Pautas & Pauta Final</span>
+                  <span className="text-[9px] bg-[#002133] text-white font-black px-1.5 py-0.5 rounded">Turmas</span>
                 </button>
                 <button
                   onClick={() => {
