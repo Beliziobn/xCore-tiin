@@ -54,11 +54,17 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
         defaultProvince="Malanje"
         authorName={directorName}
         onSuccess={(teacherData) => {
+          const firstLevel = teacherData.niveisLecciona[0];
+          const resolvedGradeClass = firstLevel?.detalhe
+            ? firstLevel.id === 'praeer'
+              ? `PRAEER ${firstLevel.detalhe}`
+              : firstLevel.detalhe
+            : firstLevel?.nome || '1ª Classe';
           const formattedTeacher = {
             id: teacherData.id,
             name: teacherData.nomeCompleto,
             schoolName: teacherData.nomeEscola || schoolName,
-            gradeClass: teacherData.niveisLecciona[0]?.nome || '4ª Classe',
+            gradeClass: resolvedGradeClass,
             room: 'Sala 03',
             turma: 'Turma A',
             shift: teacherData.turnos[0] || 'Manhã',

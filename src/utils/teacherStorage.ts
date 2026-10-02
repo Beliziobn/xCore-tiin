@@ -64,17 +64,32 @@ export function computeClassificacaoPedagogica(
 export const TEACHING_LEVELS_CATALOG: {
   id: string;
   nome: string;
-  tipoDetalhe?: 'etapa' | 'modulo' | 'ano_eja' | 'texto';
+  tipoDetalhe?: 'etapa' | 'modulo' | 'ano_eja' | 'texto' | 'classe';
   opcoesDetalhe?: string[];
 }[] = [
   { id: 'pre_escola', nome: 'Pré-escola / Classe de Iniciação' },
-  { id: 'primario', nome: 'Ensino Primário (1.ª a 6.ª classe)' },
+  {
+    id: 'primario',
+    nome: 'Ensino Primário (1.ª a 6.ª classe)',
+    tipoDetalhe: 'classe',
+    opcoesDetalhe: ['1ª Classe', '2ª Classe', '3ª Classe', '4ª Classe', '5ª Classe', '6ª Classe'],
+  },
   { id: 'praeer', nome: 'PRAEER', tipoDetalhe: 'etapa', opcoesDetalhe: ['Etapa 1', 'Etapa 2', 'Etapa 3'] },
   { id: 'primario_adultos', nome: 'Ensino Primário de Adultos' },
   { id: 'alfabetizacao', nome: 'Alfabetização', tipoDetalhe: 'modulo', opcoesDetalhe: ['Módulo 1', 'Módulo 2', 'Módulo 3'] },
-  { id: 'eja', nome: 'EJA', tipoDetalhe: 'ano_eja', opcoesDetalhe: ['1.º ano', '2.º ano', 'Total'] },
-  { id: 'i_ciclo_geral', nome: 'I Ciclo do Ensino Secundário Geral' },
-  { id: 'i_ciclo_tecnico', nome: 'I Ciclo do Ensino Secundário Técnico-Profissional' },
+  { id: 'eja', nome: 'EJA', tipoDetalhe: 'ano_eja', opcoesDetalhe: ['Módulo 1', 'Módulo 2', 'Módulo 3'] },
+  {
+    id: 'i_ciclo_geral',
+    nome: 'I Ciclo do Ensino Secundário Geral (7.ª a 9.ª classe)',
+    tipoDetalhe: 'classe',
+    opcoesDetalhe: ['7ª Classe', '8ª Classe', '9ª Classe'],
+  },
+  {
+    id: 'i_ciclo_tecnico',
+    nome: 'I Ciclo do Ensino Secundário Técnico-Profissional',
+    tipoDetalhe: 'classe',
+    opcoesDetalhe: ['7ª Classe', '8ª Classe', '9ª Classe'],
+  },
   { id: 'ii_ciclo_geral', nome: 'II Ciclo do Ensino Secundário Geral' },
   { id: 'ii_ciclo_tecnico', nome: 'II Ciclo do Ensino Secundário Técnico-Profissional' },
   { id: 'ii_ciclo_formacao_prof', nome: 'II Ciclo do Ensino Secundário de Formação de Professores' },
