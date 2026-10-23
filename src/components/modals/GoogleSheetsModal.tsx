@@ -142,7 +142,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     try {
       setIsAuthLoading(true);
       setAuthError(null);
-      const res = await googleSignIn();
+      const res = await googleSignIn({ requireWorkspaceScopes: true });
       if (res && res.user) {
         setGoogleUser(res.user);
         setIsConnected(true);

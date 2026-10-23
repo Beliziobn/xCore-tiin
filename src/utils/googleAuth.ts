@@ -13,10 +13,25 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Configure Google Provider with requested Workspace scopes
+// Configure standard Google Provider strictly for User Authentication (Sign in with Google)
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
+
+/**
+ * Creates a GoogleAuthProvider configured with Google Workspace scopes (Drive/Sheets),
+ * used strictly for on-demand Sheets export/sync operations.
+ */
+export const getWorkspaceProvider = (): GoogleAuthProvider => {
+  const provider = new GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+  provider.addScope('https://www.googleapis.com/auth/drive.file');
+  provider.setCustomParameters({
+    prompt: 'consent',
+  });
+  return provider;
+};
 
 // Cache the access token strictly in memory as required by workspace security guidelines
 let cachedAccessToken: string | null = null;
@@ -62,13 +77,21 @@ export interface GoogleSignInResult {
   error?: string;
 }
 
+export interface GoogleSignInOptions {
+  requireWorkspaceScopes?: boolean;
+}
+
 /**
- * Perform Google Sign-In with popup to acquire user credentials and Workspace access token.
+ * Perform Sign in with Google using popup window.
+ * Strictly respects Google Identity guidelines (standard profile and email on initial login).
  */
-export const googleSignIn = async (): Promise<GoogleSignInResult | null> => {
+export const googleSignIn = async (
+  options?: GoogleSignInOptions
+): Promise<GoogleSignInResult | null> => {
   try {
     isSigningIn = true;
-    const result = await signInWithPopup(auth, googleProvider);
+    const provider = options?.requireWorkspaceScopes ? getWorkspaceProvider() : googleProvider;
+    const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     
     // Use credential accessToken if present, or Firebase ID token as fallback
@@ -106,7 +129,6 @@ export const googleSignIn = async (): Promise<GoogleSignInResult | null> => {
         user: null,
         accessToken: '',
         unauthorizedDomain: true,
-        fallbackNeeded: true,
         error: 'auth/unauthorized-domain',
       };
     }
@@ -120,7 +142,6 @@ export const googleSignIn = async (): Promise<GoogleSignInResult | null> => {
       return {
         user: null,
         accessToken: '',
-        fallbackNeeded: true,
         error: 'auth/popup-blocked',
       };
     }
@@ -129,7 +150,6 @@ export const googleSignIn = async (): Promise<GoogleSignInResult | null> => {
     return {
       user: null,
       accessToken: '',
-      fallbackNeeded: true,
       error: errorMsg || 'Erro na autenticação Google',
     };
   } finally {
