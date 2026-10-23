@@ -25,6 +25,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Hero } from '../Hero';
+import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import type { UserAccount } from '../../types';
 import {
   CadastramentoEfectividadeRecord,
@@ -1413,6 +1414,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                     <div>
                       {/* 1. Official Angolan Government Header */}
                       <div className="text-center pb-2 mb-6 font-sans">
+                        {/* Insígnia da República de Angola */}
+                        <div className="flex justify-center mb-3">
+                          <img
+                            src={emblemAngolaImg}
+                            alt="Insígnia da República de Angola"
+                            className="w-20 sm:w-24 h-auto max-h-24 object-contain mx-auto"
+                          />
+                        </div>
+
                         <p className="text-[13px] sm:text-[14px] font-black uppercase tracking-widest text-slate-900 leading-tight">
                           REPÚBLICA DE ANGOLA
                         </p>
