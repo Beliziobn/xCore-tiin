@@ -96,6 +96,7 @@ async function startServer() {
     teachers: any[];
     students: any[];
     applications: any[];
+    efectividade: any[];
     updatedAt: string;
   }
 
@@ -114,6 +115,7 @@ async function startServer() {
             teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
             students: Array.isArray(parsed.students) ? parsed.students : [],
             applications: Array.isArray(parsed.applications) ? parsed.applications : [],
+            efectividade: Array.isArray(parsed.efectividade) ? parsed.efectividade : [],
             updatedAt: parsed.updatedAt || new Date().toISOString(),
           };
         }
@@ -127,6 +129,7 @@ async function startServer() {
       teachers: [],
       students: [],
       applications: [],
+      efectividade: [],
       updatedAt: new Date().toISOString(),
     };
   }
@@ -143,6 +146,11 @@ async function startServer() {
     } catch (err) {
       console.warn("[NetworkStore] Failed to write store file:", err);
     }
+  }
+
+  // Ensure data directory and initial persistence file exist immediately
+  if (!fs.existsSync(networkStoreFile)) {
+    persistNetworkStore();
   }
 
   function upsertByKey(list: any[], incomingItems: any[], getKey: (item: any) => string): any[] {
@@ -355,7 +363,7 @@ async function startServer() {
   });
 
   app.post("/api/network/sync", (req, res) => {
-    const { schools, directors, teachers, students, applications } = req.body || {};
+    const { schools, directors, teachers, students, applications, efectividade } = req.body || {};
     let changed = false;
 
     if (Array.isArray(schools) && schools.length > 0) {
@@ -414,6 +422,18 @@ async function startServer() {
       changed = true;
     }
 
+    if (Array.isArray(efectividade) && efectividade.length > 0) {
+      if (!Array.isArray(networkStore.efectividade)) {
+        networkStore.efectividade = [];
+      }
+      networkStore.efectividade = upsertByKey(
+        networkStore.efectividade,
+        efectividade,
+        (e) => String(e.id || `${e.bi || ''}::${e.agente || ''}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
     if (changed) {
       persistNetworkStore();
     }
@@ -421,6 +441,72 @@ async function startServer() {
     res.json({
       success: true,
       ...networkStore,
+    });
+  });
+
+  // ============================================================================
+  // EFECTIVIDADE & CADASTRAMENTO DE PESSOAL (SHARED & PERSISTENT DATA)
+  // Ensures personnel cadastros persist on disk and are shared across all sessions/admin
+  // ============================================================================
+  app.get("/api/efectividade", (req, res) => {
+    res.json({
+      success: true,
+      records: networkStore.efectividade || [],
+      count: (networkStore.efectividade || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/efectividade", (req, res) => {
+    const { record, records } = req.body || {};
+    const incoming: any[] = [];
+    if (record && typeof record === "object") incoming.push(record);
+    if (Array.isArray(records)) incoming.push(...records);
+
+    if (incoming.length > 0) {
+      if (!Array.isArray(networkStore.efectividade)) {
+        networkStore.efectividade = [];
+      }
+      networkStore.efectividade = upsertByKey(
+        networkStore.efectividade,
+        incoming,
+        (rec) => String(rec.id || `${rec.bi || ''}::${rec.agente || ''}::${rec.nome || ''}`).trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.efectividade || [],
+      count: (networkStore.efectividade || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/efectividade/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim();
+    if (Array.isArray(networkStore.efectividade)) {
+      networkStore.efectividade = networkStore.efectividade.filter(
+        (r) => String(r.id || "").trim() !== targetId
+      );
+      persistNetworkStore();
+    }
+    res.json({
+      success: true,
+      records: networkStore.efectividade || [],
+      count: (networkStore.efectividade || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/efectividade", (req, res) => {
+    networkStore.efectividade = [];
+    persistNetworkStore();
+    res.json({
+      success: true,
+      records: [],
+      count: 0,
+      updatedAt: networkStore.updatedAt,
     });
   });
 

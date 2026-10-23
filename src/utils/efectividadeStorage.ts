@@ -104,11 +104,71 @@ export function clearAllEfectividadeRecords(): void {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify([]));
-    localStorage.removeItem('sigre_cadastramento_efectividade_v1');
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { cleared: true } }));
+
+    // Clear server persistent store
+    fetch('/api/efectividade', {
+      method: 'DELETE',
+    }).catch(() => {});
   } catch (err) {
     console.error('Erro ao esvaziar base de dados:', err);
   }
+}
+
+/**
+ * Synchronizes efectividade personnel records with the shared server database.
+ * Ensures data is fixed, persistent, and accessible across multiple users and admin accounts.
+ */
+export async function syncEfectividadeFromServer(): Promise<CadastramentoEfectividadeRecord[]> {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return [];
+  }
+  try {
+    const localRecords = getStoredEfectividadeRecords();
+    const res = await fetch('/api/efectividade');
+    if (!res.ok) {
+      return localRecords;
+    }
+    const data = await res.json();
+    if (data && Array.isArray(data.records)) {
+      const serverRecords: CadastramentoEfectividadeRecord[] = data.records;
+      const recordMap = new Map<string, CadastramentoEfectividadeRecord>();
+
+      // Load server records first
+      serverRecords.forEach((sr) => {
+        if (sr && sr.id) {
+          recordMap.set(sr.id, sr);
+        }
+      });
+
+      // Merge any local records that haven't reached the server yet
+      let hasUnsynced = false;
+      localRecords.forEach((lr) => {
+        if (lr && lr.id && !recordMap.has(lr.id)) {
+          recordMap.set(lr.id, lr);
+          hasUnsynced = true;
+        }
+      });
+
+      const merged = Array.from(recordMap.values());
+      localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(merged));
+
+      if (hasUnsynced) {
+        // Send unsynced local records to server
+        fetch('/api/efectividade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ records: merged }),
+        }).catch(() => {});
+      }
+
+      window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { records: merged } }));
+      return merged;
+    }
+  } catch (err) {
+    console.warn('Falha na sincronização de efectividade com servidor:', err);
+  }
+  return getStoredEfectividadeRecords();
 }
 
 /**
@@ -203,6 +263,16 @@ export function saveEfectividadeRecord(
   try {
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(nextRecords));
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: savedRecord }));
+
+    // Persist immediately on the shared backend database so it never disappears and is shared
+    fetch('/api/efectividade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record: savedRecord }),
+    }).catch((err) => {
+      console.warn('Falha temporária ao sincronizar registo no servidor:', err);
+    });
+
     return { success: true, record: savedRecord };
   } catch (err) {
     console.error('Erro ao guardar no localStorage:', err);
@@ -219,6 +289,14 @@ export function deleteEfectividadeRecord(id: string): boolean {
   try {
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { id, deleted: true } }));
+
+    // Delete immediately on the shared backend database
+    fetch(`/api/efectividade/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }).catch((err) => {
+      console.warn('Falha temporária ao eliminar registo no servidor:', err);
+    });
+
     return true;
   } catch {
     return false;

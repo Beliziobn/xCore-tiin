@@ -154,42 +154,6 @@ export default function App() {
     subtitle: 'A sua solicitação foi recebida e registada na plataforma Sigre.',
   });
 
-  // Ensure clean slate on first load so no pre-inserted or cached mock data exists
-  if (typeof window !== 'undefined' && localStorage.getItem('sigre_clean_slate_active_v3') !== 'true') {
-    try {
-      const keysToClean = [
-        'ucore_admin_schools',
-        'ucore_admin_teachers',
-        'ucore_admin_students',
-        'ucore_admin_directors',
-        'ucore_teacher_students',
-        'ucore_teacher_profile',
-        'ucore_attendance_records',
-        'ucore_attendance_sessions',
-        'ucore_student_attendance_records_v2',
-        'ucore_teacher_attendance_records_v2',
-        'ucore_registered_teachers_v2',
-        'ucore_registered_students_v2',
-        'ucore_registered_directors_v2',
-        'ucore_school_announcements_v1',
-        'ucore_pending_applications',
-        'ucore_audit_logs_v1',
-        'ucore_attendance_diary_notes',
-        'ucore_dme_staff_members',
-        'ucore_director_profile',
-        'ucore_chat_channels',
-        'ucore_chat_messages',
-        'sigre_school_registrations',
-        'sigre_director_rooms',
-        'sigre_director_classes',
-      ];
-      keysToClean.forEach((k) => localStorage.removeItem(k));
-      localStorage.setItem('sigre_clean_slate_active_v3', 'true');
-    } catch {
-      // ignore
-    }
-  }
-
   // Purge any "Escola Modelo Central" and related records immediately on startup
   if (typeof window !== 'undefined') {
     purgeModeloCentralData();

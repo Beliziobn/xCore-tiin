@@ -37,6 +37,7 @@ import {
   findDuplicateEfectividade,
   formatAngolanDate,
   formatAngolanDateExtenso,
+  syncEfectividadeFromServer,
 } from '../../utils/efectividadeStorage';
 
 interface DeclaracaoEfectividadePageProps {
@@ -133,7 +134,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   // Database search and filters
   const [searchQuery, setSearchQuery] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<{ id: string; nome: string } | null>(null);
+  const [showClearAllModal, setShowClearAllModal] = useState(false);
 
   const reloadRecords = () => {
     setRecords(getStoredEfectividadeRecords());
@@ -141,6 +143,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
   useEffect(() => {
     reloadRecords();
+    syncEfectividadeFromServer().then((synced) => {
+      if (Array.isArray(synced)) {
+        setRecords(synced);
+      }
+    }).catch(() => {});
+
     const handler = () => reloadRecords();
     window.addEventListener('sigre-efectividade-updated', handler);
     window.addEventListener('storage', handler);
@@ -351,14 +359,17 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   };
 
   const handleDeleteRecord = (id: string, nome: string) => {
-    if (window.confirm(`Tem a certeza que deseja eliminar o cadastro de "${nome}"? Esta operação é irreversível.`)) {
-      deleteEfectividadeRecord(id);
-      reloadRecords();
-      showToast(`Registo de "${nome}" eliminado da base de dados.`);
-      if (selectedRecordForView?.id === id) {
-        setSelectedRecordForView(null);
-        setActiveTab('database');
-      }
+    setRecordToDelete({ id, nome });
+  };
+
+  const executeDeleteRecord = (id: string, nome: string) => {
+    deleteEfectividadeRecord(id);
+    reloadRecords();
+    setRecordToDelete(null);
+    showToast(`O cadastro de "${nome}" foi eliminado com sucesso.`);
+    if (selectedRecordForView?.id === id) {
+      setSelectedRecordForView(null);
+      setActiveTab('database');
     }
   };
 
@@ -367,16 +378,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       showToast('A base de dados já se encontra vazia.');
       return;
     }
-    if (
-      window.confirm(
-        'Tem a certeza de que deseja esvaziar todos os funcionários cadastrados da base de dados? Esta ação eliminará todos os registos actuais.'
-      )
-    ) {
-      clearAllEfectividadeRecords();
-      setRecords([]);
-      setSelectedRecordForView(null);
-      showToast('Base de dados de pessoal esvaziada com sucesso.');
-    }
+    setShowClearAllModal(true);
+  };
+
+  const executeClearDatabase = () => {
+    clearAllEfectividadeRecords();
+    setRecords([]);
+    setSelectedRecordForView(null);
+    setShowClearAllModal(false);
+    showToast('Base de dados de pessoal esvaziada com sucesso.');
   };
 
   const handlePrintDocument = () => {
@@ -1360,6 +1370,16 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
                 <button
                   type="button"
+                  onClick={() => handleDeleteRecord(selectedRecordForView.id, selectedRecordForView.nome)}
+                  className="inline-flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-red-200"
+                  title="Eliminar este cadastro da base de dados"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                  <span>Eliminar</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     setFormData(getInitialFormState(currentUser));
                     setActiveTab('form');
@@ -1492,6 +1512,88 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           </div>
         )}
       </main>
+
+      {/* Modal de Confirmação para Eliminar Registo Individual */}
+      {recordToDelete && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                Eliminar Cadastro?
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Tem a certeza que deseja eliminar o cadastro de <strong className="text-slate-950 font-bold">{recordToDelete.nome}</strong> da base de dados?
+              </p>
+              <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-left font-medium">
+                Aviso: Esta ação removerá o registo permanentemente da base de dados do sistema Sigre.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setRecordToDelete(null)}
+                className="flex-1 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => executeDeleteRecord(recordToDelete.id, recordToDelete.nome)}
+                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Eliminar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação para Esvaziar Toda a Base de Dados */}
+      {showClearAllModal && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                Esvaziar Toda a Base de Dados?
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Tem a certeza que deseja eliminar <strong>todos os {records.length} funcionários cadastrados</strong> da base de dados?
+              </p>
+              <p className="text-[11px] text-red-700 bg-red-50 p-2.5 rounded-xl border border-red-200 text-left font-medium">
+                Aviso: Esta ação é definitiva e apagará todos os cadastros de pessoal guardados nesta base de dados.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearAllModal(false)}
+                className="flex-1 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={executeClearDatabase}
+                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Esvaziar Tudo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
