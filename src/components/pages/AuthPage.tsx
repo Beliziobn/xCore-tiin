@@ -37,7 +37,7 @@ import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg'
 import { verifyPassword, updatePassword } from '../../utils/passwordService';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole, AdminSchool } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
-import { googleSignIn } from '../../utils/googleAuth';
+import { googleSignIn, getGoogleUser } from '../../utils/googleAuth';
 import { 
   UCORE_MUNICIPALITIES, 
   UCORE_DISCIPLINAS, 
@@ -359,33 +359,98 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [customGoogleEmail, setCustomGoogleEmail] = useState('');
 
   const completeGoogleLogin = (targetEmail: string, targetName: string, uid?: string) => {
+    const cleanEmail = targetEmail.trim().toLowerCase();
     const isDirectorMunicipal =
-      targetEmail.toLowerCase() === 'dmedoquessua@gmail.com' ||
-      targetEmail.toLowerCase().includes('dmedoquessua');
+      cleanEmail === 'dmedoquessua@gmail.com' ||
+      cleanEmail.includes('dmedoquessua');
+
+    // Check approval application and rosters
+    const approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
+    const teacherPreReg = searchPreRegisteredTeacher(cleanEmail, '', targetName);
+    const directorPreReg = searchPreRegisteredDirector(cleanEmail, '', targetName);
+
+    let resolvedRole: 'admin' | 'diretor' | 'professor' = 'admin';
+    let resolvedScope: 'escola' | 'administracao' = 'administracao';
+    let resolvedSchoolRole: SchoolStaffRole | undefined = undefined;
+    let resolvedAdminRole: AdminStaffRole | undefined = 'diretor_municipal';
+    let resolvedCargo = isDirectorMunicipal
+      ? 'Director Municipal da Educação de Quessua'
+      : 'Utilizador Google';
+    let resolvedPrefix = isDirectorMunicipal ? 'Dr.' : 'Sr(a).';
+    let resolvedSchoolName: string | undefined = isDirectorMunicipal ? 'Direcção Municipal da Educação de Quessua' : undefined;
+    let resolvedSchoolId: string | undefined = undefined;
 
     const names = targetName.trim().split(' ');
-    const gFirst = isDirectorMunicipal ? 'Director Municipal' : (names[0] || 'Utilizador');
-    const gLast = isDirectorMunicipal ? 'da Educação' : (names.slice(1).join(' ') || 'Google');
+    let gFirst = names[0] || 'Utilizador';
+    let gLast = names.slice(1).join(' ') || '';
+
+    if (approvalCheck.app) {
+      const app = approvalCheck.app;
+      resolvedScope = app.scope || resolvedScope;
+      resolvedSchoolRole = app.schoolRole;
+      resolvedAdminRole = app.adminRole;
+      resolvedCargo = app.roleRequested || resolvedCargo;
+      resolvedSchoolName = app.schoolName || resolvedSchoolName;
+      resolvedSchoolId = app.schoolId;
+      if (app.scope === 'escola') {
+        resolvedRole = app.schoolRole === 'professor' ? 'professor' : 'diretor';
+        resolvedPrefix = app.schoolRole === 'professor' ? 'Prof.' : 'Director';
+      }
+      const appNames = (app.fullName || '').trim().split(' ');
+      if (appNames[0]) gFirst = appNames[0];
+      if (appNames.length > 1) gLast = appNames.slice(1).join(' ');
+    } else if (teacherPreReg.found) {
+      resolvedRole = 'professor';
+      resolvedScope = 'escola';
+      resolvedSchoolRole = 'professor';
+      resolvedAdminRole = undefined;
+      resolvedCargo = 'Professor(a) / Docente';
+      resolvedPrefix = 'Prof.';
+      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
+      resolvedSchoolId = registeredSchools[0]?.id;
+      if (teacherPreReg.teacherName) {
+        const tNames = teacherPreReg.teacherName.trim().split(' ');
+        if (tNames[0]) gFirst = tNames[0];
+        if (tNames.length > 1) gLast = tNames.slice(1).join(' ');
+      }
+    } else if (directorPreReg.found) {
+      resolvedRole = 'diretor';
+      resolvedScope = 'escola';
+      resolvedSchoolRole = 'diretor_geral';
+      resolvedAdminRole = undefined;
+      resolvedCargo = 'Director(a) Geral';
+      resolvedPrefix = 'Director';
+      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
+      resolvedSchoolId = registeredSchools[0]?.id;
+      if (directorPreReg.directorName) {
+        const dNames = directorPreReg.directorName.trim().split(' ');
+        if (dNames[0]) gFirst = dNames[0];
+        if (dNames.length > 1) gLast = dNames.slice(1).join(' ');
+      }
+    } else if (isDirectorMunicipal) {
+      gFirst = 'Director Municipal';
+      gLast = 'da Educação';
+    }
 
     const googleAccount: UserAccount = {
       id: uid || (isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_google_' + Date.now()),
       firstName: gFirst,
       lastName: gLast,
-      email: targetEmail.trim().toLowerCase(),
-      role: 'admin',
-      scope: 'administracao',
-      adminRole: 'diretor_municipal',
-      cargoTitle: isDirectorMunicipal
-        ? 'Director Municipal da Educação de Quessua'
-        : 'Administrador de Sistema (Google)',
-      schoolName: 'Direcção Municipal da Educação de Quessua',
+      email: cleanEmail,
+      role: resolvedRole,
+      scope: resolvedScope,
+      schoolRole: resolvedSchoolRole,
+      adminRole: resolvedAdminRole,
+      cargoTitle: resolvedCargo,
+      schoolName: resolvedSchoolName || (resolvedScope === 'administracao' ? 'Direcção Municipal da Educação de Quessua' : registeredSchools[0]?.name || 'Unidade Escolar'),
+      schoolId: resolvedSchoolId || (resolvedScope === 'escola' ? registeredSchools[0]?.id : undefined),
       municipalityOrDepartment: 'Quessua',
-      titlePrefix: isDirectorMunicipal ? 'Dr.' : 'Admin.',
-      greeting: `Olá ${isDirectorMunicipal ? 'Dr.' : ''} ${gFirst}`,
+      titlePrefix: resolvedPrefix,
+      greeting: `Olá ${resolvedPrefix} ${gFirst}`,
       status: 'ativo',
     };
 
-    setSuccessMsg(`Autenticado com sucesso via Google (${targetEmail})! Redirecionando...`);
+    setSuccessMsg(`Autenticado com sucesso via Google (${cleanEmail})! A redirecionar...`);
     setShowGoogleChooser(false);
     setTimeout(() => {
       onLoginSuccess(googleAccount);
@@ -1013,7 +1078,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="dmedoquessua@gmail.com"
+                        placeholder="seu.email@gmail.com"
                         className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                       />
                     </div>
@@ -1064,7 +1129,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
                         className="w-4 h-4 rounded text-[#f75142] focus:ring-[#f75142] border-slate-300 cursor-pointer"
-                      />
+                      >
+                      </input>
                       <span>Manter sessão iniciada neste dispositivo</span>
                     </label>
                   </div>
@@ -1110,10 +1176,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     />
                     <button
                       type="button"
-                      onClick={() => setShowGoogleChooser(true)}
+                      onClick={() => {
+                        if (email && email.includes('@')) {
+                          setCustomGoogleEmail(email);
+                        }
+                        setShowGoogleChooser(true);
+                      }}
                       className="text-[11px] text-slate-500 hover:text-[#002133] hover:underline font-medium cursor-pointer flex items-center gap-1 pt-0.5"
                     >
-                      <span>Problemas no login Google? Escolha a conta diretamente</span>
+                      <span>Problemas no pop-up? Entrar diretamente com a sua conta Google</span>
                     </button>
                   </div>
 
@@ -1894,129 +1965,162 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </footer>
       )}
 
-      {/* Google Account Chooser Modal */}
-      {showGoogleChooser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
-            {/* Header */}
-            <div className="p-6 pb-4 border-b border-slate-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <svg className="w-6 h-6 shrink-0" viewBox="0 0 48 48">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  </svg>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 leading-tight">Entrar com o Google</h3>
-                    <p className="text-[11px] text-slate-500">Escolha a sua conta Google para aceder ao Sigre</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowGoogleChooser(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+      {/* Google Account Modal - Exclusively the user's own Google account */}
+      {showGoogleChooser && (() => {
+        const activeGoogleUser = getGoogleUser();
+        const activeEmail = activeGoogleUser?.email || '';
+        const activeName = activeGoogleUser?.displayName || '';
 
-            {/* Account List */}
-            <div className="p-6 pt-4 space-y-2.5">
-              {/* Director Municipal Official Account */}
-              <button
-                type="button"
-                onClick={() => completeGoogleLogin('dmedoquessua@gmail.com', 'Director Municipal da Educação')}
-                className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-[#f75142] hover:bg-orange-50/50 transition-all text-left flex items-center justify-between group cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#002133] text-white flex items-center justify-center font-bold text-sm shrink-0">
-                    DM
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-slate-900 group-hover:text-[#f75142] transition-colors">
-                        Director Municipal da Educação
-                      </span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#f75142]/10 text-[#f75142]">
-                        DME Oficial
-                      </span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+              {/* Header */}
+              <div className="p-6 pb-4 border-b border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <svg className="w-6 h-6 shrink-0" viewBox="0 0 48 48">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 leading-tight">Entrar com a sua Conta Google</h3>
+                      <p className="text-[11px] text-slate-500">Apenas a sua conta de utilizador</p>
                     </div>
-                    <span className="text-xs text-slate-500 block truncate">dmedoquessua@gmail.com</span>
                   </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#f75142] group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-              </button>
-
-              {/* Belizio dos Santos */}
-              <button
-                type="button"
-                onClick={() => completeGoogleLogin('beliziodos20@gmail.com', 'Belízio dos Santos')}
-                className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 transition-all text-left flex items-center justify-between group cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                    B
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                        Belízio dos Santos
-                      </span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                        Conta Google
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-500 block truncate">beliziodos20@gmail.com</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-              </button>
-
-              {/* Or enter custom Google email */}
-              <div className="pt-2 border-t border-slate-100">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
-                  Ou introduza outro e-mail Google:
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={customGoogleEmail}
-                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                    placeholder="seuemail@gmail.com"
-                    className="flex-1 h-9 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-[#f75142]"
-                  />
                   <button
                     type="button"
-                    disabled={!customGoogleEmail.trim()}
-                    onClick={() => {
-                      if (customGoogleEmail.trim()) {
-                        completeGoogleLogin(customGoogleEmail.trim(), 'Utilizador Google');
-                      }
-                    }}
-                    className="px-3.5 h-9 rounded-lg bg-[#002133] hover:bg-[#00314d] text-white text-xs font-bold disabled:opacity-50 cursor-pointer transition-colors"
+                    onClick={() => setShowGoogleChooser(false)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                   >
-                    Entrar
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
-            </div>
 
-            <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-              <span>Sigre Quessua • Autenticação Segura</span>
-              <button
-                type="button"
-                onClick={() => setShowGoogleChooser(false)}
-                className="text-slate-600 hover:underline cursor-pointer font-medium"
-              >
-                Cancelar
-              </button>
+              {/* Account Body */}
+              <div className="p-6 pt-4 space-y-4">
+                {activeEmail ? (
+                  /* If a Google account is active in session */
+                  <div className="space-y-3">
+                    <div className="text-xs text-slate-600">
+                      Foi detectada a seguinte conta Google no seu navegador:
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => completeGoogleLogin(activeEmail, activeName || 'Utilizador Google', activeGoogleUser?.uid)}
+                      className="w-full p-4 rounded-xl border-2 border-emerald-500/40 bg-emerald-50/40 hover:bg-emerald-50 hover:border-emerald-500 transition-all text-left flex items-center justify-between group cursor-pointer shadow-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 uppercase">
+                          {activeName ? activeName.charAt(0) : activeEmail.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                              {activeName || 'A sua Conta Google'}
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              A Sua Conta
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-600 block truncate font-medium">{activeEmail}</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-emerald-600 group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
+                    </button>
+
+                    <div className="pt-2 border-t border-slate-100">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1.5">
+                        Ou utilize outro endereço de e-mail seu:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={customGoogleEmail}
+                          onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                          placeholder="o.seu.email@gmail.com"
+                          className="flex-1 h-10 px-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10"
+                        />
+                        <button
+                          type="button"
+                          disabled={!customGoogleEmail.trim() || !customGoogleEmail.includes('@')}
+                          onClick={() => {
+                            if (customGoogleEmail.trim()) {
+                              completeGoogleLogin(customGoogleEmail.trim(), 'Utilizador Google');
+                            }
+                          }}
+                          className="px-4 h-10 rounded-xl bg-[#002133] hover:bg-[#00314d] text-white text-xs font-bold disabled:opacity-50 cursor-pointer transition-colors"
+                        >
+                          Entrar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* No Google account in session - Prompt for user's own Google account */
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Introduza o endereço de e-mail da <span className="font-bold text-slate-800">sua própria conta Google</span> para entrar no sistema:
+                    </p>
+                    <div className="space-y-2">
+                      <input
+                        type="email"
+                        autoFocus
+                        value={customGoogleEmail || email || ''}
+                        onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                        placeholder="o.seu.email@gmail.com"
+                        className="w-full h-11 px-3.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10"
+                      />
+                      <button
+                        type="button"
+                        disabled={!(customGoogleEmail || email || '').trim().includes('@')}
+                        onClick={() => {
+                          const target = (customGoogleEmail || email || '').trim();
+                          if (target) {
+                            completeGoogleLogin(target, 'Utilizador Google');
+                          }
+                        }}
+                        className="w-full h-11 rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white text-xs sm:text-sm font-bold disabled:opacity-50 cursor-pointer transition-colors flex items-center justify-center gap-2 shadow-sm"
+                      >
+                        <span>Entrar com a minha conta Google</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setShowGoogleChooser(false);
+                          await handleGoogleSignInFlow();
+                        }}
+                        className="text-xs font-medium text-slate-600 hover:text-[#002133] hover:underline cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-[#f75142]" />
+                        <span>Abrir janela de autenticação Google</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Sigre Quessua • Apenas a sua conta de utilizador</span>
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleChooser(false)}
+                  className="text-slate-600 hover:underline cursor-pointer font-medium"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

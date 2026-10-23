@@ -47,11 +47,11 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
       color: 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white',
     },
     {
-      title: 'Salas Virtuais & Zoom',
-      desc: 'Participe em videoconferências e reuniões pedagógicas em tempo real.',
-      icon: Video,
-      action: onNavigateMeetings,
-      badge: 'Ao Vivo',
+      title: 'Perguntas Frequentes & Suporte',
+      desc: 'Esclareça dúvidas sobre a plataforma, processos e avaliações escolares.',
+      icon: HelpCircle,
+      action: onNavigateSupport || onNavigateHome,
+      badge: 'Suporte',
       color: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white',
     },
     {

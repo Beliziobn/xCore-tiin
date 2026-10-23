@@ -17,9 +17,6 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
-googleProvider.setCustomParameters({
-  prompt: 'select_account',
-});
 
 // Cache the access token strictly in memory as required by workspace security guidelines
 let cachedAccessToken: string | null = null;

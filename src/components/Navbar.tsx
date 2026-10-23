@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, Video, Sparkles, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications } from '../utils/authApprovalStorage';
 
@@ -470,40 +470,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </>
                   )}
 
-                  {/* Shared Video Meetings / Zoom for all users */}
+                  {/* Declaração de Efectividade Oficial em Branco */}
                   <button
-                    id="nav-dropdown-meetings"
                     onClick={() => {
-                      onSelectPage('reunioes');
+                      onSelectPage('declaracao-efectividade');
                       setShowPagesDropdown(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-blue-600 hover:bg-blue-50 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-slate-50 hover:text-[#f75142] transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
                   >
                     <span className="flex items-center gap-2">
-                      <Video className="w-3.5 h-3.5" />
-                      <span>Salas Virtuais & Zoom</span>
+                      <FileText className="w-3.5 h-3.5 text-[#f75142]" />
+                      <span>Declaração de Efectividade</span>
                     </span>
-                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">Ao Vivo</span>
-                  </button>
-
-                  {/* Sigre RAG Inteligente */}
-                  <button
-                    id="nav-dropdown-rag"
-                    onClick={() => {
-                      if (onOpenRag) {
-                        onOpenRag();
-                      } else {
-                        onSelectPage('rag');
-                      }
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-indigo-700 hover:bg-indigo-50 transition-colors border-t border-slate-100 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Sigre RAG Inteligente</span>
-                    </span>
-                    <span className="text-[9px] bg-indigo-100 text-indigo-800 font-black px-1.5 py-0.5 rounded">IA / MED</span>
+                    <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Em Branco</span>
                   </button>
                 </div>
               )}
@@ -1012,33 +991,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
           <button
             onClick={() => {
-              if (onOpenRag) {
-                onOpenRag();
-              } else {
-                onSelectPage('rag');
-              }
+              onSelectPage('declaracao-efectividade');
               setMobileMenuOpen(false);
             }}
-            className="text-left py-2 px-3 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+            className="text-left py-2 px-3 text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-600" />
-              <span>Sigre RAG Inteligente</span>
+              <FileText className="w-4 h-4 text-[#f75142]" />
+              <span>Declaração de Efectividade</span>
             </div>
-            <span className="text-[9px] bg-indigo-200 text-indigo-900 font-black px-1.5 py-0.5 rounded">IA / MED</span>
-          </button>
-          <button
-            onClick={() => {
-              onSelectPage('reunioes');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <Video className="w-4 h-4 text-blue-600" />
-              <span>Salas Virtuais & Zoom</span>
-            </div>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Em Branco</span>
           </button>
           {onOpenChat && (
             <button

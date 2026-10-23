@@ -102,6 +102,7 @@ import { Sparkles, X } from 'lucide-react';
 import { NotFoundPage } from './components/pages/NotFoundPage';
 import { ThankYouPage } from './components/pages/ThankYouPage';
 import { CasesPage } from './components/pages/CasesPage';
+import { DeclaracaoEfectividadePage } from './components/pages/DeclaracaoEfectividadePage';
 
 import type { 
   EducationalModule, 
@@ -1164,6 +1165,16 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    if (
+      pageId === 'declaracao-efectividade' ||
+      pageId === 'efectividade' ||
+      pageId === 'mapa-efectividade' ||
+      pageId === 'efectividade-branco'
+    ) {
+      setCurrentView('declaracao-efectividade');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     // fallback
     const card = activeSession.cards.find((c) => c.id.includes(pageId) || pageId.includes(c.icon));
@@ -1853,6 +1864,26 @@ export default function App() {
           currentUser={currentUser}
           onJoinMeeting={(roomId, title, initialVideo) => {
             handleOpenMeeting(roomId, title, initialVideo);
+          }}
+        />
+      );
+    }
+
+    // Declaração de Efectividade (Modelo Oficial em Branco)
+    if (
+      currentView === 'declaracao-efectividade' ||
+      currentView === 'efectividade' ||
+      currentView === 'mapa-efectividade'
+    ) {
+      return (
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
         />
       );
