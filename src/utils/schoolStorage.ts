@@ -185,12 +185,15 @@ export function getSchoolRegistrationData(school?: AdminSchool): SchoolRegistrat
     location: 'Quêssua - Zona Central',
     category: 'Ensino Primário',
     teachersCount: 0,
+    classesCount: 0,
     roomsCount: 0,
     turmasCount: 0,
     studentsWithDocs: 0,
     studentsWithoutDocs: 0,
     performanceRate: 0,
     attendanceRate: 0,
+    phone: '',
+    email: '',
   };
   if (safeSchool.registrationData) {
     return safeSchool.registrationData;

@@ -189,16 +189,20 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
     const dsName = ds.nomeCompleto || ds.name || 'Aluno';
     const dsSchool = ds.escola || ds.nomeEscola || '';
     const key = `${norm(dsName)}::${norm(dsSchool)}`;
-    if (!seenStudentIds.has(ds.id) && !seenStudentNames.has(key)) {
+    if (!seenStudentIds.has(ds.id || '') && !seenStudentNames.has(key)) {
       unifiedStudents.push({
-        id: ds.id,
+        id: ds.id || `std-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: dsName,
         gender: ds.genero === 'F' ? 'F' : 'M',
-        age: ds.idadeCalculada,
+        age: ds.idadeCalculada ?? ds.idade,
         birthDate: ds.dataNascimento,
         gradeClass: normalizeClasseLabel(ds.classeEtapaModulo || ds.classe),
         room: ds.sala || 'Sala 01',
         turma: ds.turma || 'Turma A',
+        guardianName: ds.encarregado || 'Encarregado de Educação',
+        location: ds.municipio || 'Quêssua',
+        presenceRate: ds.attendanceRate ?? 96,
+        performanceScore: ds.averageGrade ?? 15,
         schoolName: dsSchool,
         hasDocuments: ds.possuiDocumento ?? true,
         documentType: ds.documentType || 'Cédula Pessoal',
@@ -207,7 +211,7 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
         status: ds.statusAcademico || 'Aprovado',
         registrationData: ds,
       });
-      seenStudentIds.add(ds.id);
+      if (ds.id) seenStudentIds.add(ds.id);
       seenStudentNames.add(key);
     }
   });
@@ -238,11 +242,14 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
         category: inferredCat as any,
         location: d?.municipio || 'Quêssua, Malanje',
         roomsCount: 6,
+        classesCount: 6,
         turmasCount: 6,
         teachersCount: 8,
         performanceRate: 85,
+        attendanceRate: 95,
         directorName: 'Direcção Escolar',
         phone: '+244 923 000 000',
+        email: 'escola@educacao.gov.ao',
         studentsWithDocs: 1,
         studentsWithoutDocs: 0,
       });

@@ -310,6 +310,17 @@ export interface StudentRegistrationData {
   // Audit
   dataCadastro?: string;
   codigoMatricula?: string;
+
+  // Compatibility & SIGE Aggregation Fields
+  nomeEscola?: string;
+  idadeCalculada?: number;
+  faixaEtariaSelecionada?: string;
+  possuiDocumento?: boolean;
+  documentType?: string;
+  attendanceRate?: number;
+  averageGrade?: number;
+  statusAcademico?: string;
+  modalidadeKey?: StudentModalidadeKey;
 }
 
 export interface DirectorStudent {
@@ -604,6 +615,10 @@ export interface AdminStudent {
   schoolName: string;
   schoolId?: string;
   schoolType?: string;
+  birthDate?: string;
+  status?: string;
+  attendanceRate?: number;
+  averageGrade?: number;
   registrationData?: StudentRegistrationData;
 }
 

@@ -114,7 +114,7 @@ export function searchPreRegisteredTeacher(
   email: string,
   biNumber: string,
   fullName: string,
-  schoolName: string
+  schoolName: string = ''
 ): { found: boolean; teacherName?: string; details?: string; id?: string } {
   const normEmail = email.trim().toLowerCase();
   const normBi = biNumber.trim().toUpperCase();
@@ -148,7 +148,7 @@ export function searchPreRegisteredDirector(
   email: string,
   biNumber: string,
   fullName: string,
-  schoolName: string
+  schoolName: string = ''
 ): { found: boolean; directorName?: string; details?: string; schoolMatched?: string } {
   const normEmail = email.trim().toLowerCase();
   const normBi = biNumber.trim().toUpperCase();

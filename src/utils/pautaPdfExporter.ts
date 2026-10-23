@@ -243,11 +243,18 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
   const availSubjW = contentWidth - (fixedNumW + fixedNameW + fixedSexoW + fixedMediaW + fixedObsW);
   const dynamicSubjW = Number((availSubjW / Math.max(1, classDisciplinas.length)).toFixed(2));
 
+  interface TableColumn {
+    key: string;
+    title: string;
+    width: number;
+    align: 'left' | 'center' | 'right';
+  }
+
   // Columns definition for Landscape All Disciplines (Sum = 277mm)
-  const columnsGeneral = [
-    { key: 'num', title: 'Nº', width: fixedNumW, align: 'center' as const },
-    { key: 'nome', title: 'Nome Completo do Aluno', width: fixedNameW, align: 'left' as const },
-    { key: 'sexo', title: 'Sexo', width: fixedSexoW, align: 'center' as const },
+  const columnsGeneral: TableColumn[] = [
+    { key: 'num', title: 'Nº', width: fixedNumW, align: 'center' },
+    { key: 'nome', title: 'Nome Completo do Aluno', width: fixedNameW, align: 'left' },
+    { key: 'sexo', title: 'Sexo', width: fixedSexoW, align: 'center' },
     ...classDisciplinas.map((subj, idx) => ({
       key: `subj_${idx}`,
       title: `${DISCIPLINE_ABBR[subj] || subj.slice(0, 7).toUpperCase()} (${mtHeaderLabel})`,
@@ -260,37 +267,37 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
 
   // Columns definition for Single Discipline - Single Trimester (Portrait Sum = 190mm)
   // ONLY shows the selected trimester!
-  const columnsSingleDisciplineTrimester = [
-    { key: 'num', title: 'Nº', width: 10, align: 'center' as const },
-    { key: 'nome', title: 'Nome Completo do Aluno', width: 72, align: 'left' as const },
-    { key: 'sexo', title: 'Sexo', width: 12, align: 'center' as const },
-    { key: 'p1', title: `MAC (${periodo}ºT)`, width: 17, align: 'center' as const },
-    { key: 'p2', title: `NPP (${periodo}ºT)`, width: 17, align: 'center' as const },
-    { key: 'trabalho', title: `NPT (${periodo}ºT)`, width: 17, align: 'center' as const },
-    { key: 'media', title: `MT${periodo === 'I' ? '1' : periodo === 'II' ? '2' : '3'}`, width: 18, align: 'center' as const },
-    { key: 'resultado', title: 'OBSERVAÇÃO', width: 27, align: 'center' as const },
+  const columnsSingleDisciplineTrimester: TableColumn[] = [
+    { key: 'num', title: 'Nº', width: 10, align: 'center' },
+    { key: 'nome', title: 'Nome Completo do Aluno', width: 72, align: 'left' },
+    { key: 'sexo', title: 'Sexo', width: 12, align: 'center' },
+    { key: 'p1', title: `MAC (${periodo}ºT)`, width: 17, align: 'center' },
+    { key: 'p2', title: `NPP (${periodo}ºT)`, width: 17, align: 'center' },
+    { key: 'trabalho', title: `NPT (${periodo}ºT)`, width: 17, align: 'center' },
+    { key: 'media', title: `MT${periodo === 'I' ? '1' : periodo === 'II' ? '2' : '3'}`, width: 18, align: 'center' },
+    { key: 'resultado', title: 'OBSERVAÇÃO', width: 27, align: 'center' },
   ];
 
   // Columns definition for Single Discipline - Pauta Final (Landscape Sum = 277mm)
   // Shows Iº Trimestre, IIº Trimestre, IIIº Trimestre and MFD for ONLY the chosen discipline!
-  const columnsSingleDisciplineFinal = [
-    { key: 'num', title: 'Nº', width: 9, align: 'center' as const },
-    { key: 'nome', title: 'Nome Completo do Aluno', width: 58, align: 'left' as const },
-    { key: 'sexo', title: 'Sexo', width: 10, align: 'center' as const },
-    { key: 't1_mac', title: 'T1 MAC', width: 13, align: 'center' as const },
-    { key: 't1_npp', title: 'T1 NPP', width: 13, align: 'center' as const },
-    { key: 't1_npt', title: 'T1 NPT', width: 13, align: 'center' as const },
-    { key: 't1_mt', title: 'MT1', width: 14, align: 'center' as const },
-    { key: 't2_mac', title: 'T2 MAC', width: 13, align: 'center' as const },
-    { key: 't2_npp', title: 'T2 NPP', width: 13, align: 'center' as const },
-    { key: 't2_npt', title: 'T2 NPT', width: 13, align: 'center' as const },
-    { key: 't2_mt', title: 'MT2', width: 14, align: 'center' as const },
-    { key: 't3_mac', title: 'T3 MAC', width: 13, align: 'center' as const },
-    { key: 't3_npp', title: 'T3 NPP', width: 13, align: 'center' as const },
-    { key: 't3_npt', title: 'T3 NPT', width: 13, align: 'center' as const },
-    { key: 't3_mt', title: 'MT3', width: 14, align: 'center' as const },
-    { key: 'mfd', title: 'MFD', width: 15, align: 'center' as const },
-    { key: 'resultado', title: 'OBS.', width: 26, align: 'center' as const },
+  const columnsSingleDisciplineFinal: TableColumn[] = [
+    { key: 'num', title: 'Nº', width: 9, align: 'center' },
+    { key: 'nome', title: 'Nome Completo do Aluno', width: 58, align: 'left' },
+    { key: 'sexo', title: 'Sexo', width: 10, align: 'center' },
+    { key: 't1_mac', title: 'T1 MAC', width: 13, align: 'center' },
+    { key: 't1_npp', title: 'T1 NPP', width: 13, align: 'center' },
+    { key: 't1_npt', title: 'T1 NPT', width: 13, align: 'center' },
+    { key: 't1_mt', title: 'MT1', width: 14, align: 'center' },
+    { key: 't2_mac', title: 'T2 MAC', width: 13, align: 'center' },
+    { key: 't2_npp', title: 'T2 NPP', width: 13, align: 'center' },
+    { key: 't2_npt', title: 'T2 NPT', width: 13, align: 'center' },
+    { key: 't2_mt', title: 'MT2', width: 14, align: 'center' },
+    { key: 't3_mac', title: 'T3 MAC', width: 13, align: 'center' },
+    { key: 't3_npp', title: 'T3 NPP', width: 13, align: 'center' },
+    { key: 't3_npt', title: 'T3 NPT', width: 13, align: 'center' },
+    { key: 't3_mt', title: 'MT3', width: 14, align: 'center' },
+    { key: 'mfd', title: 'MFD', width: 15, align: 'center' },
+    { key: 'resultado', title: 'OBS.', width: 26, align: 'center' },
   ];
 
   const columns = isAllDisciplines

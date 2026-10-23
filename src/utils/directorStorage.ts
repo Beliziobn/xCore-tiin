@@ -169,6 +169,7 @@ export function buildInitialDirectorDossier(
     location: 'Quêssua - Zona Central',
     category: 'Ensino Primário',
     teachersCount: 0,
+    classesCount: 0,
     roomsCount: 0,
     turmasCount: 0,
     studentsWithDocs: 0,

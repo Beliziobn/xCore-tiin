@@ -178,7 +178,7 @@ export async function exportTurmaStudentListToPDF(
       } else if (col.key === 'idade') {
         val = String(student.idade);
       } else if (col.key === 'situacao') {
-        val = student.condicaoMatricula === 'Matriculado' ? '' : student.condicaoMatricula;
+        val = (student.condicaoMatricula as string) === 'Matriculado' || student.condicaoMatricula === 'Novo' ? '' : student.condicaoMatricula;
       }
 
       pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
