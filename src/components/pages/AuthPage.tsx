@@ -54,7 +54,7 @@ import {
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
 import { getSchoolRegistrationData, getOfferedLevelsBadges, syncSchoolsFromServer } from '../../utils/schoolStorage';
-import { saveUserToFirestore } from '../../utils/firestoreSync';
+import { saveUserToFirestore, fetchUserFromFirestore } from '../../utils/firestoreSync';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -283,6 +283,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   // Status & Feedback
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [googleNotice, setGoogleNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -361,7 +362,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   }, [mode, email, biNumber, firstName, lastName, selectedSchoolId, selectedMunicipality, schoolRole, institutionalScope, registeredSchools]);
 
-  const completeGoogleLogin = (
+  const completeGoogleLogin = async (
     targetEmail: string,
     targetName: string,
     uid?: string,
@@ -376,11 +377,128 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       cleanEmail === 'beliziodos20@gmail.com' ||
       cleanEmail.includes('belizio');
 
-    // Check approval application and rosters
-    const approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
+    // 1. Sync fresh applications from server / Firestore to ensure we check any existing application
+    let approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
+    if (!approvalCheck.app) {
+      try {
+        const freshApps = await syncApplicationsFromServer();
+        const matchedApp = freshApps.find(
+          (a) =>
+            (uid && a.userId === uid) ||
+            (cleanEmail && a.email?.trim().toLowerCase() === cleanEmail)
+        );
+        if (matchedApp) {
+          approvalCheck = {
+            status: matchedApp.status === 'aprovado' ? 'ativo' : matchedApp.status,
+            app: matchedApp,
+          };
+        }
+      } catch {}
+    }
+
+    // 2. Check pre-registration rosters
     const teacherPreReg = searchPreRegisteredTeacher(cleanEmail, '', targetName);
     const directorPreReg = searchPreRegisteredDirector(cleanEmail, '', targetName);
 
+    // 3. Check Firestore user document
+    let existingFirestoreUser: UserAccount | null = null;
+    try {
+      existingFirestoreUser = await fetchUserFromFirestore(cleanEmail);
+    } catch {}
+
+    // Check if account already exists in the system
+    const hasExistingAccount = Boolean(
+      isDirectorMunicipal ||
+      isSuperAdmin ||
+      approvalCheck.app ||
+      existingFirestoreUser ||
+      teacherPreReg.found ||
+      directorPreReg.found
+    );
+
+    const names = targetName.trim().split(' ');
+    let gFirst = names[0] || 'Utilizador';
+    let gLast = names.slice(1).join(' ') || '';
+
+    // SE NÃO TEM AINDA UMA CONTA CRIADA E CADASTRADA NO SISTEMA:
+    // Leva automaticamente o utilizador à aba de criação de conta com os dados do Google preenchidos
+    if (!hasExistingAccount) {
+      setIsGoogleLoading(false);
+      setLoading(false);
+      onAuthLoadingChange?.(false);
+      setIsGooglePickerOpen(false);
+
+      // Preenche os dados identificados na conta Google
+      setEmail(cleanEmail);
+      if (gFirst && gFirst !== 'Utilizador' && gFirst !== 'Google') {
+        setFirstName(gFirst);
+      }
+      if (gLast && gLast !== 'Google') {
+        setLastName(gLast);
+      }
+      setPassword('Ucore@2026');
+      setConfirmPassword('Ucore@2026');
+      setAgreeTerms(true);
+
+      // Altera automaticamente para a aba de criação de conta
+      setMode('register');
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      setGoogleNotice(
+        `Conta Google identificada (${cleanEmail}). Complete os dados institucionais abaixo para criar a sua conta no Sigre e submeter para homologação.`
+      );
+
+      // Rola suavemente até o formulário de cadastro
+      setTimeout(() => {
+        const cardContainer = document.getElementById('auth-card-container');
+        if (cardContainer) {
+          cardContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+      return;
+    }
+
+    // SE JÁ POSSUI CONTA CADASTRADA:
+    // 1. Se a candidatura estiver pendente de homologação
+    if (approvalCheck.app && approvalCheck.status === 'pendente') {
+      const app = approvalCheck.app;
+      const pendingUser: UserAccount = {
+        id: app.userId || uid || 'usr_' + Date.now(),
+        firstName: gFirst,
+        lastName: gLast,
+        email: cleanEmail,
+        role: app.type === 'professor' ? 'professor' : 'diretor',
+        scope: app.scope || 'escola',
+        schoolRole: app.schoolRole,
+        adminRole: app.adminRole,
+        cargoTitle: app.roleRequested || 'Candidato Institucional',
+        schoolName: app.schoolName || 'Unidade Escolar',
+        schoolId: app.schoolId,
+        municipalityOrDepartment: app.municipality || 'Quêssua',
+        titlePrefix: app.type === 'professor' ? 'Prof.' : 'Director',
+        greeting: `Olá ${gFirst}`,
+        avatar: photoURL || undefined,
+        status: 'pendente',
+      };
+      setSuccessMsg(
+        `A sua candidatura como ${app.roleRequested} continua em análise na Direção Municipal da Educação. A aceder ao ambiente de acompanhamento...`
+      );
+      setTimeout(() => {
+        onLoginSuccess(pendingUser);
+      }, 600);
+      return;
+    }
+
+    // 2. Se foi indeferida
+    if (approvalCheck.app && approvalCheck.status === 'rejeitado') {
+      setErrorMsg(
+        `A sua candidatura foi indeferida pela administração: ${approvalCheck.app.rejectionReason || 'Contacte a Direção Municipal da Educação.'}`
+      );
+      setIsGoogleLoading(false);
+      return;
+    }
+
+    // 3. Se possui conta ativa, resolver credenciais e entrar
     let resolvedRole: 'admin' | 'diretor' | 'professor' = 'admin';
     let resolvedScope: 'escola' | 'administracao' = 'administracao';
     let resolvedSchoolRole: SchoolStaffRole | undefined = undefined;
@@ -389,14 +507,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       ? 'Administrador de Sistema Sigre (Super Admin)'
       : isDirectorMunicipal
       ? 'Director Municipal da Educação de Quessua'
-      : 'Utilizador Google';
+      : 'Utilizador Institucional';
     let resolvedPrefix = isSuperAdmin ? 'Admin.' : isDirectorMunicipal ? 'Dr.' : 'Sr(a).';
     let resolvedSchoolName: string | undefined = 'Direcção Municipal da Educação de Quessua';
     let resolvedSchoolId: string | undefined = undefined;
-
-    const names = targetName.trim().split(' ');
-    let gFirst = names[0] || 'Utilizador';
-    let gLast = names.slice(1).join(' ') || '';
 
     if (isSuperAdmin) {
       resolvedRole = 'admin';
@@ -431,6 +545,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       const appNames = (app.fullName || '').trim().split(' ');
       if (appNames[0]) gFirst = appNames[0];
       if (appNames.length > 1) gLast = appNames.slice(1).join(' ');
+    } else if (existingFirestoreUser) {
+      resolvedRole = existingFirestoreUser.role;
+      resolvedScope = existingFirestoreUser.scope || resolvedScope;
+      resolvedSchoolRole = existingFirestoreUser.schoolRole;
+      resolvedAdminRole = existingFirestoreUser.adminRole;
+      resolvedCargo = existingFirestoreUser.cargoTitle || resolvedCargo;
+      resolvedSchoolName = existingFirestoreUser.schoolName;
+      resolvedSchoolId = existingFirestoreUser.schoolId;
+      resolvedPrefix = existingFirestoreUser.titlePrefix || resolvedPrefix;
+      if (existingFirestoreUser.firstName) gFirst = existingFirestoreUser.firstName;
+      if (existingFirestoreUser.lastName) gLast = existingFirestoreUser.lastName;
     } else if (teacherPreReg.found) {
       resolvedRole = 'professor';
       resolvedScope = 'escola';
@@ -511,12 +636,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setIsGoogleLoading(true);
       setErrorMsg(null);
       setSuccessMsg(null);
+      setGoogleNotice(null);
       const res = await googleSignIn();
       if (!res || res.cancelled) {
         return;
       }
       if (res.user && res.user.email) {
-        completeGoogleLogin(
+        await completeGoogleLogin(
           res.user.email,
           res.user.displayName || 'Utilizador Google',
           res.user.uid,
@@ -546,6 +672,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setMode(initialMode);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setGoogleNotice(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [initialMode]);
 
@@ -553,6 +680,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setMode(newMode);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setGoogleNotice(null);
     setForgotPasswordOpen(false);
   };
 
@@ -1284,6 +1412,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-2 animate-in fade-in">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                     <span>{successMsg}</span>
+                  </div>
+                )}
+                {googleNotice && (
+                  <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 text-xs font-medium flex items-start gap-2.5 animate-in fade-in shadow-xs">
+                    <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-0.5">
+                      <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                        <span>Conta Google Verificada</span>
+                        {email && (
+                          <span className="px-1.5 py-0.2 rounded-full bg-blue-200/80 text-blue-900 text-[10px] font-black">
+                            {email}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-blue-800 leading-relaxed">
+                        {googleNotice}
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -2032,6 +2178,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Google Account Picker Modal for Direct Account Selection or Popup Block Fallback */}
+      <GoogleAccountPickerModal
+        isOpen={isGooglePickerOpen}
+        onClose={() => setIsGooglePickerOpen(false)}
+        onSelectAccount={(selectedEmail, selectedName, selectedRole) => {
+          completeGoogleLogin(selectedEmail, selectedName, undefined, null, selectedRole);
+        }}
+        reason={googlePickerReason}
+      />
 
       {/* Footer Note (when standalone) */}
       {!hideHeader && (

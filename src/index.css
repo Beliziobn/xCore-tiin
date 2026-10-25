@@ -65,6 +65,7 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
     color: #002133;
+    text-wrap: balance;
   }
 
   html.dark h1,
@@ -73,7 +74,7 @@
   html.dark h4,
   html.dark h5,
   html.dark h6 {
-    color: #f8fafc !important;
+    color: #f8fafc;
   }
 
   /* Body copy and controls use the humanist sans for legibility */
@@ -82,13 +83,49 @@
     font-family: var(--font-sans);
   }
 
-  /* Ensure typography uses brand primary contrast #002133 */
-  .text-black,
-  .text-slate-950,
-  .text-slate-900,
-  .text-gray-950,
-  .text-gray-900 {
-    color: #002133 !important;
+  /* Tabular numerals for vertical alignment in tables, metrics, and grades (Prompt Mestre v4 Seção 16 & 18.3) */
+  td, th, .tabular-nums, .stat-number, .metric-card .value, .grades-table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ensure typography uses brand primary contrast #002133 in light theme without breaking dark surfaces (WCAG 1.4.3) */
+  html:not(.dark) .text-black,
+  html:not(.dark) .text-slate-950,
+  html:not(.dark) .text-slate-900,
+  html:not(.dark) .text-gray-950,
+  html:not(.dark) .text-gray-900 {
+    color: #002133;
+  }
+
+  /* WCAG 2.2 AA 2.4.7 Focus Visible & 2.4.11 Focus Not Obscured */
+  :focus-visible {
+    outline: 2px solid var(--color-brand, #f75142);
+    outline-offset: 2px;
+    scroll-margin-top: calc(var(--header-height, 84px) + 16px);
+  }
+
+  /* Skip to main content link (WCAG 2.4.1 Bypass Blocks) */
+  .skip-to-content-link {
+    position: fixed;
+    top: -100px;
+    left: 16px;
+    z-index: 9999;
+    background-color: #002133;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    padding: 0.625rem 1rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px rgba(0, 33, 51, 0.35);
+    transition: top 0.15s ease;
+    text-decoration: none;
+  }
+
+  .skip-to-content-link:focus,
+  .skip-to-content-link:focus-visible {
+    top: 12px;
+    outline: 2px solid #f75142;
+    outline-offset: 2px;
   }
 
   ::selection {
@@ -221,6 +258,12 @@ html.lenis.lenis-stopped {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   .nav-link, .cta-button, .site-header {
     transition: none;
   }
@@ -617,7 +660,6 @@ html.lenis.lenis-stopped {
   font-size: 14px;
   height: 44px;
   letter-spacing: 0.25px;
-  outline: none;
   overflow: hidden;
   padding: 0 12px;
   position: relative;
@@ -629,6 +671,11 @@ html.lenis.lenis-stopped {
   width: auto;
   max-width: 400px;
   min-width: min-content;
+}
+
+.gsi-material-button:focus-visible {
+  outline: 2px solid #f75142;
+  outline-offset: 2px;
 }
 
 .gsi-material-button .gsi-material-button-icon {
@@ -894,6 +941,12 @@ html.lenis.lenis-stopped {
   transform: translateY(-1px);
 }
 
-
-
-
+@media print {
+  #btn-floating-support-chat,
+  #system-toast-notification,
+  .skip-to-content-link,
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

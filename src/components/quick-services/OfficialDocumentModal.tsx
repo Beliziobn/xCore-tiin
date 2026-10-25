@@ -1,20 +1,20 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   X,
   Printer,
-  Download,
   CheckCircle2,
   ShieldCheck,
   FileText,
-  Calendar,
-  School,
-  User,
-  Award,
-  Send,
-  Phone,
   MessageSquare
 } from 'lucide-react';
+import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import type { QuickServiceRequest } from '../../types';
+import {
+  isFemaleFirstName,
+  adaptOccupationalTextToGender,
+  getPreposicaoEscola,
+  formatFinalidadeWithPreposition,
+} from '../../utils/genderGrammar';
 
 interface OfficialDocumentModalProps {
   isOpen: boolean;
@@ -32,6 +32,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
   onOpenNotifyModal,
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
+  const [genderOverride, setGenderOverride] = useState<'M' | 'F' | null>(null);
 
   if (!isOpen || !request) return null;
 
@@ -46,6 +47,47 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
     year: 'numeric',
   });
 
+  const targetPersonName =
+    request.serviceType === 'DECLARACAO_EFECTIVIDADE'
+      ? details.employeeName || request.requesterName
+      : details.studentName || request.requesterName;
+
+  const isFeminino =
+    genderOverride === 'F'
+      ? true
+      : genderOverride === 'M'
+      ? false
+      : isFemaleFirstName(targetPersonName);
+
+  const artigoTratamento = isFeminino ? 'a Senhora' : 'o Senhor';
+  const portadorPortadora = isFeminino ? 'portadora' : 'portador';
+  const funcionarioFuncionaria = isFeminino ? 'funcionária' : 'funcionário';
+  const colocadoColocada = isFeminino ? 'colocada' : 'colocado';
+  const enquadradoEnquadrada = isFeminino ? 'enquadrada' : 'enquadrado';
+  const inscritoInscrita = isFeminino ? 'inscrita' : 'inscrito';
+  const interessadoInteressada = isFeminino ? 'pela interessada' : 'pelo interessado';
+  const doDaFuncionario = isFeminino ? 'da funcionária' : 'do funcionário';
+  const peloMesmoPelaMesma = isFeminino ? 'pela mesma' : 'pelo mesmo';
+
+  const artigoAluno = isFeminino ? 'a aluna' : 'o aluno';
+  const identificadoIdentificada = isFeminino ? 'identificada' : 'identificado';
+  const matriculadoMatriculada = isFeminino ? 'matriculada' : 'matriculado';
+  const aprovadoAprovada = isFeminino ? 'APROVADA' : 'APROVADO';
+  const aoAEstudante = isFeminino ? 'à estudante' : 'ao estudante';
+  const doDaAluno = isFeminino ? 'da aluna' : 'do aluno';
+
+  const schoolOrDept =
+    details.employeeSchoolOrDepartment || request.targetSchoolName || 'Rede Municipal do Quêssua';
+  const prepEscola = getPreposicaoEscola(schoolOrDept);
+  const adaptedCategory = adaptOccupationalTextToGender(
+    details.employeeCategory || 'Docente',
+    isFeminino
+  );
+  const finalidadeFormatted = formatFinalidadeWithPreposition(
+    details.purpose || 'Fins Legais e Bancários',
+    isFeminino
+  );
+
   // Calculate sample academic subjects & grades if Boletim
   const subjects = [
     { name: 'Língua Portuguesa', p1: 15, p2: 16, pt: 16, mt: 16 },
@@ -59,10 +101,42 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
   const overallAvg = (subjects.reduce((acc, s) => acc + s.mt, 0) / subjects.length).toFixed(1);
 
   return (
-    <div className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:fixed print:inset-0">
+    <div className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+          }
+          #siteHeader,
+          #btn-floating-support-chat,
+          #system-toast-notification,
+          .no-print,
+          footer,
+          nav {
+            display: none !important;
+            visibility: hidden !important;
+          }
+          #official-modal-print-sheet {
+            box-sizing: border-box !important;
+            box-shadow: none !important;
+            border: 1.5px solid #000000 !important;
+            padding: 12mm 14mm !important;
+            margin: 0 auto !important;
+            width: 100% !important;
+            max-width: 186mm !important;
+            max-height: 274mm !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            overflow: hidden !important;
+          }
+        }
+      `}</style>
       <div className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden print:max-h-none print:border-none print:shadow-none print:rounded-none">
         {/* Top Control Bar (Hidden during print) */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0 print:hidden">
+        <div className="px-6 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
               <FileText className="w-5 h-5" />
@@ -80,7 +154,33 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Gender Selector */}
+            <div
+              role="group"
+              aria-label="Concordância de género"
+              className="inline-flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700"
+            >
+              <button
+                type="button"
+                onClick={() => setGenderOverride('M')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  !isFeminino ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Masculino
+              </button>
+              <button
+                type="button"
+                onClick={() => setGenderOverride('F')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  isFeminino ? 'bg-[#f75142] text-white' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Feminino
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={handlePrint}
@@ -117,20 +217,17 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
         {/* Document Printable Sheet */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-10 bg-slate-100 print:bg-white print:p-0">
           <div
+            id="official-modal-print-sheet"
             ref={printRef}
             className="bg-white mx-auto max-w-3xl p-8 sm:p-12 border border-slate-300 shadow-lg rounded-xl print:border-none print:shadow-none print:p-6 print:max-w-none text-slate-900 leading-relaxed font-serif"
           >
             {/* Header: Republic of Angola */}
-            <div className="text-center space-y-1 mb-8 border-b-2 border-slate-900/80 pb-6">
-              <div className="flex justify-center mb-3">
+            <div className="text-center space-y-1 mb-6 border-b-2 border-slate-900/80 pb-5">
+              <div className="flex justify-center mb-2.5">
                 <img
-                  src="/public/Emblem_of_Angola.svg.webp"
+                  src={emblemAngolaImg}
                   alt="Insígnia da República de Angola"
-                  className="w-16 h-16 object-contain"
-                  onError={(e) => {
-                    // Fallback to local SVG emblem if path varies
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
+                  className="w-20 h-auto max-h-20 object-contain mx-auto"
                 />
               </div>
               <h2 className="text-base sm:text-lg font-black tracking-widest uppercase font-sans text-slate-900">
@@ -148,7 +245,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             </div>
 
             {/* Document Title Banner */}
-            <div className="text-center my-6">
+            <div className="text-center my-5">
               <div className="inline-block border-y-2 border-slate-900 py-2 px-6">
                 <h1 className="text-lg sm:text-xl font-black uppercase tracking-wide text-slate-950 font-sans">
                   {request.serviceType === 'DECLARACAO_EFECTIVIDADE' && 'Declaração Oficial de Efectividade'}
@@ -166,12 +263,14 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {request.serviceType === 'DECLARACAO_EFECTIVIDADE' && (
               <div className="space-y-4 text-justify text-sm sm:text-base leading-relaxed text-slate-800">
                 <p>
-                  Para os devidos efeitos legais e a pedido da parte interessada, o Director Municipal da Educação do Município do Quêssua, Província de Malanje, <strong>DECLARA</strong> que:
+                  Para os devidos efeitos legais e administrativos, e por ter sido solicitada {interessadoInteressada}, o Director Municipal da Educação do Município do Quêssua, Província de Malanje, <strong>DECLARA</strong> que {artigoTratamento} <strong>{details.employeeName || request.requesterName}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong className="font-mono">{details.employeeBi || 'Conforme Registo'}</strong> e {inscritoInscrita} sob o número de agente público <strong className="font-mono">{details.employeeAgente || 'REG-DME-2026'}</strong>, é {funcionarioFuncionaria} do Sector da Educação, onde se encontra {colocadoColocada} {prepEscola} <strong>{schoolOrDept}</strong>, {enquadradoEnquadrada} na categoria e função de <strong>{adaptedCategory}</strong>:
                 </p>
 
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 my-4 font-sans text-sm space-y-1.5">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 my-3 font-sans text-sm space-y-1.5">
                   <div>
-                    <span className="text-slate-500">Nome do Funcionário(a):</span>{' '}
+                    <span className="text-slate-500">
+                      {isFeminino ? 'Nome da Funcionária:' : 'Nome do Funcionário:'}
+                    </span>{' '}
                     <strong className="text-slate-950 text-base">{details.employeeName || request.requesterName}</strong>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -187,25 +286,25 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                     <div>
                       <span className="text-slate-500">Categoria / Função:</span>{' '}
-                      <strong className="text-slate-900">{details.employeeCategory || 'Docente'}</strong>
+                      <strong className="text-slate-900">{adaptedCategory}</strong>
                     </div>
                     <div>
                       <span className="text-slate-500">Instituição / Escola:</span>{' '}
-                      <strong className="text-slate-900">{details.employeeSchoolOrDepartment || request.targetSchoolName || 'Rede Municipal do Quêssua'}</strong>
+                      <strong className="text-slate-900">{schoolOrDept}</strong>
                     </div>
                   </div>
                 </div>
 
                 <p>
-                  Encontra-se no pleno exercício das suas funções docentes/administrativas nesta circunscrição municipal, mantendo <strong>EFECTIVIDADE PLENA</strong> e assiduidade ininterrupta no período de referência de <strong>{details.referenceMonthYear || 'Fevereiro / 2026'}</strong>, sem registo de faltas injustificadas nem quaisquer sanções disciplinares averbadas no seu processo individual.
+                  Encontra-se no pleno exercício das suas funções nesta circunscrição municipal, mantendo <strong>EFECTIVIDADE PLENA</strong> e assiduidade ininterrupta no período de referência de <strong>{details.referenceMonthYear || 'Fevereiro / 2026'}</strong>, sem registo de faltas injustificadas nem quaisquer sanções disciplinares averbadas no processo individual {doDaFuncionario}.
                 </p>
 
                 <p>
-                  A presente declaração é emitida em conformidade com o Estatuto da Carreira Docente da República de Angola e destina-se especificamente para: <strong>{details.purpose || 'Fins Legais e Bancários'}</strong>.
+                  A presente declaração é emitida em conformidade com o Estatuto da Carreira Docente da República de Angola, destinando-se especificamente {finalidadeFormatted.preposition} <strong>{finalidadeFormatted.text}</strong>, devendo ser utilizada exclusivamente {peloMesmoPelaMesma} para os fins legalmente previstos.
                 </p>
 
-                <p className="pt-2">
-                  Por ser verdade e ter sido expressamente solicitada, passou-se a presente declaração que vai por mim assinada e autenticada com o selo branco oficial em uso nesta Direcção Municipal.
+                <p className="pt-1">
+                  Por corresponder à verdade e por ter sido expressamente solicitada {interessadoInteressada}, mandei passar a presente declaração que vai por mim assinada e autenticada com o carimbo a óleo em uso nesta Direcção Municipal.
                 </p>
               </div>
             )}
@@ -213,12 +312,12 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {request.serviceType === 'BOLETIM_NOTAS' && (
               <div className="space-y-4 text-sm sm:text-base leading-relaxed text-slate-800">
                 <p className="text-justify">
-                  A Direcção do <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> certifica que o(a) aluno(a) abaixo identificado(a) obteve o seguinte rendimento pedagógico referente ao <strong>{details.trimestre || 'Ano Lectivo 2025/2026'}</strong>:
+                  A Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> certifica que {artigoAluno} abaixo {identificadoIdentificada} obteve o seguinte rendimento pedagógico referente ao <strong>{details.trimestre || 'Ano Lectivo 2025/2026'}</strong>:
                 </p>
 
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 font-sans text-xs sm:text-sm grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>
-                    <span className="text-slate-500 block">Aluno:</span>
+                    <span className="text-slate-500 block">{isFeminino ? 'Aluna:' : 'Aluno:'}</span>
                     <strong className="text-slate-950">{details.studentName || 'Nome do Estudante'}</strong>
                   </div>
                   <div>
@@ -275,7 +374,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                 <div className="bg-emerald-50 border border-emerald-300 p-3 rounded-xl font-sans text-xs flex items-center justify-between text-emerald-950">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Situação Académica: <strong>APROVADO / TRANSITA DE ANO</strong></span>
+                    <span>Situação Académica: <strong>{aprovadoAprovada} / TRANSITA DE ANO</strong></span>
                   </div>
                   <span className="font-mono font-bold text-emerald-800">Resultado Oficial Homologado</span>
                 </div>
@@ -285,11 +384,11 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {request.serviceType === 'DECLARACAO_MATRICULA' && (
               <div className="space-y-4 text-justify text-sm sm:text-base leading-relaxed text-slate-800">
                 <p>
-                  Para os devidos efeitos legais e a pedido da parte interessada, o Director do <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> faz constar e <strong>DECLARA</strong> que:
+                  Para os devidos efeitos legais e por ter sido solicitada {interessadoInteressada}, a Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> faz constar e <strong>DECLARA</strong> que {artigoAluno}:
                 </p>
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 font-sans text-sm space-y-2">
                   <div>
-                    <span className="text-slate-500">Nome do Aluno(a):</span>{' '}
+                    <span className="text-slate-500">{isFeminino ? 'Nome da Aluna:' : 'Nome do Aluno:'}</span>{' '}
                     <strong className="text-slate-950 text-base">{details.studentName || request.requesterName}</strong>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -304,10 +403,10 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   </div>
                 </div>
                 <p>
-                  Encontra-se devidamente matriculado(a) e a frequentar as aulas curriculares normais durante o Ano Lectivo de <strong>2025/2026</strong> nesta instituição de ensino do Sistema Geral de Educação.
+                  Encontra-se devidamente {matriculadoMatriculada} e a frequentar as aulas curriculares normais durante o Ano Lectivo de <strong>2025/2026</strong> nesta instituição de ensino do Sistema Geral de Educação.
                 </p>
                 <p>
-                  A presente declaração é válida para: <strong>{details.purpose || 'Fins de Abono de Família e Comprovação de Frequência'}</strong>.
+                  A presente declaração destina-se {finalidadeFormatted.preposition} <strong>{finalidadeFormatted.text}</strong>.
                 </p>
               </div>
             )}
@@ -315,16 +414,16 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {request.serviceType === 'GUIA_TRANSFERENCIA' && (
               <div className="space-y-4 text-justify text-sm sm:text-base leading-relaxed text-slate-800">
                 <p>
-                  A Direcção do <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> concede por este meio a presente <strong>GUIA OFICIAL DE TRANSFERÊNCIA ESCOLAR</strong> ao estudante:
+                  A Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> concede por este meio a presente <strong>GUIA OFICIAL DE TRANSFERÊNCIA ESCOLAR</strong> {aoAEstudante}:
                 </p>
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 font-sans text-sm space-y-2">
                   <div>
-                    <span className="text-slate-500">Estudante:</span>{' '}
+                    <span className="text-slate-500">{isFeminino ? 'Aluna:' : 'Aluno:'}</span>{' '}
                     <strong className="text-slate-950 text-base">{details.studentName || request.requesterName}</strong>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <span className="text-slate-500">Classe Atual:</span>{' '}
+                      <span className="text-slate-500">Classe Actual:</span>{' '}
                       <strong className="text-slate-900">{details.studentClasse || '9ª Classe'}</strong>
                     </div>
                     <div>
@@ -334,18 +433,18 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   </div>
                 </div>
                 <p>
-                  Mais se declara que o processo individual do aluno se encontra regularizado, sem quaisquer impedimentos legais ou disciplinares, podendo a escola receptora proceder à respectiva integração.
+                  Mais se declara que o processo individual {doDaAluno} se encontra regularizado, sem quaisquer impedimentos legais ou disciplinares, podendo a escola receptora proceder à respectiva integração.
                 </p>
               </div>
             )}
 
             {/* Date and Location */}
-            <div className="text-right font-sans text-xs sm:text-sm text-slate-700 mt-8 mb-12">
+            <div className="text-right font-sans text-xs sm:text-sm text-slate-700 mt-6 mb-8">
               Quêssua (Malanje), aos {issueDate}.
             </div>
 
             {/* Signatures & Seal Block */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-6 border-t border-slate-300 font-sans text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-5 border-t border-slate-300 font-sans text-xs">
               <div className="text-center space-y-1">
                 <p className="font-bold text-slate-800 uppercase tracking-wider">O Director Municipal da Educação</p>
                 <div className="pt-6 pb-2 flex justify-center">

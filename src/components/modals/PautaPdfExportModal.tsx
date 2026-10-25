@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   FileDown,
@@ -19,6 +19,7 @@ import {
   formatGradeForClass,
   isPassingGradeForClass,
 } from '../../utils/miniPautaStorage';
+import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 
 export interface PautaPdfExportModalProps {
   isOpen: boolean;
@@ -196,11 +197,26 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
     window.print();
   };
 
+  // Prompt Mestre v4 Seção 18.4: Fecho seguro do diálogo com tecla Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isExporting) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isExporting, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <div
       id="pauta-pdf-export-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pauta-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200"
     >
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
@@ -212,7 +228,7 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
+                <h3 id="pauta-modal-title" className="text-base sm:text-lg font-black tracking-tight text-white">
                   Gerar Mini-Pauta / Pauta Final (PDF)
                 </h3>
                 <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
@@ -227,9 +243,11 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
 
           <button
             id="btn-close-pauta-modal"
+            type="button"
             onClick={onClose}
             className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Fechar janela"
+            aria-label="Fechar janela"
           >
             <X className="w-5 h-5" />
           </button>
@@ -391,6 +409,14 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
           <div className="bg-white w-full max-w-4xl mx-auto shadow-md border border-slate-300 p-4 sm:p-8 text-black overflow-hidden box-border">
             {/* Cabeçalho Institucional Simples — Município do Quéssua */}
             <div className="text-center font-serif space-y-0.5 mb-4">
+              {/* Insígnia da República de Angola */}
+              <div className="flex justify-center mb-2.5">
+                <img
+                  src={emblemAngolaImg}
+                  alt="Insígnia da República de Angola"
+                  className="w-16 sm:w-20 md:w-24 h-auto max-h-24 object-contain mx-auto"
+                />
+              </div>
               <p className="text-xs sm:text-sm font-normal uppercase tracking-wide text-black">
                 REPÚBLICA DE ANGOLA
               </p>

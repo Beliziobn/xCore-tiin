@@ -177,6 +177,19 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Prompt Mestre v4 Seção 18.4 & 18.5: Fecho previsível de menus e popovers com tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showPagesDropdown) setShowPagesDropdown(false);
+        if (showNotifications) setShowNotifications(false);
+        if (mobileMenuOpen) setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPagesDropdown, showNotifications, mobileMenuOpen]);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markAllAsRead = () => {
@@ -185,6 +198,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
+      <a href="#main-content" className="skip-to-content-link">
+        Saltar para o conteúdo principal
+      </a>
       {isScrolled && <div className="w-full h-[76px]" aria-hidden="true" />}
       <header
         id="siteHeader"
@@ -196,18 +212,21 @@ export const Navbar: React.FC<NavbarProps> = ({
       >
         <nav
           id="ucore-navbar"
+          aria-label="Navegação principal"
           className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[76px] flex items-center justify-between"
         >
         {/* Logo */}
         <button
           id="logo-button"
+          type="button"
+          aria-label="SIGRE - Ir para a página inicial"
           onClick={() => {
             if (onNavigateToHome) {
               onNavigateToHome();
             }
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
+          className="flex items-center gap-2.5 group cursor-pointer rounded-xl focus:outline-none"
         >
           <div className="w-10 h-10 rounded-xl bg-[#002133] flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(0,33,51,0.45)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
             <Box className="w-5 h-5 text-white" strokeWidth={2.5} />
@@ -220,6 +239,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Dynamic Scroll Progress Bar */}
         <div
           id="navbar-scroll-progress"
+          aria-hidden="true"
           className="absolute bottom-0 left-0 h-[2.5px] bg-[#002133] transition-all duration-100 ease-out"
           style={{ width: `${scrollProgress}%` }}
         />
@@ -231,12 +251,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative">
               <button
                 id="nav-paginas-dropdown"
+                type="button"
+                aria-expanded={showPagesDropdown}
+                aria-haspopup="menu"
+                aria-controls="nav-paginas-menu"
                 onClick={() => setShowPagesDropdown((prev) => !prev)}
                 onBlur={() => setTimeout(() => setShowPagesDropdown(false), 200)}
-                className="flex items-center gap-1.5 text-[#002133] hover:text-white transition-colors cursor-pointer py-1"
+                className="flex items-center gap-1.5 text-[#002133] hover:text-white transition-colors cursor-pointer py-1 rounded-lg px-1.5"
               >
-                <span>Paginas</span>
+                <span>Páginas</span>
                 <ChevronDown
+                  aria-hidden="true"
                   className={`w-4 h-4 text-[#002133]/80 transition-transform duration-200 ${
                     showPagesDropdown ? 'rotate-180 text-white' : ''
                   }`}
@@ -244,7 +269,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               {showPagesDropdown && (
-                <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div
+                  id="nav-paginas-menu"
+                  role="menu"
+                  aria-label="Menu de páginas do sistema"
+                  className="absolute top-full right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150"
+                >
                   {activeRole === 'admin' ? (
                     <>
                       <button
@@ -333,20 +363,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                           <span>Cofre de Backups</span>
                         </span>
                         <span className="text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">1-Click</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          onSelectPage('admin-servicos-rapidos');
-                          setShowPagesDropdown(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs text-amber-700 bg-amber-50/60 hover:bg-amber-100/70 transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <Zap className="w-4 h-4 text-amber-600" strokeWidth={2} />
-                          <span>Serviços Rápidos & Efectividade</span>
-                        </span>
-                        <span className="text-[9px] bg-amber-600 text-white font-bold px-1.5 py-0.5 rounded">Cidadão</span>
                       </button>
 
                       <button
@@ -448,19 +464,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                           <span>Mini-Pautas & Pauta Final</span>
                         </span>
                         <span className="text-[9px] bg-[#002133] text-white font-black px-1.5 py-0.5 rounded">Turmas</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          onSelectPage('diretor-servicos-rapidos');
-                          setShowPagesDropdown(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs text-amber-700 bg-amber-50/60 hover:bg-amber-100/70 transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <Zap className="w-4 h-4 text-amber-600" strokeWidth={2} />
-                          <span>Pedidos de Boletins (Serviços Rápidos)</span>
-                        </span>
-                        <span className="text-[9px] bg-amber-600 text-white font-bold px-1.5 py-0.5 rounded">Pais</span>
                       </button>
 
                       <button
@@ -565,66 +568,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </>
                   )}
 
-                  {/* Declaração de Efectividade Oficial em Branco */}
+                  {/* Declarações de Efectividade Oficial */}
                   <button
+                    id="dropdown-declaracao-efectividade-btn"
                     onClick={() => {
                       onSelectPage('declaracao-efectividade');
                       setShowPagesDropdown(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-slate-50 hover:text-[#f75142] transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-emerald-50 hover:text-emerald-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
                   >
                     <span className="flex items-center gap-2">
-                      <FileText className="w-3.5 h-3.5 text-[#f75142]" />
-                      <span>Declaração de Efectividade</span>
+                      <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Declarações de Efectividade</span>
                     </span>
-                    <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Em Branco</span>
-                  </button>
-
-                  {/* Serviços Rápidos & Pedidos dos Usuários no Dropdown */}
-                  <button
-                    onClick={() => {
-                      onSelectPage(activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos'));
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-amber-950 bg-amber-50/80 hover:bg-amber-100 transition-colors border-t border-amber-200/60 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
-                      <span>Serviços Rápidos (Pedidos)</span>
-                    </span>
-                    {pendingQuickRequestsCount > 0 && (
-                      <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
-                        {pendingQuickRequestsCount}
-                      </span>
-                    )}
+                    <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
                   </button>
                 </div>
               )}
             </div>
-
-            {/* Botão Direto na Barra Superior: Serviços Rápidos & Efectividade (Pedidos dos Usuários) */}
-            <button
-              id="navbar-servicos-rapidos-efectividade-btn"
-              type="button"
-              onClick={() => onSelectPage(activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos'))}
-              className={`flex items-center gap-2 transition-all cursor-pointer py-1.5 px-3.5 rounded-full text-[14px] font-bold ${
-                currentView === 'admin-servicos-rapidos' ||
-                currentView === 'servicos-rapidos' ||
-                currentView === 'diretor-servicos-rapidos' ||
-                currentView === 'pedidos-rapidos'
-                  ? 'bg-[#002133] text-white shadow-md ring-2 ring-white/30'
-                  : 'text-[#002133] hover:text-white hover:bg-black/10'
-              }`}
-              title="Aceder aos Pedidos que os Usuários estão a fazer"
-            >
-              <Zap className="w-4 h-4 text-amber-300 fill-amber-300 shrink-0" />
-              <span>Serviços Rápidos & Efectividade</span>
-              {pendingQuickRequestsCount > 0 && (
-                <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black animate-pulse shadow-xs">
-                  {pendingQuickRequestsCount}
-                </span>
-              )}
-            </button>
           </div>
         )}
 
@@ -698,10 +659,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="relative">
                 <button
                   id="notification-bell-btn"
+                  type="button"
                   onClick={() => setShowNotifications((prev) => !prev)}
+                  aria-expanded={showNotifications}
+                  aria-haspopup="dialog"
                   className="relative p-2 rounded-full text-white hover:bg-white/20 transition-colors cursor-pointer focus:outline-none"
                   title="Notificações"
-                  aria-label="Notificações"
+                  aria-label={unreadCount > 0 ? `Notificações (${unreadCount} não lidas)` : 'Notificações'}
                 >
                   <Bell className="w-6 h-6 text-white" strokeWidth={2.2} />
                   {unreadCount > 0 && (
@@ -711,18 +675,23 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 {/* Notifications Popover */}
                 {showNotifications && (
-                  <div className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-slate-900">
+                  <div
+                    role="dialog"
+                    aria-label="Painel de notificações"
+                    className="absolute right-0 top-full mt-3 w-80 sm:w-88 bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-slate-200 p-4 z-50 text-slate-900"
+                  >
                     <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-xs uppercase tracking-[0.15em] text-[#002133]">Notificações</span>
                         {unreadCount > 0 && (
-                          <span className="text-[10px] bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-full font-bold uppercase">
+                          <span className="text-[10px] bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-full font-bold uppercase tabular-nums">
                             {unreadCount} novas
                           </span>
                         )}
                       </div>
                       {unreadCount > 0 && (
                         <button
+                          type="button"
                           onClick={markAllAsRead}
                           className="text-[10px] uppercase tracking-wider text-slate-600 hover:text-slate-900 font-bold cursor-pointer underline"
                         >
@@ -732,20 +701,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
 
                     <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto mt-2">
-                      {notifications.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`py-2.5 px-2 rounded-lg transition-colors ${
-                            item.read ? 'opacity-50 hover:bg-slate-50' : 'bg-slate-50/80 hover:bg-slate-100'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
-                            <span className="text-[10px] text-slate-400 tracking-wider">{item.time}</span>
-                          </div>
-                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
+                      {notifications.length === 0 ? (
+                        <div className="py-6 px-3 text-center text-xs text-slate-500">
+                          Sem novas notificações no momento.
                         </div>
-                      ))}
+                      ) : (
+                        notifications.map((item) => (
+                          <div
+                            key={item.id}
+                            className={`py-2.5 px-2 rounded-lg transition-colors ${
+                              item.read ? 'opacity-50 hover:bg-slate-50' : 'bg-slate-50/80 hover:bg-slate-100'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
+                              <span className="text-[10px] text-slate-400 tracking-wider tabular-nums">{item.time}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -772,9 +747,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 id="navbar-user-profile-btn"
+                type="button"
                 onClick={onOpenProfile}
                 className="flex items-center gap-2 bg-[#002133] text-white hover:bg-[#001726] px-3 py-1.5 rounded-full transition-all cursor-pointer group shadow-sm"
                 title="Meu Perfil"
+                aria-label={`Meu Perfil (${currentUser.firstName})`}
               >
                 <div className="w-6 h-6 rounded-full bg-white text-[#002133] flex items-center justify-center text-[10px] font-black uppercase">
                   {currentUser.firstName.charAt(0)}
@@ -786,11 +763,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               {onLogout && (
                 <button
                   id="navbar-logout-btn"
+                  type="button"
                   onClick={onLogout}
-                  className="p-1.5 text-[#002133] hover:text-white hover:bg-black/10 rounded-full transition-colors cursor-pointer"
+                  className="p-2 text-[#002133] hover:text-white hover:bg-black/10 rounded-full transition-colors cursor-pointer"
                   title="Encerrar sessão"
+                  aria-label="Encerrar sessão"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -848,6 +827,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile menu hamburger */}
           <button
             id="mobile-menu-toggle"
+            type="button"
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             className="md:hidden p-2 text-[#002133] hover:text-white rounded-lg focus:outline-none cursor-pointer"
           >

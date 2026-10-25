@@ -14,7 +14,7 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
     <button
       id="btn-floating-support-chat"
       onClick={onClick}
-      className="fixed bottom-5 right-5 z-40 group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-[#e04436] via-[#f75142] to-[#f86f63] text-white rounded-full shadow-[0_8px_25px_rgba(247,81,66,0.45)] hover:shadow-[0_12px_32px_rgba(247,81,66,0.6)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border border-white/40 select-none"
+      className="no-print print:hidden fixed bottom-5 right-5 z-40 group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-[#e04436] via-[#f75142] to-[#f86f63] text-white rounded-full shadow-[0_8px_25px_rgba(247,81,66,0.45)] hover:shadow-[0_12px_32px_rgba(247,81,66,0.6)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border border-white/40 select-none"
       title="Abrir Chat de Apoio Escolar"
       aria-label="Abrir Chat de Apoio Escolar"
     >

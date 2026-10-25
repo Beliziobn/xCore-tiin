@@ -620,14 +620,74 @@ export default function App() {
     return cleanup;
   }, []);
 
-  // When switching page or view, smoothly reset scroll to top and refresh reveals
+  // When switching page or view, smoothly reset scroll to top, refresh reveals, and update document.title (Prompt Mestre v4 Seção 15.1 & 23.1)
   useEffect(() => {
     scrollToTop(true);
+    const viewTitles: Record<string, string> = {
+      home: 'Painel Institucional',
+      'admin-dashboard': 'Painel Central da Administração',
+      'admin-estatisticas': 'Estatísticas da Rede Escolar',
+      'admin-escolas': 'Gestão da Rede de Escolas',
+      'admin-directores': 'Corpo Directivo Municipal',
+      'admin-professores': 'Quadro Docente Municipal',
+      'admin-alunos': 'Registo Geral de Alunos',
+      'admin-anuncios': 'Demandas, Circulares e Editais',
+      'admin-aprovacoes': 'Central de Homologações',
+      'admin-inscricoes': 'Homologação de Inscrições',
+      'admin-perfil': 'Perfil do Administrador',
+      'diretor-dashboard': 'Painel da Direcção Escolar',
+      'diretor-estatisticas': 'Estatísticas da Unidade Escolar',
+      'diretor-professores': 'Corpo Docente da Escola',
+      'diretor-presenca': 'Livro de Ponto Docente',
+      'diretor-alunos': 'Alunos Matriculados',
+      'diretor-salas': 'Gestão de Salas de Aula',
+      'diretor-turmas': 'Gestão de Turmas e Horários',
+      'diretor-pautas': 'Mini-Pautas e Pauta Final',
+      'diretor-aprovacoes': 'Aprovação de Inscrições da Escola',
+      'diretor-perfil': 'Perfil do Director',
+      estatisticas: 'Estatísticas da Turma',
+      'minha-turma': 'Diário de Classe e Notas',
+      'professor-turma': 'Diário de Classe e Notas',
+      'professor-presenca': 'Chamada Diária de Alunos',
+      'perfil-professor': 'Perfil do Docente',
+      'aluno-perfil': 'Ficha Individual do Aluno',
+      'declaracao-efectividade': 'Declaração de Efectividade Oficial',
+      efectividade: 'Declaração de Efectividade Oficial',
+      sobre: 'Sobre a Plataforma Sigre',
+      termos: 'Termos de Utilização',
+      privacidade: 'Política de Privacidade',
+      seguranca: 'Segurança e Proteção de Dados',
+      cases: 'Casos de Sucesso',
+      obrigado: 'Confirmação de Solicitação',
+    };
+    const pageTitle =
+      currentPage === 'login'
+        ? 'Iniciar Sessão'
+        : currentPage === 'register'
+        ? 'Criar Conta Institucional'
+        : viewTitles[currentView] || 'Sistema Integrado de Gestão Escolar';
+    document.title = `${pageTitle} | Sigre Angola`;
+
     const timer = setTimeout(() => {
       refreshScrollReveals();
     }, 60);
     return () => clearTimeout(timer);
   }, [currentPage, currentView]);
+
+  // Prompt Mestre v4 Seção 18.4: Fecho previsível de modais informativos via tecla Escape
+  useEffect(() => {
+    const handleGlobalEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedCard) setSelectedCard(null);
+        else if (selectedModule) setSelectedModule(null);
+        else if (infoModalType) setInfoModalType(null);
+        else if (settingsModalOpen) setSettingsModalOpen(false);
+        else if (isDemoModalOpen) setIsDemoModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalEscape);
+    return () => window.removeEventListener('keydown', handleGlobalEscape);
+  }, [selectedCard, selectedModule, infoModalType, settingsModalOpen, isDemoModalOpen]);
 
   const unreadChatCount = useMemo(() => {
     return chatChannels.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
@@ -2363,21 +2423,26 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f7f3f3] text-[#002133] flex flex-col font-sans selection:bg-[#f75142] selection:text-white relative">
-      {/* Toast Alert Notification (Posicionado no canto inferior direito para nunca cobrir o cabeçalho) */}
+      {/* Toast Alert Notification (Posicionado no canto inferior direito com região viva acessível WCAG 4.1.3) */}
       {toastMessage && (
         <div 
           id="system-toast-notification"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
           className="fixed bottom-6 right-6 z-50 max-w-sm bg-[#002133]/95 backdrop-blur-md text-white pl-4 pr-3 py-3 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.3)] border border-white/20 text-xs font-medium tracking-wide animate-in fade-in slide-in-from-bottom-5 flex items-center justify-between gap-3 pointer-events-auto"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-[#f75142] animate-ping shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-[#f75142] shrink-0" aria-hidden="true" />
             <span className="leading-snug">{toastMessage}</span>
           </div>
           <button
             id="btn-dismiss-toast"
+            type="button"
             onClick={() => setToastMessage(null)}
-            className="p-1 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+            className="p-1 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
             title="Fechar notificação"
+            aria-label="Fechar notificação"
           >
             <X className="w-4 h-4" />
           </button>
@@ -2459,9 +2524,11 @@ export default function App() {
         onOpenQuickServices={() => setIsQuickServicesModalOpen(true)}
       />
 
-      {/* Main Routed View with smooth page transitions */}
+      {/* Main Routed View with smooth page transitions & skip-link landmark */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
+          id="main-content"
+          tabIndex={-1}
           key={
             !currentUser
               ? 'public-landing'
@@ -2474,8 +2541,8 @@ export default function App() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="w-full flex-1 flex flex-col"
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="w-full flex-1 flex flex-col focus:outline-none"
         >
           {renderCurrentView()}
         </motion.div>

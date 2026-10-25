@@ -34,6 +34,7 @@ import {
 import type { QuickServiceRequest, QuickServiceStatus, QuickServiceType, UserAccount } from '../../types';
 import { fetchQuickRequests, updateQuickRequestStatus, deleteQuickRequest, clearAllQuickRequests } from '../../utils/quickServicesStorage';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
+import { isFemaleFirstName } from '../../utils/genderGrammar';
 
 interface QuickRequestsManagementViewProps {
   currentUser?: UserAccount | null;
@@ -206,28 +207,31 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   ) => {
     setNotifyModalRequest(req);
     const citizenName = req.requesterName || 'Cidadão';
+    const isFem = isFemaleFirstName(req.details?.employeeName || req.requesterName);
+    const saudacao = isFem ? `Exma. Senhora ${citizenName}` : `Exmo. Senhor ${citizenName}`;
+    const munidoMunida = isFem ? 'munida' : 'munido';
     const proto = req.protocol;
     const servTitle = req.title;
 
     if (presetType === 'LEVANTAMENTO') {
       setTargetStatus('CONCLUIDO');
       setNotificationMessage(
-        `Exmo(a) Sr(a). ${citizenName}, informamos que o seu pedido com protocolo nº ${proto} (${servTitle}) foi deferido com sucesso pelos serviços da Direcção Municipal da Educação do Quêssua. O documento oficial encontra-se devidamente emitido, assinado e autenticado, pronto para levantamento presencial na nossa instituição (Secretaria Geral), nos dias úteis das 08h00 às 15h30. Por favor, compareça munido(a) do seu Bilhete de Identidade original.`
+        `${saudacao}, informamos que o seu pedido com protocolo nº ${proto} (${servTitle}) foi deferido com sucesso pelos serviços da Direcção Municipal da Educação do Quêssua. O documento oficial encontra-se devidamente emitido, assinado e autenticado, pronto para levantamento presencial na nossa instituição (Secretaria Geral), nos dias úteis das 08h00 às 15h30. Por favor, compareça ${munidoMunida} do seu Bilhete de Identidade original.`
       );
     } else if (presetType === 'CONCLUIDO') {
       setTargetStatus('CONCLUIDO');
       setNotificationMessage(
-        `Exmo(a) Sr(a). ${citizenName}, confirmamos que a sua solicitação ${proto} (${servTitle}) foi processada com êxito pela Direcção Municipal da Educação. O documento encontra-se concluído e pronto.`
+        `${saudacao}, confirmamos que a sua solicitação ${proto} (${servTitle}) foi processada com êxito pela Direcção Municipal da Educação. O documento encontra-se concluído e pronto.`
       );
     } else if (presetType === 'EM_ANALISE') {
       setTargetStatus('EM_ANALISE');
       setNotificationMessage(
-        `Exmo(a) Sr(a). ${citizenName}, a sua solicitação com protocolo ${proto} foi recebida e encontra-se presentemente em fase de análise e conferência nos arquivos da Repartição da Educação.`
+        `${saudacao}, a sua solicitação com protocolo ${proto} foi recebida e encontra-se presentemente em fase de análise e conferência nos arquivos da Repartição da Educação.`
       );
     } else {
       setTargetStatus('EM_ANALISE');
       setNotificationMessage(
-        `Exmo(a) Sr(a). ${citizenName}, referente ao pedido ${proto}, solicitamos que compareça à Direcção Municipal da Educação (Secretaria Geral) para apresentação de documentação complementar necessária à emissão do documento.`
+        `${saudacao}, referente ao pedido ${proto}, solicitamos que compareça à Direcção Municipal da Educação (Secretaria Geral) para apresentação de documentação complementar necessária à emissão do documento.`
       );
     }
   };
