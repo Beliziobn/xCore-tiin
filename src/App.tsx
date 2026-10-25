@@ -1036,7 +1036,8 @@ export default function App() {
     // 1. Strict Authorization Guard: A user can never and must never enter or tamper with someone else's profile
     if (currentUser) {
       let targetView = pageId;
-      if (pageId === 'perfil-professor' || pageId === 'perfil') targetView = 'professor-perfil';
+      if (pageId === 'perfil-professor') targetView = 'professor-perfil';
+      if (pageId === 'perfil') targetView = getOwnProfileViewForUser(currentUser);
       if (pageId === 'perfil-aluno') targetView = 'aluno-perfil';
       if (pageId === 'minha-turma' || pageId === 'turma' || pageId === 'turmas' || (activeRole === 'professor' && pageId === 'alunos')) {
         targetView = 'professor-turma';
@@ -1097,6 +1098,11 @@ export default function App() {
     }
 
     if (activeRole === 'admin') {
+      if (pageId === 'perfil') {
+        setCurrentView('admin-perfil');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       if (pageId === 'aprovacoes' || pageId === 'inscricoes' || pageId === 'homologacao' || pageId === 'homologacoes') {
         setCurrentView('admin-aprovacoes');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1109,6 +1115,11 @@ export default function App() {
       }
       if (pageId === 'escolas') {
         setCurrentView('admin-escolas');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (pageId === 'directores' || pageId === 'diretores') {
+        setCurrentView('admin-directores');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1457,10 +1468,14 @@ export default function App() {
         <AdminProfilePage
           onOpenGetStarted={() => handleOpenAuth('login')}
           schools={adminSchools}
+          directors={adminDirectors}
+          teachers={adminTeachers}
+          students={adminStudents}
           onNavigateToStatistics={() => {
             setCurrentView('admin-estatisticas');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
+          onSelectPage={handleSelectPage}
           isLoggedIn={isSessionStarted}
           currentUser={currentUser}
           onNavigateToOwnProfile={() => {
@@ -1474,10 +1489,20 @@ export default function App() {
           }}
           onLogout={handleLogout}
           onOpenSettings={() => {
-            setProfileFocusZone(true);
-            setSettingsTriggerCount((c) => c + 1);
+            setSettingsModalOpen(true);
           }}
           onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
+          onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+          onOpenBackupManager={() => setIsGlobalBackupModalOpen(true)}
+          onOpenAuditLogs={() => setIsAuditLogsModalOpen(true)}
+          onOpenRag={() => {
+            setRagInitialQuery('');
+            setIsRagModalOpen(true);
+          }}
+          onOpenRegisterModal={(type) => setAdminModalType(type)}
+          sessionSettings={activeSession.settings}
+          onSaveSessionSettings={handleSaveSettings}
+          initialTab={profileInitialTab}
           focusZone={profileFocusZone}
           settingsTrigger={settingsTriggerCount}
         />

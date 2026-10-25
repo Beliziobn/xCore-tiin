@@ -7,9 +7,37 @@
   --coral-deep: #c93f26;
   --navy: #0e1b2c;
   --navy-soft: rgba(14, 27, 44, 0.72);
-  --cream: #f2eee7;
+  --cream: #fafafa;
   --header-height: 84px;
   --header-height-compact: 64px;
+
+  /* Masakula v2.0 + Sigre Angola Engineering Design Tokens */
+  --canvas: #fafafa;
+  --surface: #ffffff;
+  --surface-subtle: #f4f4f6;
+  --ink: #002133;
+  --line: #e8e8ea;
+  --line-strong: #d1d1d6;
+  --track: #ececee;
+
+  --text-primary: #002133;
+  --text-secondary: #52606d;
+  --text-on-dark: #ffffff;
+  --text-secondary-on-dark: #9fb3c8;
+
+  --accent: #f75142;
+
+  --success-soft: #e7f6f0;
+  --success-text: #0b7a54;
+  --warning-soft: #fdf1e0;
+  --warning-text: #a34a08;
+  --danger-soft: #fde8ed;
+  --danger-text: #c8002f;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 9999px;
 }
 
 @theme {
@@ -34,8 +62,8 @@
   --color-ink-soft: #334e68;
   --color-black: #002133;
 
-  /* Global page surface — soft off-white to avoid harsh pure white */
-  --color-background: #f7f3f3;
+  /* Global page surface — 95% neutral canvas (#fafafa) per Masakula v2.0 */
+  --color-background: #fafafa;
 
   --radius: 0.875rem;
 }
@@ -46,7 +74,7 @@
   #root {
     font-family: var(--font-sans);
     color: #002133;
-    background-color: var(--color-background);
+    background-color: var(--canvas, #fafafa);
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -939,6 +967,128 @@ html.lenis.lenis-stopped {
 .profile-modal .cta-btn:hover {
   background: #1F2937;
   transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Masakula v2.0 — Atomic Engineering & Subtraction Rules (Sigre Angola)
+   ========================================================================== */
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #e8e8ea);
+  border-radius: var(--r-lg, 14px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.kpi:hover {
+  border-color: var(--line-strong, #d1d1d6);
+}
+
+.kpi--featured {
+  background: var(--ink, #002133);
+  border-color: var(--ink, #002133);
+  color: var(--text-on-dark, #ffffff);
+}
+
+.kpi--featured .kpi__label,
+.kpi--featured .kpi__meta {
+  color: var(--text-secondary-on-dark, #9fb3c8);
+}
+
+.btn--primary {
+  background: var(--ink, #002133);
+  color: var(--text-on-dark, #ffffff);
+  border: 1px solid var(--ink, #002133);
+  border-radius: var(--r-md, 10px);
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.btn--primary:hover {
+  opacity: 0.92;
+}
+
+.btn--secondary {
+  background: var(--surface, #ffffff);
+  color: var(--text-primary, #002133);
+  border: 1px solid var(--line-strong, #d1d1d6);
+  border-radius: var(--r-md, 10px);
+  padding: 9px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn--secondary:hover {
+  background: var(--surface-subtle, #f4f4f6);
+}
+
+.btn--tertiary {
+  background: transparent;
+  color: var(--text-secondary, #52606d);
+  border: none;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn--tertiary:hover {
+  color: var(--text-primary, #002133);
+}
+
+.filter-chip {
+  padding: 7px 14px;
+  border-radius: var(--r-pill, 9999px);
+  border: 1px solid var(--line, #e8e8ea);
+  background: var(--surface, #ffffff);
+  color: var(--text-secondary, #52606d);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  border-color: var(--line-strong, #d1d1d6);
+  color: var(--text-primary, #002133);
+}
+
+.filter-chip.is-active {
+  background: var(--ink, #002133);
+  border-color: var(--ink, #002133);
+  color: var(--text-on-dark, #ffffff);
+  font-weight: 600;
+}
+
+.badge--neutral {
+  background: var(--surface-subtle, #f4f4f6);
+  color: var(--text-secondary, #52606d);
+}
+.badge--success {
+  background: var(--success-soft, #e7f6f0);
+  color: var(--success-text, #0b7a54);
+}
+.badge--warning {
+  background: var(--warning-soft, #fdf1e0);
+  color: var(--warning-text, #a34a08);
+}
+.badge--danger {
+  background: var(--danger-soft, #fde8ed);
+  color: var(--danger-text, #c8002f);
 }
 
 @media print {

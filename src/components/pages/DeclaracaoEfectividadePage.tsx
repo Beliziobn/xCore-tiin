@@ -520,7 +520,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   }, [records]);
 
   return (
-    <div id="declaracao-efectividade-page" className="w-full min-h-screen bg-[#F6F4EE] flex flex-col font-sans">
+    <div id="declaracao-efectividade-page" className="w-full min-h-screen bg-[#fafafa] flex flex-col font-sans">
       {/* Print CSS rules - ensures strict single-page A4 portrait format and hides all UI chrome */}
       <style>{`
         @media print {
@@ -628,22 +628,21 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       )}
 
       {/* Navigation Tabs Bar */}
-      <nav id="page-tabs-bar" className="no-print border-b border-[#D9D6CC] bg-white sticky top-0 z-40 shadow-xs">
+      <nav id="page-tabs-bar" className="no-print border-b border-[#e8e8ea] bg-white sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               type="button"
               onClick={() => setActiveTab('form')}
-              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
                 activeTab === 'form'
-                  ? 'border-[#f75142] text-[#f75142]'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-[#002133] text-[#002133]'
+                  : 'border-transparent text-[#52606d] hover:text-[#002133]'
               }`}
             >
-              <FileText className="w-4 h-4" />
               <span>Formulário de Cadastro</span>
               {formData.id && (
-                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-black">
+                <span className="text-[10px] badge--warning px-2 py-0.5 rounded-full font-semibold">
                   A Editar
                 </span>
               )}
@@ -652,15 +651,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             <button
               type="button"
               onClick={() => setActiveTab('database')}
-              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
                 activeTab === 'database'
-                  ? 'border-[#f75142] text-[#f75142]'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-[#002133] text-[#002133]'
+                  : 'border-transparent text-[#52606d] hover:text-[#002133]'
               }`}
             >
-              <Users className="w-4 h-4" />
               <span>Pessoal Cadastrado (Base de Dados)</span>
-              <span className="text-[11px] bg-[#002133] text-white px-2 py-0.5 rounded-full font-bold">
+              <span className="text-[11px] bg-[#f4f4f6] text-[#002133] px-2 py-0.5 rounded-full font-semibold numeric">
                 {records.length}
               </span>
             </button>
@@ -668,16 +666,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             <button
               type="button"
               onClick={() => setActiveTab('pedidos')}
-              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
                 activeTab === 'pedidos'
-                  ? 'border-[#f75142] text-[#f75142]'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-[#002133] text-[#002133]'
+                  : 'border-transparent text-[#52606d] hover:text-[#002133]'
               }`}
             >
-              <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
               <span>Pedidos dos Usuários (Serviços Rápidos)</span>
               {quickRequestsCount > 0 && (
-                <span className="text-[11px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-black animate-pulse">
+                <span className="text-[11px] badge--warning px-2 py-0.5 rounded-full font-semibold numeric">
                   {quickRequestsCount}
                 </span>
               )}
@@ -687,13 +684,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               <button
                 type="button"
                 onClick={() => setActiveTab('view-ficha')}
-                className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+                className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
                   activeTab === 'view-ficha'
-                    ? 'border-[#f75142] text-[#f75142]'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                    ? 'border-[#002133] text-[#002133]'
+                    : 'border-transparent text-[#52606d] hover:text-[#002133]'
                 }`}
               >
-                <BadgeCheck className="w-4 h-4 text-emerald-600" />
                 <span className="truncate max-w-[150px] sm:max-w-[220px]">
                   Ficha Oficial: {selectedRecordForView.nome.split(' ')[0]}
                 </span>
@@ -702,7 +698,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           </div>
 
           <div className="flex items-center gap-2 py-2">
-            <span className="text-xs text-slate-500 hidden md:inline">
+            <span className="text-xs text-[#52606d] hidden md:inline">
               República de Angola • Quêssua
             </span>
           </div>
@@ -1462,26 +1458,26 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                               <button
                                 type="button"
                                 onClick={() => handleOpenViewFicha(item)}
-                                className="px-2.5 py-1.5 rounded-lg bg-[#002133] hover:bg-[#00314d] text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                className="btn--secondary text-[11px] py-1 px-2.5 flex items-center gap-1"
                                 title="Ver e exportar Declaração / Ficha em PDF"
                               >
-                                <Eye className="w-3.5 h-3.5" />
+                                <Eye className="w-3.5 h-3.5 text-[#52606d]" />
                                 <span>Ficha</span>
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => handleStartEditRecord(item)}
-                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] cursor-pointer transition-colors"
+                                className="btn--secondary text-[11px] py-1 px-2"
                                 title="Editar dados"
                               >
-                                <Edit className="w-3.5 h-3.5" />
+                                <Edit className="w-3.5 h-3.5 text-[#52606d]" />
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => handleDeleteRecord(item.id, item.nome)}
-                                className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] cursor-pointer transition-colors"
+                                className="p-1.5 rounded-[10px] bg-[#fde8ed] hover:opacity-90 text-[#c8002f] text-[11px] cursor-pointer transition-colors"
                                 title="Eliminar registo"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />

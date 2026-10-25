@@ -62,17 +62,23 @@
 | `A11Y-006` | `document.title` permanecia estático ao alternar entre vistas internas e o toast de sistema não anunciava mensagens a leitores de ecrã (`WCAG 2.4.2` e `4.1.3`). | `src/App.tsx` | `P1` | Falta de sincronização de `document.title` com `currentView`/`currentPage` e falta de `role="status" aria-live="polite"` no toast. | Sincronização automática do título da página por vista e adição de região viva `role="status" aria-live="polite"` no toast. | `EV-007` (`E1`/`E0`) | `verificado_no_escopo` |
 | `UX-004` | Filtros da página de Pautas sem associação explícita `htmlFor`/`id`, falta de botão de limpeza rápida no campo de busca de aluno e modal de exportação PDF sem `role="dialog"`/`Escape`. | `DirectorPautasPage.tsx`, `PautaPdfExportModal.tsx` | `P2` | Labels visuais sem atributo `htmlFor` e input de pesquisa sem ação de reset imediato. | Associados todos os `<label htmlFor>`, adicionado `aria-pressed` nas turmas, botão `X` para limpar busca e `Escape` + `role="dialog"` no modal de PDF. | `EV-008` (`E1`/`E0`) | `verificado_no_escopo` |
 
+| `UX-005` | Na impressão de `#oficial-a4-sheet`, o documento podia ultrapassar uma única página A4 e o botão flutuante `#btn-floating-support-chat` aparecia impresso. | `DeclaracaoEfectividadePage.tsx`, `OfficialDocumentModal.tsx`, `FloatingChatButton.tsx`, `index.css` | `P0` | Ausência de `@page { size: A4 portrait; margin: 10mm 12mm; }`, `max-height: 274mm`, `break-inside: avoid` e regra `@media print` global para `#btn-floating-support-chat`. | Aplicado isolamento estrito de página A4 única e ocultação total do botão de chat e cromos de UI na impressão. | `EV-009` (`E0`/`E1`) | `verificado_no_escopo` |
+| `UX-006` | O texto oficial das Declarações de Efectividade não adaptava integralmente substantivos, pronomes, preposições contraídas e cargos ao género do requerente (feminino vs. masculino). | `src/utils/genderGrammar.ts`, `DeclaracaoEfectividadePage.tsx`, `OfficialDocumentModal.tsx`, `QuickRequestsManagementView.tsx` | `P0` | Falta de motor gramatical para flexão de cargos (`Professor/Professora`, `Director/Directora`, `Coordenador/Coordenadora`), locuções (`ao serviço / a serviço`), preposições de escolas/províncias e seletor explícito de género. | Criado `genderGrammar.ts` com concordância integral portuguesa/angolana e seletor Masculino/Feminino em tempo real. | `EV-010` (`E0`/`E1`) | `verificado_no_escopo` |
+| `VIS-001` | Excesso de caixas cinzas aninhadas (*Card-in-Card*), múltiplos KPIs coloridos simultâneos, ícones decorativos em filtros, pontos pulsantes (`animate-ping`) e botões primários escuros repetidos em grelhas de cartões (Especificação Masakula v2.0). | `src/index.css`, `StatCardItem.tsx`, `StatCards.tsx`, `QuickRequestsManagementView.tsx`, `DeclaracaoEfectividadePage.tsx`, `AdminSchoolsPage.tsx` | `P1` | Acúmulo de ornamentos visuais, badges redundantes (`Taxa %`, `Total`) e sombras/gradientes concorrentes. | Aplicada a Especificação Técnica Masakula v2.0 combinada ao Prompt Mestre v4: base 95% neutra (`--canvas: #fafafa`, `--surface: #ffffff`, `--line: #e8e8ea`), máximo 1 `.kpi--featured` (`#002133`) por grelha, eliminação de *Card-in-Card* ($D_{\max} \le 1$) e botões `.btn--secondary` em listas/cartões, preservando intactos os documentos oficiais A4. | `EV-011` (`E0`/`E1`) | `verificado_no_escopo` |
+
 ---
 
 ## 5. Lotes de Implementação e Rastreabilidade (Seção 14 & 40.4)
 
 | Lote | Arquivos Alterados | Problemas Endereçados | Risco | Estado |
 |---|---|---|---|---|
-| `LOT-001` | `/src/index.css` | `A11Y-001`, `A11Y-002`, `UX-001` | Baixo | `verificado_no_escopo` |
+| `LOT-001` | `/src/index.css` | `A11Y-001`, `A11Y-002`, `UX-001`, `UX-005`, `VIS-001` | Baixo | `verificado_no_escopo` |
 | `LOT-002` | `/src/components/Navbar.tsx` | `A11Y-003`, `UX-002`, `UX-003` | Baixo | `verificado_no_escopo` |
 | `LOT-003` | `/src/App.tsx` | `A11Y-003`, `A11Y-006`, `UX-002` | Baixo | `verificado_no_escopo` |
 | `LOT-004` | `/src/components/pages/director/DirectorPautasPage.tsx`, `/src/components/modals/PautaPdfExportModal.tsx` | `UX-004` | Baixo | `verificado_no_escopo` |
-| `LOT-005` | `/auditoria-uiux/relatorio.md` | Documentação e continuidade (Seções 39 e 40) | Baixo | `verificado_no_escopo` |
+| `LOT-005` | `/src/utils/genderGrammar.ts`, `/src/components/chat/FloatingChatButton.tsx`, `/src/components/quick-services/OfficialDocumentModal.tsx` | `UX-005`, `UX-006` | Baixo | `verificado_no_escopo` |
+| `LOT-006` | `/src/components/StatCardItem.tsx`, `/src/components/StatCards.tsx` | `VIS-001` (Masakula v2.0 KPI & Filter Subtraction) | Baixo | `verificado_no_escopo` |
+| `LOT-007` | `/src/components/quick-services/QuickRequestsManagementView.tsx`, `/src/components/pages/DeclaracaoEfectividadePage.tsx`, `/src/components/pages/admin/AdminSchoolsPage.tsx` | `UX-005`, `UX-006`, `VIS-001` | Baixo | `verificado_no_escopo` |
 
 ---
 
@@ -83,7 +89,7 @@
 | `VER-001` | Typecheck & Lint (`tsc --noEmit`) | `lint_applet` | Node.js / Linux container | `Passou` (0 erros) | `E0` |
 | `VER-002` | Build de Produção (`vite build`) | `compile_applet` | Node.js / Linux container | `Passou` | `E0` |
 | `VER-003` | Servidor de Desenvolvimento | `restart_dev_server` (Porta 3000) | Ambiente local AI Studio | `Passou` | `E0` |
-| `VER-004` | Inspeção Estática de Contratos e Invariantes | Revisão de diffs por lote (`LOT-001` a `LOT-004`) | Repositório local | `Passou` | `E1` |
+| `VER-004` | Inspeção Estática de Contratos, Impressão A4 e Invariantes Masakula v2.0 | Revisão de diffs por lote (`LOT-001` a `LOT-007`) | Repositório local | `Passou` | `E1` |
 
 ---
 
@@ -94,8 +100,8 @@
 | Rotas e Vistas | `C3` nas vistas críticas; `C1` nas vistas secundárias | Inspeção estática + validação de compilação | Testes em navegador físico externo dependem do utilizador |
 | Perfis (`admin`, `diretor`, `professor`, público) | `C2` / `C3` | Análise de fluxos e guardas de acesso (`authGuard.ts`) | Nenhuma regressão de permissão introduzida |
 | Teclado e Foco | `C2` | Implementação de `:focus-visible`, skip-link, `Escape` e `aria-*` | Leitor de ecrã físico (NVDA/VoiceOver) não executável no container |
-| Temas (Claro / Escuro) | `C2` | Correção de escopo `html:not(.dark)` em `src/index.css` | — |
-| Idioma (`pt-AO`) | `C3` | Revisão de microcopy e títulos dinâmicos | — |
+| Engenharia Visual & Subtração (Masakula v2.0) | `C3` | Tokens `--canvas`, `--surface`, `--ink`, `--line`, eliminação de *Card-in-Card* e limite de 1 `.kpi--featured` por ecrã | Documentos oficiais A4 preservados com a Insígnia da República de Angola |
+| Idioma e Concordância de Género (`pt-AO`) | `C3` | Motor `genderGrammar.ts` para flexão feminina/masculina completa nas declarações oficiais | — |
 
 ---
 
@@ -107,20 +113,7 @@
 | `AC-002` | Menus suspensos (`Páginas`, `Notificações`, `Mobile`) e modais fecham com a tecla `Escape` sem perda de estado. | Atendido | `EV-005`, `EV-008` | Nenhuma |
 | `AC-003` | Tabelas de pautas e métricas utilizam `tabular-nums` e preservam a insígnia oficial da República de Angola no cabeçalho. | Atendido | `EV-004`, `EV-008` | Nenhuma |
 | `AC-004` | `document.title` atualiza dinamicamente conforme a vista ativa e notificações toast possuem `role="status" aria-live="polite"`. | Atendido | `EV-007` | Nenhuma |
-| `AC-005` | Build de produção e verificação de tipos (`tsc --noEmit`) concluem sem erros. | Atendido | `VER-001`, `VER-002` | Nenhuma |
+| `AC-005` | A folha `#oficial-a4-sheet` imprime rigorosamente numa única página A4 sem exibir `#btn-floating-support-chat` e adapta pronomes, substantivos, preposições e cargos ao género Masculino/Feminino. | Atendido | `EV-009`, `EV-010` | Nenhuma |
+| `AC-006` | A interface aplica a Especificação Técnica de Engenharia Visual e Subtração Masakula v2.0 (base 95% neutra `#fafafa`/`#ffffff`, máximo 1 `.kpi--featured` escuro por grelha, zero *Card-in-Card* e ações secundárias `.btn--secondary` em cartões repetitivos). | Atendido | `EV-011` | Nenhuma |
+| `AC-007` | Build de produção e verificação de tipos (`tsc --noEmit`) concluem sem erros. | Atendido | `VER-001`, `VER-002` | Nenhuma |
 
----
-
-## 9. Riscos Residuais, Reversão e Continuidade (Seções 35, 40.11–40.13)
-
-### 9.1 Riscos Residuais
-| Risco | Impacto | Probabilidade | Próxima Ação | Prioridade |
-|---|---|---|---|---|
-| Componentes legados extensos com mais de 1.500 linhas (`App.tsx`, `AuthPage.tsx`) | Manutenibilidade a médio prazo | Baixa no curto prazo | Modularizar gradualmente apenas quando houver alteração funcional específica | P3 |
-
-### 9.2 Procedimento de Reversão
-Cada lote (`LOT-001` a `LOT-004`) foi aplicado de forma isolada e aditiva, sem alterar esquemas de dados ou contratos de API:
-- Para reverter estilos globais (`LOT-001`): restaurar o bloco `@layer base` em `/src/index.css`.
-- Para reverter atributos de navegação (`LOT-002`): restaurar `/src/components/Navbar.tsx`.
-- Para reverter sincronização de título e `aria-live` (`LOT-003`): restaurar `/src/App.tsx`.
-- Para reverter melhorias de formulário nas pautas (`LOT-004`): restaurar `/src/components/pages/director/DirectorPautasPage.tsx` e `/src/components/modals/PautaPdfExportModal.tsx`.

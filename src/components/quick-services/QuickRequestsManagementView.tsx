@@ -278,26 +278,21 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   return (
     <div className="space-y-6">
       {/* Top Header Card */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="flex items-start sm:items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#002133] text-amber-400 flex items-center justify-center shrink-0 border border-slate-800 shadow-md">
-            <ShieldCheck className="w-7 h-7" />
+      <div className="bg-white rounded-[14px] p-6 border border-[#e8e8ea] flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#002133] tracking-tight">
+              Serviços Rápidos & Despachos de Cidadãos
+            </h1>
+            {isMasterAdmin && (
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#f4f4f6] text-[#52606d] border border-[#e8e8ea]">
+                Gabinete Central DME • dmedoquessua@gmail.com
+              </span>
+            )}
           </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-[#002133] tracking-tight">
-                Serviços Rápidos & Despachos de Cidadãos
-              </h1>
-              {isMasterAdmin && (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-blue-100 text-blue-900 border border-blue-200">
-                  Gabinete Central DME • dmedoquessua@gmail.com
-                </span>
-              )}
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Recepção, verificação e emissão de declarações de efectividade, boletins de notas e guias solicitadas pela comunidade.
-            </p>
-          </div>
+          <p className="text-xs sm:text-sm text-[#52606d] mt-1">
+            Recepção, verificação e emissão de declarações de efectividade, boletins de notas e guias solicitadas pela comunidade.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -305,10 +300,9 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             <button
               type="button"
               onClick={onOpenNewRequestModal}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+              className="btn--primary text-xs flex items-center gap-2"
               title="Registar nova solicitação de cidadão/utente"
             >
-              <FileText className="w-3.5 h-3.5" />
               <span>+ Novo Pedido</span>
             </button>
           )}
@@ -317,7 +311,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             type="button"
             onClick={loadRequests}
             disabled={isLoading}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+            className="btn--secondary text-xs flex items-center gap-2"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Actualizar</span>
@@ -327,9 +321,8 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             <button
               type="button"
               onClick={onNavigateToDeclaracaoEfectividade}
-              className="px-4 py-2.5 bg-[#002133] hover:bg-[#00314a] text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+              className="btn--secondary text-xs flex items-center gap-2"
             >
-              <FileCheck className="w-3.5 h-3.5 text-amber-400" />
               <span>Emitir Efectividade</span>
             </button>
           )}
@@ -339,89 +332,76 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               type="button"
               onClick={handleClearAll}
               disabled={isLoading}
-              className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              className="px-3.5 py-2 bg-[#fde8ed] hover:opacity-90 text-[#c8002f] font-semibold text-xs rounded-[10px] flex items-center gap-1.5 transition-all cursor-pointer"
               title="Zerar e eliminar permanentemente todos os pedidos"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <Trash2 className="w-3.5 h-3.5" />
               <span>Zerar Pedidos</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Metric Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      {/* Metric Stat Cards — Masakula v2.0: 1 Featured Anchor Card + 3 White Surface Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div
           onClick={() => {
             setStatusFilter('TODOS');
             setTypeFilter('TODOS');
           }}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-            statusFilter === 'TODOS' && typeFilter === 'TODOS'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/20'
-              : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300'
-          }`}
+          className="kpi kpi--featured cursor-pointer"
         >
-          <div className="text-[11px] font-bold uppercase tracking-wider opacity-75">Total de Pedidos</div>
-          <div className="text-2xl font-black mt-1">{counts.total}</div>
-          <div className="text-[10px] opacity-75 mt-0.5">Entradas em tempo real</div>
+          <span className="kpi__label text-xs font-medium">Total de Pedidos</span>
+          <span className="kpi__value numeric text-3xl font-bold tracking-tight mt-1">{counts.total}</span>
+          <span className="kpi__meta text-xs mt-1">Entradas consolidadas</span>
         </div>
 
         <div
           onClick={() => setStatusFilter('PENDENTE')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-            statusFilter === 'PENDENTE'
-              ? 'bg-amber-500 text-white border-amber-600 shadow-md ring-2 ring-amber-500/20'
-              : 'bg-white text-amber-900 border-amber-200 hover:border-amber-300'
+          className={`kpi cursor-pointer ${
+            statusFilter === 'PENDENTE' ? 'ring-2 ring-[#002133]' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Pendentes</span>
-            {counts.pendentes > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-            )}
-          </div>
-          <div className="text-2xl font-black mt-1">{counts.pendentes}</div>
-          <div className="text-[10px] opacity-80 mt-0.5">Aguardam despacho</div>
+          <span className="kpi__label text-xs font-medium text-[#52606d]">Pendentes</span>
+          <span className="kpi__value numeric text-3xl font-bold text-[#002133] tracking-tight mt-1">
+            {counts.pendentes}
+          </span>
+          <span className="kpi__meta text-xs text-[#a34a08] mt-1">Aguardam despacho</span>
         </div>
 
         <div
           onClick={() => setStatusFilter('EM_ANALISE')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-            statusFilter === 'EM_ANALISE'
-              ? 'bg-blue-600 text-white border-blue-700 shadow-md ring-2 ring-blue-600/20'
-              : 'bg-white text-blue-900 border-blue-200 hover:border-blue-300'
+          className={`kpi cursor-pointer ${
+            statusFilter === 'EM_ANALISE' ? 'ring-2 ring-[#002133]' : ''
           }`}
         >
-          <div className="text-[11px] font-bold uppercase tracking-wider">Em Análise</div>
-          <div className="text-2xl font-black mt-1">{counts.emAnalise}</div>
-          <div className="text-[10px] opacity-80 mt-0.5">Na secretaria / repartição</div>
+          <span className="kpi__label text-xs font-medium text-[#52606d]">Em Análise</span>
+          <span className="kpi__value numeric text-3xl font-bold text-[#002133] tracking-tight mt-1">
+            {counts.emAnalise}
+          </span>
+          <span className="kpi__meta text-xs text-[#52606d] mt-1">Na secretaria / repartição</span>
         </div>
 
         <div
           onClick={() => setStatusFilter('CONCLUIDO')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-            statusFilter === 'CONCLUIDO'
-              ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-600/20'
-              : 'bg-white text-emerald-900 border-emerald-200 hover:border-emerald-300'
+          className={`kpi cursor-pointer ${
+            statusFilter === 'CONCLUIDO' ? 'ring-2 ring-[#002133]' : ''
           }`}
         >
-          <div className="text-[11px] font-bold uppercase tracking-wider">Concluídos / Emitidos</div>
-          <div className="text-2xl font-black mt-1">{counts.concluidos}</div>
-          <div className="text-[10px] opacity-80 mt-0.5">Prontos ou entregues</div>
+          <span className="kpi__label text-xs font-medium text-[#52606d]">Concluídos / Emitidos</span>
+          <span className="kpi__value numeric text-3xl font-bold text-[#002133] tracking-tight mt-1">
+            {counts.concluidos}
+          </span>
+          <span className="kpi__meta text-xs text-[#0b7a54] mt-1">Prontos ou entregues</span>
         </div>
       </div>
 
-      {/* Service Type Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+      {/* Service Type Filter Tabs — Neutral Filter Chips without decorative icons */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <button
           type="button"
           onClick={() => setTypeFilter('TODOS')}
-          className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            typeFilter === 'TODOS'
-              ? 'bg-[#002133] text-white shadow-xs'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-          }`}
+          className={`filter-chip whitespace-nowrap ${typeFilter === 'TODOS' ? 'is-active' : ''}`}
         >
           Todos os Serviços ({counts.total})
         </button>
@@ -429,72 +409,60 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         <button
           type="button"
           onClick={() => setTypeFilter('DECLARACAO_EFECTIVIDADE')}
-          className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-            typeFilter === 'DECLARACAO_EFECTIVIDADE'
-              ? 'bg-blue-700 text-white shadow-xs'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          className={`filter-chip whitespace-nowrap ${
+            typeFilter === 'DECLARACAO_EFECTIVIDADE' ? 'is-active' : ''
           }`}
         >
-          <FileCheck className="w-3.5 h-3.5" />
-          <span>Efectividade DME ({counts.efectividade})</span>
+          Efectividade DME ({counts.efectividade})
         </button>
 
         <button
           type="button"
           onClick={() => setTypeFilter('BOLETIM_NOTAS')}
-          className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-            typeFilter === 'BOLETIM_NOTAS'
-              ? 'bg-emerald-700 text-white shadow-xs'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          className={`filter-chip whitespace-nowrap ${
+            typeFilter === 'BOLETIM_NOTAS' ? 'is-active' : ''
           }`}
         >
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span>Boletins de Notas ({counts.boletins})</span>
+          Boletins de Notas ({counts.boletins})
         </button>
 
         <button
           type="button"
           onClick={() => setTypeFilter('DECLARACAO_MATRICULA')}
-          className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-            typeFilter === 'DECLARACAO_MATRICULA'
-              ? 'bg-indigo-700 text-white shadow-xs'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          className={`filter-chip whitespace-nowrap ${
+            typeFilter === 'DECLARACAO_MATRICULA' ? 'is-active' : ''
           }`}
         >
-          <FileText className="w-3.5 h-3.5" />
-          <span>Matrículas & Frequência ({counts.matriculas})</span>
+          Matrículas & Frequência ({counts.matriculas})
         </button>
 
         <button
           type="button"
           onClick={() => setTypeFilter('GUIA_TRANSFERENCIA')}
-          className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-            typeFilter === 'GUIA_TRANSFERENCIA'
-              ? 'bg-amber-700 text-white shadow-xs'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          className={`filter-chip whitespace-nowrap ${
+            typeFilter === 'GUIA_TRANSFERENCIA' ? 'is-active' : ''
           }`}
         >
-          <ExternalLink className="w-3.5 h-3.5" />
-          <span>Transferências ({counts.transferencias})</span>
+          Transferências ({counts.transferencias})
         </button>
       </div>
 
       {/* Search and Status Toolbar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="bg-white rounded-[14px] p-4 border border-[#e8e8ea] flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="relative w-full md:w-96">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          <Search className="w-4 h-4 text-[#52606d] absolute left-3 top-3" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Pesquisar protocolo, nome, telefone, aluno ou BI..."
-            className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+            className="w-full pl-9 pr-3.5 py-2 bg-white border border-[#e8e8ea] rounded-[10px] text-xs sm:text-sm text-[#002133] focus:border-[#002133] outline-none transition-all"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+              className="absolute right-2.5 top-2.5 text-[#52606d] hover:text-[#002133]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -507,11 +475,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               key={st}
               type="button"
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                statusFilter === st
-                  ? 'bg-[#002133] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+              className={`filter-chip ${statusFilter === st ? 'is-active' : ''}`}
             >
               {st === 'TODOS' && 'Todos os Estados'}
               {st === 'PENDENTE' && 'Pendentes'}
@@ -523,19 +487,18 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         </div>
       </div>
 
-      {/* Requests List */}
+      {/* Requests List — Flat Surface Cards (Zero Card-in-Card nested gray boxes) */}
       {isLoading && requests.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-600">A carregar solicitações em tempo real...</p>
+        <div className="bg-white rounded-[14px] p-12 border border-[#e8e8ea] text-center">
+          <Loader2 className="w-7 h-7 text-[#002133] animate-spin mx-auto mb-2" />
+          <p className="text-sm font-medium text-[#52606d]">A carregar solicitações em tempo real...</p>
         </div>
       ) : displayedRequests.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center space-y-3">
-          <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800">
+        <div className="bg-white rounded-[14px] p-12 border border-[#e8e8ea] text-center space-y-3">
+          <h3 className="text-base font-semibold text-[#002133]">
             Nenhuma solicitação encontrada com os filtros actuais
           </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
+          <p className="text-xs text-[#52606d] max-w-md mx-auto">
             {searchQuery || statusFilter !== 'TODOS' || typeFilter !== 'TODOS'
               ? 'Foram aplicados filtros de pesquisa que restringiram os resultados.'
               : 'Nenhum pedido foi registado ainda na base de dados.'}
@@ -548,14 +511,14 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                 setStatusFilter('TODOS');
                 setTypeFilter('TODOS');
               }}
-              className="px-4 py-2 bg-[#002133] hover:bg-[#00314a] text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+              className="btn--secondary text-xs"
             >
               Limpar Filtros e Ver Todos ({counts.total})
             </button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5">
+        <div className="grid grid-cols-1 gap-4">
           {displayedRequests.map((req) => {
             const cleanPhone = (req.requesterPhone || '').replace(/\D/g, '');
             const fullPhone = cleanPhone.startsWith('244') ? cleanPhone : `244${cleanPhone}`;
@@ -564,107 +527,79 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             return (
               <div
                 key={req.id}
-                className={`bg-white rounded-2xl p-5 border transition-all shadow-xs ${
-                  req.status === 'PENDENTE'
-                    ? 'border-amber-300 bg-amber-50/15 ring-1 ring-amber-300/60'
-                    : req.status === 'EM_ANALISE'
-                    ? 'border-blue-200 hover:border-blue-300'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
+                className="bg-white rounded-[14px] p-5 border border-[#e8e8ea] hover:border-[#d1d1d6] transition-colors"
               >
-                {/* Request Header Banner */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                  <div className="flex items-start gap-3.5">
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                        req.serviceType === 'BOLETIM_NOTAS'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : req.serviceType === 'DECLARACAO_EFECTIVIDADE'
-                          ? 'bg-blue-100 text-blue-800'
-                          : req.serviceType === 'DECLARACAO_MATRICULA'
-                          ? 'bg-indigo-100 text-indigo-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {req.serviceType === 'BOLETIM_NOTAS' && <GraduationCap className="w-6 h-6" />}
-                      {req.serviceType === 'DECLARACAO_EFECTIVIDADE' && <FileCheck className="w-6 h-6" />}
-                      {req.serviceType === 'DECLARACAO_MATRICULA' && <FileText className="w-6 h-6" />}
-                      {req.serviceType === 'GUIA_TRANSFERENCIA' && <ExternalLink className="w-6 h-6" />}
+                {/* Zona 1: Header — Protocolo, Título e Badge Semântico */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#e8e8ea]">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyProtocol(req.protocol)}
+                        className="font-mono font-semibold text-xs bg-[#f4f4f6] hover:bg-[#e8e8ea] text-[#002133] px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Clique para copiar protocolo"
+                      >
+                        <span>{req.protocol}</span>
+                        <Copy className="w-3 h-3 text-[#52606d]" />
+                      </button>
+
+                      <h3 className="text-base font-semibold text-[#002133]">{req.title}</h3>
+
+                      {req.status === 'PENDENTE' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold badge--warning">
+                          Pendente
+                        </span>
+                      )}
+                      {req.status === 'EM_ANALISE' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold badge--neutral">
+                          Em Análise
+                        </span>
+                      )}
+                      {req.status === 'CONCLUIDO' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold badge--success">
+                          Concluído / Emitido
+                        </span>
+                      )}
+                      {req.status === 'REJEITADO' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold badge--danger">
+                          Requer Comparência
+                        </span>
+                      )}
                     </div>
 
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleCopyProtocol(req.protocol)}
-                          className="font-mono font-black text-xs sm:text-sm bg-slate-900 hover:bg-slate-800 text-amber-400 px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                          title="Clique para copiar protocolo"
-                        >
-                          <span>{req.protocol}</span>
-                          <Copy className="w-3 h-3 text-slate-400" />
-                        </button>
-
-                        <h3 className="text-base font-black text-[#002133]">{req.title}</h3>
-
-                        {req.status === 'PENDENTE' && (
-                          <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-black uppercase rounded-full border border-amber-300 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-amber-600 animate-spin" />
-                            <span>Pendente</span>
-                          </span>
-                        )}
-                        {req.status === 'EM_ANALISE' && (
-                          <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 text-[10px] font-black uppercase rounded-full border border-blue-300">
-                            Em Análise
-                          </span>
-                        )}
-                        {req.status === 'CONCLUIDO' && (
-                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 text-[10px] font-black uppercase rounded-full border border-emerald-300 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Concluído / Emitido</span>
-                          </span>
-                        )}
-                        {req.status === 'REJEITADO' && (
-                          <span className="px-2.5 py-0.5 bg-rose-100 text-rose-900 text-[10px] font-black uppercase rounded-full border border-rose-300">
-                            Requer Comparência
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
-                        <span>
-                          Submetido: {new Date(req.createdAt).toLocaleDateString('pt-PT')} às{' '}
-                          {new Date(req.createdAt).toLocaleTimeString('pt-PT', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                    <div className="text-xs text-[#52606d] mt-1.5 flex flex-wrap items-center gap-3">
+                      <span className="numeric">
+                        Submetido: {new Date(req.createdAt).toLocaleDateString('pt-PT')} às{' '}
+                        {new Date(req.createdAt).toLocaleTimeString('pt-PT', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                      {req.targetSchoolName && (
+                        <span className="font-medium text-[#002133]">
+                          • {req.targetSchoolName}
                         </span>
-                        {req.targetSchoolName && (
-                          <span className="font-semibold text-slate-700 flex items-center gap-1">
-                            <School className="w-3.5 h-3.5 text-slate-400" />
-                            {req.targetSchoolName}
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Top Action Buttons: EMIT DOCUMENT & NOTIFY */}
+                  {/* Zona 4: Ações Secundárias Outline (Zero botões cheios repetidos em cada card) */}
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setDocumentModalRequest(req)}
-                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="btn--secondary text-xs flex items-center gap-1.5"
                     >
-                      <Printer className="w-3.5 h-3.5" />
+                      <Printer className="w-3.5 h-3.5 text-[#52606d]" />
                       <span>Emitir Documento Oficial</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleOpenNotifyModal(req, 'LEVANTAMENTO')}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="btn--secondary text-xs flex items-center gap-1.5"
                     >
-                      <MessageSquare className="w-3.5 h-3.5" />
+                      <MessageSquare className="w-3.5 h-3.5 text-[#52606d]" />
                       <span>Notificar Levantamento</span>
                     </button>
 
@@ -672,185 +607,172 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                       <button
                         type="button"
                         onClick={() => handleOpenNotifyModal(req, 'EM_ANALISE')}
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                        className="btn--tertiary text-xs"
                       >
-                        <Clock className="w-3.5 h-3.5 inline mr-1" />
-                        <span>Em Análise</span>
+                        Marcar em Análise
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Main Content Grid: Citizen Contact & Request Data */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-4 text-xs">
-                  {/* Citizen Contact Card */}
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-2">
+                {/* Zona 2 & 3: Dados do Pedinte e Especificações em Superfície Plana (Sem sub-caixas cinzas) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 text-xs">
+                  {/* Coluna 1: Identificação do Pedinte */}
+                  <div className="space-y-1.5 lg:border-r lg:border-[#e8e8ea] lg:pr-5">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                      <span className="font-semibold text-[#52606d] uppercase tracking-wider text-[10px]">
                         Identificação do Pedinte
                       </span>
-                      <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                      <span className="text-[11px] font-medium text-[#52606d]">
                         {req.requesterRoleTitle || 'Cidadão'}
                       </span>
                     </div>
 
-                    <div className="font-black text-sm text-slate-900">{req.requesterName}</div>
+                    <div className="font-semibold text-sm text-[#002133]">{req.requesterName}</div>
 
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-[#52606d]">
                       <a
                         href={`https://wa.me/${fullPhone}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-lg font-bold flex items-center gap-1 transition-colors"
+                        className="hover:text-[#002133] underline underline-offset-2 font-medium numeric"
                       >
-                        <Phone className="w-3 h-3 text-emerald-700" />
-                        <span>WhatsApp: {req.requesterPhone}</span>
+                        WhatsApp: {req.requesterPhone}
                       </a>
-
                       <a
                         href={`tel:${cleanPhone}`}
-                        className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold"
+                        className="hover:text-[#002133] font-medium"
                         title="Ligar"
                       >
-                        <Phone className="w-3.5 h-3.5" />
+                        Ligar
                       </a>
-                    </div>
-
-                    {req.requesterEmail && (
-                      <div className="text-slate-600 flex items-center gap-1.5 pt-1 truncate">
-                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      {req.requesterEmail && (
                         <a
                           href={`mailto:${req.requesterEmail}`}
-                          className="hover:underline text-indigo-600 truncate"
+                          className="hover:text-[#002133] truncate"
                         >
                           {req.requesterEmail}
                         </a>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
 
-                  {/* Specification & Data Fields */}
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-2 lg:col-span-2">
-                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block">
+                  {/* Colunas 2-3: Especificações Submetidas */}
+                  <div className="space-y-2 lg:col-span-2">
+                    <span className="font-semibold text-[#52606d] uppercase tracking-wider text-[10px] block">
                       Especificações & Dados Submetidos
                     </span>
 
-                    {/* Declaração de Efectividade Fields */}
                     {req.serviceType === 'DECLARACAO_EFECTIVIDADE' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Funcionário(a):</span>
-                          <span className="font-black text-slate-900 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Funcionário(a)</span>
+                          <span className="font-semibold text-[#002133] text-xs">
                             {details.employeeName || req.requesterName}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">B.I. / Agente:</span>
-                          <span className="font-mono font-bold text-slate-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">B.I. / Agente</span>
+                          <span className="font-mono font-medium text-[#002133] text-xs numeric">
                             {details.employeeBi || 'Registo Geral'}
                             {details.employeeAgente ? ` (${details.employeeAgente})` : ''}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Categoria:</span>
-                          <span className="font-semibold text-slate-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Categoria</span>
+                          <span className="font-medium text-[#002133] text-xs">
                             {details.employeeCategory || 'Docente'}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Mês de Referência:</span>
-                          <span className="font-bold text-indigo-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Mês de Referência</span>
+                          <span className="font-medium text-[#002133] text-xs numeric">
                             {details.referenceMonthYear || '2026'}
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Boletim de Notas Fields */}
                     {req.serviceType === 'BOLETIM_NOTAS' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Estudante:</span>
-                          <span className="font-black text-slate-900 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Estudante</span>
+                          <span className="font-semibold text-[#002133] text-xs">
                             {details.studentName || 'Nome do Aluno'}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Classe / Turma:</span>
-                          <span className="font-bold text-slate-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Classe / Turma</span>
+                          <span className="font-medium text-[#002133] text-xs">
                             {details.studentClasse || '8ª Classe'} - {details.studentTurma || 'A'}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Trimestre:</span>
-                          <span className="font-bold text-indigo-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Trimestre</span>
+                          <span className="font-medium text-[#002133] text-xs">
                             {details.trimestre || '1º Trimestre'}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">B.I. / Processo:</span>
-                          <span className="font-mono font-bold text-slate-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">B.I. / Processo</span>
+                          <span className="font-mono font-medium text-[#002133] text-xs numeric">
                             {details.studentBiOrProcesso || 'Não informado'}
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Matrícula Fields */}
                     {req.serviceType === 'DECLARACAO_MATRICULA' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Aluno:</span>
-                          <span className="font-black text-slate-900 text-xs">{details.studentName}</span>
+                          <span className="text-[#52606d] block text-[11px]">Aluno</span>
+                          <span className="font-semibold text-[#002133] text-xs">{details.studentName}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Classe / Ano:</span>
-                          <span className="font-bold text-slate-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Classe / Ano</span>
+                          <span className="font-medium text-[#002133] text-xs numeric">
                             {details.studentClasse} ({details.academicYear || '2025/2026'})
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Processo:</span>
-                          <span className="font-mono font-bold text-slate-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Processo</span>
+                          <span className="font-mono font-medium text-[#002133] text-xs numeric">
                             {details.studentBiOrProcesso || 'Geral'}
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Guia de Transferência Fields */}
                     {req.serviceType === 'GUIA_TRANSFERENCIA' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Aluno:</span>
-                          <span className="font-black text-slate-900 text-xs">{details.studentName}</span>
+                          <span className="text-[#52606d] block text-[11px]">Aluno</span>
+                          <span className="font-semibold text-[#002133] text-xs">{details.studentName}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Classe Atual:</span>
-                          <span className="font-bold text-slate-800 text-xs">{details.studentClasse}</span>
+                          <span className="text-[#52606d] block text-[11px]">Classe Atual</span>
+                          <span className="font-medium text-[#002133] text-xs">{details.studentClasse}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Destino Solicitado:</span>
-                          <span className="font-bold text-indigo-800 text-xs">
+                          <span className="text-[#52606d] block text-[11px]">Destino Solicitado</span>
+                          <span className="font-medium text-[#002133] text-xs">
                             {details.purpose || 'Instituição pretendida'}
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Purpose / Legal destination if applicable */}
                     {details.purpose && req.serviceType !== 'GUIA_TRANSFERENCIA' && (
-                      <div className="text-slate-600 text-xs pt-1 border-t border-slate-200/60">
-                        <span className="font-semibold text-slate-700">Finalidade Declarada:</span>{' '}
+                      <div className="text-[#52606d] text-xs pt-2 border-t border-[#e8e8ea]">
+                        <span className="font-medium text-[#002133]">Finalidade Declarada:</span>{' '}
                         {details.purpose}
                       </div>
                     )}
 
-                    {/* Citizen Notes */}
                     {details.notes && (
-                      <div className="text-slate-600 text-xs pt-1">
-                        <span className="font-semibold text-slate-700">Observações do Pedinte:</span>{' '}
-                        <span className="italic">{details.notes}</span>
+                      <div className="text-[#52606d] text-xs pt-1">
+                        <span className="font-medium text-[#002133]">Observações do Pedinte:</span>{' '}
+                        <span>{details.notes}</span>
                       </div>
                     )}
                   </div>
@@ -858,20 +780,17 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
 
                 {/* Despacho & Resolution History */}
                 {details.responseMessage && (
-                  <div className="mt-3.5 bg-emerald-50/70 border border-emerald-300/80 rounded-xl p-3 text-xs space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-emerald-950">
-                      <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Despacho Oficial Emitido ao Pedinte:</span>
-                      </span>
+                  <div className="mt-4 pt-3 border-t border-[#e8e8ea] text-xs space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 font-semibold text-[#0b7a54]">
+                      <span>Despacho Oficial Emitido ao Pedinte</span>
                       {details.resolvedAt && (
-                        <span className="text-[10px] text-emerald-700 font-medium">
+                        <span className="text-[11px] text-[#52606d] font-normal numeric">
                           Despachado em: {new Date(details.resolvedAt).toLocaleDateString('pt-PT')} por{' '}
                           {details.resolvedBy}
                         </span>
                       )}
                     </div>
-                    <p className="text-emerald-900 leading-relaxed italic pl-5">
+                    <p className="text-[#52606d] leading-relaxed">
                       "{details.responseMessage}"
                     </p>
                   </div>

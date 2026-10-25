@@ -6,24 +6,27 @@ import {
   MapPin,
   Building,
   Award,
-  CheckCircle2,
   Settings,
   FileSpreadsheet,
   Edit3,
   BarChart3,
-  School,
-  Users,
-  GraduationCap,
   ArrowRight,
+  ArrowLeft,
   Landmark,
   UserPlus,
-  Eye,
-  Briefcase,
   Plus,
   X,
-  Check
+  Check,
+  Archive,
+  Lock,
+  Bell,
+  IdCard,
+  User,
+  ChevronRight,
+  ClipboardCheck,
+  FileText,
+  ShieldAlert,
 } from 'lucide-react';
-import { Hero } from '../../Hero';
 import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
 import {
   ProfileOptionsSection,
@@ -31,12 +34,26 @@ import {
   ProfileModalType,
 } from '../../profile/ProfileOptionsSection';
 import { AccessDeniedGuard } from '../../common/AccessDeniedGuard';
-import type { AdminSchool, AdminStaffRole, UserAccount } from '../../../types';
+import { syncApplicationsFromServer } from '../../../utils/authApprovalStorage';
+import type {
+  AdminSchool,
+  AdminDirector,
+  AdminTeacher,
+  AdminStudent,
+  AdminStaffRole,
+  UserAccount,
+  SessionSettings,
+} from '../../../types';
+import type { AdminModalType } from './AdminRegistrationModal';
 
 interface AdminProfilePageProps {
   onOpenGetStarted: () => void;
   schools: AdminSchool[];
+  directors?: AdminDirector[];
+  teachers?: AdminTeacher[];
+  students?: AdminStudent[];
   onNavigateToStatistics: () => void;
+  onSelectPage?: (pageId: string) => void;
   isLoggedIn?: boolean;
   currentUser?: UserAccount | null;
   onNavigateToOwnProfile?: () => void;
@@ -44,6 +61,14 @@ interface AdminProfilePageProps {
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenExcelExport?: () => void;
+  onOpenGoogleSheets?: () => void;
+  onOpenBackupManager?: () => void;
+  onOpenAuditLogs?: () => void;
+  onOpenRag?: () => void;
+  onOpenRegisterModal?: (type: AdminModalType) => void;
+  sessionSettings?: SessionSettings;
+  onSaveSessionSettings?: (updated: SessionSettings) => void;
+  initialTab?: 'visao-geral' | 'configuracoes';
   focusZone?: boolean;
   settingsTrigger?: number;
 }
@@ -61,22 +86,26 @@ export interface DMEStaffMember {
 
 const DEFAULT_DME_STAFF: DMEStaffMember[] = [];
 
-
 const STORAGE_KEY_DME_STAFF = 'ucore_dme_staff_list';
 const STORAGE_KEY_ADMIN_AVATAR = 'ucore_admin_avatar';
 const STORAGE_KEY_ADMIN_DATA = 'ucore_admin_profile_data';
 
 export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
-  onOpenGetStarted,
   schools,
+  directors = [],
+  teachers = [],
+  students = [],
   onNavigateToStatistics,
-  isLoggedIn,
+  onSelectPage,
   currentUser,
   onNavigateToOwnProfile,
   onBackToHome,
   onLogout,
   onOpenSettings,
   onOpenExcelExport,
+  onOpenBackupManager,
+  onOpenAuditLogs,
+  initialTab,
   focusZone,
   settingsTrigger,
 }) => {
@@ -86,13 +115,39 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       <AccessDeniedGuard
         currentUser={currentUser}
         attemptedView="admin-perfil"
-        reason={`A sua conta (${currentUser.firstName} • ${currentUser.role.toUpperCase()}) não possui privilégios de Administração Central. Cada utilizador tem acesso estrito e exclusivo apenas ao seu próprio perfil.`}
+        reason={`A sua conta (${currentUser.firstName} • ${currentUser.role.toUpperCase()}) não possui privilégios de Administração Geral. Cada utilizador tem acesso estrito e exclusivo apenas ao seu próprio perfil.`}
         onNavigateToOwnProfile={onNavigateToOwnProfile || (() => {})}
         onBackToHome={onBackToHome || (() => {})}
         onLogout={onLogout || (() => {})}
       />
     );
   }
+
+  const [activeTab, setActiveTab] = useState<'visao-geral' | 'configuracoes'>(
+    initialTab || 'visao-geral'
+  );
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    let mounted = true;
+    syncApplicationsFromServer()
+      .then((all) => {
+        if (!mounted) return;
+        const pending = all.filter((a) => a.status === 'pendente').length;
+        setPendingApprovalsCount(pending);
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const userAdminAvatarKey = currentUser?.id
     ? `${STORAGE_KEY_ADMIN_AVATAR}_${currentUser.id}`
@@ -104,6 +159,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
 
   useEffect(() => {
     if (focusZone || settingsTrigger) {
+      setActiveTab('configuracoes');
       const timer = setTimeout(() => {
         const el = document.getElementById('zona-dados-senha');
         if (el) {
@@ -144,12 +200,18 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
 
   const getRoleTitle = (role: AdminStaffRole): string => {
     switch (role) {
-      case 'diretor_municipal': return 'Director(a) Municipal da Educação';
-      case 'inspetor_escolar': return 'Inspetor(a) Escolar Municipal';
-      case 'chefe_reparticao': return 'Chefe de Repartição / Ensino Geral';
-      case 'tecnico_estatistica': return 'Técnico(a) de Planeamento & Estatística';
-      case 'admin_sistema': return 'Administrador(a) de Sistema Sigre';
-      default: return 'Funcionário da Administração';
+      case 'diretor_municipal':
+        return 'Director(a) Municipal da Educação';
+      case 'inspetor_escolar':
+        return 'Inspetor(a) Escolar Municipal';
+      case 'chefe_reparticao':
+        return 'Chefe de Repartição / Ensino Geral';
+      case 'tecnico_estatistica':
+        return 'Técnico(a) de Planeamento & Estatística';
+      case 'admin_sistema':
+        return 'Administrador(a) Geral do Sistema Sigre';
+      default:
+        return 'Funcionário da Administração';
     }
   };
 
@@ -162,8 +224,10 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       name: newStaffName.trim(),
       role: newStaffRole,
       cargoTitle: getRoleTitle(newStaffRole),
-      department: newStaffDept.trim() || 'Direcção Municipal da Educação',
-      email: newStaffEmail.trim() || `${newStaffName.toLowerCase().replace(/\s+/g, '.')}@sigre.edu.ao`,
+      department: newStaffDept.trim() || 'Direcção Municipal da Educação de Quêssua',
+      email:
+        newStaffEmail.trim() ||
+        `${newStaffName.toLowerCase().replace(/\s+/g, '.')}@sigre.edu.ao`,
       phone: newStaffPhone.trim() || '+244 923 000 000',
       status: 'Ativo',
     };
@@ -193,25 +257,68 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     }
   };
 
+  const buildDefaultAdminProfile = (user?: UserAccount | null): UserProfileData => {
+    const fullName = user
+      ? `${user.firstName} ${user.lastName}`.trim()
+      : 'Dr. Belízio Miguel dos Santos António';
+    const isGenericName =
+      fullName === 'Director Municipal da Educação' ||
+      fullName === 'Dr. Fred Silva' ||
+      fullName === 'Admin. Fred';
+    const resolvedName = isGenericName
+      ? 'Dr. Belízio Miguel dos Santos António'
+      : fullName;
+
+    return {
+      name: resolvedName,
+      email: user?.email || 'dmedoquessua@gmail.com',
+      phone: user?.phone || '+244 923 450 110',
+      roleTitle:
+        user?.cargoTitle ||
+        'Administrador Geral & Director Municipal da Educação de Quêssua',
+      schoolName:
+        user?.schoolName ||
+        'Direcção Municipal da Educação de Quêssua',
+      biNumber: user?.biNumber || '005481920ME031',
+      address: 'Sede da Direcção Municipal da Educação de Quêssua, Malanje',
+    };
+  };
+
   const [adminData, setAdminData] = useState<UserProfileData>(() => {
+    const fallback = buildDefaultAdminProfile(currentUser);
     try {
       const saved = localStorage.getItem(userAdminDataKey);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          parsed.name === 'Dr. Fred Silva' ||
+          parsed.name === 'Admin. Fred' ||
+          parsed.email === 'fred.admin@ucore.edu.ao' ||
+          parsed.email === 'diretor.municipal@sigre.edu.ao'
+        ) {
+          return fallback;
+        }
+        return { ...fallback, ...parsed };
+      }
     } catch {
       // ignore
     }
-    const adminName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Dr. Fred Silva';
-    const adminEmail = currentUser?.email || 'diretor.municipal@sigre.edu.ao';
-    return {
-      name: adminName,
-      email: adminEmail,
-      phone: '+244 923 001 100',
-      roleTitle: 'Superintendente & Administrador Geral da Rede Sigre',
-      schoolName: 'Direcção Municipal da Educação & Rede Sigre',
-      biNumber: '005481920LA031',
-      address: 'Edifício Monumental, Ingombota, Luanda',
-    };
+    return fallback;
   });
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setAdminData((prev) => {
+      const isLegacy =
+        prev.name === 'Dr. Fred Silva' ||
+        prev.name === 'Admin. Fred' ||
+        prev.email === 'fred.admin@ucore.edu.ao';
+      if (isLegacy) {
+        return buildDefaultAdminProfile(currentUser);
+      }
+      return prev;
+    });
+  }, [currentUser]);
 
   const handleUpdateAdminData = (updated: Partial<UserProfileData>) => {
     const next = {
@@ -250,405 +357,518 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     }
   };
 
-  const totalStudents = schools.reduce((acc, s) => acc + s.studentsWithDocs + s.studentsWithoutDocs, 0);
-  const totalTeachers = schools.reduce((acc, s) => acc + s.teachersCount, 0);
+  const totalStudents =
+    students.length > 0
+      ? students.length
+      : schools.reduce((acc, s) => acc + s.studentsWithDocs + s.studentsWithoutDocs, 0);
+  const totalTeachers =
+    teachers.length > 0
+      ? teachers.length
+      : schools.reduce((acc, s) => acc + s.teachersCount, 0);
+  const totalDirectors =
+    directors.length > 0 ? directors.length : schools.length;
+
+  const initials =
+    adminData.name
+      .replace(/^Dr\.?\s+/i, '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0])
+      .join('')
+      .toUpperCase() || 'AG';
 
   return (
-    <div id="admin-profile-page" className="w-full min-h-screen bg-[#F6F7F9]">
-      {/* Hero Header */}
-      <Hero
-        onOpenGetStarted={onOpenGetStarted}
-        isLoggedIn={isLoggedIn}
-        customTitle="Perfil do Administrador Geral"
-        customSubtitle="Supervisão executiva, conformidade e definições estratégicas da rede Sigre"
-      />
+    <div id="admin-profile-page" className="w-full min-h-screen bg-[#f8f9fa]">
+      <main className="w-full max-w-6xl mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-10 space-y-6">
+        {/* Top Navigation & Sub-View Switcher (Clean, uncluttered toolbar matching TeacherProfilePage) */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            {onBackToHome && (
+              <button
+                type="button"
+                onClick={onBackToHome}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white border border-gray-200 text-[#002133] hover:bg-gray-50 font-medium text-xs transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 text-[#002133]" />
+                <span>Voltar ao painel</span>
+              </button>
+            )}
 
-      {/* Main Container - Aligned exactly with Hero's max-w-6xl and padding */}
-      <main className="w-full max-w-6xl mx-auto px-4 sm:px-8 lg:px-16 py-8 sm:py-10 space-y-6">
-        
-        {/* 1. Resumo do Administrador (Hero Profile Summary Card) */}
+            <div className="inline-flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setActiveTab('visao-geral')}
+                className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  activeTab === 'visao-geral'
+                    ? 'bg-white text-[#002133] shadow-xs'
+                    : 'text-gray-600 hover:text-[#002133]'
+                }`}
+              >
+                Visão geral
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('configuracoes')}
+                className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  activeTab === 'configuracoes'
+                    ? 'bg-white text-[#002133] shadow-xs'
+                    : 'text-gray-600 hover:text-[#002133]'
+                }`}
+              >
+                Configurações
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setActiveModal('manage-profile')}
+              className="px-3.5 py-2 rounded-lg bg-white border border-gray-200 text-[#002133] hover:bg-gray-50 font-medium text-xs transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-gray-500" />
+              <span>Editar perfil</span>
+            </button>
+            <button
+              type="button"
+              onClick={onNavigateToStatistics}
+              className="px-4 py-2 rounded-lg bg-[#002133] hover:bg-[#003049] text-white font-medium text-xs transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-[#f75142]" />
+              <span>Estatísticas da rede</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Clean Profile Heading Card */}
         <section
           id="admin-profile-summary"
-          aria-label="Resumo do Administrador"
-          className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/90 shadow-2xs"
+          aria-label="Resumo do Perfil do Administrador Geral"
+          className="bg-white rounded-xl p-6 sm:p-8 border border-gray-200"
         >
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-            {/* Foto de Perfil Interativa com uploader */}
+          <div className="flex flex-col-reverse sm:flex-row items-center sm:items-start justify-between gap-6">
+            <div className="flex-1 text-center sm:text-left min-w-0">
+              <p className="text-xs font-medium text-gray-500 mb-1">
+                Administrador Geral • Direcção Municipal da Educação de Quêssua
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#002133] tracking-tight truncate">
+                {adminData.name}
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">{adminData.roleTitle}</p>
+
+              {/* Contact & Identity Row — Unboxed inline text */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-5 gap-y-2 mt-4 pt-4 border-t border-gray-100 text-xs text-gray-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-gray-400" />
+                  {adminData.email}
+                </span>
+                <span className="inline-flex items-center gap-1.5 font-mono">
+                  <Phone className="w-3.5 h-3.5 text-gray-400" />
+                  {adminData.phone}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Building className="w-3.5 h-3.5 text-gray-400" />
+                  {adminData.schoolName}
+                </span>
+              </div>
+            </div>
+
             <div className="flex flex-col items-center shrink-0">
               <ProfilePhotoUploader
                 id="admin-photo-uploader"
                 photo={adminPhoto}
                 onPhotoChange={handlePhotoChange}
-                fallbackInitials="AF"
+                fallbackInitials={initials}
                 shape="square"
                 badgePosition="bottom-right"
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr from-[#f75142] to-[#e04436] text-white font-black text-3xl flex items-center justify-center shadow-xs"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-[#002133] text-white font-bold text-3xl flex items-center justify-center border border-gray-200"
               />
-              <span className="text-xs text-slate-500 mt-2 font-medium">
-                {adminPhoto ? 'Alterar foto' : 'Carregar foto'}
+              <span className="text-[11px] text-gray-400 mt-1.5">
+                {adminPhoto ? 'Clique para alterar foto' : 'Adicionar foto'}
               </span>
             </div>
-
-            {/* Informações Centrais do Administrador */}
-            <div className="flex-1 text-center md:text-left min-w-0">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center justify-center sm:justify-start gap-3 flex-wrap">
-                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                      Admin. Fred
-                    </h2>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200/80">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Conta Ativa
-                    </span>
-                  </div>
-                  <p className="text-sm sm:text-base font-semibold text-slate-700 mt-1">
-                    Superintendente & Administrador Geral da Rede Central Sigre
-                  </p>
-                </div>
-
-                <div className="self-center sm:self-start shrink-0">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-semibold shadow-2xs">
-                    <ShieldCheck className="w-4 h-4 text-[#f75142]" />
-                    <span>Acesso: Root Admin</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Linha de Contactos e Localização */}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-y-2 gap-x-5 mt-4 pt-4 border-t border-slate-100 text-sm text-slate-600">
-                <span className="inline-flex items-center gap-1.5 font-medium">
-                  <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-                  fred.admin@ucore.edu.ao
-                </span>
-                <span className="inline-flex items-center gap-1.5 font-medium">
-                  <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                  +244 923 001 100
-                </span>
-                <span className="inline-flex items-center gap-1.5 font-medium">
-                  <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                  Luanda Central, Angola
-                </span>
-              </div>
-
-              {/* Botões de Ação do Cabeçalho */}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-5">
-                <button
-                  type="button"
-                  onClick={() => setActiveModal('manage-profile')}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs sm:text-sm font-semibold transition-colors cursor-pointer border border-slate-200/60"
-                >
-                  <Edit3 className="w-4 h-4 text-[#f75142]" />
-                  <span>Gerir perfil</span>
-                </button>
-
-                {onOpenSettings && (
-                  <button
-                    type="button"
-                    onClick={onOpenSettings}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer border border-slate-200 shadow-2xs"
-                  >
-                    <Settings className="w-4 h-4 text-slate-500" />
-                    <span>Definições da sessão</span>
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
         </section>
 
-        {/* 2. Indicadores da Rede (Área de métricas limpas, sem cartão pesado externo) */}
-        <section aria-label="Indicadores da Rede" className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-              Indicadores da Rede Escolar
-            </h3>
-            <span className="text-xs text-slate-500 font-medium">
-              Dados consolidados do ano letivo 2026
-            </span>
+        {/* Key Indicators Bar — Single clean horizontal strip with dividers */}
+        <section
+          aria-label="Indicadores da Rede Municipal"
+          className="bg-white rounded-xl border border-gray-200 divide-y sm:divide-y-0 sm:divide-x divide-gray-100 grid grid-cols-2 sm:grid-cols-5"
+        >
+          <button
+            type="button"
+            onClick={() => onSelectPage && onSelectPage('admin-escolas')}
+            className="p-4 sm:p-5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            <span className="text-[11px] text-gray-500 block">Escolas da Rede</span>
+            <p className="text-lg font-bold text-[#002133] mt-1 font-mono tabular-nums">
+              {schools.length}
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectPage && onSelectPage('admin-directores')}
+            className="p-4 sm:p-5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            <span className="text-[11px] text-gray-500 block">Directores</span>
+            <p className="text-lg font-bold text-[#002133] mt-1 font-mono tabular-nums">
+              {totalDirectors}
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectPage && onSelectPage('admin-professores')}
+            className="p-4 sm:p-5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            <span className="text-[11px] text-gray-500 block">Professores</span>
+            <p className="text-lg font-bold text-[#002133] mt-1 font-mono tabular-nums">
+              {totalTeachers}
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectPage && onSelectPage('admin-alunos')}
+            className="p-4 sm:p-5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            <span className="text-[11px] text-gray-500 block">Estudantes</span>
+            <p className="text-lg font-bold text-[#002133] mt-1 font-mono tabular-nums">
+              {totalStudents.toLocaleString('pt-AO')}
+            </p>
+          </button>
+
+          <div className="p-4 sm:p-5 col-span-2 sm:col-span-1">
+            <span className="text-[11px] text-gray-500 block">B.I. / Registo</span>
+            <p className="text-sm font-bold text-[#002133] mt-1.5 font-mono truncate">
+              {adminData.biNumber}
+            </p>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Indicador 1: Escolas */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
-              <div>
-                <span className="text-xs font-medium text-slate-500 block">
-                  Escolas Sob Gestão
-                </span>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">
-                  {schools.length}
-                </div>
-                <span className="inline-block mt-1 text-xs font-semibold text-[#f75142]">
-                  100% Integradas ao Sigre
-                </span>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center shrink-0 border border-[#fee4e2]">
-                <School className="w-6 h-6" />
-              </div>
-            </div>
-
-            {/* Indicador 2: Professores */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
-              <div>
-                <span className="text-xs font-medium text-slate-500 block">
-                  Professores na Rede
-                </span>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">
-                  {totalTeachers}
-                </div>
-                <span className="inline-block mt-1 text-xs font-semibold text-emerald-700">
-                  Quadro Docente Ativo
-                </span>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                <Users className="w-6 h-6" />
-              </div>
-            </div>
-
-            {/* Indicador 3: Estudantes */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
-              <div>
-                <span className="text-xs font-medium text-slate-500 block">
-                  Estudantes Ativos
-                </span>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">
-                  {totalStudents.toLocaleString('pt-AO')}
-                </div>
-                <span className="inline-block mt-1 text-xs font-semibold text-[#f75142]">
-                  Matrículas Homologadas
-                </span>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/80">
-                <GraduationCap className="w-6 h-6" />
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Ações Rápidas (Diretamente associadas aos indicadores) */}
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-            {onOpenExcelExport && (
-              <button
-                type="button"
-                onClick={onOpenExcelExport}
-                className="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl border border-slate-300/80 shadow-2xs cursor-pointer transition-all flex items-center gap-2"
-                title="Exportar dados consolidados em formato Excel"
+        {/* Main Content Area: Overview vs Full Settings */}
+        {activeTab === 'visao-geral' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column (8 cols): Institutional Governance Details & DME Staff */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Dados Institucionais da Administração Geral */}
+              <section
+                id="admin-institutional-details"
+                aria-label="Dados Institucionais do Administrador Geral"
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden"
               >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                <span>Exportar Planilhas Excel (.xlsx)</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onNavigateToStatistics}
-              className="px-6 py-2.5 bg-[#f75142] hover:bg-[#e04436] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs cursor-pointer transition-all flex items-center gap-2"
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Acessar Painel Estatístico Global</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </section>
-
-        {/* 4. Layout em Duas Colunas no Desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
-          
-          {/* Coluna 1: Diretrizes e Informações Institucionais (lg:col-span-7) */}
-          <div className="lg:col-span-7 space-y-6">
-            
-            {/* Bloco 1: Diretrizes da Gestão Central */}
-            <section
-              id="management-guidelines"
-              aria-label="Diretrizes Estruturais da Gestão Central"
-              className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#fef2f1] text-[#f75142] flex items-center justify-center shrink-0 border border-[#fee4e2]">
-                  <Building className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-slate-900 leading-tight">
-                    Diretrizes da Gestão Central
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Missão, metas estratégicas e supervisão da rede
-                  </p>
-                </div>
-              </div>
-
-              <blockquote className="text-sm text-slate-700 leading-relaxed pl-3.5 border-l-2 border-[#f75142] italic bg-slate-50/60 py-2.5 pr-3 rounded-r-xl">
-                "Priorizamos a excelência e organização em toda a malha escolar. O nosso objetivo compreende a regularização civil de 100% dos educandos, acompanhamento assíduo de docentes e estudantes e a evolução consistente dos índices pedagógicos em Angola."
-              </blockquote>
-
-              <div className="flex flex-wrap gap-2 pt-1">
-                <span className="bg-slate-50 px-3 py-1 rounded-full border border-slate-200 text-slate-800 font-semibold text-xs">
-                  Gestão Letiva 2026
-                </span>
-                <span className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 text-emerald-800 font-semibold text-xs">
-                  Registo Civil Ativo
-                </span>
-                <span className="bg-slate-50 px-3 py-1 rounded-full border border-slate-200 text-slate-700 font-semibold text-xs">
-                  Auditoria Periódica
-                </span>
-                <span className="bg-[#fef2f1] px-3 py-1 rounded-full border border-[#fee4e2] text-[#f75142] font-semibold text-xs">
-                  Conformidade com Censo
-                </span>
-              </div>
-            </section>
-
-            {/* Bloco 2: Informações Institucionais & Conformidade */}
-            <section
-              id="institutional-information"
-              aria-label="Informações Institucionais e Conformidade"
-              className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0 border border-slate-200/80">
-                  <Award className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-slate-900 leading-tight">
-                    Informações Institucionais & Conformidade
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Dados de registo da sede central e habilitação jurídica
-                  </p>
-                </div>
-              </div>
-
-              <div className="divide-y divide-slate-100 text-sm">
-                <div className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <span className="text-slate-500 font-medium">Instituição Tutelar</span>
-                  <span className="text-slate-900 font-semibold">
-                    {adminData.schoolName || 'Ministério da Educação & Rede Sigre Escolas'}
-                  </span>
-                </div>
-
-                <div className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <span className="text-slate-500 font-medium">Sede Operacional</span>
-                  <span className="text-slate-900 font-semibold">
-                    {adminData.address || 'Edifício Monumental, Ingombota, Luanda'}
-                  </span>
-                </div>
-
-                <div className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <span className="text-slate-500 font-medium">Nº de Registo / B.I.</span>
-                  <span className="text-slate-900 font-mono font-semibold">
-                    {adminData.biNumber || '005481920LA031'}
-                  </span>
-                </div>
-
-                <div className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <span className="text-slate-500 font-medium">Status de Auditoria</span>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold text-xs bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    100% Conforme às Normas Nacionais
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {/* Bloco 3: Quadro de Funcionários da Administração Municipal da Educação (DME) */}
-            <section
-              id="municipal-admin-staff"
-              aria-label="Quadro de Funcionários da Administração Municipal da Educação"
-              className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-4"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-100">
-                    <Landmark className="w-5 h-5" />
-                  </div>
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                   <div>
-                    <h4 className="text-base font-bold text-slate-900 leading-tight">
-                      Quadro de Funcionários da Administração (DME)
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Flexão de cargos executivos, inspecção escolar e repartições municipais
+                    <h2 className="text-base font-bold text-[#002133]">
+                      Dados Institucionais & Governação
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Credenciais oficiais do Administrador Geral na Direcção Municipal
                     </p>
                   </div>
+                  <Landmark className="w-4 h-4 text-gray-400" />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsAddStaffModalOpen(true)}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#002133] hover:bg-[#06283a] text-white shadow-2xs transition-all cursor-pointer self-start sm:self-auto"
-                >
-                  <UserPlus className="w-3.5 h-3.5 text-[#f75142]" />
-                  <span>Cadastrar Funcionário DME</span>
-                </button>
-              </div>
+                <div className="divide-y divide-gray-100 text-sm">
+                  <div className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs text-gray-500">Órgão de Tutela</span>
+                    <span className="font-semibold text-[#002133]">
+                      Governo Provincial de Malanje • Administração Municipal
+                    </span>
+                  </div>
+                  <div className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs text-gray-500">Repartição Central</span>
+                    <span className="font-semibold text-[#002133]">
+                      {adminData.schoolName}
+                    </span>
+                  </div>
+                  <div className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs text-gray-500">Cargo Homologado</span>
+                    <span className="font-semibold text-[#002133]">
+                      {adminData.roleTitle}
+                    </span>
+                  </div>
+                  <div className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs text-gray-500">Nível de Acesso no Sistema</span>
+                    <span className="font-semibold text-[#002133] inline-flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-[#f75142]" />
+                      Administrador Geral (Controlo Total da Rede)
+                    </span>
+                  </div>
+                  <div className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs text-gray-500">Localização</span>
+                    <span className="font-semibold text-[#002133]">
+                      {adminData.address}
+                    </span>
+                  </div>
+                </div>
+              </section>
 
-              {/* Staff grid */}
-              <div className="grid grid-cols-1 gap-3">
-                {dmeStaff.map((staff) => (
-                  <div
-                    key={staff.id}
-                    className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              {/* Quadro da Direcção Municipal (DME) */}
+              <section
+                id="admin-dme-staff-section"
+                aria-label="Quadro de Funcionários da Direcção Municipal da Educação"
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+              >
+                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold text-[#002133]">
+                      Quadro da Direcção Municipal (DME)
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Inspectores, chefes de repartição e técnicos vinculados ao gabinete
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsAddStaffModalOpen(true)}
+                    className="px-3.5 py-2 rounded-lg bg-[#002133] hover:bg-[#003049] text-white font-medium text-xs transition-colors inline-flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
-                        {staff.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-900 text-sm">{staff.name}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                            {staff.cargoTitle}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{staff.department}</p>
-                        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Mail className="w-3 h-3 text-slate-400" />
-                            {staff.email}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="w-3 h-3 text-slate-400" />
-                            {staff.phone}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    <Plus className="w-3.5 h-3.5 text-[#f75142]" />
+                    <span>Cadastrar funcionário</span>
+                  </button>
+                </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <Check className="w-3 h-3" />
-                        {staff.status}
-                      </span>
-                      {staff.id.startsWith('dme-') && !['dme-1', 'dme-2', 'dme-3'].includes(staff.id) && (
+                {dmeStaff.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-sm font-medium text-[#002133]">
+                      Nenhum funcionário técnico listado na DME
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                      Adicione inspectores escolares, chefes de repartição ou técnicos de estatística da Direcção Municipal.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {dmeStaff.map((member) => (
+                      <div
+                        key={member.id}
+                        className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-gray-50/60 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-[#002133] truncate">
+                            {member.name}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            {member.cargoTitle} • {member.department}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                            {member.email} · {member.phone}
+                          </p>
+                        </div>
+
                         <button
                           type="button"
-                          onClick={() => handleDeleteStaff(staff.id)}
-                          className="text-xs text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                          onClick={() => handleDeleteStaff(member.id)}
                           title="Remover funcionário"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </section>
-          </div>
-
-          {/* Coluna 2: Definições da Conta, Preferências e Segurança (lg:col-span-5) */}
-          <div id="zona-dados-senha" className="lg:col-span-5 scroll-mt-24">
-            <div className="mb-4">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#f75142] block">
-                Definições da Conta & Segurança
-              </span>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
-                Zona de Alteração de Dados & Palavra-passe
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Edite os dados do superadministrador e redefina credenciais de acesso seguro.
-              </p>
+                )}
+              </section>
             </div>
+
+            {/* Right Column (4 cols): Clean Account, Profile & System Settings Card (Exact same pattern as TeacherProfilePage + Admin actions) */}
+            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h2 className="text-sm font-bold text-[#002133]">
+                    Conta & Configurações
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Opções do perfil e ferramentas do Administrador Geral
+                  </p>
+                </div>
+
+                <div className="divide-y divide-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal('manage-profile')}
+                    className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <User className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                      <span className="text-xs font-medium text-[#002133]">
+                        Gerir perfil
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal('personal-info')}
+                    className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <IdCard className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                      <span className="text-xs font-medium text-[#002133]">
+                        Informações pessoais
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal('notifications')}
+                    className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Bell className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                      <span className="text-xs font-medium text-[#002133]">
+                        Notificações
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal('change-password')}
+                    className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Lock className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                      <span className="text-xs font-medium text-[#002133]">
+                        Alterar palavra-passe
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </button>
+
+                  {onOpenSettings && (
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Settings className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                        <span className="text-xs font-medium text-[#002133]">
+                          Definições da sessão
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+
+                  {onSelectPage && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectPage('admin-aprovacoes')}
+                      className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ClipboardCheck className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                        <span className="text-xs font-medium text-[#002133]">
+                          Homologações de contas
+                          {pendingApprovalsCount > 0
+                            ? ` (${pendingApprovalsCount})`
+                            : ''}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+
+                  {onSelectPage && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectPage('declaracao-efectividade')}
+                      className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                        <span className="text-xs font-medium text-[#002133]">
+                          Declarações de efectividade
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+
+                  {onOpenBackupManager && (
+                    <button
+                      type="button"
+                      onClick={onOpenBackupManager}
+                      className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Archive className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                        <span className="text-xs font-medium text-[#002133]">
+                          Cofre de backups
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+
+                  {onOpenAuditLogs && (
+                    <button
+                      type="button"
+                      onClick={onOpenAuditLogs}
+                      className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ShieldAlert className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                        <span className="text-xs font-medium text-[#002133]">
+                          Registos de auditoria
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+
+                  {onOpenExcelExport && (
+                    <button
+                      type="button"
+                      onClick={onOpenExcelExport}
+                      className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileSpreadsheet className="w-4 h-4 text-gray-400 group-hover:text-[#002133]" />
+                        <span className="text-xs font-medium text-[#002133]">
+                          Exportar dados Excel
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Full-width Settings View when "Configurações" tab is selected */
+          <div id="zona-dados-senha" className="scroll-mt-24 bg-white rounded-xl border border-gray-200 p-6 sm:p-8">
+            <div className="pb-4 mb-6 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-[#002133]">
+                  Configurações da Conta & Segurança
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Edite os dados oficiais do Administrador Geral, contactos e palavra-passe de acesso.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('visao-geral')}
+                className="text-xs font-semibold text-[#f75142] hover:underline cursor-pointer"
+              >
+                Voltar à visão geral
+              </button>
+            </div>
+
             <ProfileOptionsSection
-              className="w-full"
-              hideProfileHeaderCard={true}
               user={{
                 name: adminData.name,
                 email: adminData.email,
@@ -660,118 +880,156 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 address: adminData.address,
               }}
               onUpdateUser={handleUpdateAdminData}
+              showBackHeader={false}
+              hideProfileHeaderCard={true}
               externalActiveModal={activeModal}
               onCloseExternalModal={() => setActiveModal(null)}
             />
           </div>
-        </div>
+        )}
+
+        {/* Mount ProfileOptionsSection modals invisibly when in Overview tab */}
+        {activeTab === 'visao-geral' && (
+          <ProfileOptionsSection
+            user={{
+              name: adminData.name,
+              email: adminData.email,
+              phone: adminData.phone,
+              roleTitle: adminData.roleTitle,
+              avatar: adminPhoto,
+              schoolName: adminData.schoolName,
+              biNumber: adminData.biNumber,
+              address: adminData.address,
+            }}
+            onUpdateUser={handleUpdateAdminData}
+            externalActiveModal={activeModal}
+            onCloseExternalModal={() => setActiveModal(null)}
+            modalsOnly={true}
+          />
+        )}
       </main>
 
-      {/* Modal de Cadastro de Funcionário da Administração (DME) */}
+      {/* Modal: Cadastrar Funcionário da DME */}
       {isAddStaffModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white rounded-xl w-full max-w-lg border border-gray-200 overflow-hidden">
+            <div className="bg-[#002133] px-6 py-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-                  <Landmark className="w-5 h-5" />
-                </div>
+                <UserPlus className="w-5 h-5 text-[#f75142]" />
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Novo Funcionário da Administração (DME)</h3>
-                  <p className="text-xs text-slate-500">Cadastre o cargo específico na Direcção Municipal</p>
+                  <h3 className="text-sm font-bold">
+                    Cadastrar Funcionário da DME
+                  </h3>
+                  <p className="text-xs text-gray-300">
+                    Direcção Municipal da Educação de Quêssua
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddStaffModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddStaff} className="space-y-4 pt-4">
+            <form onSubmit={handleAddStaff} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Nome Completo <span className="text-red-500">*</span>
+                <label className="block text-xs font-medium text-[#002133] mb-1.5">
+                  Cargo / Função na Administração *
+                </label>
+                <select
+                  value={newStaffRole}
+                  onChange={(e) => setNewStaffRole(e.target.value as AdminStaffRole)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white text-sm text-[#002133] focus:outline-hidden focus:border-[#002133]"
+                >
+                  <option value="diretor_municipal">
+                    Director(a) Municipal da Educação
+                  </option>
+                  <option value="inspetor_escolar">
+                    Inspetor(a) Escolar Municipal
+                  </option>
+                  <option value="chefe_reparticao">
+                    Chefe de Repartição / Ensino Geral
+                  </option>
+                  <option value="tecnico_estatistica">
+                    Técnico(a) de Planeamento & Estatística
+                  </option>
+                  <option value="admin_sistema">
+                    Administrador(a) Geral do Sistema Sigre
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#002133] mb-1.5">
+                  Nome Completo *
                 </label>
                 <input
                   type="text"
                   required
                   value={newStaffName}
                   onChange={(e) => setNewStaffName(e.target.value)}
-                  placeholder="Ex: Dr. Paulo Mateus"
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white font-medium"
+                  placeholder="Ex: Dra. Helena Sebastião"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white text-sm text-[#002133] focus:outline-hidden focus:border-[#002133]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Função / Cargo na Administração <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newStaffRole}
-                  onChange={(e) => setNewStaffRole(e.target.value as AdminStaffRole)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white font-semibold cursor-pointer"
-                >
-                  <option value="diretor_municipal">Director(a) Municipal da Educação</option>
-                  <option value="inspetor_escolar">Inspetor(a) Escolar Municipal</option>
-                  <option value="chefe_reparticao">Chefe de Repartição / Ensino Geral</option>
-                  <option value="tecnico_estatistica">Técnico(a) de Planeamento & Estatística</option>
-                  <option value="admin_sistema">Administrador(a) de Sistema Sigre / RH</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Gabinete / Repartição Municipal <span className="text-red-500">*</span>
+                <label className="block text-xs font-medium text-[#002133] mb-1.5">
+                  Repartição / Gabinete
                 </label>
                 <input
                   type="text"
-                  required
                   value={newStaffDept}
                   onChange={(e) => setNewStaffDept(e.target.value)}
-                  placeholder="Ex: Gabinete de Inspecção e Supervisão Pedagógica"
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white"
+                  placeholder="Ex: Repartição de Inspecção Escolar"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white text-sm text-[#002133] focus:outline-hidden focus:border-[#002133]"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">E-mail Institucional</label>
+                  <label className="block text-xs font-medium text-[#002133] mb-1.5">
+                    E-mail Institucional
+                  </label>
                   <input
                     type="email"
                     value={newStaffEmail}
                     onChange={(e) => setNewStaffEmail(e.target.value)}
-                    placeholder="paulo.mateus@ucore.edu.ao"
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white"
+                    placeholder="nome@sigre.edu.ao"
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white text-sm text-[#002133] focus:outline-hidden focus:border-[#002133]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Telefone</label>
+                  <label className="block text-xs font-medium text-[#002133] mb-1.5">
+                    Telefone
+                  </label>
                   <input
                     type="tel"
                     value={newStaffPhone}
                     onChange={(e) => setNewStaffPhone(e.target.value)}
                     placeholder="+244 923 000 000"
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] bg-white"
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white text-sm text-[#002133] focus:outline-hidden focus:border-[#002133]"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setIsAddStaffModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 font-medium text-xs hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#f75142] hover:bg-[#e04436] text-white shadow-xs transition-all"
+                  className="px-4 py-2 rounded-lg bg-[#002133] hover:bg-[#003049] text-white font-medium text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
-                  Salvar Funcionário
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Guardar</span>
                 </button>
               </div>
             </form>

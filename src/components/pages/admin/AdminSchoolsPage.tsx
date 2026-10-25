@@ -213,7 +213,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
   }, [activeSchool, schoolsToDisplay]);
 
   return (
-    <div id="admin-schools-page" className="w-full min-h-screen bg-[#f7f3f3]">
+    <div id="admin-schools-page" className="w-full min-h-screen bg-[#fafafa]">
       {/* Hero Header matching "Minhas Salas" (DirectorRoomsPage) */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
@@ -558,123 +558,98 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             </div>
 
             {/* 6. Desempenho */}
-            <div className="p-4 sm:p-5 flex flex-col justify-between bg-emerald-50/20">
+            <div className="p-4 sm:p-5 flex flex-col justify-between">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Aproveitamento</span>
-                <Award className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aproveitamento</span>
+                <Award className="w-3.5 h-3.5 text-slate-400" />
               </div>
               <div>
-                <span className="text-2xl sm:text-3xl font-black text-emerald-800 tracking-tight block">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight block numeric">
                   {displayValues.performanceRate}
                 </span>
-                <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">Média Geral</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Média Geral</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 3. Censo Documental: Card compacto com progresso + 3 indicadores-chave */}
-        <div id="admin-documentation-census" className="reveal-up bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5 sm:p-6 mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 shadow-2xs shrink-0">
-                <FileCheck className="w-4 h-4" />
+        {/* 3. Censo Documental: Superfície Plana com Barra de Progresso Sólida (Masakula v2.0) */}
+        <div id="admin-documentation-census" className="reveal-up bg-white rounded-2xl border border-[#e8e8ea] p-5 sm:p-6 mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-[#e8e8ea]">
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm sm:text-base font-bold text-[#002133] tracking-tight">
+                  Censo Documental & Regularização
+                </h4>
+                <span className="text-[11px] font-medium badge--neutral px-2 py-0.5 rounded-md">
+                  Registo Civil
+                </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                    Censo Documental & Regularização
-                  </h4>
-                  <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200">
-                    Registo Civil
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Auditoria de Certidões, Assentos e Bilhetes de Identidade dos estudantes
-                </p>
-              </div>
+              <p className="text-xs text-[#52606d] mt-0.5">
+                Auditoria de Certidões, Assentos e Bilhetes de Identidade dos estudantes
+              </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-slate-600">
-                Total: <strong className="text-slate-900">{docsStats.total.toLocaleString('pt-AO')} alunos</strong>
+              <span className="text-xs font-medium text-[#52606d] numeric">
+                Total: <strong className="text-[#002133]">{docsStats.total.toLocaleString('pt-AO')} alunos</strong>
               </span>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full badge--success numeric">
                 {docsStats.rate}% Regularizados
               </span>
             </div>
           </div>
 
-          {/* Segmented Progress Bar */}
-          <div className="space-y-1.5 mb-4">
-            <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+          {/* Solid Progress Bar (--ink on --track, 6px height, zero gradients) */}
+          <div className="mb-5">
+            <div className="w-full h-1.5 rounded-full bg-[#ececee] overflow-hidden">
               <div
                 style={{ width: `${docsStats.rate}%` }}
-                className="h-full bg-emerald-500 transition-all duration-500"
+                className="h-full bg-[#002133] rounded-full transition-all duration-500"
                 title={`${docsStats.rate}% regularizados`}
-              />
-              <div
-                style={{ width: `${100 - docsStats.rate}%` }}
-                className="h-full bg-amber-400 transition-all duration-500"
-                title={`${100 - docsStats.rate}% pendentes`}
               />
             </div>
           </div>
 
-          {/* 3 Streamlined Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div className="bg-emerald-50/40 border border-emerald-200/70 rounded-xl p-3.5 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block mb-0.5">
-                  Alunos com Documentos
+          {/* 3 Flat Metric Divisions (Zero nested colored boxes or Unicode dingbats) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 pt-1 divide-y sm:divide-y-0 sm:divide-x divide-[#e8e8ea]">
+            <div className="pt-2 sm:pt-0">
+              <span className="text-xs font-medium text-[#52606d] block mb-1">
+                Alunos com Documentos
+              </span>
+              <div className="flex items-baseline gap-2 numeric">
+                <span className="text-2xl font-bold text-[#002133] tracking-tight">
+                  {displayValues.studentsWithDocs}
                 </span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-emerald-950 tracking-tight">
-                    {displayValues.studentsWithDocs}
-                  </span>
-                  <span className="text-[11px] text-emerald-700 font-semibold">({docsStats.rate}%)</span>
-                </div>
-                <span className="text-[11px] text-slate-500 mt-0.5 block">Certidão ou B.I. homologado</span>
+                <span className="text-xs text-[#0b7a54] font-semibold">({docsStats.rate}%)</span>
               </div>
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
-                ✓
-              </div>
+              <span className="text-xs text-[#52606d] mt-0.5 block">Certidão ou B.I. homologado</span>
             </div>
 
-            <div className="bg-amber-50/40 border border-amber-200/70 rounded-xl p-3.5 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block mb-0.5">
-                  Alunos sem Documentos
+            <div className="pt-3 sm:pt-0 sm:pl-6">
+              <span className="text-xs font-medium text-[#52606d] block mb-1">
+                Alunos sem Documentos
+              </span>
+              <div className="flex items-baseline gap-2 numeric">
+                <span className="text-2xl font-bold text-[#002133] tracking-tight">
+                  {displayValues.studentsWithoutDocs}
                 </span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-amber-950 tracking-tight">
-                    {displayValues.studentsWithoutDocs}
-                  </span>
-                  <span className="text-[11px] text-amber-700 font-semibold">({100 - docsStats.rate}%)</span>
-                </div>
-                <span className="text-[11px] text-slate-500 mt-0.5 block">Em trâmite na brigada civil</span>
+                <span className="text-xs text-[#a34a08] font-semibold">({100 - docsStats.rate}%)</span>
               </div>
-              <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
-                !
-              </div>
+              <span className="text-xs text-[#52606d] mt-0.5 block">Em trâmite na brigada civil</span>
             </div>
 
-            <div className="bg-blue-50/40 border border-blue-200/70 rounded-xl p-3.5 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-blue-800 block mb-0.5">
-                  Frequência Escolar
+            <div className="pt-3 sm:pt-0 sm:pl-6">
+              <span className="text-xs font-medium text-[#52606d] block mb-1">
+                Frequência Escolar
+              </span>
+              <div className="flex items-baseline gap-2 numeric">
+                <span className="text-2xl font-bold text-[#002133] tracking-tight">
+                  {displayValues.attendanceRate}
                 </span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-blue-950 tracking-tight">
-                    {displayValues.attendanceRate}
-                  </span>
-                  <span className="text-[11px] text-blue-700 font-semibold">assiduidade</span>
-                </div>
-                <span className="text-[11px] text-slate-500 mt-0.5 block">Média consolidada em sala</span>
+                <span className="text-xs text-[#52606d] font-medium">assiduidade</span>
               </div>
-              <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
-                %
-              </div>
+              <span className="text-xs text-[#52606d] mt-0.5 block">Média consolidada em sala</span>
             </div>
           </div>
         </div>

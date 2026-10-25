@@ -67,39 +67,27 @@ export const StatCards: React.FC<StatCardsProps> = ({
 
       {/* Card Classification Filter Chips & Settings Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-medium border border-slate-200/60">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              filter === 'all'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`filter-chip ${filter === 'all' ? 'is-active' : ''}`}
           >
             Todos ({session.cards.length})
           </button>
           <button
             type="button"
             onClick={() => setFilter('clickable')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
-              filter === 'clickable'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`filter-chip ${filter === 'clickable' ? 'is-active' : ''}`}
           >
-            <span>Módulos Clicáveis ({clickableCount})</span>
+            Módulos Clicáveis ({clickableCount})
           </button>
           <button
             type="button"
             onClick={() => setFilter('stats')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
-              filter === 'stats'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`filter-chip ${filter === 'stats' ? 'is-active' : ''}`}
           >
-            <span>Estatísticas ({nonClickableCount})</span>
+            Estatísticas ({nonClickableCount})
           </button>
         </div>
 
@@ -108,28 +96,25 @@ export const StatCards: React.FC<StatCardsProps> = ({
           {session.settings?.autoSync && (
             <span
               title="Sincronização em tempo real ativa nas configurações"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold"
+              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
             >
-              <span className="w-2 h-2 rounded-full bg-[#002133]" />
-              <span>Sincronização Ativa</span>
+              Sincronização Ativa
             </span>
           )}
           {session.settings?.showPercentages && (
             <span
               title="Exibição de percentuais ativa nas configurações"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold"
+              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
             >
-              <Percent className="w-3.5 h-3.5 text-slate-600" />
-              <span>Métricas em %</span>
+              Métricas em %
             </span>
           )}
           {session.settings?.emailAlerts && (
             <span
               title="Alertas críticos ativos nas configurações"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold"
+              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
             >
-              <Bell className="w-3.5 h-3.5 text-slate-600" />
-              <span>Alertas Ativos</span>
+              Alertas Ativos
             </span>
           )}
           {onOpenSettings && (
@@ -137,22 +122,23 @@ export const StatCards: React.FC<StatCardsProps> = ({
               id="statcards-open-settings-btn"
               type="button"
               onClick={onOpenSettings}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#002133] hover:bg-[#001726] text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 border border-white/10"
+              className="btn--secondary inline-flex items-center gap-1.5"
               title="Abrir Configurações da Sessão"
             >
-              <Settings className="w-3.5 h-3.5 text-[#f75142]" />
+              <Settings className="w-3.5 h-3.5 text-[#52606d]" />
               <span>Configurações</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Harmonized Cards Grid with equal heights and uniform composition */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto items-stretch">
-        {filteredCards.map((card) => (
+      {/* Harmonized Cards Grid: 1 Featured Anchor Card + Clean Surface Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 max-w-5xl mx-auto items-stretch">
+        {filteredCards.map((card, index) => (
           <StatCardItem
             key={card.id}
             card={card}
+            featured={index === 0}
             onSelect={handleCardClick}
             showPercentages={session.settings?.showPercentages !== false}
           />
