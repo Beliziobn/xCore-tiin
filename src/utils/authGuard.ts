@@ -39,6 +39,9 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'admin-inscricoes',
     'admin-anuncios',
     'admin-perfil',
+    'admin-servicos-rapidos',
+    'servicos-rapidos',
+    'pedidos-rapidos',
     'reunioes',
     'reunioes-salas',
     'sobre',
@@ -72,6 +75,9 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'pauta-final',
     'diretor-perfil',
     'diretor-presenca',
+    'diretor-servicos-rapidos',
+    'servicos-rapidos',
+    'pedidos-rapidos',
     'declaracao-efectividade',
     'efectividade',
     'mapa-efectividade',
@@ -179,6 +185,10 @@ export function getViewTitle(view: string): string {
     'admin-aprovacoes': 'Central de Homologação & Inscrições (Admin)',
     'admin-inscricoes': 'Central de Homologação & Inscrições (Admin)',
     'admin-anuncios': 'Demandas & Editais Oficiais (Admin)',
+    'admin-servicos-rapidos': 'Serviços Rápidos & Despachos de Cidadãos (Admin)',
+    'diretor-servicos-rapidos': 'Serviços Rápidos & Boletins (Direção)',
+    'servicos-rapidos': 'Serviços Rápidos ao Cidadão',
+    'pedidos-rapidos': 'Serviços Rápidos ao Cidadão',
     'diretor-estatisticas': 'Estatísticas Escolares (Direção)',
     'diretor-professores': 'Corpo Docente da Escola (Direção)',
     'diretor-alunos': 'Matrículas & Alunos (Direção)',
@@ -260,8 +270,21 @@ export function canUserAccessView(user: UserAccount | null, view: string): ViewA
     };
   }
 
-  const role = user.role as UserRole;
+  const role = (user.role || '').toLowerCase() as UserRole;
   const userOwnProfile = getOwnProfileViewForUser(user);
+
+  // Master Admin: dmedoquessua@gmail.com has full authorization for municipal administration and quick services
+  if (user.email?.trim().toLowerCase() === 'dmedoquessua@gmail.com' || role === 'admin') {
+    if (
+      view === 'admin-servicos-rapidos' ||
+      view === 'servicos-rapidos' ||
+      view === 'pedidos-rapidos' ||
+      view === 'efectividade' ||
+      view === 'declaracao-efectividade'
+    ) {
+      return { allowed: true, userOwnProfileView: userOwnProfile };
+    }
+  }
 
   // Check if target is a personal profile view
   const profileInfo = PROFILE_VIEWS[view];

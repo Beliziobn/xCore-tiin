@@ -1446,7 +1446,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <QuickRequestsManagementView
             currentUser={currentUser}
-            activeRole={activeRole as any}
+            activeRole={currentUser?.role === 'admin' || currentUser?.email === 'dmedoquessua@gmail.com' ? 'admin' : (activeRole as any)}
             schoolName={currentUser?.schoolName || ''}
             onNavigateToDeclaracaoEfectividade={() => {
               setCurrentView('efectividade');
@@ -1463,7 +1463,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <QuickRequestsManagementView
             currentUser={currentUser}
-            activeRole={activeRole as any}
+            activeRole="diretor"
             schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
             showToast={showToast}
           />

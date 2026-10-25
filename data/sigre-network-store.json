@@ -16,13 +16,13 @@
       "updatedAt": "2026-10-25T09:44:12.811Z",
       "requesterName": "Augusto Miranda",
       "requesterPhone": "931223344",
-      "requesterEmail": "",
+      "requesterEmail": "augusto.miranda@escola.ao",
       "requesterRoleTitle": "Docente / Funcionário",
       "targetRole": "ADMIN",
       "targetSchoolId": "",
-      "targetSchoolName": "",
+      "targetSchoolName": "Escola Primária nº 4 do Quêssua",
       "targetDirectorEmail": "",
-      "targetAdminEmail": "beliziodos20@gmail.com",
+      "targetAdminEmail": "dmedoquessua@gmail.com",
       "details": {
         "employeeName": "Augusto Miranda",
         "employeeBi": "001928374ME042",
@@ -30,7 +30,8 @@
         "employeeSchoolOrDepartment": "Escola Primária nº 4 do Quêssua",
         "employeeCategory": "Professor do Iº Ciclo",
         "referenceMonthYear": "Fevereiro / 2026",
-        "purpose": "Fins Bancários / Crédito Habitação"
+        "purpose": "Fins Bancários / Crédito Habitação",
+        "notes": "Necessidade urgente para processo de crédito junto da agência bancária de Malanje."
       }
     },
     {
@@ -43,23 +44,80 @@
       "updatedAt": "2026-10-25T09:44:20.906Z",
       "requesterName": "Pedro Sebastião",
       "requesterPhone": "923456789",
-      "requesterEmail": "",
+      "requesterEmail": "pedro.sebastiao@gmail.com",
       "requesterRoleTitle": "Encarregado de Educação",
       "targetRole": "DIRECTOR",
       "targetSchoolId": "",
       "targetSchoolName": "Complexo Escolar do Quêssua",
       "targetDirectorEmail": "",
-      "targetAdminEmail": "beliziodos20@gmail.com",
+      "targetAdminEmail": "dmedoquessua@gmail.com",
       "details": {
         "studentName": "Mateus Sebastião",
+        "studentBiOrProcesso": "002948192LA091",
         "studentClasse": "8ª Classe",
         "studentTurma": "A",
+        "studentPeriodo": "Manhã",
         "trimestre": "1º Trimestre",
         "responseMessage": "Boletim emitido com sucesso e assinado pelo Diretor Geral. Disponível na secretaria.",
         "resolvedBy": "Fert Horlan (Diretor Geral)",
         "resolvedAt": "2026-10-25T09:44:20.906Z"
       }
+    },
+    {
+      "id": "req_1792922100000_1932",
+      "protocol": "SR-2026-1932",
+      "serviceType": "DECLARACAO_MATRICULA",
+      "title": "Declaração de Matrícula - Paulo Domingos",
+      "status": "PENDENTE",
+      "createdAt": "2026-10-25T10:15:00.000Z",
+      "updatedAt": "2026-10-25T10:15:00.000Z",
+      "requesterName": "Esperança Domingos",
+      "requesterPhone": "924112233",
+      "requesterEmail": "",
+      "requesterRoleTitle": "Encarregada de Educação",
+      "targetRole": "ADMIN",
+      "targetSchoolId": "",
+      "targetSchoolName": "Escola Primária nº 4 do Quêssua",
+      "targetDirectorEmail": "",
+      "targetAdminEmail": "dmedoquessua@gmail.com",
+      "details": {
+        "studentName": "Paulo Domingos",
+        "studentBiOrProcesso": "008821943ME011",
+        "studentClasse": "5ª Classe",
+        "studentTurma": "B",
+        "academicYear": "2025/2026",
+        "purpose": "Abono de Família / Segurança Social (INSS)",
+        "notes": "Comprovativo solicitado pela entidade empregadora para renovação do abono."
+      }
+    },
+    {
+      "id": "req_1792922200000_3821",
+      "protocol": "SR-2026-3821",
+      "serviceType": "GUIA_TRANSFERENCIA",
+      "title": "Guia de Transferência - Teresa Kiala",
+      "status": "EM_ANALISE",
+      "createdAt": "2026-10-25T10:20:00.000Z",
+      "updatedAt": "2026-10-25T10:22:00.000Z",
+      "requesterName": "Manuel António Kiala",
+      "requesterPhone": "936778899",
+      "requesterEmail": "manuel.kiala@gmail.com",
+      "requesterRoleTitle": "Pai / Encarregado de Educação",
+      "targetRole": "ADMIN",
+      "targetSchoolId": "",
+      "targetSchoolName": "Complexo Escolar do Quêssua",
+      "targetDirectorEmail": "",
+      "targetAdminEmail": "dmedoquessua@gmail.com",
+      "details": {
+        "studentName": "Teresa Kiala",
+        "studentBiOrProcesso": "007129384ME052",
+        "studentClasse": "9ª Classe",
+        "purpose": "Destino: Colégio do Quêssua (Mudança de Residência familiar)",
+        "notes": "A família mudou-se de bairro; solicita transferência urgente para continuar o 2º trimestre.",
+        "responseMessage": "Processo em análise na repartição pedagógica. Registo de notas da 8ª e 9ª classes a ser apurado.",
+        "resolvedBy": "Belízio dos Santos (Administrador Central DME)",
+        "resolvedAt": "2026-10-25T10:22:00.000Z"
+      }
     }
   ],
-  "updatedAt": "2026-10-25T09:44:20.907Z"
+  "updatedAt": "2026-10-25T10:25:00.000Z"
 }

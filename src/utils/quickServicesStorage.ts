@@ -83,6 +83,10 @@ export async function submitQuickServiceRequest(payload: {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
         } catch {}
 
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sigre_quick_request_created', { detail: data.request }));
+        }
+
         return {
           success: true,
           request: data.request,
@@ -164,6 +168,10 @@ export async function updateQuickRequestStatus(
             }
           }
         } catch {}
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sigre_quick_request_updated', { detail: data.request }));
+        }
         return { success: true, request: data.request };
       }
     }

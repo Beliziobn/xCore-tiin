@@ -732,6 +732,15 @@ async function startServer() {
   // SERVIÇOS RÁPIDOS (SELF-SERVICE / PEDIDOS PÚBLICOS SEM LOGIN)
   // ============================================================================
   app.get("/api/quick-requests", (req, res) => {
+    try {
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.quickRequests)) {
+          networkStore.quickRequests = parsed.quickRequests;
+        }
+      }
+    } catch {}
     let requests = Array.isArray(networkStore.quickRequests) ? networkStore.quickRequests : [];
     const { schoolId, targetRole, protocol, phone, id } = req.query as Record<string, string>;
 
@@ -819,7 +828,7 @@ async function startServer() {
       targetSchoolId: data.targetSchoolId || '',
       targetSchoolName: data.targetSchoolName || '',
       targetDirectorEmail: resolvedDirectorEmail,
-      targetAdminEmail: 'beliziodos20@gmail.com',
+      targetAdminEmail: 'dmedoquessua@gmail.com',
       details: data.details || {},
     };
 
