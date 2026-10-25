@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText, Archive, Zap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
-import { getPendingApplications } from '../utils/authApprovalStorage';
+import { getPendingApplications, syncApplicationsFromServer, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
 
 interface NavbarProps {
   onOpenGetStarted: () => void;
@@ -72,17 +72,44 @@ export const Navbar: React.FC<NavbarProps> = ({
     const updateCounts = () => {
       try {
         const all = getPendingApplications();
-        const dirPending = all.filter((a) => a.targetApproverRole === 'diretor' && a.status === 'pendente').length;
-        const admPending = all.filter((a) => (a.targetApproverRole === 'admin' || a.type === 'diretor') && a.status === 'pendente').length;
+        const userSchool = currentUser?.schoolName?.trim().toLowerCase();
+        
+        const dirPending = all.filter((a) => {
+          if (a.status !== 'pendente') return false;
+          if (a.targetApproverRole !== 'diretor' && a.type !== 'professor') return false;
+          if (currentUser?.role === 'diretor' && userSchool) {
+            const aSchool = (a.schoolName || '').trim().toLowerCase();
+            return !aSchool || aSchool === userSchool || aSchool.includes(userSchool) || userSchool.includes(aSchool);
+          }
+          return true;
+        }).length;
+
+        const admPending = all.filter((a) => {
+          if (a.status !== 'pendente') return false;
+          return (
+            a.targetApproverRole === 'admin' ||
+            a.type === 'diretor' ||
+            a.type === 'membro_dme' ||
+            a.scope === 'administracao' ||
+            a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
+          );
+        }).length;
+
         setPendingAppsCount({ director: dirPending, admin: admPending });
       } catch {
         // ignore
       }
     };
+
     updateCounts();
-    const interval = setInterval(updateCounts, 2500);
-    return () => clearInterval(interval);
-  }, []);
+    const handleSync = () => updateCounts();
+    window.addEventListener('sigre-data-synced', handleSync);
+    const interval = setInterval(updateCounts, 3000);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      clearInterval(interval);
+    };
+  }, [currentUser?.role, currentUser?.schoolName]);
 
   const isLoginLoading = (isAuthLoading && authLoadingAction === 'login') || navLoadingAction === 'login';
   const isRegisterLoading = (isAuthLoading && authLoadingAction === 'register') || navLoadingAction === 'register';
@@ -733,19 +760,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              {onOpenQuickServices && (
-                <button
-                  id="navbar-servicos-rapidos-btn"
-                  type="button"
-                  onClick={onOpenQuickServices}
-                  className="hidden sm:inline-flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs hover:shadow-md cursor-pointer border border-amber-500/30 group"
-                  title="Serviços Rápidos ao Cidadão (Sem Login)"
-                >
-                  <Zap className="w-3.5 h-3.5 fill-current text-slate-950 group-hover:scale-110 transition-transform" />
-                  <span>Serviços Rápidos</span>
-                </button>
-              )}
-
               <button
                 id="navbar-entrar-btn"
                 type="button"

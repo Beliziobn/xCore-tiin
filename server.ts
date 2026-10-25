@@ -473,6 +473,15 @@ async function startServer() {
     });
   });
 
+  app.get("/api/network/applications", (req, res) => {
+    res.json({
+      success: true,
+      applications: networkStore.applications || [],
+      count: (networkStore.applications || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
   app.post("/api/network/applications", (req, res) => {
     const { application, applications } = req.body || {};
     const incoming: any[] = [];

@@ -45,7 +45,8 @@ import {
   approveApplication,
   rejectApplication,
   savePendingApplication,
-  resolveSchoolDirectorName
+  resolveSchoolDirectorName,
+  syncApplicationsFromServer
 } from '../../../utils/authApprovalStorage';
 import { Hero } from '../../Hero';
 
@@ -108,15 +109,30 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   const [simSubject, setSimSubject] = useState('Matemática');
   const [simBi, setSimBi] = useState('');
 
-  const loadApplications = () => {
-    const all = getPendingApplications();
-    // Filter for applications directed to the Director
-    const directorApps = all.filter((a) => a.targetApproverRole === 'diretor');
-    setApplications(directorApps);
+  const [schoolScopeFilter, setSchoolScopeFilter] = useState<'minha_escola' | 'todas'>('minha_escola');
+
+  const loadApplications = async () => {
+    try {
+      const all = await syncApplicationsFromServer();
+      // Filter for applications directed to School Directors (Teachers and School Staff)
+      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor');
+      setApplications(directorApps);
+    } catch {
+      const all = getPendingApplications();
+      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor');
+      setApplications(directorApps);
+    }
   };
 
   useEffect(() => {
     loadApplications();
+    const handleSync = () => loadApplications();
+    window.addEventListener('sigre-data-synced', handleSync);
+    const interval = setInterval(loadApplications, 4500);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      clearInterval(interval);
+    };
   }, []);
 
   // Filtered list
@@ -128,6 +144,15 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       // Role filter
       if (roleFilter !== 'todos' && app.type !== roleFilter) return false;
 
+      // School Scope filter
+      if (schoolScopeFilter === 'minha_escola' && schoolName) {
+        const normSchool = schoolName.trim().toLowerCase();
+        const appSchool = (app.schoolName || '').trim().toLowerCase();
+        if (appSchool && !appSchool.includes(normSchool) && !normSchool.includes(appSchool)) {
+          return false;
+        }
+      }
+
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -136,12 +161,13 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
         const matchesEmail = app.email.toLowerCase().includes(q);
         const matchesSubject = app.subject?.toLowerCase().includes(q);
         const matchesPhone = app.phone.toLowerCase().includes(q);
-        return matchesName || matchesBi || matchesEmail || matchesSubject || matchesPhone;
+        const matchesSchool = app.schoolName?.toLowerCase().includes(q);
+        return matchesName || matchesBi || matchesEmail || matchesSubject || matchesPhone || matchesSchool;
       }
 
       return true;
     });
-  }, [applications, statusFilter, roleFilter, searchQuery]);
+  }, [applications, statusFilter, roleFilter, searchQuery, schoolScopeFilter, schoolName]);
 
   // Counts
   const counts = useMemo(() => {
@@ -558,6 +584,37 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 </button>
               )}
             </div>
+
+            {/* School Scope Toggle (Minha Escola vs Todas as Escolas) */}
+            {schoolName && (
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSchoolScopeFilter("minha_escola")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    schoolScopeFilter === "minha_escola"
+                      ? "bg-white text-[#002133] shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                  title={`Exibir apenas candidatos direcionados à ${schoolName}`}
+                >
+                  <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Minha Escola ({schoolName.length > 22 ? schoolName.slice(0, 20) + '...' : schoolName})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSchoolScopeFilter("todas")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    schoolScopeFilter === "todas"
+                      ? "bg-white text-[#002133] shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                  title="Exibir todas as candidaturas docentes"
+                >
+                  <span>Todas as Escolas</span>
+                </button>
+              </div>
+            )}
 
             {/* Role Filter Chips */}
             <div className="flex items-center gap-1 overflow-x-auto py-0.5 scrollbar-none">

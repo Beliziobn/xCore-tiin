@@ -119,6 +119,7 @@ export interface UserAccount {
   approvedBy?: string;
   approverTargetRole?: 'admin' | 'diretor';
   approverTargetSchoolName?: string;
+  approverTargetEmail?: string;
   rejectionReason?: string;
   nivelAcademico?: string;
   anosServico?: number;
@@ -160,6 +161,7 @@ export interface PendingApplication {
   schoolId?: string;
   municipality: string;
   targetApproverRole: 'admin' | 'diretor';
+  targetApproverEmail?: string;
   approverDirectorName?: string;
   subject?: string;
   gradeClass?: string;

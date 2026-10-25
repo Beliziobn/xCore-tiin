@@ -42,6 +42,8 @@ export const UCORE_GRAUS_CLASSES = [
   '12ª Classe (IIº Ciclo / Secundário)',
 ];
 
+export const OFFICIAL_DME_ADMIN_EMAIL = 'dmedoquessua@gmail.com';
+
 const STORAGE_KEY_APPLICATIONS = 'ucore_pending_applications';
 const STORAGE_KEY_USERS = 'ucore_registered_users';
 
@@ -61,43 +63,119 @@ export function getPendingApplications(type?: string): PendingApplication[] {
   } catch {
     // ignore
   }
-  // Clean slate
   return type ? list.filter((a) => a.type === type) : list;
 }
 
 /**
+ * Synchronizes pending applications from the server's persistent disk store
+ * so applications created in any session/browser are instantly visible to their supervisor.
+ */
+export async function syncApplicationsFromServer(): Promise<PendingApplication[]> {
+  try {
+    const res = await fetch('/api/network/applications');
+    if (!res.ok) return getPendingApplications();
+    const data = await res.json();
+    if (data && Array.isArray(data.applications)) {
+      const serverApps: PendingApplication[] = data.applications;
+      const localApps = getPendingApplications();
+
+      const map = new Map<string, PendingApplication>();
+      localApps.forEach((a) => {
+        const key = String(a.id || a.userId || a.email).trim().toLowerCase();
+        if (key) map.set(key, a);
+      });
+
+      serverApps.forEach((sa) => {
+        const key = String(sa.id || sa.userId || sa.email).trim().toLowerCase();
+        if (!key) return;
+        const existing = map.get(key);
+        if (!existing) {
+          map.set(key, sa);
+        } else {
+          // If server state was approved or rejected, take it
+          if (sa.status !== 'pendente' && existing.status === 'pendente') {
+            map.set(key, sa);
+          } else {
+            map.set(key, { ...existing, ...sa });
+          }
+        }
+      });
+
+      const merged = Array.from(map.values());
+      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(merged));
+      return merged;
+    }
+  } catch (err) {
+    console.warn('[authApprovalStorage] Falha ao sincronizar candidaturas do servidor:', err);
+  }
+  return getPendingApplications();
+}
+
+/**
  * Returns applications targeted for the school director, optionally filtered by school name.
+ * Teachers always route here.
  */
 export function getApplicationsForDirector(schoolName?: string): PendingApplication[] {
   const all = getPendingApplications();
   return all.filter((a) => {
-    const isTarget = a.targetApproverRole === 'diretor';
+    const isTarget = a.targetApproverRole === 'diretor' || a.type === 'professor';
     if (!isTarget) return false;
     if (!schoolName) return true;
-    const normA = a.schoolName?.trim().toLowerCase() || '';
+    const normA = (a.schoolName || '').trim().toLowerCase();
     const normS = schoolName.trim().toLowerCase();
-    return normA.includes(normS) || normS.includes(normA);
+    return normA === normS || normA.includes(normS) || normS.includes(normA);
   });
 }
 
 /**
- * Returns applications targeted for the central administrator (e.g. school directors, institutional staff).
+ * Returns applications targeted for the central administrator (dmedoquessua@gmail.com).
+ * Administration members and school general directors always route here.
  */
 export function getApplicationsForAdmin(): PendingApplication[] {
   const all = getPendingApplications();
-  return all.filter((a) => a.targetApproverRole === 'admin');
+  return all.filter((a) => {
+    return (
+      a.targetApproverRole === 'admin' ||
+      a.type === 'diretor' ||
+      a.type === 'membro_dme' ||
+      a.scope === 'administracao' ||
+      a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
+    );
+  });
 }
 
 export function savePendingApplication(app: PendingApplication): void {
   try {
+    // Explicit Supervisor Assignment:
+    // 1. Administration staff & School General Directors -> Master Admin (dmedoquessua@gmail.com)
+    // 2. Teachers & School staff -> School Director of that specific school
+    const isAdminTarget =
+      app.scope === 'administracao' ||
+      app.type === 'diretor' ||
+      app.type === 'membro_dme' ||
+      app.targetApproverRole === 'admin';
+
+    const normalizedApp: PendingApplication = {
+      ...app,
+      targetApproverRole: isAdminTarget ? 'admin' : 'diretor',
+      targetApproverEmail: isAdminTarget ? OFFICIAL_DME_ADMIN_EMAIL : undefined,
+      approverDirectorName: isAdminTarget
+        ? `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`
+        : app.approverDirectorName || resolveSchoolDirectorName(null, app.schoolName),
+    };
+
     const existing = getPendingApplications();
-    const updated = [app, ...existing.filter((a) => a.id !== app.id && a.userId !== app.userId)];
+    const updated = [
+      normalizedApp,
+      ...existing.filter((a) => a.id !== normalizedApp.id && a.userId !== normalizedApp.userId),
+    ];
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
+
     if (typeof window !== 'undefined') {
       fetch('/api/network/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application: app }),
+        body: JSON.stringify({ application: normalizedApp }),
       }).catch(() => {});
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     }
@@ -259,6 +337,61 @@ export function approveApplication(
           // ignore
         }
       });
+    }
+
+    // If a Teacher (Professor) is approved, ensure their record is saved to teacher rosters
+    if (target.type === 'professor') {
+      try {
+        const rawAdmins = localStorage.getItem('ucore_admin_teachers');
+        const adminTeachers = rawAdmins ? JSON.parse(rawAdmins) : [];
+        const rawDirs = localStorage.getItem('ucore_director_teachers_v1');
+        const dirTeachers = rawDirs ? JSON.parse(rawDirs) : [];
+
+        const teacherSchool = target.schoolName || 'Escola Primária do Quéssua';
+        const teacherSubject = target.subject || 'Língua Portuguesa';
+        const teacherClass = target.gradeClass || '4ª Classe';
+        const teacherShift = 'Manhã';
+
+        const teacherEntry: any = {
+          id: target.userId || target.id,
+          name: target.fullName,
+          schoolName: teacherSchool,
+          subject: teacherSubject,
+          classAssigned: teacherClass,
+          gradeClass: teacherClass,
+          room: 'Sala 01',
+          turma: 'Turma A',
+          shift: teacherShift,
+          directorName: approverName,
+          status: 'Ativo',
+          email: target.email,
+          phone: target.phone,
+          qualification: complementaryData?.nivelAcademico || target.nivelAcademico || 'Licenciado',
+          gender: 'M',
+        };
+
+        const existingAdminIdx = adminTeachers.findIndex(
+          (t: any) => t.id === teacherEntry.id || (t.email && t.email.toLowerCase() === target.email.toLowerCase())
+        );
+        if (existingAdminIdx >= 0) {
+          adminTeachers[existingAdminIdx] = { ...adminTeachers[existingAdminIdx], ...teacherEntry };
+        } else {
+          adminTeachers.unshift(teacherEntry);
+        }
+        localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
+
+        const existingDirIdx = dirTeachers.findIndex(
+          (t: any) => t.id === teacherEntry.id || (t.email && t.email.toLowerCase() === target.email.toLowerCase())
+        );
+        if (existingDirIdx >= 0) {
+          dirTeachers[existingDirIdx] = { ...dirTeachers[existingDirIdx], ...teacherEntry };
+        } else {
+          dirTeachers.unshift(teacherEntry);
+        }
+        localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(dirTeachers));
+      } catch (err) {
+        console.warn('Erro ao integrar professor no quadro após aprovação:', err);
+      }
     }
 
     // Update active user in localStorage if matching

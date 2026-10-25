@@ -42,7 +42,9 @@ import {
   getPendingApplications,
   approveApplication,
   rejectApplication,
-  savePendingApplication
+  savePendingApplication,
+  syncApplicationsFromServer,
+  OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
 import { buildInitialDirectorDossier, saveDirector } from '../../../utils/directorStorage';
 import { Hero } from '../../Hero';
@@ -105,17 +107,42 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [simSchool, setSimSchool] = useState('');
   const [simBi, setSimBi] = useState('');
 
-  const loadApplications = () => {
-    const all = getPendingApplications();
-    // In admin approval center, show all applications where target is admin (School General Directors + Municipal Direction DME members)
-    const adminApps = all.filter(
-      (a) => a.targetApproverRole === 'admin' || a.type === 'diretor' || a.type === 'membro_dme'
-    );
-    setApplications(adminApps);
+  const loadApplications = async () => {
+    try {
+      const all = await syncApplicationsFromServer();
+      // In admin approval center, show all applications where target is admin (School General Directors + Municipal Direction DME members)
+      const adminApps = all.filter(
+        (a) =>
+          a.targetApproverRole === 'admin' ||
+          a.type === 'diretor' ||
+          a.type === 'membro_dme' ||
+          a.scope === 'administracao' ||
+          a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
+      );
+      setApplications(adminApps);
+    } catch {
+      const all = getPendingApplications();
+      const adminApps = all.filter(
+        (a) =>
+          a.targetApproverRole === 'admin' ||
+          a.type === 'diretor' ||
+          a.type === 'membro_dme' ||
+          a.scope === 'administracao' ||
+          a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
+      );
+      setApplications(adminApps);
+    }
   };
 
   useEffect(() => {
     loadApplications();
+    const handleSync = () => loadApplications();
+    window.addEventListener('sigre-data-synced', handleSync);
+    const interval = setInterval(loadApplications, 4500);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      clearInterval(interval);
+    };
   }, []);
 
   // Filtered applications

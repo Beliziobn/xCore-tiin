@@ -15,7 +15,14 @@ import {
   Loader2
 } from 'lucide-react';
 import type { UserAccount, PendingApplication } from '../../types';
-import { checkUserApprovalStatus, approveApplication, getPendingApplications, resolveSchoolDirectorName } from '../../utils/authApprovalStorage';
+import { 
+  checkUserApprovalStatus, 
+  approveApplication, 
+  getPendingApplications, 
+  resolveSchoolDirectorName,
+  syncApplicationsFromServer,
+  OFFICIAL_DME_ADMIN_EMAIL
+} from '../../utils/authApprovalStorage';
 import { SectionShader } from '../SectionShader';
 
 interface PendingApprovalPageProps {
@@ -50,6 +57,11 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     matchedApp?.scope === 'administracao' ||
     matchedApp?.type === 'membro_dme';
 
+  const isTeacher =
+    currentUser.role === 'professor' ||
+    currentUser.schoolRole === 'professor' ||
+    matchedApp?.type === 'professor';
+
   const isTargetAdmin = matchedApp
     ? matchedApp.targetApproverRole === 'admin'
     : currentUser.approverTargetRole
@@ -59,27 +71,61 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
   const targetSchool =
     matchedApp?.schoolName ||
     currentUser.schoolName ||
-    'Direcção Municipal da Educação do Quéssua';
+    'Complexo Escolar do Quéssua';
 
   const schoolDirectorName = !isTargetAdmin
     ? matchedApp?.approverDirectorName || resolveSchoolDirectorName(null, targetSchool)
-    : 'Administrador Central (DME)';
+    : `Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL})`;
 
   const approverRole = isTargetAdmin
-    ? 'Administrador Central (DME)'
-    : `Direção da ${targetSchool} (Diretor(a): ${schoolDirectorName})`;
+    ? `Administrador Central (DME) — ${OFFICIAL_DME_ADMIN_EMAIL}`
+    : `Direção da Escola: ${targetSchool} (Diretor(a): ${schoolDirectorName})`;
 
   const cargoDisplay =
     currentUser.cargoTitle ||
     matchedApp?.roleRequested ||
-    (isTargetAdmin ? 'Diretor(a) Geral' : 'Pessoal do Âmbito Escolar');
+    (isTeacher ? 'Professor(a) / Docente' : isTargetAdmin ? 'Membro da Direção Municipal' : 'Pessoal do Âmbito Escolar');
 
-  const handleCheckStatus = () => {
+  // Background polling to auto-detect approval by supervisor in real-time
+  React.useEffect(() => {
+    let isMounted = true;
+    const pollStatus = async () => {
+      try {
+        await syncApplicationsFromServer();
+        const res = checkUserApprovalStatus(currentUser.id, currentUser.email);
+        if (res.status === 'ativo' && isMounted) {
+          showToast?.(`A sua conta foi homologada por ${res.app?.approvedBy || approverRole}! A carregar o seu ambiente de trabalho...`);
+          const updated: UserAccount = {
+            ...currentUser,
+            status: 'ativo',
+          };
+          onApprovalConfirmed(updated);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    pollStatus();
+    const interval = setInterval(pollStatus, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentUser.id, currentUser.email, onApprovalConfirmed, showToast, approverRole]);
+
+  const handleCheckStatus = async () => {
     if (checking) return;
     setChecking(true);
     setIsClockAccelerated(true);
 
-    // Feedback visual contínuo com aceleração temporária do relógio (1.6s)
+    try {
+      await syncApplicationsFromServer();
+    } catch {
+      // ignore
+    }
+
+    // Continuous visual feedback with temporary clock acceleration
     setTimeout(() => {
       setIsClockAccelerated(false);
       setChecking(false);
@@ -87,18 +133,22 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       
       const res = checkUserApprovalStatus(currentUser.id, currentUser.email);
       if (res.status === 'ativo') {
-        showToast?.('Parabéns! A sua candidatura foi homologada. A carregar o seu painel...');
+        showToast?.('Parabéns! A sua conta foi homologada pelo seu responsável. A carregar o painel...');
         const updated: UserAccount = {
           ...currentUser,
           status: 'ativo',
         };
         onApprovalConfirmed(updated);
       } else if (res.status === 'rejeitado') {
-        showToast?.('Aviso: A sua inscrição requer retificação documental junto da secretaria.');
+        showToast?.('Aviso: A sua inscrição requer retificação documental junto do seu responsável.');
       } else {
-        showToast?.('A sua candidatura continua em análise pelos serviços competentes.');
+        showToast?.(
+          isTargetAdmin
+            ? `A sua candidatura continua na fila de despacho do Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}).`
+            : `A sua candidatura continua na fila de homologação do(a) Diretor(a) da escola (${schoolDirectorName}).`
+        );
       }
-    }, 1600);
+    }, 1200);
   };
 
   const handleSimulateInstantApproval = () => {
@@ -110,7 +160,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
         (a) => a.userId === currentUser.id || a.email.toLowerCase() === currentUser.email.toLowerCase()
       );
       const approverLabel = isTargetAdmin
-        ? 'Administrador Central (DME)'
+        ? `Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL})`
         : `${schoolDirectorName} (Direção da ${targetSchool})`;
       if (targetApp) {
         approveApplication(targetApp.id, approverLabel);
@@ -521,28 +571,29 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
               {isAdminScopeMember
                 ? `Inscrição da Direção Municipal — ${cargoDisplay}`
                 : isTargetAdmin
-                ? 'Candidatura de Diretor(a) Geral Escolar'
-                : `Inscrição do Âmbito Escolar — ${cargoDisplay}`}
+                ? 'Candidatura de Direção Geral Escolar'
+                : `Inscrição de Professor(a) / Docente — ${cargoDisplay}`}
             </h2>
           </div>
-          <p className="text-xs font-semibold text-amber-800 pl-6">
-            Encaminhada a: {approverRole}
-          </p>
-          <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal pl-6">
-            {isAdminScopeMember ? (
-              <>
-                A sua conta como membro da Direção Municipal (<strong>{cargoDisplay}</strong>) foi enviada ao <strong>Administrador Central (DME)</strong> para homologação oficial.
-              </>
-            ) : isTargetAdmin ? (
-              <>
-                Por critérios de segurança institucional da rede Sigre, a credenciação de <strong>Diretor(a) Geral</strong> da escola <strong>{targetSchool}</strong> é enviada ao <strong>Administrador Central (DME)</strong> para homologação.
-              </>
-            ) : (
-              <>
-                A sua inscrição como <strong>{cargoDisplay}</strong> foi enviada à Direção da escola selecionada (<strong>{targetSchool}</strong>), onde o(a) Diretor(a) responsável é <strong>{schoolDirectorName}</strong>, para aprovação e homologação.
-              </>
-            )}
-          </p>
+          <div className="pl-6 space-y-1">
+            <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+              <span>Mesa de Despacho Responsável:</span>
+              <span className="font-mono bg-amber-100/90 text-amber-950 px-2 py-0.5 rounded-md border border-amber-200">
+                {approverRole}
+              </span>
+            </p>
+            <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pt-1">
+              {isAdminScopeMember || isTargetAdmin ? (
+                <>
+                  A sua conta foi registada com sucesso na rede Sigre e encontra-se na fila de homologação do <strong>Administrador Central da Direção Municipal (dmedoquessua@gmail.com)</strong>. <em>Não parou em um vazio:</em> a sua ficha já está disponível no painel de despachos oficiais para validação e atribuição de permissões.
+                </>
+              ) : (
+                <>
+                  A sua conta de Professor(a) foi registada e encaminhada diretamente para a fila de homologação do(a) <strong>Diretor(a) da sua escola ({schoolDirectorName})</strong> na instituição <strong>{targetSchool}</strong>. <em>Não parou em um vazio:</em> o(a) seu(sua) Diretor(a) tem a sua inscrição ativa no painel de inscrições docentes para atribuir turma, sala e efectividade.
+                </>
+              )}
+            </p>
+          </div>
         </div>
 
         {/* Resumo da sua Solicitação (Stagger 5) */}

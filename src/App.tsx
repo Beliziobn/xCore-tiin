@@ -52,6 +52,7 @@ import {
   saveRegisteredSchool,
   syncSchoolsFromServer,
 } from './utils/schoolStorage';
+import { syncApplicationsFromServer } from './utils/authApprovalStorage';
 
 // Teacher & Student Pages
 import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
@@ -324,6 +325,7 @@ export default function App() {
         // ignore
       }
     };
+    syncApplicationsFromServer().catch(() => {});
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
     return () => {
