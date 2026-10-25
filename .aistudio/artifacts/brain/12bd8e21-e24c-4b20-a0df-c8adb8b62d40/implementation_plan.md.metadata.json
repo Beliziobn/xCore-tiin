@@ -1,6 +1,0 @@
-{
-  "summary":  "Plano de arquitetura e implementação para persistência rígida no banco de dados com isolamento por escola, proteção contra esvaziamento não autorizado restrito ao Super Admin Belízio com código de confirmação, e cofre de backups automáticos diários com botão de restauração instantânea de um clique.",
-  "updatedAt":  "2026-10-25T09:12:25.131428385Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

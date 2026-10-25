@@ -103,9 +103,6 @@ import { NotFoundPage } from './components/pages/NotFoundPage';
 import { ThankYouPage } from './components/pages/ThankYouPage';
 import { CasesPage } from './components/pages/CasesPage';
 import { DeclaracaoEfectividadePage } from './components/pages/DeclaracaoEfectividadePage';
-import { BackupManagerModal } from './components/modals/BackupManagerModal';
-import { QuickServicesModal } from './components/modals/QuickServicesModal';
-import { QuickRequestsManagementView } from './components/quick-services/QuickRequestsManagementView';
 
 import type { 
   EducationalModule, 
@@ -143,8 +140,6 @@ export default function App() {
   const [infoModalType, setInfoModalType] = useState<InfoModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
-  const [isGlobalBackupModalOpen, setIsGlobalBackupModalOpen] = useState(false);
-  const [isQuickServicesModalOpen, setIsQuickServicesModalOpen] = useState(false);
   const [thankYouConfig, setThankYouConfig] = useState<{
     type?: 'enrollment' | 'school-registration' | 'contact' | 'support' | 'general';
     title?: string;
@@ -1206,7 +1201,6 @@ export default function App() {
             onDirectLogin={(role) => handleDirectDemoLogin(role)}
             onOpenAbout={() => setInfoModalType('about')}
             onOpenSupport={() => setInfoModalType('support')}
-            onOpenQuickServices={() => setIsQuickServicesModalOpen(true)}
           />
         );
       }
@@ -1435,37 +1429,6 @@ export default function App() {
           }}
           showToast={showToast}
         />
-      );
-    }
-
-    // Quick Requests Views for Admin and Director
-    if (currentView === 'admin-servicos-rapidos' || currentView === 'servicos-rapidos') {
-      return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <QuickRequestsManagementView
-            currentUser={currentUser}
-            activeRole={activeRole as any}
-            schoolName={currentUser?.schoolName || ''}
-            onNavigateToDeclaracaoEfectividade={() => {
-              setCurrentView('efectividade');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            showToast={showToast}
-          />
-        </div>
-      );
-    }
-
-    if (currentView === 'diretor-servicos-rapidos') {
-      return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <QuickRequestsManagementView
-            currentUser={currentUser}
-            activeRole={activeRole as any}
-            schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
-            showToast={showToast}
-          />
-        </div>
       );
     }
 
@@ -2406,8 +2369,6 @@ export default function App() {
         }}
         onOpenDemoModal={() => setIsDemoModalOpen(true)}
         onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
-        onOpenBackupManager={() => setIsGlobalBackupModalOpen(true)}
-        onOpenQuickServices={() => setIsQuickServicesModalOpen(true)}
       />
 
       {/* Main Routed View with smooth page transitions */}
@@ -2650,20 +2611,6 @@ export default function App() {
         currentUser={currentUser}
         activeRole={activeRole}
         initialQuery={ragInitialQuery}
-      />
-
-      {/* Global Backup Vault & 1-Click Restoration Modal */}
-      <BackupManagerModal
-        isOpen={isGlobalBackupModalOpen}
-        onClose={() => setIsGlobalBackupModalOpen(false)}
-        currentUser={currentUser}
-      />
-
-      {/* Public Citizen Quick Services Modal (Zero Login Required) */}
-      <QuickServicesModal
-        isOpen={isQuickServicesModalOpen}
-        onClose={() => setIsQuickServicesModalOpen(false)}
-        availableSchools={adminSchools}
       />
     </div>
   );

@@ -37,8 +37,7 @@ import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg'
 import { verifyPassword, updatePassword } from '../../utils/passwordService';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole, AdminSchool } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
-import { googleSignIn, getGoogleUser, createGoogleUserSession } from '../../utils/googleAuth';
-import { GoogleAccountPickerModal } from '../modals/GoogleAccountPickerModal';
+import { googleSignIn, getGoogleUser } from '../../utils/googleAuth';
 import { 
   UCORE_MUNICIPALITIES, 
   UCORE_DISCIPLINAS, 
@@ -302,8 +301,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isGooglePickerOpen, setIsGooglePickerOpen] = useState(false);
-  const [googlePickerReason, setGooglePickerReason] = useState<'unauthorized-domain' | 'popup-blocked' | 'direct' | 'fallback'>('direct');
 
   // Keep selectedSchoolId synced with registeredSchools and auto-fill municipality from registered school data
   useEffect(() => {
@@ -362,16 +359,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     targetEmail: string,
     targetName: string,
     uid?: string,
-    photoURL?: string | null,
-    manualRoleHint?: string
+    photoURL?: string | null
   ) => {
     const cleanEmail = targetEmail.trim().toLowerCase();
     const isDirectorMunicipal =
       cleanEmail === 'dmedoquessua@gmail.com' ||
       cleanEmail.includes('dmedoquessua');
-    const isSuperAdmin =
-      cleanEmail === 'beliziodos20@gmail.com' ||
-      cleanEmail.includes('belizio');
 
     // Check approval application and rosters
     const approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
@@ -381,39 +374,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     let resolvedRole: 'admin' | 'diretor' | 'professor' = 'admin';
     let resolvedScope: 'escola' | 'administracao' = 'administracao';
     let resolvedSchoolRole: SchoolStaffRole | undefined = undefined;
-    let resolvedAdminRole: AdminStaffRole | undefined = 'admin_sistema';
-    let resolvedCargo = isSuperAdmin
-      ? 'Administrador de Sistema Sigre (Super Admin)'
-      : isDirectorMunicipal
+    let resolvedAdminRole: AdminStaffRole | undefined = 'diretor_municipal';
+    let resolvedCargo = isDirectorMunicipal
       ? 'Director Municipal da Educação de Quessua'
       : 'Utilizador Google';
-    let resolvedPrefix = isSuperAdmin ? 'Admin.' : isDirectorMunicipal ? 'Dr.' : 'Sr(a).';
-    let resolvedSchoolName: string | undefined = 'Direcção Municipal da Educação de Quessua';
+    let resolvedPrefix = isDirectorMunicipal ? 'Dr.' : 'Sr(a).';
+    let resolvedSchoolName: string | undefined = isDirectorMunicipal ? 'Direcção Municipal da Educação de Quessua' : undefined;
     let resolvedSchoolId: string | undefined = undefined;
 
     const names = targetName.trim().split(' ');
     let gFirst = names[0] || 'Utilizador';
     let gLast = names.slice(1).join(' ') || '';
 
-    if (isSuperAdmin) {
-      resolvedRole = 'admin';
-      resolvedScope = 'administracao';
-      resolvedAdminRole = 'admin_sistema';
-      resolvedCargo = 'Administrador de Sistema Sigre (Super Admin)';
-      resolvedPrefix = 'Admin.';
-      resolvedSchoolName = 'Direcção Municipal da Educação de Quessua';
-      gFirst = 'Belízio';
-      gLast = gLast && gLast !== 'Utilizador' && gLast !== 'Google' ? gLast : 'Administrador';
-    } else if (isDirectorMunicipal) {
-      resolvedRole = 'admin';
-      resolvedScope = 'administracao';
-      resolvedAdminRole = 'diretor_municipal';
-      resolvedCargo = 'Director Municipal da Educação de Quessua';
-      resolvedPrefix = 'Dr.';
-      resolvedSchoolName = 'Direcção Municipal da Educação de Quessua';
-      gFirst = 'Director Municipal';
-      gLast = 'da Educação';
-    } else if (approvalCheck.app) {
+    if (approvalCheck.app) {
       const app = approvalCheck.app;
       resolvedScope = app.scope || resolvedScope;
       resolvedSchoolRole = app.schoolRole;
@@ -456,30 +429,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         if (dNames[0]) gFirst = dNames[0];
         if (dNames.length > 1) gLast = dNames.slice(1).join(' ');
       }
-    } else if (manualRoleHint === 'professor') {
-      resolvedRole = 'professor';
-      resolvedScope = 'escola';
-      resolvedSchoolRole = 'professor';
-      resolvedAdminRole = undefined;
-      resolvedCargo = 'Professor(a) / Docente';
-      resolvedPrefix = 'Prof.';
-      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
-      resolvedSchoolId = registeredSchools[0]?.id;
-    } else if (manualRoleHint === 'diretor') {
-      resolvedRole = 'diretor';
-      resolvedScope = 'escola';
-      resolvedSchoolRole = 'diretor_geral';
-      resolvedAdminRole = undefined;
-      resolvedCargo = 'Director(a) Geral';
-      resolvedPrefix = 'Director';
-      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
-      resolvedSchoolId = registeredSchools[0]?.id;
+    } else if (isDirectorMunicipal) {
+      gFirst = 'Director Municipal';
+      gLast = 'da Educação';
     }
 
-    createGoogleUserSession(cleanEmail, `${gFirst} ${gLast}`.trim(), uid, photoURL);
-
     const googleAccount: UserAccount = {
-      id: uid || (isSuperAdmin ? 'usr_belizio_admin' : isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_google_' + Date.now()),
+      id: uid || (isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_google_' + Date.now()),
       firstName: gFirst,
       lastName: gLast,
       email: cleanEmail,
@@ -521,19 +477,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         );
         return;
       }
-      // If popup was blocked or domain not allowed, open the graceful account selector
-      setGooglePickerReason(
-        res.unauthorizedDomain
-          ? 'unauthorized-domain'
-          : res.popupBlocked
-          ? 'popup-blocked'
-          : 'fallback'
-      );
-      setIsGooglePickerOpen(true);
+      if (res.unauthorizedDomain) {
+        setErrorMsg('O domínio deste ambiente precisa de constar nos domínios autorizados no Firebase Authentication. Pode também aceder com o seu e-mail e senha da instituição.');
+        return;
+      }
+      if (res.error === 'auth/popup-blocked') {
+        setErrorMsg('A janela do Google foi bloqueada pelo navegador. Por favor, permita pop-ups nesta página para entrar com a conta Google.');
+        return;
+      }
+      if (res.error) {
+        setErrorMsg(`Não foi possível autenticar com o Google: ${res.error}`);
+      }
     } catch (err: any) {
-      console.warn('Google sign-in tentativa capturada:', err?.message || err);
-      setGooglePickerReason('fallback');
-      setIsGooglePickerOpen(true);
+      console.warn('Google sign-in erro:', err?.message || err);
+      setErrorMsg('Falha na comunicação com o serviço Google. Por favor, tente novamente.');
     } finally {
       setIsGoogleLoading(false);
     }
@@ -1223,23 +1180,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     </div>
                   </div>
 
-                  <div className="w-full flex flex-col items-center gap-1.5">
+                  <div className="w-full flex justify-center">
                     <GoogleSignInButton
                       onClick={handleGoogleSignInFlow}
                       isLoading={isGoogleLoading}
                       label="Continuar com o Google"
                       className="w-full justify-center"
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGooglePickerReason('direct');
-                        setIsGooglePickerOpen(true);
-                      }}
-                      className="text-[11px] font-semibold text-[#1a73e8] hover:underline cursor-pointer flex items-center gap-1 transition-colors mt-0.5"
-                    >
-                      <span>Problemas com o pop-up? Selecionar conta Google diretamente</span>
-                    </button>
                   </div>
 
                   {/* Switch to Register */}

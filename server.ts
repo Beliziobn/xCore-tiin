@@ -97,7 +97,6 @@ async function startServer() {
     students: any[];
     applications: any[];
     efectividade: any[];
-    quickRequests: any[];
     updatedAt: string;
   }
 
@@ -117,7 +116,6 @@ async function startServer() {
             students: Array.isArray(parsed.students) ? parsed.students : [],
             applications: Array.isArray(parsed.applications) ? parsed.applications : [],
             efectividade: Array.isArray(parsed.efectividade) ? parsed.efectividade : [],
-            quickRequests: Array.isArray(parsed.quickRequests) ? parsed.quickRequests : [],
             updatedAt: parsed.updatedAt || new Date().toISOString(),
           };
         }
@@ -132,7 +130,6 @@ async function startServer() {
       students: [],
       applications: [],
       efectividade: [],
-      quickRequests: [],
       updatedAt: new Date().toISOString(),
     };
   }
@@ -155,166 +152,6 @@ async function startServer() {
   if (!fs.existsSync(networkStoreFile)) {
     persistNetworkStore();
   }
-
-  // ============================================================================
-  // BACKUP ENGINE & DATA PRESERVATION VAULT (DAILY SNAPSHOTS & 1-CLICK RESTORE)
-  // ============================================================================
-  const backupsDir = path.join(networkDataDir, "backups");
-  if (!fs.existsSync(backupsDir)) {
-    fs.mkdirSync(backupsDir, { recursive: true });
-  }
-
-  interface BackupSnapshotMeta {
-    id: string;
-    filename: string;
-    timestamp: string;
-    isoDate: string;
-    label: string;
-    actor: string;
-    stats: {
-      schools: number;
-      directors: number;
-      teachers: number;
-      students: number;
-      applications: number;
-      efectividade: number;
-      totalRecords: number;
-    };
-    sizeBytes: number;
-  }
-
-  function createBackupSnapshot(label: string = "manual", actor: string = "sistema"): BackupSnapshotMeta | null {
-    try {
-      if (!fs.existsSync(backupsDir)) {
-        fs.mkdirSync(backupsDir, { recursive: true });
-      }
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const dateSlug = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      const cleanLabel = label.replace(/[^a-zA-Z0-9-_]/g, '_');
-      const filename = `sigre-backup_${dateSlug}_${cleanLabel}.json`;
-      const filePath = path.join(backupsDir, filename);
-
-      const stats = {
-        schools: (networkStore.schools || []).length,
-        directors: (networkStore.directors || []).length,
-        teachers: (networkStore.teachers || []).length,
-        students: (networkStore.students || []).length,
-        applications: (networkStore.applications || []).length,
-        efectividade: (networkStore.efectividade || []).length,
-        quickRequests: (networkStore.quickRequests || []).length,
-        totalRecords:
-          (networkStore.schools || []).length +
-          (networkStore.teachers || []).length +
-          (networkStore.students || []).length +
-          (networkStore.efectividade || []).length +
-          (networkStore.quickRequests || []).length,
-      };
-
-      const payload = {
-        meta: {
-          id: `bkp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-          filename,
-          timestamp: now.toISOString(),
-          label,
-          actor,
-          stats,
-        },
-        store: {
-          schools: networkStore.schools || [],
-          directors: networkStore.directors || [],
-          teachers: networkStore.teachers || [],
-          students: networkStore.students || [],
-          applications: networkStore.applications || [],
-          efectividade: networkStore.efectividade || [],
-          quickRequests: networkStore.quickRequests || [],
-          updatedAt: networkStore.updatedAt,
-        },
-      };
-
-      const content = JSON.stringify(payload, null, 2);
-      fs.writeFileSync(filePath, content, "utf-8");
-
-      return {
-        id: payload.meta.id,
-        filename,
-        timestamp: payload.meta.timestamp,
-        isoDate: now.toLocaleDateString("pt-PT"),
-        label,
-        actor,
-        stats,
-        sizeBytes: Buffer.byteLength(content, "utf-8"),
-      };
-    } catch (err) {
-      console.error("[Backup] Failed to create snapshot:", err);
-      return null;
-    }
-  }
-
-  function listBackupSnapshots(): BackupSnapshotMeta[] {
-    try {
-      if (!fs.existsSync(backupsDir)) return [];
-      const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith(".json"));
-      const list: BackupSnapshotMeta[] = [];
-
-      for (const file of files) {
-        try {
-          const fullPath = path.join(backupsDir, file);
-          const stat = fs.statSync(fullPath);
-          const raw = fs.readFileSync(fullPath, "utf-8");
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.meta) {
-            list.push({
-              id: parsed.meta.id || file,
-              filename: file,
-              timestamp: parsed.meta.timestamp || stat.mtime.toISOString(),
-              isoDate: new Date(parsed.meta.timestamp || stat.mtime).toLocaleString("pt-PT"),
-              label: parsed.meta.label || "Snapshot",
-              actor: parsed.meta.actor || "sistema",
-              stats: parsed.meta.stats || {
-                schools: parsed.store?.schools?.length || 0,
-                directors: parsed.store?.directors?.length || 0,
-                teachers: parsed.store?.teachers?.length || 0,
-                students: parsed.store?.students?.length || 0,
-                applications: parsed.store?.applications?.length || 0,
-                efectividade: parsed.store?.efectividade?.length || 0,
-                totalRecords:
-                  (parsed.store?.schools?.length || 0) +
-                  (parsed.store?.teachers?.length || 0) +
-                  (parsed.store?.students?.length || 0) +
-                  (parsed.store?.efectividade?.length || 0),
-              },
-              sizeBytes: stat.size,
-            });
-          }
-        } catch (e) {
-          console.warn("[Backup] Could not parse backup file:", file, e);
-        }
-      }
-
-      return list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    } catch (err) {
-      console.error("[Backup] Failed to list backups:", err);
-      return [];
-    }
-  }
-
-  function checkDailyBackup() {
-    try {
-      if (!fs.existsSync(backupsDir)) {
-        fs.mkdirSync(backupsDir, { recursive: true });
-      }
-      const todayPrefix = `sigre-backup_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
-      const files = fs.readdirSync(backupsDir);
-      const existsToday = files.some((f) => f.startsWith(todayPrefix));
-      if (!existsToday) {
-        createBackupSnapshot("diario-automatico", "sistema");
-      }
-    } catch (e) {
-      console.warn("[Backup] checkDailyBackup error:", e);
-    }
-  }
-  checkDailyBackup();
 
   function upsertByKey(list: any[], incomingItems: any[], getKey: (item: any) => string): any[] {
     const map = new Map<string, any>();
@@ -608,27 +445,14 @@ async function startServer() {
   });
 
   // ============================================================================
-  // EFECTIVIDADE & CADASTRAMENTO DE PESSOAL (SHARED, ISOLATED & RIGID DATABASE)
-  // Ensures personnel cadastros persist on disk, with strict Belízio wipe guards
+  // EFECTIVIDADE & CADASTRAMENTO DE PESSOAL (SHARED & PERSISTENT DATA)
+  // Ensures personnel cadastros persist on disk and are shared across all sessions/admin
   // ============================================================================
   app.get("/api/efectividade", (req, res) => {
-    const schoolQuery = String(req.query.school || req.query.schoolId || "").trim().toLowerCase();
-    const userEmail = String(req.headers["x-user-email"] || req.query.email || "").trim().toLowerCase();
-
-    let records = networkStore.efectividade || [];
-
-    // Isolation: If a school filter is provided and the caller is not the Super Admin Belízio, scope results
-    if (schoolQuery && schoolQuery !== "all" && userEmail !== "beliziodos20@gmail.com") {
-      records = records.filter((r) => {
-        const sc = String(r.escola || r.schoolId || "").toLowerCase();
-        return sc.includes(schoolQuery) || schoolQuery.includes(sc);
-      });
-    }
-
     res.json({
       success: true,
-      records,
-      count: records.length,
+      records: networkStore.efectividade || [],
+      count: (networkStore.efectividade || []).length,
       updatedAt: networkStore.updatedAt,
     });
   });
@@ -659,26 +483,14 @@ async function startServer() {
     });
   });
 
-  // Individual record deletion: matches ID, BI, or Agente so the specific record is permanently deleted
   app.delete("/api/efectividade/:id", (req, res) => {
     const targetId = String(req.params.id || "").trim();
-    if (Array.isArray(networkStore.efectividade) && targetId) {
-      const initialCount = networkStore.efectividade.length;
-      networkStore.efectividade = networkStore.efectividade.filter((r) => {
-        const rId = String(r.id || "").trim();
-        const rBi = String(r.bi || "").trim().toUpperCase();
-        const rAgente = String(r.agente || "").trim();
-        if (rId === targetId || rBi === targetId.toUpperCase() || rAgente === targetId) {
-          return false;
-        }
-        return true;
-      });
-
-      if (networkStore.efectividade.length !== initialCount) {
-        persistNetworkStore();
-      }
+    if (Array.isArray(networkStore.efectividade)) {
+      networkStore.efectividade = networkStore.efectividade.filter(
+        (r) => String(r.id || "").trim() !== targetId
+      );
+      persistNetworkStore();
     }
-
     res.json({
       success: true,
       records: networkStore.efectividade || [],
@@ -687,300 +499,15 @@ async function startServer() {
     });
   });
 
-  // Bulk wipe protection: STRICTLY RESTRICTED TO BELÍZIO WITH CONFIRMATION CODE
   app.delete("/api/efectividade", (req, res) => {
-    const adminEmail = String(
-      req.headers["x-admin-email"] || req.query.adminEmail || req.body?.adminEmail || ""
-    ).trim().toLowerCase();
-    const confirmationCode = String(
-      req.headers["x-confirmation-code"] || req.query.confirmationCode || req.body?.confirmationCode || ""
-    ).trim();
-
-    // Verification guard
-    if (adminEmail !== "beliziodos20@gmail.com" || confirmationCode !== "SIGRE-BELIZIO-2026") {
-      return res.status(403).json({
-        success: false,
-        error: "Acesso Negado: Apenas o Administrador Máximo (beliziodos20@gmail.com) tem permissão para esvaziar a base de dados mediante o código de autorização 'SIGRE-BELIZIO-2026'.",
-      });
-    }
-
-    // Capture safety snapshot before wipe so data can NEVER be permanently lost!
-    createBackupSnapshot("pre-esvaziamento-efectividade", adminEmail);
-
     networkStore.efectividade = [];
     persistNetworkStore();
-
     res.json({
       success: true,
-      message: "Base de dados de efectividade esvaziada pelo Administrador Máximo. Ponto de restauração gerado com sucesso.",
       records: [],
       count: 0,
       updatedAt: networkStore.updatedAt,
     });
-  });
-
-  // ============================================================================
-  // SERVIÇOS RÁPIDOS (SELF-SERVICE / PEDIDOS PÚBLICOS SEM LOGIN)
-  // ============================================================================
-  app.get("/api/quick-requests", (req, res) => {
-    let requests = Array.isArray(networkStore.quickRequests) ? networkStore.quickRequests : [];
-    const { schoolId, targetRole, protocol, phone, id } = req.query as Record<string, string>;
-
-    if (id) {
-      requests = requests.filter((r) => String(r.id) === String(id));
-    }
-    if (protocol) {
-      const cleanProt = String(protocol).trim().toUpperCase();
-      requests = requests.filter((r) => String(r.protocol || '').toUpperCase() === cleanProt);
-    }
-    if (phone) {
-      const cleanPhone = String(phone).replace(/\D/g, '');
-      requests = requests.filter((r) => String(r.requesterPhone || '').replace(/\D/g, '').includes(cleanPhone));
-    }
-    if (schoolId) {
-      requests = requests.filter((r) => String(r.targetSchoolId || '') === String(schoolId));
-    }
-    if (targetRole) {
-      requests = requests.filter((r) => String(r.targetRole || '').toUpperCase() === String(targetRole).toUpperCase());
-    }
-
-    res.json({
-      success: true,
-      requests,
-      count: requests.length,
-      updatedAt: networkStore.updatedAt,
-    });
-  });
-
-  app.post("/api/quick-requests", (req, res) => {
-    const data = req.body || {};
-    if (!data.requesterName || !data.serviceType) {
-      return res.status(400).json({ success: false, error: "Nome do requerente e tipo de serviço são obrigatórios." });
-    }
-
-    if (!Array.isArray(networkStore.quickRequests)) {
-      networkStore.quickRequests = [];
-    }
-
-    const pad = (n: number) => String(n).padStart(4, '0');
-    const randomCode = pad(Math.floor(1000 + Math.random() * 9000));
-    const now = new Date();
-    const protocol = `SR-2026-${randomCode}`;
-    const id = `req_${Date.now()}_${randomCode}`;
-
-    // Target routing logic:
-    // If Boletim de Notas or Matricula or Transferencia -> Routes to the school's Director
-    // If Declaracao de Efectividade -> Routes to Admin Belízio
-    let targetRole: 'DIRECTOR' | 'ADMIN' = 'ADMIN';
-    if (
-      data.serviceType === 'BOLETIM_NOTAS' ||
-      data.serviceType === 'DECLARACAO_MATRICULA' ||
-      data.serviceType === 'GUIA_TRANSFERENCIA'
-    ) {
-      targetRole = 'DIRECTOR';
-    } else if (data.serviceType === 'DECLARACAO_EFECTIVIDADE') {
-      targetRole = 'ADMIN';
-    }
-
-    // Try to resolve Director email if schoolId or schoolName is provided
-    let resolvedDirectorEmail = data.targetDirectorEmail || '';
-    if (targetRole === 'DIRECTOR' && (data.targetSchoolId || data.targetSchoolName)) {
-      const school = (networkStore.schools || []).find((s) => 
-        (data.targetSchoolId && s.id === data.targetSchoolId) ||
-        (data.targetSchoolName && s.name?.toLowerCase().includes(String(data.targetSchoolName).toLowerCase()))
-      );
-      if (school) {
-        resolvedDirectorEmail = school.directorEmail || '';
-      }
-    }
-
-    const newRequest = {
-      id,
-      protocol,
-      serviceType: data.serviceType,
-      title: data.title || (data.serviceType === 'BOLETIM_NOTAS' ? 'Pedido de Boletim de Notas' : 'Declaração de Efectividade'),
-      status: 'PENDENTE',
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      requesterName: String(data.requesterName || '').trim(),
-      requesterPhone: String(data.requesterPhone || '').trim(),
-      requesterEmail: String(data.requesterEmail || '').trim(),
-      requesterRoleTitle: String(data.requesterRoleTitle || (data.serviceType === 'BOLETIM_NOTAS' ? 'Encarregado de Educação' : 'Docente / Funcionário')).trim(),
-      targetRole,
-      targetSchoolId: data.targetSchoolId || '',
-      targetSchoolName: data.targetSchoolName || '',
-      targetDirectorEmail: resolvedDirectorEmail,
-      targetAdminEmail: 'beliziodos20@gmail.com',
-      details: data.details || {},
-    };
-
-    networkStore.quickRequests.unshift(newRequest);
-    persistNetworkStore();
-
-    res.json({
-      success: true,
-      message: targetRole === 'DIRECTOR' 
-        ? `Pedido registado com sucesso e encaminhado diretamente ao Diretor Escolar da escola ${newRequest.targetSchoolName || 'selecionada'}.`
-        : `Pedido registado com sucesso e encaminhado diretamente ao Gabinete do Administrador Municipal (Belízio).`,
-      request: newRequest,
-      protocol: newRequest.protocol,
-    });
-  });
-
-  app.patch("/api/quick-requests/:id", (req, res) => {
-    const id = String(req.params.id || "").trim();
-    if (!Array.isArray(networkStore.quickRequests)) {
-      networkStore.quickRequests = [];
-    }
-
-    const index = networkStore.quickRequests.findIndex((r) => r.id === id);
-    if (index === -1) {
-      return res.status(404).json({ success: false, error: "Pedido não encontrado." });
-    }
-
-    const existing = networkStore.quickRequests[index];
-    const { status, responseMessage, resolvedBy, details } = req.body || {};
-
-    const updated = {
-      ...existing,
-      status: status || existing.status,
-      updatedAt: new Date().toISOString(),
-      details: {
-        ...(existing.details || {}),
-        ...(details || {}),
-        responseMessage: responseMessage !== undefined ? responseMessage : existing.details?.responseMessage,
-        resolvedBy: resolvedBy !== undefined ? resolvedBy : existing.details?.resolvedBy,
-        resolvedAt: status === 'CONCLUIDO' || status === 'REJEITADO' ? new Date().toISOString() : existing.details?.resolvedAt,
-      },
-    };
-
-    networkStore.quickRequests[index] = updated;
-    persistNetworkStore();
-
-    res.json({
-      success: true,
-      request: updated,
-    });
-  });
-
-  app.delete("/api/quick-requests/:id", (req, res) => {
-    const id = String(req.params.id || "").trim();
-    if (!Array.isArray(networkStore.quickRequests)) {
-      networkStore.quickRequests = [];
-    }
-
-    const prevCount = networkStore.quickRequests.length;
-    networkStore.quickRequests = networkStore.quickRequests.filter((r) => r.id !== id);
-    if (networkStore.quickRequests.length !== prevCount) {
-      persistNetworkStore();
-    }
-
-    res.json({
-      success: true,
-      count: networkStore.quickRequests.length,
-    });
-  });
-
-  // ============================================================================
-  // BACKUP MANAGEMENT & RESTORATION API (1-CLICK RESTORE & DAILY SNAPSHOTS)
-  // ============================================================================
-  app.get("/api/backup/list", (req, res) => {
-    const backups = listBackupSnapshots();
-    res.json({
-      success: true,
-      count: backups.length,
-      backups,
-      currentStats: {
-        schools: (networkStore.schools || []).length,
-        directors: (networkStore.directors || []).length,
-        teachers: (networkStore.teachers || []).length,
-        students: (networkStore.students || []).length,
-        efectividade: (networkStore.efectividade || []).length,
-      },
-    });
-  });
-
-  app.post("/api/backup/create", (req, res) => {
-    const { label = "manual", actorEmail = "beliziodos20@gmail.com" } = req.body || {};
-    const snapshot = createBackupSnapshot(label, actorEmail);
-    if (!snapshot) {
-      return res.status(500).json({ success: false, error: "Falha ao gravar snapshot de backup no disco." });
-    }
-    res.json({
-      success: true,
-      message: "Ponto de restauração gravado com sucesso no cofre de segurança.",
-      backup: snapshot,
-    });
-  });
-
-  app.post("/api/backup/restore", (req, res) => {
-    const { backupId, filename, adminEmail, confirmationCode } = req.body || {};
-    const cleanEmail = String(adminEmail || "").trim().toLowerCase();
-    const cleanCode = String(confirmationCode || "").trim();
-
-    if (cleanEmail !== "beliziodos20@gmail.com" || cleanCode !== "SIGRE-BELIZIO-2026") {
-      return res.status(403).json({
-        success: false,
-        error: "Acesso Negado: A restauração da base de dados requer a conta do Administrador Máximo (beliziodos20@gmail.com) e o código de autorização 'SIGRE-BELIZIO-2026'.",
-      });
-    }
-
-    try {
-      const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith(".json"));
-      let targetFile = files.find((f) => f === filename);
-
-      if (!targetFile && backupId) {
-        for (const f of files) {
-          const raw = fs.readFileSync(path.join(backupsDir, f), "utf-8");
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.meta && parsed.meta.id === backupId) {
-            targetFile = f;
-            break;
-          }
-        }
-      }
-
-      if (!targetFile) {
-        return res.status(404).json({ success: false, error: "Ponto de backup não encontrado no cofre." });
-      }
-
-      // Automatically capture snapshot of current state before applying restore
-      createBackupSnapshot("pre-restauracao-segura", cleanEmail);
-
-      const backupRaw = fs.readFileSync(path.join(backupsDir, targetFile), "utf-8");
-      const backupData = JSON.parse(backupRaw);
-
-      if (!backupData || !backupData.store) {
-        return res.status(400).json({ success: false, error: "Arquivo de backup corrompido ou inválido." });
-      }
-
-      // Restore in memory
-      networkStore.schools = Array.isArray(backupData.store.schools) ? backupData.store.schools : [];
-      networkStore.directors = Array.isArray(backupData.store.directors) ? backupData.store.directors : [];
-      networkStore.teachers = Array.isArray(backupData.store.teachers) ? backupData.store.teachers : [];
-      networkStore.students = Array.isArray(backupData.store.students) ? backupData.store.students : [];
-      networkStore.applications = Array.isArray(backupData.store.applications) ? backupData.store.applications : [];
-      networkStore.efectividade = Array.isArray(backupData.store.efectividade) ? backupData.store.efectividade : [];
-      networkStore.quickRequests = Array.isArray(backupData.store.quickRequests) ? backupData.store.quickRequests : [];
-      networkStore.updatedAt = new Date().toISOString();
-
-      persistNetworkStore();
-
-      res.json({
-        success: true,
-        message: "Base de dados restaurada com sucesso!",
-        restoredFrom: targetFile,
-        stats: {
-          schools: networkStore.schools.length,
-          teachers: networkStore.teachers.length,
-          students: networkStore.students.length,
-          efectividade: networkStore.efectividade.length,
-        },
-      });
-    } catch (err: any) {
-      console.error("[Backup] Restore error:", err);
-      res.status(500).json({ success: false, error: err?.message || "Erro interno ao restaurar backup." });
-    }
   });
 
   // Audit Logs API (Append-only & Query with limits)

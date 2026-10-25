@@ -22,13 +22,10 @@ import {
   Info,
   Clock,
   BadgeCheck,
-  UserCheck,
-  Archive,
-  Lock
+  UserCheck
 } from 'lucide-react';
 import { Hero } from '../Hero';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
-import { BackupManagerModal } from '../modals/BackupManagerModal';
 import type { UserAccount } from '../../types';
 import {
   CadastramentoEfectividadeRecord,
@@ -134,15 +131,11 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Database search, filters & safety backup states
+  // Database search and filters
   const [searchQuery, setSearchQuery] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
   const [recordToDelete, setRecordToDelete] = useState<{ id: string; nome: string } | null>(null);
   const [showClearAllModal, setShowClearAllModal] = useState(false);
-  const [clearAllConfirmationCode, setClearAllConfirmationCode] = useState('');
-  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
-
-  const isSuperAdmin = currentUser?.email?.toLowerCase().trim() === 'beliziodos20@gmail.com';
 
   const reloadRecords = () => {
     setRecords(getStoredEfectividadeRecords());
@@ -158,11 +151,9 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
     const handler = () => reloadRecords();
     window.addEventListener('sigre-efectividade-updated', handler);
-    window.addEventListener('sigre-database-restored', handler);
     window.addEventListener('storage', handler);
     return () => {
       window.removeEventListener('sigre-efectividade-updated', handler);
-      window.removeEventListener('sigre-database-restored', handler);
       window.removeEventListener('storage', handler);
     };
   }, []);
@@ -387,36 +378,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       showToast('A base de dados já se encontra vazia.');
       return;
     }
-    if (!isSuperAdmin) {
-      showToast('Apenas o Administrador Máximo (beliziodos20@gmail.com) tem autorização para esvaziar a base de dados.');
-      return;
-    }
-    setClearAllConfirmationCode('');
     setShowClearAllModal(true);
   };
 
-  const executeClearDatabase = async () => {
-    if (!isSuperAdmin) {
-      showToast('Apenas o Administrador Máximo (beliziodos20@gmail.com) tem permissão para esta ação.');
-      setShowClearAllModal(false);
-      return;
-    }
-
-    if (clearAllConfirmationCode.trim() !== 'SIGRE-BELIZIO-2026') {
-      showToast('Código de autorização inválido. Digite SIGRE-BELIZIO-2026.');
-      return;
-    }
-
-    const res = await clearAllEfectividadeRecords('beliziodos20@gmail.com', 'SIGRE-BELIZIO-2026');
-    if (res.success) {
-      setRecords([]);
-      setSelectedRecordForView(null);
-      setShowClearAllModal(false);
-      setClearAllConfirmationCode('');
-      showToast('Base de dados esvaziada pelo Administrador Máximo. Ponto de segurança salvo no cofre.');
-    } else {
-      showToast(res.error || 'Erro ao esvaziar base de dados.');
-    }
+  const executeClearDatabase = () => {
+    clearAllEfectividadeRecords();
+    setRecords([]);
+    setSelectedRecordForView(null);
+    setShowClearAllModal(false);
+    showToast('Base de dados de pessoal esvaziada com sucesso.');
   };
 
   const handlePrintDocument = () => {
@@ -1191,22 +1161,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsBackupModalOpen(true)}
-                    className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-xs cursor-pointer transition-colors"
-                    title="Cofre de backups diários e restauração de dados para segurança máxima"
-                  >
-                    <Archive className="w-4 h-4 text-emerald-400" />
-                    <span>Cofre de Backups & Restaurar</span>
-                  </button>
-
-                  {isSuperAdmin && records.length > 0 && (
+                  {records.length > 0 && (
                     <button
                       type="button"
                       onClick={handleClearDatabase}
                       className="h-11 px-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs sm:text-sm font-bold flex items-center gap-2 border border-red-200 cursor-pointer transition-colors"
-                      title="Eliminar todos os cadastros existentes na base de dados (Exclusivo Belízio)"
+                      title="Eliminar todos os cadastros existentes na base de dados"
                     >
                       <Trash2 className="w-4 h-4 text-red-600" />
                       <span>Esvaziar Base de Dados</span>
@@ -1594,7 +1554,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         </div>
       )}
 
-      {/* Modal de Confirmação para Esvaziar Toda a Base de Dados (Exclusivo Belízio) */}
+      {/* Modal de Confirmação para Esvaziar Toda a Base de Dados */}
       {showClearAllModal && (
         <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-150">
@@ -1603,42 +1563,21 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             </div>
 
             <div className="text-center space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-900 text-[11px] font-bold">
-                <Lock className="w-3.5 h-3.5" />
-                <span>Autorização do Administrador Máximo</span>
-              </div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight">
                 Esvaziar Toda a Base de Dados?
               </h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 Tem a certeza que deseja eliminar <strong>todos os {records.length} funcionários cadastrados</strong> da base de dados?
               </p>
-              <div className="text-[11px] text-red-800 bg-red-50 p-3 rounded-2xl border border-red-200 text-left space-y-2 font-medium">
-                <p>
-                  Por segurança, um <strong>ponto de restauração de segurança</strong> será criado no cofre antes da limpeza.
-                </p>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-red-900 mb-1">
-                    Digite o código de autorização: <span className="font-mono text-red-700">SIGRE-BELIZIO-2026</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={clearAllConfirmationCode}
-                    onChange={(e) => setClearAllConfirmationCode(e.target.value)}
-                    placeholder="SIGRE-BELIZIO-2026"
-                    className="w-full h-9 px-3 rounded-lg border border-red-300 bg-white text-xs font-mono font-bold text-slate-900 outline-none focus:border-red-600"
-                  />
-                </div>
-              </div>
+              <p className="text-[11px] text-red-700 bg-red-50 p-2.5 rounded-xl border border-red-200 text-left font-medium">
+                Aviso: Esta ação é definitiva e apagará todos os cadastros de pessoal guardados nesta base de dados.
+              </p>
             </div>
 
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowClearAllModal(false);
-                  setClearAllConfirmationCode('');
-                }}
+                onClick={() => setShowClearAllModal(false)}
                 className="flex-1 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
               >
                 Cancelar
@@ -1646,8 +1585,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               <button
                 type="button"
                 onClick={executeClearDatabase}
-                disabled={clearAllConfirmationCode.trim() !== 'SIGRE-BELIZIO-2026'}
-                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-xs sm:text-sm font-bold transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Esvaziar Tudo</span>
@@ -1656,14 +1594,6 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           </div>
         </div>
       )}
-
-      {/* Modal do Cofre de Backups e Restauração Instantânea */}
-      <BackupManagerModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-        currentUser={currentUser}
-        onRestoreComplete={reloadRecords}
-      />
     </div>
   );
 };
