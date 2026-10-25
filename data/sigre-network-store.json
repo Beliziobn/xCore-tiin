@@ -5,5 +5,61 @@
   "students": [],
   "applications": [],
   "efectividade": [],
-  "updatedAt": "2026-10-23T11:49:02.662Z"
+  "quickRequests": [
+    {
+      "id": "req_1792921452811_7547",
+      "protocol": "SR-2026-7547",
+      "serviceType": "DECLARACAO_EFECTIVIDADE",
+      "title": "Declaração de Efectividade",
+      "status": "PENDENTE",
+      "createdAt": "2026-10-25T09:44:12.811Z",
+      "updatedAt": "2026-10-25T09:44:12.811Z",
+      "requesterName": "Augusto Miranda",
+      "requesterPhone": "931223344",
+      "requesterEmail": "",
+      "requesterRoleTitle": "Docente / Funcionário",
+      "targetRole": "ADMIN",
+      "targetSchoolId": "",
+      "targetSchoolName": "",
+      "targetDirectorEmail": "",
+      "targetAdminEmail": "beliziodos20@gmail.com",
+      "details": {
+        "employeeName": "Augusto Miranda",
+        "employeeBi": "001928374ME042",
+        "employeeAgente": "AG-9281",
+        "employeeSchoolOrDepartment": "Escola Primária nº 4 do Quêssua",
+        "employeeCategory": "Professor do Iº Ciclo",
+        "referenceMonthYear": "Fevereiro / 2026",
+        "purpose": "Fins Bancários / Crédito Habitação"
+      }
+    },
+    {
+      "id": "req_1792921439067_4540",
+      "protocol": "SR-2026-4540",
+      "serviceType": "BOLETIM_NOTAS",
+      "title": "Pedido de Boletim de Notas",
+      "status": "CONCLUIDO",
+      "createdAt": "2026-10-25T09:43:59.067Z",
+      "updatedAt": "2026-10-25T09:44:20.906Z",
+      "requesterName": "Pedro Sebastião",
+      "requesterPhone": "923456789",
+      "requesterEmail": "",
+      "requesterRoleTitle": "Encarregado de Educação",
+      "targetRole": "DIRECTOR",
+      "targetSchoolId": "",
+      "targetSchoolName": "Complexo Escolar do Quêssua",
+      "targetDirectorEmail": "",
+      "targetAdminEmail": "beliziodos20@gmail.com",
+      "details": {
+        "studentName": "Mateus Sebastião",
+        "studentClasse": "8ª Classe",
+        "studentTurma": "A",
+        "trimestre": "1º Trimestre",
+        "responseMessage": "Boletim emitido com sucesso e assinado pelo Diretor Geral. Disponível na secretaria.",
+        "resolvedBy": "Fert Horlan (Diretor Geral)",
+        "resolvedAt": "2026-10-25T09:44:20.906Z"
+      }
+    }
+  ],
+  "updatedAt": "2026-10-25T09:44:20.907Z"
 }

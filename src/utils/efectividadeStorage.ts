@@ -64,6 +64,41 @@ export const ANGOLA_PROVINCIAS = [
 ];
 
 const STORAGE_KEY_EFECTIVIDADE = 'sigre_cadastramento_efectividade_v2';
+const STORAGE_KEY_DELETED = 'sigre_deleted_efectividade_ids_v2';
+
+function getDeletedIds(): Set<string> {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function addDeletedId(id: string) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const set = getDeletedIds();
+    set.add(id);
+    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(set)));
+  } catch {
+    // ignore
+  }
+}
+
+function removeDeletedId(id: string) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const set = getDeletedIds();
+    set.delete(id);
+    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(set)));
+  } catch {
+    // ignore
+  }
+}
 
 // Empty default records: personnel is registered exclusively via the form
 const INITIAL_EFECTIVIDADE_RECORDS: CadastramentoEfectividadeRecord[] = [];
@@ -88,7 +123,8 @@ export function getStoredEfectividadeRecords(): CadastramentoEfectividadeRecord[
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed;
+      const deleted = getDeletedIds();
+      return parsed.filter((r) => r && r.id && !deleted.has(r.id));
     }
     return [];
   } catch (err) {
@@ -99,33 +135,68 @@ export function getStoredEfectividadeRecords(): CadastramentoEfectividadeRecord[
 
 /**
  * Empty all registered personnel records in the database
+ * Strictly restricted to Super Admin Belízio with the master confirmation code
  */
-export function clearAllEfectividadeRecords(): void {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify([]));
-    window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { cleared: true } }));
+export async function clearAllEfectividadeRecords(
+  adminEmail: string = 'beliziodos20@gmail.com',
+  confirmationCode: string = 'SIGRE-BELIZIO-2026'
+): Promise<{ success: boolean; error?: string }> {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return { success: false, error: 'Ambiente sem suporte a armazenamento local.' };
+  }
 
-    // Clear server persistent store
-    fetch('/api/efectividade', {
+  if (adminEmail !== 'beliziodos20@gmail.com' || confirmationCode !== 'SIGRE-BELIZIO-2026') {
+    return {
+      success: false,
+      error: 'Operação não autorizada. Apenas o Administrador Máximo (beliziodos20@gmail.com) tem permissão de esvaziamento.',
+    };
+  }
+
+  try {
+    // Send authenticated wipe command to server
+    const res = await fetch('/api/efectividade', {
       method: 'DELETE',
-    }).catch(() => {});
-  } catch (err) {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-email': adminEmail,
+        'x-confirmation-code': confirmationCode,
+      },
+      body: JSON.stringify({ adminEmail, confirmationCode }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || 'Falha ao esvaziar base de dados no servidor.' };
+    }
+
+    localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify([]));
+    localStorage.removeItem(STORAGE_KEY_DELETED);
+    window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { cleared: true } }));
+    return { success: true };
+  } catch (err: any) {
     console.error('Erro ao esvaziar base de dados:', err);
+    return { success: false, error: err?.message || 'Falha na comunicação com o servidor.' };
   }
 }
 
 /**
  * Synchronizes efectividade personnel records with the shared server database.
  * Ensures data is fixed, persistent, and accessible across multiple users and admin accounts.
+ * Anti-resurrection safeguard: prevents deleted records from reappearing.
  */
-export async function syncEfectividadeFromServer(): Promise<CadastramentoEfectividadeRecord[]> {
+export async function syncEfectividadeFromServer(schoolFilter?: string): Promise<CadastramentoEfectividadeRecord[]> {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return [];
   }
   try {
     const localRecords = getStoredEfectividadeRecords();
-    const res = await fetch('/api/efectividade');
+    const deletedIds = getDeletedIds();
+
+    const url = schoolFilter && schoolFilter !== 'ALL'
+      ? `/api/efectividade?school=${encodeURIComponent(schoolFilter)}`
+      : '/api/efectividade';
+
+    const res = await fetch(url);
     if (!res.ok) {
       return localRecords;
     }
@@ -134,18 +205,21 @@ export async function syncEfectividadeFromServer(): Promise<CadastramentoEfectiv
       const serverRecords: CadastramentoEfectividadeRecord[] = data.records;
       const recordMap = new Map<string, CadastramentoEfectividadeRecord>();
 
-      // Load server records first
+      // Load server records first, excluding locally deleted ones
       serverRecords.forEach((sr) => {
-        if (sr && sr.id) {
+        if (sr && sr.id && !deletedIds.has(sr.id)) {
           recordMap.set(sr.id, sr);
         }
       });
 
-      // Merge any local records that haven't reached the server yet
+      // Merge any local records that haven't reached the server yet and were NOT deleted
       let hasUnsynced = false;
+      const unsyncedList: CadastramentoEfectividadeRecord[] = [];
+
       localRecords.forEach((lr) => {
-        if (lr && lr.id && !recordMap.has(lr.id)) {
+        if (lr && lr.id && !deletedIds.has(lr.id) && !recordMap.has(lr.id)) {
           recordMap.set(lr.id, lr);
+          unsyncedList.push(lr);
           hasUnsynced = true;
         }
       });
@@ -153,12 +227,12 @@ export async function syncEfectividadeFromServer(): Promise<CadastramentoEfectiv
       const merged = Array.from(recordMap.values());
       localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(merged));
 
-      if (hasUnsynced) {
+      if (hasUnsynced && unsyncedList.length > 0) {
         // Send unsynced local records to server
         fetch('/api/efectividade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ records: merged }),
+          body: JSON.stringify({ records: unsyncedList }),
         }).catch(() => {});
       }
 
@@ -261,6 +335,9 @@ export function saveEfectividadeRecord(
   }
 
   try {
+    if (savedRecord && savedRecord.id) {
+      removeDeletedId(savedRecord.id);
+    }
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(nextRecords));
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: savedRecord }));
 
@@ -281,11 +358,13 @@ export function saveEfectividadeRecord(
 }
 
 /**
- * Delete a record
+ * Delete a record permanently
  */
 export function deleteEfectividadeRecord(id: string): boolean {
+  if (!id) return false;
+  addDeletedId(id);
   const records = getStoredEfectividadeRecords();
-  const next = records.filter((r) => r.id !== id);
+  const next = records.filter((r) => r.id !== id && r.bi !== id && r.agente !== id);
   try {
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { id, deleted: true } }));

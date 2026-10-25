@@ -18,7 +18,8 @@ import {
   ChevronRight,
   School,
   FileSpreadsheet,
-  Award
+  Award,
+  Zap
 } from 'lucide-react';
 import type { UserAccount } from '../../types';
 import { SectionShader } from '../SectionShader';
@@ -30,6 +31,7 @@ interface PublicLandingPageProps {
   onDirectLogin: (role: 'admin' | 'diretor' | 'professor') => void;
   onOpenAbout?: () => void;
   onOpenSupport?: () => void;
+  onOpenQuickServices?: () => void;
 }
 
 export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
@@ -38,6 +40,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   onDirectLogin,
   onOpenAbout,
   onOpenSupport,
+  onOpenQuickServices,
 }) => {
   const [activeTab, setActiveTab] = useState<'direcao' | 'admin' | 'professor'>('direcao');
 
@@ -100,14 +103,18 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               <ArrowRight className="w-4 h-4 shrink-0" strokeWidth={2} />
             </button>
 
-            {/* Acessar Plataforma */}
+            {/* Serviços Rápidos (Acesso Público Sem Login) */}
             <button
               id="landing-btn-acessar-plataforma"
               type="button"
-              onClick={onAcessarPlataforma}
-              className="w-full sm:w-auto inline-flex items-center justify-center bg-white hover:bg-slate-50 text-[#002133] border border-slate-300 hover:border-slate-400 font-bold text-sm sm:text-base px-8 py-4 rounded-xl shadow-2xs hover:shadow-xs active:scale-98 transition-all duration-200 cursor-pointer"
+              onClick={onOpenQuickServices || onAcessarPlataforma}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 text-[#002133] border-2 border-slate-300 hover:border-slate-800 font-bold text-sm sm:text-base px-8 py-4 rounded-xl shadow-xs hover:shadow-md active:scale-98 transition-all duration-200 cursor-pointer group"
             >
-              <span>Acessar Plataforma</span>
+              <Zap className="w-4 h-4 text-amber-500 fill-amber-500 group-hover:scale-110 transition-transform" />
+              <span>Serviços Rápidos</span>
+              <span className="text-[10px] uppercase font-black tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                Sem login
+              </span>
             </button>
           </div>
 

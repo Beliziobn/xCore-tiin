@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText } from 'lucide-react';
+import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText, Archive, Zap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications } from '../utils/authApprovalStorage';
 
@@ -26,6 +26,8 @@ interface NavbarProps {
   onOpenSettings?: () => void;
   onOpenDemoModal?: () => void;
   onOpenGoogleSheets?: () => void;
+  onOpenBackupManager?: () => void;
+  onOpenQuickServices?: () => void;
 }
 
 const mockNotifications: NotificationItem[] = [];
@@ -54,6 +56,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
   onOpenDemoModal,
   onOpenGoogleSheets,
+  onOpenBackupManager,
+  onOpenQuickServices,
 }) => {
   const [showPagesDropdown, setShowPagesDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -270,6 +274,34 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                       <button
                         onClick={() => {
+                          if (onOpenBackupManager) onOpenBackupManager();
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Archive className="w-4 h-4 text-emerald-600" strokeWidth={2} />
+                          <span>Cofre de Backups</span>
+                        </span>
+                        <span className="text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">1-Click</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          onSelectPage('admin-servicos-rapidos');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-amber-700 bg-amber-50/60 hover:bg-amber-100/70 transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Zap className="w-4 h-4 text-amber-600" strokeWidth={2} />
+                          <span>Serviços Rápidos & Efectividade</span>
+                        </span>
+                        <span className="text-[9px] bg-amber-600 text-white font-bold px-1.5 py-0.5 rounded">Cidadão</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
                           onSelectPage('admin-perfil');
                           setShowPagesDropdown(false);
                         }}
@@ -368,6 +400,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </span>
                         <span className="text-[9px] bg-[#002133] text-white font-black px-1.5 py-0.5 rounded">Turmas</span>
                       </button>
+                      <button
+                        onClick={() => {
+                          onSelectPage('diretor-servicos-rapidos');
+                          setShowPagesDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-amber-700 bg-amber-50/60 hover:bg-amber-100/70 transition-colors uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Zap className="w-4 h-4 text-amber-600" strokeWidth={2} />
+                          <span>Pedidos de Boletins (Serviços Rápidos)</span>
+                        </span>
+                        <span className="text-[9px] bg-amber-600 text-white font-bold px-1.5 py-0.5 rounded">Pais</span>
+                      </button>
+
                       <button
                         onClick={() => {
                           onSelectPage('diretor-perfil');
@@ -515,28 +561,73 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </span>
                     )}
                   </button>
+
+                  <button
+                    id="navbar-director-quick-services-btn"
+                    onClick={() => onSelectPage('diretor-servicos-rapidos')}
+                    className={`hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      currentView === 'diretor-servicos-rapidos'
+                        ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                        : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                    }`}
+                    title="Pedidos de Boletins & Serviços Rápidos dos Encarregados"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Boletins dos Pais</span>
+                  </button>
                 </>
               )}
 
               {/* Quick Approvals Button for Admin */}
               {activeRole === 'admin' && (
+                <>
+                  <button
+                    id="navbar-admin-quick-approvals-btn"
+                    onClick={() => onSelectPage('admin-aprovacoes')}
+                    className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      currentView === 'admin-aprovacoes' || currentView === 'admin-inscricoes'
+                        ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                        : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                    }`}
+                    title="Central de Homologação de Diretores e Inscrições"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Homologações</span>
+                    {pendingAppsCount.admin > 0 && (
+                      <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                        {pendingAppsCount.admin}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    id="navbar-admin-quick-services-btn"
+                    onClick={() => onSelectPage('admin-servicos-rapidos')}
+                    className={`hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      currentView === 'admin-servicos-rapidos'
+                        ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
+                        : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                    }`}
+                    title="Demandas de Serviços Rápidos & Efectividade"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Serviços Rápidos</span>
+                  </button>
+                </>
+              )}
+
+              {/* Quick Backup Vault Button for Admin */}
+              {activeRole === 'admin' && (
                 <button
-                  id="navbar-admin-quick-approvals-btn"
-                  onClick={() => onSelectPage('admin-aprovacoes')}
-                  className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                    currentView === 'admin-aprovacoes' || currentView === 'admin-inscricoes'
-                      ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
-                      : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
-                  }`}
-                  title="Central de Homologação de Diretores e Inscrições"
+                  id="navbar-admin-quick-backup-btn"
+                  onClick={() => {
+                    if (onOpenBackupManager) onOpenBackupManager();
+                  }}
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-400/40"
+                  title="Cofre de Backups & Restauração 1-Click"
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Homologações</span>
-                  {pendingAppsCount.admin > 0 && (
-                    <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
-                      {pendingAppsCount.admin}
-                    </span>
-                  )}
+                  <Archive className="w-3.5 h-3.5 text-white" />
+                  <span>Cofre de Backups</span>
                 </button>
               )}
 
@@ -642,6 +733,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              {onOpenQuickServices && (
+                <button
+                  id="navbar-servicos-rapidos-btn"
+                  type="button"
+                  onClick={onOpenQuickServices}
+                  className="hidden sm:inline-flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs hover:shadow-md cursor-pointer border border-amber-500/30 group"
+                  title="Serviços Rápidos ao Cidadão (Sem Login)"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-current text-slate-950 group-hover:scale-110 transition-transform" />
+                  <span>Serviços Rápidos</span>
+                </button>
+              )}
+
               <button
                 id="navbar-entrar-btn"
                 type="button"
