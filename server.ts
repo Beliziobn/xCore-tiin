@@ -1080,6 +1080,18 @@ async function startServer() {
     });
   });
 
+  app.post("/api/quick-requests/clear-all", (req, res) => {
+    networkStore.quickRequests = [];
+    persistNetworkStore();
+    res.json({ success: true, count: 0, message: "Todos os pedidos foram zerados com sucesso." });
+  });
+
+  app.delete("/api/quick-requests", (req, res) => {
+    networkStore.quickRequests = [];
+    persistNetworkStore();
+    res.json({ success: true, count: 0, message: "Todos os pedidos foram zerados com sucesso." });
+  });
+
   // ============================================================================
   // BACKUP MANAGEMENT & RESTORATION API (1-CLICK RESTORE & DAILY SNAPSHOTS)
   // ============================================================================

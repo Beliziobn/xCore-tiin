@@ -54,6 +54,7 @@ import {
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
 import { getSchoolRegistrationData, getOfferedLevelsBadges, syncSchoolsFromServer } from '../../utils/schoolStorage';
+import { saveUserToFirestore } from '../../utils/firestoreSync';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -895,6 +896,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           approverTargetRole: targetApproverRole,
           approverTargetSchoolName: resolvedSchoolName,
         };
+
+        // Persist user account directly to Firebase Firestore Cloud Database
+        saveUserToFirestore(newUser).catch((err) => {
+          console.warn('[AuthPage] Erro ao sincronizar usuário no Firestore:', err);
+        });
 
         if (isPending) {
           setSuccessMsg(

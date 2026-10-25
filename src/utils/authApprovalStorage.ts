@@ -1,6 +1,14 @@
 import type { PendingApplication, UserAccount, AdminSchool, PendingApprovalComplementaryData } from '../types';
 import { initialAdminSchools, initialAdminDirectors } from '../data/adminData';
 import { directorTeachersData } from '../data/directorData';
+import {
+  saveApplicationToFirestore,
+  fetchApplicationsFromFirestore,
+  updateApplicationInFirestore,
+  deleteApplicationFromFirestore,
+  clearApprovedApplicationsFromFirestore,
+  subscribeToApplications,
+} from './firestoreSync';
 
 export const UCORE_MUNICIPALITIES = [
   'Quêssua (Malanje)',
@@ -95,76 +103,102 @@ export function getPendingApplications(type?: string): PendingApplication[] {
 }
 
 /**
- * Synchronizes pending applications from the server's persistent disk store
- * so applications created in any session/browser are instantly visible to their supervisor.
- * Includes bidirectional syncing for pending applications while respecting server purges.
+ * Synchronizes pending applications from the Firestore cloud database and the server's persistent disk store
+ * so applications created in any session, browser, or mobile device are instantly visible to their supervisor.
  */
 export async function syncApplicationsFromServer(): Promise<PendingApplication[]> {
   try {
-    const res = await fetch('/api/network/applications');
-    if (!res.ok) return getPendingApplications();
-    const data = await res.json();
-    if (data && Array.isArray(data.applications)) {
-      const serverApps: PendingApplication[] = data.applications;
-      const localApps = getPendingApplications();
-      const deletedIds = getDeletedApplicationIds();
+    const deletedIds = getDeletedApplicationIds();
+    const map = new Map<string, PendingApplication>();
 
-      // If server has no approved applications, clean local approved applications to stay in lockstep
-      const serverApprovedKeys = new Set(
-        serverApps
-          .filter((sa) => sa.status === 'aprovado' || sa.approvedAt)
-          .map((sa) => String(sa.id || sa.userId || sa.email).trim().toLowerCase())
-      );
-
-      const map = new Map<string, PendingApplication>();
-
-      // Server applications are authoritative
-      serverApps.forEach((sa) => {
-        const key = String(sa.id || sa.userId || sa.email).trim().toLowerCase();
-        if (!key || deletedIds.has(key)) return;
-        map.set(key, sa);
-      });
-
-      // Local applications: only keep if not in deleted set and, if approved, it must exist on server
-      localApps.forEach((la) => {
-        const key = String(la.id || la.userId || la.email).trim().toLowerCase();
-        if (!key || deletedIds.has(key)) return;
-        if (la.status === 'aprovado' && !serverApprovedKeys.has(key)) {
-          // Server already purged this approved record; discard from local
-          return;
-        }
-        if (!map.has(key)) {
-          // If it's a pending application not yet on server, keep it
-          if (la.status === 'pendente') {
-            map.set(key, la);
-          }
-        }
-      });
-
-      // BIDIRECTIONAL SYNC: Only push PENDING applications that are missing from server
-      const missingOnServer = Array.from(map.values()).filter((item) => {
-        if (item.status !== 'pendente') return false;
-        const key = String(item.id || item.userId || item.email).trim().toLowerCase();
-        return !serverApps.some((sa) => String(sa.id || sa.userId || sa.email).trim().toLowerCase() === key);
-      });
-
-      if (missingOnServer.length > 0) {
-        fetch('/api/network/applications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ applications: missingOnServer }),
-          keepalive: true,
-        }).catch(() => {});
+    // 1. Fetch authoritative cloud data from Firebase Firestore
+    try {
+      const firestoreApps = await fetchApplicationsFromFirestore();
+      if (Array.isArray(firestoreApps) && firestoreApps.length > 0) {
+        firestoreApps.forEach((fa) => {
+          const key = String(fa.id || fa.userId || fa.email).trim().toLowerCase();
+          if (!key || deletedIds.has(key)) return;
+          map.set(key, fa);
+        });
       }
-
-      const merged = Array.from(map.values());
-      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(merged));
-      return merged;
+    } catch (err) {
+      console.warn('[authApprovalStorage] Falha ao carregar do Firestore:', err);
     }
+
+    // 2. Fetch server applications
+    try {
+      const res = await fetch('/api/network/applications');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.applications)) {
+          const serverApps: PendingApplication[] = data.applications;
+          serverApps.forEach((sa) => {
+            const key = String(sa.id || sa.userId || sa.email).trim().toLowerCase();
+            if (!key || deletedIds.has(key)) return;
+            if (!map.has(key)) {
+              map.set(key, sa);
+              // Push to Firestore if not already present
+              saveApplicationToFirestore(sa).catch(() => {});
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 3. Local applications
+    const localApps = getPendingApplications();
+    localApps.forEach((la) => {
+      const key = String(la.id || la.userId || la.email).trim().toLowerCase();
+      if (!key || deletedIds.has(key)) return;
+      if (!map.has(key)) {
+        if (la.status === 'pendente') {
+          map.set(key, la);
+          saveApplicationToFirestore(la).catch(() => {});
+        }
+      }
+    });
+
+    const merged = Array.from(map.values());
+    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(merged));
+    return merged;
   } catch (err) {
-    console.warn('[authApprovalStorage] Falha ao sincronizar candidaturas do servidor:', err);
+    console.warn('[authApprovalStorage] Falha ao sincronizar candidaturas:', err);
+    return getPendingApplications();
   }
-  return getPendingApplications();
+}
+
+/**
+ * Initializes a real-time cloud listener that keeps this device's application list
+ * updated in real time whenever any candidate signs up on any mobile or desktop device.
+ */
+let realtimeUnsubscribe: (() => void) | null = null;
+export function initRealtimeApplicationsSync(
+  onUpdate?: (apps: PendingApplication[]) => void
+): () => void {
+  if (realtimeUnsubscribe) {
+    return realtimeUnsubscribe;
+  }
+
+  realtimeUnsubscribe = subscribeToApplications((firestoreApps) => {
+    try {
+      const deletedIds = getDeletedApplicationIds();
+      const validApps = firestoreApps.filter((a) => {
+        const aId = String(a.id || '').trim().toLowerCase();
+        const uId = String(a.userId || '').trim().toLowerCase();
+        return !deletedIds.has(aId) && !deletedIds.has(uId);
+      });
+
+      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(validApps));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+      }
+      onUpdate?.(validApps);
+    } catch (e) {
+      console.warn('[authApprovalStorage] Erro no listener em tempo real:', e);
+    }
+  });
+
+  return realtimeUnsubscribe;
 }
 
 /**
@@ -220,6 +254,11 @@ export function savePendingApplication(app: PendingApplication): void {
     ];
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
 
+    // Save directly to Firestore cloud database
+    saveApplicationToFirestore(normalizedApp).catch((e) => {
+      console.warn('[authApprovalStorage] Falha ao persistir no Firestore:', e);
+    });
+
     if (typeof window !== 'undefined') {
       fetch('/api/network/applications', {
         method: 'POST',
@@ -235,11 +274,10 @@ export function savePendingApplication(app: PendingApplication): void {
 }
 
 /**
- * Async version that ensures the application is physically persisted on the backend server
+ * Async version that ensures the application is physically persisted on the Firebase Firestore cloud
+ * and backend server so it appears immediately on the administrator's mobile device.
  */
 export async function savePendingApplicationAsync(app: PendingApplication): Promise<PendingApplication> {
-  savePendingApplication(app);
-
   const isAdminTarget =
     app.scope === 'administracao' ||
     app.type === 'diretor' ||
@@ -254,6 +292,15 @@ export async function savePendingApplicationAsync(app: PendingApplication): Prom
       ? `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`
       : app.approverDirectorName || resolveSchoolDirectorName(null, app.schoolName),
   };
+
+  savePendingApplication(normalizedApp);
+
+  try {
+    // Await cloud Firestore persistence
+    await saveApplicationToFirestore(normalizedApp);
+  } catch (err) {
+    console.warn('[authApprovalStorage] Aviso ao gravar no Firestore:', err);
+  }
 
   try {
     const res = await fetch('/api/network/applications', {
@@ -512,6 +559,11 @@ export function approveApplication(
       }
     }
 
+    // Push approval to Firestore cloud
+    saveApplicationToFirestore(updatedApp).catch((e) => {
+      console.warn('[authApprovalStorage] Falha ao atualizar homologação no Firestore:', e);
+    });
+
     if (typeof window !== 'undefined') {
       fetch('/api/network/applications', {
         method: 'POST',
@@ -567,6 +619,11 @@ export function rejectApplication(
         // ignore
       }
     }
+
+    // Push rejection to Firestore cloud
+    saveApplicationToFirestore(updatedApp).catch((e) => {
+      console.warn('[authApprovalStorage] Falha ao atualizar rejeição no Firestore:', e);
+    });
 
     if (typeof window !== 'undefined') {
       fetch('/api/network/applications', {
@@ -758,6 +815,12 @@ export async function deleteApplication(applicationId: string): Promise<boolean>
       });
     }
 
+    // Delete from Firestore cloud
+    deleteApplicationFromFirestore(applicationId).catch(() => {});
+    if (target?.userId && target.userId !== applicationId) {
+      deleteApplicationFromFirestore(target.userId).catch(() => {});
+    }
+
     // Call server DELETE
     try {
       await fetch(`/api/network/applications/${encodeURIComponent(applicationId)}`, {
@@ -851,7 +914,14 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
       }
     } catch {}
 
-    // 5. Call server to clear disk store
+    // 5. Clear approved records from Firestore cloud database
+    try {
+      await clearApprovedApplicationsFromFirestore();
+    } catch (e) {
+      console.warn('[authApprovalStorage] Falha ao limpar homologados no Firestore:', e);
+    }
+
+    // Call server to clear disk store
     let serverCount = approved.length;
     try {
       const res = await fetch('/api/network/clear-homologated', {

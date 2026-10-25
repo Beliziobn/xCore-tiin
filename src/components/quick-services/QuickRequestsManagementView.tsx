@@ -28,10 +28,11 @@ import {
   Share2,
   Copy,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Trash2
 } from 'lucide-react';
 import type { QuickServiceRequest, QuickServiceStatus, QuickServiceType, UserAccount } from '../../types';
-import { fetchQuickRequests, updateQuickRequestStatus, deleteQuickRequest } from '../../utils/quickServicesStorage';
+import { fetchQuickRequests, updateQuickRequestStatus, deleteQuickRequest, clearAllQuickRequests } from '../../utils/quickServicesStorage';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 
 interface QuickRequestsManagementViewProps {
@@ -77,6 +78,22 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       setRequests(data);
     } catch (e) {
       console.error('[QuickServices] Failed to load requests:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm('Tem certeza de que deseja zerar e eliminar todos os pedidos de Serviços Rápidos & Efectividade? Esta acção eliminará todos os pedidos da nuvem e do sistema.')) {
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await clearAllQuickRequests();
+      setRequests([]);
+      showToast?.(`Todos os pedidos foram zerados com sucesso.`);
+    } catch {
+      showToast?.('Erro ao zerar pedidos.');
     } finally {
       setIsLoading(false);
     }
@@ -310,6 +327,19 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             >
               <FileCheck className="w-3.5 h-3.5 text-amber-400" />
               <span>Emitir Efectividade</span>
+            </button>
+          )}
+
+          {isMasterAdmin && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              disabled={isLoading}
+              className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="Zerar e eliminar permanentemente todos os pedidos"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Zerar Pedidos</span>
             </button>
           )}
         </div>

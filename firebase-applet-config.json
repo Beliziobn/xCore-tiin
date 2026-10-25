@@ -3,6 +3,7 @@
   "appId": "1:394490361963:web:ebcb768501bd16f242192e",
   "apiKey": "AIzaSyAj0hJEYxpCVMUCIH1NzDcYI2Sl8IiCsco",
   "authDomain": "hip-ship-440ks.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-centralucore-5db64e5c-3a83-464e-9fb7-9cf45189257d",
   "storageBucket": "hip-ship-440ks.firebasestorage.app",
   "messagingSenderId": "394490361963",
   "measurementId": "",

@@ -52,7 +52,8 @@ import {
   saveRegisteredSchool,
   syncSchoolsFromServer,
 } from './utils/schoolStorage';
-import { syncApplicationsFromServer } from './utils/authApprovalStorage';
+import { syncApplicationsFromServer, initRealtimeApplicationsSync } from './utils/authApprovalStorage';
+import { initRealtimeQuickRequestsSync } from './utils/quickServicesStorage';
 
 // Teacher & Student Pages
 import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
@@ -326,6 +327,8 @@ export default function App() {
       }
     };
     syncApplicationsFromServer().catch(() => {});
+    const unsubApps = initRealtimeApplicationsSync();
+    const unsubQuick = initRealtimeQuickRequestsSync();
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
     const pollInterval = setInterval(() => {
@@ -335,6 +338,8 @@ export default function App() {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('ucore-teachers-updated', handleSync);
       clearInterval(pollInterval);
+      if (typeof unsubApps === 'function') unsubApps();
+      if (typeof unsubQuick === 'function') unsubQuick();
     };
   }, []);
 

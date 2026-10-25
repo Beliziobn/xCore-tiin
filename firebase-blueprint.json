@@ -1,5 +1,283 @@
 {
   "entities": {
+    "Application": {
+      "title": "Application",
+      "description": "Candidatura institucional e homologação de diretores, professores e membros de órgãos gestores",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID exclusivo da candidatura ou homologação",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID do usuário requerente",
+          "maxLength": 128
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Nome completo do candidato",
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "description": "E-mail de contacto",
+          "maxLength": 120
+        },
+        "phone": {
+          "type": "string",
+          "description": "Número de telefone para contacto",
+          "maxLength": 30
+        },
+        "type": {
+          "type": "string",
+          "description": "Tipo de candidatura institucional",
+          "enum": ["diretor", "professor", "custom", "membro_dme", "funcionario"],
+          "maxLength": 40
+        },
+        "scope": {
+          "type": "string",
+          "description": "Âmbito da candidatura",
+          "maxLength": 40
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Nome da escola de lotação ou candidatura",
+          "maxLength": 150
+        },
+        "municipalityOrDepartment": {
+          "type": "string",
+          "description": "Município ou departamento",
+          "maxLength": 150
+        },
+        "cargoTitle": {
+          "type": "string",
+          "description": "Título oficial da função",
+          "maxLength": 120
+        },
+        "biNumber": {
+          "type": "string",
+          "description": "Bilhete de Identidade ou NIF angolano",
+          "maxLength": 30
+        },
+        "status": {
+          "type": "string",
+          "description": "Estado da homologação",
+          "enum": ["pendente", "aprovado", "rejeitado", "em_analise"],
+          "maxLength": 30
+        },
+        "targetApproverRole": {
+          "type": "string",
+          "description": "Papel do aprovador responsável (admin ou diretor)",
+          "maxLength": 40
+        },
+        "targetApproverEmail": {
+          "type": "string",
+          "description": "E-mail do aprovador",
+          "maxLength": 120
+        },
+        "approverDirectorName": {
+          "type": "string",
+          "description": "Nome do diretor aprovador",
+          "maxLength": 120
+        },
+        "approvedBy": {
+          "type": "string",
+          "description": "Identificação de quem homologou",
+          "maxLength": 120
+        },
+        "approvedAt": {
+          "type": "string",
+          "description": "Data/hora da homologação",
+          "maxLength": 60
+        },
+        "rejectionReason": {
+          "type": "string",
+          "description": "Motivo da não homologação caso rejeitado",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Data de submissão da candidatura",
+          "maxLength": 60
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Data da última atualização",
+          "maxLength": 60
+        }
+      },
+      "required": ["id", "fullName", "email", "type", "status", "createdAt"]
+    },
+    "QuickRequest": {
+      "title": "QuickRequest",
+      "description": "Pedido de serviço rápido ou efectividade submetido por cidadãos ou funcionários",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID exclusivo do pedido",
+          "maxLength": 128
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Número de protocolo gerado para acompanhamento",
+          "maxLength": 50
+        },
+        "serviceType": {
+          "type": "string",
+          "description": "Tipo de serviço solicitado",
+          "maxLength": 100
+        },
+        "requesterName": {
+          "type": "string",
+          "description": "Nome completo do requerente",
+          "maxLength": 120
+        },
+        "requesterBi": {
+          "type": "string",
+          "description": "BI do requerente",
+          "maxLength": 30
+        },
+        "requesterEmail": {
+          "type": "string",
+          "description": "E-mail do requerente",
+          "maxLength": 120
+        },
+        "requesterPhone": {
+          "type": "string",
+          "description": "Telefone do requerente",
+          "maxLength": 30
+        },
+        "targetSchool": {
+          "type": "string",
+          "description": "Unidade escolar de destino",
+          "maxLength": 150
+        },
+        "urgency": {
+          "type": "string",
+          "description": "Nível de urgência",
+          "maxLength": 30
+        },
+        "status": {
+          "type": "string",
+          "description": "Estado do atendimento",
+          "enum": ["pendente", "em_analise", "concluido", "rejeitado", "cancelado"],
+          "maxLength": 30
+        },
+        "details": {
+          "type": "string",
+          "description": "Detalhes e observações adicionais",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Data da solicitação",
+          "maxLength": 60
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Data de atualização",
+          "maxLength": 60
+        }
+      },
+      "required": ["id", "protocol", "serviceType", "requesterName", "status", "createdAt"]
+    },
+    "School": {
+      "title": "School",
+      "description": "Registo institucional de unidade escolar da rede",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID da escola",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Nome oficial da escola",
+          "maxLength": 150
+        },
+        "code": {
+          "type": "string",
+          "description": "Código da escola",
+          "maxLength": 50
+        },
+        "directorName": {
+          "type": "string",
+          "description": "Nome do diretor escolar homologado",
+          "maxLength": 120
+        },
+        "location": {
+          "type": "string",
+          "description": "Localização geográfica",
+          "maxLength": 150
+        },
+        "municipality": {
+          "type": "string",
+          "description": "Município",
+          "maxLength": 100
+        },
+        "level": {
+          "type": "string",
+          "description": "Nível de ensino",
+          "maxLength": 80
+        },
+        "studentCount": {
+          "type": "number",
+          "description": "Total de estudantes matriculados"
+        },
+        "teacherCount": {
+          "type": "number",
+          "description": "Total de professores ativos"
+        }
+      },
+      "required": ["id", "name"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Registo de docente no quadro da rede",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID do professor",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Nome completo do docente",
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "description": "E-mail do docente",
+          "maxLength": 120
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Escola onde leciona",
+          "maxLength": 150
+        },
+        "subject": {
+          "type": "string",
+          "description": "Disciplina principal",
+          "maxLength": 80
+        },
+        "gradeClass": {
+          "type": "string",
+          "description": "Classe atribuída",
+          "maxLength": 50
+        },
+        "status": {
+          "type": "string",
+          "description": "Situação funcional",
+          "maxLength": 30
+        }
+      },
+      "required": ["id", "name", "schoolName"]
+    },
     "User": {
       "title": "User",
       "description": "Perfil de usuário institucional da plataforma uCore com restrições de permissão e RLS",
@@ -221,6 +499,30 @@
     }
   },
   "firestore": {
+    "/applications/{applicationId}": {
+      "schema": {
+        "$ref": "#/entities/Application"
+      },
+      "description": "Candidaturas e homologações institucionais acessíveis de qualquer dispositivo móvel ou desktop"
+    },
+    "/quickRequests/{requestId}": {
+      "schema": {
+        "$ref": "#/entities/QuickRequest"
+      },
+      "description": "Serviços rápidos e solicitações de efectividade sincronizados na nuvem em tempo real"
+    },
+    "/schools/{schoolId}": {
+      "schema": {
+        "$ref": "#/entities/School"
+      },
+      "description": "Unidades escolares da rede municipal com diretores homologados"
+    },
+    "/teachers/{teacherId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Quadro de professores registados e homologados"
+    },
     "/users/{userId}": {
       "schema": {
         "$ref": "#/entities/User"
