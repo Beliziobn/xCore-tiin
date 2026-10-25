@@ -45,6 +45,7 @@ import {
   approveApplication,
   rejectApplication,
   savePendingApplication,
+  savePendingApplicationAsync,
   syncApplicationsFromServer,
   deleteApplication,
   clearAllHomologatedData,
@@ -81,6 +82,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [selectedSchoolFilter, setSelectedSchoolFilter] = useState<string>('todas');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Approval Modal State
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
@@ -408,7 +410,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   };
 
   // Simulate new director registration
-  const handleSimulateDirector = () => {
+  const handleSimulateDirector = async () => {
     if (!simName.trim()) return;
     const targetSchool = simSchool.trim() || (schools[0]?.name || 'Escola Primária nº 402');
     const newId = 'app-sim-dir-' + Date.now();
@@ -424,6 +426,8 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       schoolName: targetSchool,
       municipality: 'Quêssua (Malanje)',
       targetApproverRole: 'admin',
+      targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
+      approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
       status: 'pendente',
       isPreRegistered: true,
       preRegisteredDetails: 'Nomeação via Direção Municipal da Educação. Aguarda homologação formal no portal.',
@@ -431,13 +435,13 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       notes: 'Solicitação de acesso institucional como Diretor da Escola.',
     };
 
-    savePendingApplication(newApp);
-    loadApplications();
+    await savePendingApplicationAsync(newApp);
+    await loadApplications();
     setShowSimModal(false);
     setSimName('');
     setSimBi('');
     const notify = showToast || alert;
-    notify(`Inscrição de Diretor(a) "${newApp.fullName}" submetida para homologação!`);
+    notify(`Inscrição de Diretor(a) "${newApp.fullName}" submetida e sincronizada na nuvem com sucesso!`);
   };
 
   return (
@@ -446,7 +450,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       <Hero
         onOpenGetStarted={onOpenGetStarted}
         customTitle="Central de Homologações & Credenciação (DME)"
-        customSubtitle="Validação de despachos, homologação de Membros da Direção Municipal (DME) e Diretores Gerais de Escola."
+        customSubtitle="Validação de despachos e homologação ministerial de todos os Quadros da Educação de Quêssua (Membros da DME, Directores, Professores e Funcionários)."
         badge="Administrador Central (DME)"
         breadcrumbs={[
           { label: 'Início', onClick: () => window.location.reload() },
@@ -463,15 +467,21 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           <div className="p-5 sm:p-6 bg-transparent text-slate-900">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
               <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Malanje • Município do Quêssua • Homologação Central (DME)</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Malanje • Quêssua • Homologação Central (DME)</span>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Nuvem Conectada • dmedoquessua@gmail.com
+                  </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Homologação de Quadros da Direção Municipal & Diretores de Escola
+                  Homologação Municipal de Quadros & Efectividade
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  Inscrições de outros membros da Direção Municipal (Inspetores, Chefes de Repartição, Técnicos de Estatística, Admin TI) e de Diretores Gerais de Escola enviadas ao Administrador Central (DME) para homologação.
+                  Inscrições de todos os quadros municipais (Membros da Direção Municipal, Directores Gerais de Escola, Professores e Funcionários de Quêssua) recebidas e sincronizadas em tempo real a partir de qualquer dispositivo móvel ou computador.
                 </p>
               </div>
 
@@ -479,12 +489,16 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                 <button
                   type="button"
-                  onClick={loadApplications}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
-                  title="Atualizar lista"
+                  onClick={async () => {
+                    setIsSyncing(true);
+                    await loadApplications();
+                    setTimeout(() => setIsSyncing(false), 500);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  title="Sincronizar em tempo real com a base de dados central"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Sincronizar</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
+                  <span>{isSyncing ? 'A Sincronizar...' : 'Sincronizar Nuvem'}</span>
                 </button>
 
                 <button

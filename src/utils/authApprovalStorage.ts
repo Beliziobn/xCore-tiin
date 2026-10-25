@@ -77,6 +77,26 @@ function addDeletedApplicationId(id: string) {
   } catch {}
 }
 
+export function removeDeletedApplicationId(...ids: (string | undefined)[]) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const set = getDeletedApplicationIds();
+    let changed = false;
+    ids.forEach((id) => {
+      if (id) {
+        const clean = id.trim().toLowerCase();
+        if (set.has(clean)) {
+          set.delete(clean);
+          changed = true;
+        }
+      }
+    });
+    if (changed) {
+      localStorage.setItem(STORAGE_KEY_DELETED_APPLICATIONS, JSON.stringify(Array.from(set)));
+    }
+  } catch {}
+}
+
 // Seed initial demo applications if not already present
 export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [];
 
@@ -232,19 +252,15 @@ export function getApplicationsForAdmin(filterType?: string): PendingApplication
 
 export function savePendingApplication(app: PendingApplication): void {
   try {
-    const isAdminTarget =
-      app.scope === 'administracao' ||
-      app.type === 'diretor' ||
-      app.type === 'membro_dme' ||
-      app.targetApproverRole === 'admin';
+    // Clear any previous deletion tombstone so this registration is never blocked
+    removeDeletedApplicationId(app.id, app.userId, app.email);
 
     const normalizedApp: PendingApplication = {
       ...app,
-      targetApproverRole: isAdminTarget ? 'admin' : 'diretor',
-      targetApproverEmail: isAdminTarget ? OFFICIAL_DME_ADMIN_EMAIL : undefined,
-      approverDirectorName: isAdminTarget
-        ? `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`
-        : app.approverDirectorName || resolveSchoolDirectorName(null, app.schoolName),
+      // The Director Municipal da Educação (dmedoquessua@gmail.com) oversees ALL applications across the entire municipality
+      targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
+      targetApproverRole: 'admin',
+      approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
     };
 
     const existing = getPendingApplications();
@@ -254,7 +270,7 @@ export function savePendingApplication(app: PendingApplication): void {
     ];
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
 
-    // Save directly to Firestore cloud database
+    // Save directly to Firestore cloud database in background
     saveApplicationToFirestore(normalizedApp).catch((e) => {
       console.warn('[authApprovalStorage] Falha ao persistir no Firestore:', e);
     });
@@ -278,46 +294,51 @@ export function savePendingApplication(app: PendingApplication): void {
  * and backend server so it appears immediately on the administrator's mobile device.
  */
 export async function savePendingApplicationAsync(app: PendingApplication): Promise<PendingApplication> {
-  const isAdminTarget =
-    app.scope === 'administracao' ||
-    app.type === 'diretor' ||
-    app.type === 'membro_dme' ||
-    app.targetApproverRole === 'admin';
+  // Clear any deletion tombstone
+  removeDeletedApplicationId(app.id, app.userId, app.email);
 
   const normalizedApp: PendingApplication = {
     ...app,
-    targetApproverRole: isAdminTarget ? 'admin' : 'diretor',
-    targetApproverEmail: isAdminTarget ? OFFICIAL_DME_ADMIN_EMAIL : undefined,
-    approverDirectorName: isAdminTarget
-      ? `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`
-      : app.approverDirectorName || resolveSchoolDirectorName(null, app.schoolName),
+    targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
+    targetApproverRole: 'admin',
+    approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
   };
 
   savePendingApplication(normalizedApp);
 
-  try {
-    // Await cloud Firestore persistence
-    await saveApplicationToFirestore(normalizedApp);
-  } catch (err) {
+  // Guarantee parallel persistence to both Cloud Firestore and Node.js network store
+  const firestorePromise = Promise.race([
+    saveApplicationToFirestore(normalizedApp),
+    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 3500)),
+  ]).catch((err) => {
     console.warn('[authApprovalStorage] Aviso ao gravar no Firestore:', err);
-  }
+  });
 
-  try {
-    const res = await fetch('/api/network/applications', {
+  const serverPromise = Promise.race([
+    fetch('/api/network/applications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ application: normalizedApp }),
       keepalive: true,
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.applications)) {
-        localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(data.applications));
+    }).then(async (res) => {
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.applications)) {
+          localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(data.applications));
+        }
       }
-    }
-  } catch (err) {
-    console.warn('Falha ao comunicar com o servidor ao salvar candidatura:', err);
+    }),
+    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Server API timeout')), 3500)),
+  ]).catch((err) => {
+    console.warn('[authApprovalStorage] Falha ao comunicar com o servidor ao salvar candidatura:', err);
+  });
+
+  await Promise.allSettled([firestorePromise, serverPromise]);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sigre-data-synced'));
   }
+
   return normalizedApp;
 }
 

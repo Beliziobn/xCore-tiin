@@ -45,6 +45,7 @@ import {
   approveApplication,
   rejectApplication,
   savePendingApplication,
+  savePendingApplicationAsync,
   resolveSchoolDirectorName,
   syncApplicationsFromServer
 } from '../../../utils/authApprovalStorage';
@@ -387,7 +388,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   };
 
   // Create simulated candidate for demo testing
-  const handleSimulateCandidate = () => {
+  const handleSimulateCandidate = async () => {
     if (!simName.trim()) return;
     const newId = 'app-sim-' + Date.now();
     const newApp: PendingApplication = {
@@ -412,13 +413,13 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       notes: 'Candidatura de teste inserida para demonstração da Direção Escolar.',
     };
 
-    savePendingApplication(newApp);
-    loadApplications();
+    await savePendingApplicationAsync(newApp);
+    await loadApplications();
     setShowSimulateModal(false);
     setSimName('');
     setSimBi('');
     const notify = showToast || alert;
-    notify(`Nova candidatura simulada criada com sucesso para ${newApp.fullName}!`);
+    notify(`Nova candidatura simulada criada e sincronizada com sucesso para ${newApp.fullName}!`);
   };
 
   return (

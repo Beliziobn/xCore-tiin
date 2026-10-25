@@ -586,7 +586,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setAgreeTerms(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -777,9 +777,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }
 
       setLoading(true);
+      setErrorMsg(null);
+      setSuccessMsg('A registrar a sua inscrição e a sincronizar na base de dados central...');
       onAuthLoadingChange?.(true, 'register');
-      setTimeout(() => {
-        setLoading(false);
+
+      try {
         const userFirst = firstName.trim();
 
         const chosenConfig = institutionalScope === 'escola'
@@ -798,33 +800,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const resolvedSchoolId = institutionalScope === 'escola'
           ? (matchedSchool?.id || 'esc-default')
           : undefined;
-        const resolvedSchoolDirector = institutionalScope === 'escola'
-          ? resolveSchoolDirectorName(matchedSchool, resolvedSchoolName)
-          : 'Administrador Central (DME)';
 
-        // Regras de Homologação:
-        // 1. Outros membros da Direção Municipal (ou qualquer inscrição em Administração exceto a conta oficial DME master) -> Enviados ao Administrador Central (DME)
-        // 2. Diretor Geral da Escola ('diretor_geral') -> Enviado ao Administrador Central (DME)
-        // 3. Pessoal do Âmbito Escolar (Subdiretor Pedagógico, Subdiretor Administrativo, Professor, Secretário Escolar) -> Enviados à Direção da Escola selecionada (ex: Escola X -> Diretor Carl)
+        // Regras de Homologação Central DME Quêssua:
+        // A Direcção Municipal da Educação (dmedoquessua@gmail.com) é a entidade homologadora máxima de todos os quadros (Diretores, Professores, Funcionários e Membros DME).
         const isOfficialDmeMaster =
           institutionalScope === 'administracao' &&
           adminRole === 'diretor_municipal' &&
           email.trim().toLowerCase() === 'dmedoquessua@gmail.com';
 
-        const isAdminScopeMember = institutionalScope === 'administracao' && !isOfficialDmeMaster;
-        const isSchoolGeneralDirector = institutionalScope === 'escola' && schoolRole === 'diretor_geral';
-        const isSchoolStaffForDirectorApproval = institutionalScope === 'escola' && schoolRole !== 'diretor_geral';
-        const isTeacherCandidate = institutionalScope === 'escola' && schoolRole === 'professor';
+        const isPending = !isOfficialDmeMaster;
 
-        const isPending = isAdminScopeMember || isSchoolGeneralDirector || isSchoolStaffForDirectorApproval;
-        const targetApproverRole: 'admin' | 'diretor' =
-          isAdminScopeMember || isSchoolGeneralDirector ? 'admin' : 'diretor';
-
-        const appType = isAdminScopeMember
+        const appType = (institutionalScope === 'administracao' && !isOfficialDmeMaster)
           ? 'membro_dme'
-          : isSchoolGeneralDirector
+          : schoolRole === 'diretor_geral'
           ? 'diretor'
-          : isTeacherCandidate
+          : schoolRole === 'professor'
           ? 'professor'
           : 'funcionario';
 
@@ -833,10 +823,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         // Save custom password in storage
         updatePassword(email.trim(), password.trim());
 
-        // Create pending application record
+        // Create pending application record directly targeted to dmedoquessua@gmail.com
         if (isPending) {
           const appId = `app-${appType}-${Date.now()}`;
-          savePendingApplicationAsync({
+          await savePendingApplicationAsync({
             id: appId,
             userId: newUserId,
             type: appType,
@@ -851,22 +841,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             schoolName: resolvedSchoolName,
             schoolId: resolvedSchoolId,
             municipality: selectedMunicipality,
-            targetApproverRole,
-            approverDirectorName:
-              targetApproverRole === 'diretor'
-                ? resolvedSchoolDirector
-                : 'Administrador Central (DME)',
-            subject: isTeacherCandidate ? selectedSubject : undefined,
-            gradeClass: isTeacherCandidate ? selectedGradeClass : undefined,
+            targetApproverRole: 'admin',
+            targetApproverEmail: 'dmedoquessua@gmail.com',
+            approverDirectorName: 'Director Municipal da Educação (dmedoquessua@gmail.com)',
+            subject: schoolRole === 'professor' ? selectedSubject : undefined,
+            gradeClass: schoolRole === 'professor' ? selectedGradeClass : undefined,
             status: 'pendente',
             isPreRegistered: Boolean(preRegResult?.found),
             preRegisteredDetails: preRegResult?.details,
             createdAt: new Date().toLocaleString('pt-AO'),
             notes: preRegResult?.found
               ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.`
-              : targetApproverRole === 'diretor'
-              ? `Inscrição de ${cargoTitle} enviada à Direção da escola "${resolvedSchoolName}" (Diretor(a): ${resolvedSchoolDirector}) para homologação.`
-              : `Inscrição de ${cargoTitle} enviada ao Administrador Central (DME) para homologação.`,
+              : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente ao Administrador Central (DME - dmedoquessua@gmail.com) para homologação ministerial.`,
           });
         }
 
@@ -889,24 +875,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           status: isPending ? 'pendente' : 'ativo',
           biNumber: biNumber.trim(),
           phone: phone.trim() || '+244 923 000 000',
-          subject: isTeacherCandidate ? selectedSubject : undefined,
-          gradeClass: isTeacherCandidate ? selectedGradeClass : undefined,
+          subject: schoolRole === 'professor' ? selectedSubject : undefined,
+          gradeClass: schoolRole === 'professor' ? selectedGradeClass : undefined,
           isPreRegistered: Boolean(preRegResult?.found),
           submittedAt: new Date().toLocaleString('pt-AO'),
-          approverTargetRole: targetApproverRole,
+          approverTargetRole: 'admin',
           approverTargetSchoolName: resolvedSchoolName,
         };
 
         // Persist user account directly to Firebase Firestore Cloud Database
-        saveUserToFirestore(newUser).catch((err) => {
+        try {
+          await saveUserToFirestore(newUser);
+        } catch (err) {
           console.warn('[AuthPage] Erro ao sincronizar usuário no Firestore:', err);
-        });
+        }
 
         if (isPending) {
           setSuccessMsg(
-            targetApproverRole === 'admin'
-              ? `Inscrição submetida! A sua conta de ${cargoTitle} foi enviada ao Administrador Central (DME) para homologação.`
-              : `Inscrição submetida! A sua conta de ${cargoTitle} foi enviada à Direção da escola "${resolvedSchoolName}" (Diretor(a): ${resolvedSchoolDirector}) para aprovação.`
+            `Inscrição submetida! A sua conta de ${cargoTitle} foi enviada diretamente para a conta do Administrador Central (DME - dmedoquessua@gmail.com) para homologação.`
           );
         } else {
           setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${cargoTitle} (${userFirst})...`);
@@ -916,7 +902,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           onAuthLoadingChange?.(false);
           onLoginSuccess(newUser);
         }, 850);
-      }, 700);
+      } catch (err) {
+        console.error('Erro ao registar utilizador:', err);
+        setErrorMsg('Ocorreu um problema ao submeter a inscrição na base de dados central. Por favor, tente novamente.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
