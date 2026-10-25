@@ -521,12 +521,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
   return (
     <div id="declaracao-efectividade-page" className="w-full min-h-screen bg-[#fafafa] flex flex-col font-sans">
-      {/* Print CSS rules - ensures strict single-page A4 portrait format and hides all UI chrome */}
+      {/* Print CSS rules - ensures strict single-page A4 portrait format without frame (moldura) and hides all UI chrome */}
       <style>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 10mm 12mm;
+            margin: 12mm 16mm;
           }
           html,
           body,
@@ -534,16 +534,20 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #main-content,
           #declaracao-efectividade-page,
           #declaracao-efectividade-page > main,
-          #declaracao-efectividade-page > main > div {
+          #declaracao-efectividade-page > main > div,
+          #declaracao-efectividade-page > main > div > div {
             background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
             min-height: 0 !important;
             height: auto !important;
+            max-height: 270mm !important;
             width: 100% !important;
             max-width: none !important;
             transform: none !important;
-            overflow: visible !important;
+            overflow: hidden !important;
+            border: none !important;
+            box-shadow: none !important;
           }
           #siteHeader,
           #ucore-hero-section,
@@ -556,49 +560,67 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           nav {
             display: none !important;
             visibility: hidden !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           #oficial-a4-sheet {
             box-sizing: border-box !important;
             box-shadow: none !important;
-            border: 1.5px solid #000000 !important;
-            padding: 12mm 14mm !important;
+            border: none !important;
+            outline: none !important;
+            border-radius: 0 !important;
+            padding: 4mm 2mm !important;
             margin: 0 auto !important;
             width: 100% !important;
-            max-width: 186mm !important;
+            max-width: 178mm !important;
             min-height: 0 !important;
             height: auto !important;
-            max-height: 274mm !important;
+            max-height: 268mm !important;
+             display: block !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
+            page-break-before: avoid !important;
+            break-before: avoid !important;
             overflow: hidden !important;
           }
+          #oficial-a4-sheet .a4-emblem-img {
+            width: 54px !important;
+            height: auto !important;
+            max-height: 54px !important;
+          }
           #oficial-a4-sheet .a4-header-block {
-            margin-bottom: 12px !important;
-            padding-bottom: 4px !important;
+            margin-bottom: 10px !important;
+            padding-bottom: 2px !important;
           }
           #oficial-a4-sheet .a4-title-wrap {
-            padding-top: 14px !important;
-            padding-bottom: 4px !important;
+            padding-top: 12px !important;
+            padding-bottom: 2px !important;
+          }
+          #oficial-a4-sheet .a4-title-wrap h1 {
+            font-size: 14pt !important;
           }
           #oficial-a4-sheet .a4-body-copy {
-            margin-top: 14px !important;
-            font-size: 11.5pt !important;
-            line-height: 1.72 !important;
+            margin-top: 12px !important;
+            font-size: 11pt !important;
+            line-height: 1.62 !important;
           }
           #oficial-a4-sheet .a4-body-copy > p + p {
-            margin-top: 12px !important;
+            margin-top: 10px !important;
           }
           #oficial-a4-sheet .a4-footer-block {
-            padding-top: 16px !important;
-            margin-top: 16px !important;
+            padding-top: 14px !important;
+            margin-top: 14px !important;
           }
           #oficial-a4-sheet .a4-date-line {
-            margin-bottom: 24px !important;
+            margin-bottom: 22px !important;
+            font-size: 11pt !important;
           }
           #oficial-a4-sheet .a4-sig-role {
-            margin-bottom: 28px !important;
+            margin-bottom: 26px !important;
+            font-size: 11pt !important;
           }
         }
       `}</style>
@@ -1671,81 +1693,81 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               const directorNome = selectedRecordForView.director?.trim() || 'Belizio Miguel dos Santos António';
 
               return (
-                <div className="flex justify-center w-full">
+                <div className="flex justify-center w-full print:m-0 print:p-0">
                   <div
                     id="oficial-a4-sheet"
-                    className="bg-white w-full max-w-[210mm] min-h-[297mm] shadow-2xl border border-slate-300 p-10 sm:p-14 md:p-16 text-slate-950 flex flex-col justify-between mx-auto"
+                    className="bg-white w-full max-w-[210mm] shadow-xl p-8 sm:p-12 md:p-14 print:p-0 print:shadow-none print:border-none text-slate-950 flex flex-col justify-between mx-auto"
                     style={{ fontFamily: "'Times New Roman', Times, 'Source Serif 4', Georgia, serif" }}
                   >
                     <div>
                       {/* 1. Official Angolan Government Header */}
-                      <div className="a4-header-block text-center pb-2 mb-5 font-sans">
+                      <div className="a4-header-block text-center pb-1 mb-4 font-sans">
                         {/* Insígnia da República de Angola */}
-                        <div className="flex justify-center mb-2.5">
+                        <div className="flex justify-center mb-2">
                           <img
                             src={emblemAngolaImg}
                             alt="Insígnia da República de Angola"
-                            className="w-20 sm:w-24 h-auto max-h-24 object-contain mx-auto"
+                            className="a4-emblem-img w-16 sm:w-[68px] h-auto max-h-[68px] object-contain mx-auto"
                           />
                         </div>
 
-                        <p className="text-[13px] sm:text-[14px] font-black uppercase tracking-widest text-slate-900 leading-tight">
+                        <p className="text-[12.5px] sm:text-[13.5px] font-black uppercase tracking-widest text-slate-900 leading-tight">
                           REPÚBLICA DE ANGOLA
                         </p>
-                        <p className="text-[11.5px] sm:text-[12.5px] font-bold text-slate-800 uppercase tracking-wide leading-tight mt-1">
+                        <p className="text-[11px] sm:text-[12px] font-bold text-slate-800 uppercase tracking-wide leading-tight mt-0.5">
                           GOVERNO PROVINCIAL DE {selectedRecordForView.governoProv ? selectedRecordForView.governoProv.toUpperCase() : 'MALANJE'}
                         </p>
-                        <p className="text-[11.5px] sm:text-[12.5px] font-bold uppercase text-slate-800 tracking-wide leading-tight mt-0.5">
+                        <p className="text-[11px] sm:text-[12px] font-bold uppercase text-slate-800 tracking-wide leading-tight mt-0.5">
                           ADMINISTRAÇÃO MUNICIPAL DO {selectedRecordForView.administracao ? selectedRecordForView.administracao.toUpperCase() : 'QUÊSSUA'}
                         </p>
-                        <p className="text-[11.5px] sm:text-[12.5px] font-bold uppercase text-slate-800 tracking-wide leading-tight mt-0.5">
+                        <p className="text-[11px] sm:text-[12px] font-bold uppercase text-slate-800 tracking-wide leading-tight mt-0.5">
                           DIRECÇÃO MUNICIPAL DE {selectedRecordForView.direccao ? selectedRecordForView.direccao.toUpperCase() : 'EDUCAÇÃO'}
                         </p>
 
-                        <div className="a4-title-wrap pt-6 pb-1">
-                          <h1 className="text-lg sm:text-xl md:text-2xl font-black uppercase tracking-wider text-slate-950 inline-block border-b-2 border-slate-900 pb-1">
+                        <div className="a4-title-wrap pt-4 pb-1">
+                          <h1 className="text-base sm:text-lg md:text-xl font-black uppercase tracking-wider text-slate-950 inline-block border-b-2 border-slate-900 pb-0.5">
                             DECLARAÇÃO DE EFECTIVIDADE
                           </h1>
                         </div>
                       </div>
 
                       {/* 2. Official Declaration Text Content */}
-                      <div className="a4-body-copy mt-6 text-[14px] sm:text-[15px] text-justify leading-[1.9] text-slate-900 space-y-5">
-                        <p className="indent-8 sm:indent-12">
+                      <div className="a4-body-copy mt-4 text-[13.5px] sm:text-[14.5px] text-justify leading-[1.7] text-slate-900 space-y-3.5">
+                        <p className="indent-8 sm:indent-10">
                           Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do Quêssua declara, para os fins a que se destina, que {artigoTratamento} <strong>{selectedRecordForView.nome}</strong>, {filhoFilha} de <strong>{selectedRecordForView.pai}</strong> e de <strong>{selectedRecordForView.mae}</strong>, natural de <strong>{selectedRecordForView.naturalidade}</strong>, Província {prepProvincia} <strong>{selectedRecordForView.provNat}</strong>, {nascidoNascida} aos <strong>{nascimentoExtenso}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong className="font-mono tracking-wide">{selectedRecordForView.bi}</strong>, emitido aos <strong>{biEmissaoExtenso}</strong>, é {funcionarioFuncionaria} do Sector da Educação, exercendo {funcaoTexto} no Município do {selectedRecordForView.municipio}, onde se encontra {colocadoColocada} {prepEscola} <strong>{selectedRecordForView.escola}</strong>, {enquadradoEnquadrada} na categoria profissional de <strong>{adaptedCategoria}</strong> do <strong>{selectedRecordForView.grau}</strong>, {inscritoInscrita} sob o número de agente <strong>{selectedRecordForView.agente}</strong>.
                         </p>
 
-                        <p className="indent-8 sm:indent-12">
+                        <p className="indent-8 sm:indent-10">
                           Mais se declara que {referidoFuncionario} se encontra no efectivo exercício das suas funções e que a presente declaração é emitida para efeitos de comprovação da sua efectividade no Sector da Educação, destinando-se, especificamente, {finalidadeFormatted.preposition} {finalidadeFormatted.text}, para os fins administrativos e profissionais legalmente previstos.
                         </p>
 
-                        <p className="indent-8 sm:indent-12">
+                        <p className="indent-8 sm:indent-10">
                           A presente declaração comprova os elementos de identificação e de enquadramento profissional {doDaFuncionario} acima indicados, devendo ser utilizada exclusivamente {peloMesmoPelaMesma} para a finalidade que motivou a sua emissão, sem prejuízo da apresentação de outros documentos exigidos pelas entidades competentes no âmbito do referido processo concursal.
                         </p>
 
-                        <p className="indent-8 sm:indent-12">
+                        <p className="indent-8 sm:indent-10">
                           Por corresponder à verdade e por ter sido solicitada {interessadoInteressada}, mandei passar a presente declaração, que vai por mim assinada e autenticada com o carimbo a óleo em uso nesta Direcção, para que produza os efeitos administrativos a que se destina.
                         </p>
                       </div>
                     </div>
 
                     {/* 3. Footer, Date and Official Signatures Block */}
-                    <div className="a4-footer-block pt-8 mt-6">
+                    <div className="a4-footer-block pt-6 mt-4">
                       {/* Date line */}
-                      <div className="a4-date-line text-right text-[13.5px] sm:text-[14.5px] mb-10">
+                      <div className="a4-date-line text-right text-[13px] sm:text-[14px] mb-7">
                         <span>
                           Direcção Municipal de Educação do Quêssua, Quêssua aos {dataEmissaoExtenso}.
                         </span>
                       </div>
 
                       {/* Signatures */}
-                      <div className="flex flex-col items-center justify-center pt-4">
-                        <div className="text-center min-w-[280px] sm:min-w-[340px]">
-                          <p className="a4-sig-role text-[14px] sm:text-[15px] font-bold text-slate-900 mb-9 font-serif">
+                      <div className="flex flex-col items-center justify-center pt-2">
+                        <div className="text-center min-w-[260px] sm:min-w-[320px]">
+                          <p className="a4-sig-role text-[13.5px] sm:text-[14.5px] font-bold text-slate-900 mb-7 font-serif">
                             O Director Municipal
                           </p>
-                          <div className="border-b border-slate-900 mx-auto w-full max-w-[280px]"></div>
-                          <p className="text-[14px] sm:text-[15px] font-bold text-slate-950 mt-2 font-serif">
+                          <div className="border-b border-slate-900 mx-auto w-full max-w-[260px]"></div>
+                          <p className="text-[13.5px] sm:text-[14.5px] font-bold text-slate-950 mt-1.5 font-serif">
                             {directorNome}
                           </p>
                         </div>

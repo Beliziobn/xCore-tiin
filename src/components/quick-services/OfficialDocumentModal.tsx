@@ -120,12 +120,13 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
           #official-modal-print-sheet {
             box-sizing: border-box !important;
             box-shadow: none !important;
-            border: 1.5px solid #000000 !important;
-            padding: 12mm 14mm !important;
+            border: none !important;
+            outline: none !important;
+            padding: 4mm 2mm !important;
             margin: 0 auto !important;
             width: 100% !important;
-            max-width: 186mm !important;
-            max-height: 274mm !important;
+            max-width: 178mm !important;
+            max-height: 268mm !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: avoid !important;
