@@ -127,6 +127,7 @@ export interface UserAccount {
   classificacaoPedagogica?: string;
   numeroMecanograficoOuNif?: string;
   documentosConferidosPresencialmente?: boolean;
+  passwordVerifier?: string;
 }
 
 export interface PendingApprovalComplementaryData {
@@ -175,6 +176,7 @@ export interface PendingApplication {
   rejectionReason?: string;
   approvedBy?: string;
   approvedAt?: string;
+  passwordVerifier?: string;
   // Complementary data added upon approval by Director or Admin
   complementaryData?: PendingApprovalComplementaryData;
   nivelAcademico?: string;

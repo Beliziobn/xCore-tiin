@@ -34,7 +34,7 @@ import {
   DoorOpen
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
-import { verifyPassword, updatePassword } from '../../utils/passwordService';
+import { verifyPassword, updatePassword, encodePasswordVerifier } from '../../utils/passwordService';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole, AdminSchool } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
 import { googleSignIn, getGoogleUser, createGoogleUserSession } from '../../utils/googleAuth';
@@ -49,7 +49,10 @@ import {
   savePendingApplicationAsync,
   checkUserApprovalStatus,
   resolveSchoolDirectorName,
-  syncApplicationsFromServer
+  syncApplicationsFromServer,
+  getOccupiedDmeCargos,
+  checkDuplicateRegistration,
+  findRegisteredAccountByEmail,
 } from '../../utils/authApprovalStorage';
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
@@ -159,11 +162,63 @@ export const ADMIN_ROLES_CONFIG: {
   cargoFull: string;
 }[] = [
   {
+    id: 'chefe_reparticao',
+    label: 'Chefe de Repartição / Ensino Geral',
+    badge: 'Repartição de Ensino',
+    icon: Award,
+    desc: 'Supervisão do ensino primário e secundário, distribuição docente e rede curricular na DME',
+    prefix: 'Chefe de Repartição',
+    baseRole: 'admin',
+    defaultEmail: 'chefe.ensino@ucore.edu.br',
+    defaultFirst: 'Augusto',
+    defaultLast: 'Nvula',
+    cargoFull: 'Chefe de Repartição / Ensino Geral',
+  },
+  {
+    id: 'inspetor_escolar',
+    label: 'Inspector(a) Escolar Municipal',
+    badge: 'Inspecção & Auditoria',
+    icon: Eye,
+    desc: 'Inspecção técnica, auditoria curricular, supervisão pedagógica e conformidade legal na DME',
+    prefix: 'Inspector(a) Escolar',
+    baseRole: 'admin',
+    defaultEmail: 'inspetor.marcos@ucore.edu.br',
+    defaultFirst: 'Marcos',
+    defaultLast: 'Dinis',
+    cargoFull: 'Inspector(a) Escolar Municipal',
+  },
+  {
+    id: 'tecnico_estatistica',
+    label: 'Técnico(a) de Planeamento & Estatística',
+    badge: 'Planeamento & Dados',
+    icon: BarChart3,
+    desc: 'Consolidação de dados do Censo Escolar, taxas de aprovação, fluxo e infraestrutura na DME',
+    prefix: 'Técnico(a) DME',
+    baseRole: 'admin',
+    defaultEmail: 'estatistica.dme@ucore.edu.br',
+    defaultFirst: 'Helena',
+    defaultLast: 'Manuel',
+    cargoFull: 'Técnico(a) de Planeamento & Estatística',
+  },
+  {
+    id: 'tecnico_recursos_humanos',
+    label: 'Técnico(a) de Recursos Humanos / Secretaria',
+    badge: 'Secretaria DME',
+    icon: Briefcase,
+    desc: 'Gestão de processos de pessoal, efectividade municipal e expediente da Direcção Municipal',
+    prefix: 'Técnico(a) RH',
+    baseRole: 'admin',
+    defaultEmail: 'rh.dme@ucore.edu.br',
+    defaultFirst: 'Teresa',
+    defaultLast: 'Sebastião',
+    cargoFull: 'Técnico(a) de Recursos Humanos / Secretaria DME',
+  },
+  {
     id: 'diretor_municipal',
-    label: 'Diretor(a) Municipal da Educação',
-    badge: 'Liderança DME',
+    label: 'Director(a) Municipal da Educação',
+    badge: 'Titular DME',
     icon: Landmark,
-    desc: 'Liderança executiva municipal, coordenação da rede de todas as escolas do município',
+    desc: 'Cargo titular exclusivo já provido pela conta oficial dmedoquessua@gmail.com (indisponível para novo cadastro)',
     prefix: 'Director Municipal',
     baseRole: 'admin',
     defaultEmail: 'dmedoquessua@gmail.com',
@@ -172,56 +227,17 @@ export const ADMIN_ROLES_CONFIG: {
     cargoFull: 'Director Municipal da Educação de Quessua',
   },
   {
-    id: 'inspetor_escolar',
-    label: 'Inspetor(a) Escolar Municipal',
-    badge: 'Inspecção & Auditoria',
-    icon: Eye,
-    desc: 'Inspecção técnica, auditoria curricular, supervisão pedagógica e conformidade legal',
-    prefix: 'Inspetor Municipal',
-    baseRole: 'admin',
-    defaultEmail: 'inspetor.marcos@ucore.edu.br',
-    defaultFirst: 'Marcos',
-    defaultLast: 'Dinis',
-    cargoFull: 'Inspetor Técnico da Repartição Municipal',
-  },
-  {
-    id: 'chefe_reparticao',
-    label: 'Chefe de Repartição / Ensino Geral',
-    badge: 'Repartição de Ensino',
-    icon: Award,
-    desc: 'Supervisão do ensino primário e secundário, distribuição docente e rede curricular',
-    prefix: 'Chefe de Repartição',
-    baseRole: 'admin',
-    defaultEmail: 'chefe.ensino@ucore.edu.br',
-    defaultFirst: 'Augusto',
-    defaultLast: 'Nvula',
-    cargoFull: 'Chefe da Repartição do Ensino Geral',
-  },
-  {
-    id: 'tecnico_estatistica',
-    label: 'Técnico(a) de Planeamento & Estatística',
-    badge: 'Planeamento & Dados',
-    icon: BarChart3,
-    desc: 'Consolidação de dados do Censo Escolar, taxas de aprovação, fluxo e infraestrutura',
-    prefix: 'Técnico de Estatística',
-    baseRole: 'admin',
-    defaultEmail: 'estatistica.dme@ucore.edu.br',
-    defaultFirst: 'Helena',
-    defaultLast: 'Manuel',
-    cargoFull: 'Técnica de Estatística & Planeamento DME',
-  },
-  {
     id: 'admin_sistema',
-    label: 'Administrador(a) de Sistema Sigre',
-    badge: 'Super Admin TI',
+    label: 'Administrador(a) Geral do Sistema',
+    badge: 'Conta Central',
     icon: Settings,
-    desc: 'Gestão global da plataforma, parametrização dos módulos, utilizadores e segurança',
+    desc: 'Administração central vinculada ao perfil titular da Direcção Municipal (dmedoquessua@gmail.com)',
     prefix: 'Admin.',
     baseRole: 'admin',
-    defaultEmail: 'admin.sistema@sigre.edu.ao',
-    defaultFirst: 'Suporte',
-    defaultLast: 'Sigre',
-    cargoFull: 'Superintendente & Administrador de Sistemas TI',
+    defaultEmail: 'dmedoquessua@gmail.com',
+    defaultFirst: 'Administração',
+    defaultLast: 'Central DME',
+    cargoFull: 'Administrador Geral do Sistema Sigre',
   },
 ];
 
@@ -292,8 +308,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   // Institutional Scope & Role Flexion State
   const [institutionalScope, setInstitutionalScope] = useState<'escola' | 'administracao'>('escola');
   const [schoolRole, setSchoolRole] = useState<SchoolStaffRole>('diretor_geral');
-  const [adminRole, setAdminRole] = useState<AdminStaffRole>('diretor_municipal');
+  const [adminRole, setAdminRole] = useState<AdminStaffRole>('chefe_reparticao');
   const [schoolOrUnitName, setSchoolOrUnitName] = useState('');
+
+  // Occupied DME cargos map (prevents registering duplicate DME cargos or another Director Municipal)
+  const occupiedDmeCargos = React.useMemo(() => {
+    return getOccupiedDmeCargos();
+  }, [mode, storageRevision]);
+
+  // Ensure selected adminRole in registration defaults to an available DME cargo
+  useEffect(() => {
+    if (mode === 'register' && institutionalScope === 'administracao') {
+      if (occupiedDmeCargos[adminRole]?.occupied) {
+        const firstAvailable = ADMIN_ROLES_CONFIG.find((r) => !occupiedDmeCargos[r.id]?.occupied);
+        if (firstAvailable && firstAvailable.id !== adminRole) {
+          setAdminRole(firstAvailable.id);
+        }
+      }
+    }
+  }, [mode, institutionalScope, occupiedDmeCargos, adminRole]);
   
   // Sigre Predefined System Selection Options
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>(UCORE_MUNICIPALITIES[0]);
@@ -337,7 +370,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   }, [registeredSchools, selectedSchoolId]);
 
-  // Real-time pre-registration search across Sigre roster
+  // Real-time pre-registration search across Sigre roster (ONLY for school scope; DME staff are NEVER school directors)
   useEffect(() => {
     if (mode !== 'register') {
       setPreRegResult(null);
@@ -357,8 +390,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setPreRegResult(null);
       }
     } else {
-      const res = searchPreRegisteredDirector(email, biNumber, fullName, selectedMunicipality);
-      setPreRegResult(res.found ? res : null);
+      // Pessoal da Direcção Municipal (DME) nunca deve ser vinculado como Director de Escola
+      setPreRegResult(null);
     }
   }, [mode, email, biNumber, firstName, lastName, selectedSchoolId, selectedMunicipality, schoolRole, institutionalScope, registeredSchools]);
 
@@ -462,20 +495,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     // 1. Se a candidatura estiver pendente de homologação
     if (approvalCheck.app && approvalCheck.status === 'pendente') {
       const app = approvalCheck.app;
+      const isDmeMember = app.scope === 'administracao' || app.type === 'membro_dme' || Boolean(app.adminRole);
+      const dmeCfg = isDmeMember ? ADMIN_ROLES_CONFIG.find((c) => c.id === app.adminRole) : undefined;
       const pendingUser: UserAccount = {
         id: app.userId || uid || 'usr_' + Date.now(),
         firstName: gFirst,
         lastName: gLast,
         email: cleanEmail,
-        role: app.type === 'professor' ? 'professor' : 'diretor',
-        scope: app.scope || 'escola',
-        schoolRole: app.schoolRole,
-        adminRole: app.adminRole,
-        cargoTitle: app.roleRequested || 'Candidato Institucional',
-        schoolName: app.schoolName || 'Unidade Escolar',
-        schoolId: app.schoolId,
+        role: isDmeMember ? 'admin' : app.type === 'professor' || app.schoolRole === 'professor' ? 'professor' : 'diretor',
+        scope: isDmeMember ? 'administracao' : app.scope || 'escola',
+        schoolRole: isDmeMember ? undefined : app.schoolRole,
+        adminRole: isDmeMember ? (app.adminRole || 'chefe_reparticao') : undefined,
+        cargoTitle: app.roleRequested || dmeCfg?.label || 'Candidato Institucional',
+        schoolName: isDmeMember ? 'Direcção Municipal da Educação de Quêssua' : (app.schoolName || 'Unidade Escolar'),
+        schoolId: isDmeMember ? undefined : app.schoolId,
         municipalityOrDepartment: app.municipality || 'Quêssua',
-        titlePrefix: app.type === 'professor' ? 'Prof.' : 'Director',
+        titlePrefix: isDmeMember
+          ? (dmeCfg?.prefix || 'Quadro DME')
+          : app.type === 'professor' || app.schoolRole === 'professor'
+          ? 'Prof.'
+          : 'Director',
         greeting: `Olá ${gFirst}`,
         avatar: photoURL || undefined,
         status: 'pendente',
@@ -502,12 +541,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     let resolvedRole: 'admin' | 'diretor' | 'professor' = 'admin';
     let resolvedScope: 'escola' | 'administracao' = 'administracao';
     let resolvedSchoolRole: SchoolStaffRole | undefined = undefined;
-    let resolvedAdminRole: AdminStaffRole | undefined = 'admin_sistema';
+    let resolvedAdminRole: AdminStaffRole | undefined = 'chefe_reparticao';
     let resolvedCargo = isSuperAdmin
       ? 'Administrador de Sistema Sigre (Super Admin)'
       : isDirectorMunicipal
       ? 'Director Municipal da Educação de Quessua'
-      : 'Utilizador Institucional';
+      : 'Quadro Institucional';
     let resolvedPrefix = isSuperAdmin ? 'Admin.' : isDirectorMunicipal ? 'Dr.' : 'Sr(a).';
     let resolvedSchoolName: string | undefined = 'Direcção Municipal da Educação de Quessua';
     let resolvedSchoolId: string | undefined = undefined;
@@ -532,15 +571,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       gLast = 'da Educação';
     } else if (approvalCheck.app) {
       const app = approvalCheck.app;
-      resolvedScope = app.scope || resolvedScope;
-      resolvedSchoolRole = app.schoolRole;
-      resolvedAdminRole = app.adminRole;
-      resolvedCargo = app.roleRequested || resolvedCargo;
-      resolvedSchoolName = app.schoolName || resolvedSchoolName;
-      resolvedSchoolId = app.schoolId;
-      if (app.scope === 'escola') {
-        resolvedRole = app.schoolRole === 'professor' ? 'professor' : 'diretor';
-        resolvedPrefix = app.schoolRole === 'professor' ? 'Prof.' : 'Director';
+      const isDmeMember = app.scope === 'administracao' || app.type === 'membro_dme' || Boolean(app.adminRole);
+      if (isDmeMember) {
+        const dmeCfg = ADMIN_ROLES_CONFIG.find((c) => c.id === app.adminRole);
+        resolvedRole = 'admin';
+        resolvedScope = 'administracao';
+        resolvedSchoolRole = undefined;
+        resolvedAdminRole = app.adminRole || 'chefe_reparticao';
+        resolvedCargo = app.roleRequested || dmeCfg?.label || 'Chefe de Repartição / Ensino Geral';
+        resolvedPrefix = dmeCfg?.prefix || resolvedCargo;
+        resolvedSchoolName = 'Direcção Municipal da Educação de Quêssua';
+        resolvedSchoolId = undefined;
+      } else {
+        const schCfg = SCHOOL_ROLES_CONFIG.find((c) => c.id === app.schoolRole);
+        resolvedScope = 'escola';
+        resolvedSchoolRole = app.schoolRole || (app.type === 'professor' ? 'professor' : 'diretor_geral');
+        resolvedAdminRole = undefined;
+        resolvedRole = app.type === 'professor' || app.schoolRole === 'professor' ? 'professor' : 'diretor';
+        resolvedCargo = app.roleRequested || schCfg?.label || (resolvedRole === 'professor' ? 'Professor(a) / Docente' : 'Diretor(a) Geral');
+        resolvedPrefix = schCfg?.prefix || (resolvedRole === 'professor' ? 'Prof.' : 'Director');
+        resolvedSchoolName = app.schoolName || resolvedSchoolName;
+        resolvedSchoolId = app.schoolId;
       }
       const appNames = (app.fullName || '').trim().split(' ');
       if (appNames[0]) gFirst = appNames[0];
@@ -719,160 +770,245 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setErrorMsg(null);
 
     if (mode === 'login') {
-      if (!email.trim() || !password.trim()) {
-        setErrorMsg('Por favor, informe seu e-mail e palavra-passe.');
-        return;
-      }
-
-      if (!verifyPassword(email.trim(), password.trim())) {
-        setErrorMsg('A palavra-passe informada está incorreta para este e-mail.');
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail || !password) {
+        setErrorMsg('Por favor, informe o seu e-mail e a sua palavra-passe.');
         return;
       }
 
       setLoading(true);
       onAuthLoadingChange?.(true, 'login');
 
-      // Sync applications from server to ensure fresh approval status from any device
-      syncApplicationsFromServer().catch(() => {}).finally(() => {
-        setLoading(false);
-        
-        // Find if matches preset or detect context
-        let matchedScope: 'escola' | 'administracao' = institutionalScope;
-        let matchedSchoolRole = schoolRole;
-        let matchedAdminRole = adminRole;
-        let resolvedCargoTitle = '';
-        let resolvedPrefix = '';
-        let resolvedRole: 'admin' | 'diretor' | 'professor' = 'admin';
+      try {
+        // 1. Sync applications and user records from cloud/server before authenticating
+        await syncApplicationsFromServer().catch(() => {});
+        let firestoreUser: UserAccount | null = null;
+        try {
+          firestoreUser = await fetchUserFromFirestore(cleanEmail);
+        } catch {}
 
-        if (institutionalScope === 'escola') {
-          const cfg = SCHOOL_ROLES_CONFIG.find(c => c.id === schoolRole) || SCHOOL_ROLES_CONFIG[0];
-          resolvedRole = cfg.baseRole;
-          resolvedCargoTitle = cfg.label;
-          resolvedPrefix = cfg.prefix;
-        } else {
-          const cfg = ADMIN_ROLES_CONFIG.find(c => c.id === adminRole) || ADMIN_ROLES_CONFIG[0];
-          resolvedRole = cfg.baseRole;
-          resolvedCargoTitle = cfg.label;
-          resolvedPrefix = cfg.prefix;
+        const accountLookup = findRegisteredAccountByEmail(cleanEmail);
+        const hasRegisteredAccount = Boolean(accountLookup.exists || firestoreUser);
+
+        if (!hasRegisteredAccount) {
+          setLoading(false);
+          onAuthLoadingChange?.(false);
+          setErrorMsg(
+            'Nenhuma conta registada foi localizada para este endereço de e-mail. Crie a sua própria conta antes de iniciar sessão.'
+          );
+          return;
         }
 
-        // Email heuristics override if user typed freeform
-        const lowEmail = email.toLowerCase().trim();
-        const isDirectorMunicipal =
-          lowEmail === 'dmedoquessua@gmail.com' ||
-          lowEmail.includes('dmedoquessua') ||
-          (matchedScope === 'administracao' && matchedAdminRole === 'diretor_municipal');
+        // 2. Strict 100% Exact Password Verification (zero tolerance for 1-digit differences or accessing someone else's account)
+        const remoteVerifier = accountLookup.app?.passwordVerifier || firestoreUser?.passwordVerifier;
+        if (!verifyPassword(cleanEmail, password, remoteVerifier)) {
+          setLoading(false);
+          onAuthLoadingChange?.(false);
+          setErrorMsg(
+            'A palavra-passe introduzida está incorreta para esta conta. Por segurança, o acesso foi bloqueado — verifique todos os caracteres e dígitos.'
+          );
+          return;
+        }
 
-        if (isDirectorMunicipal) {
+        // 3. Resolve exact role, scope, and cargo from the authenticated user's record
+        //    (NEVER treat DME staff as School Directors or as the Municipal Director!)
+        const isMasterAdmin =
+          cleanEmail === 'dmedoquessua@gmail.com' || cleanEmail === 'beliziodos20@gmail.com';
+
+        let matchedScope: 'escola' | 'administracao' = 'escola';
+        let matchedSchoolRole: SchoolStaffRole | undefined = undefined;
+        let matchedAdminRole: AdminStaffRole | undefined = undefined;
+        let resolvedRole: 'admin' | 'diretor' | 'professor' = 'diretor';
+        let resolvedCargoTitle = '';
+        let resolvedPrefix = '';
+        let resolvedFirst = firstName.trim() || 'Utilizador';
+        let resolvedLast = lastName.trim() || 'Sigre';
+        let resolvedSchoolName = 'Unidade Escolar';
+        let resolvedSchoolId: string | undefined = undefined;
+        let resolvedUserId = 'usr_' + Date.now();
+
+        if (isMasterAdmin) {
           matchedScope = 'administracao';
-          matchedAdminRole = 'diretor_municipal';
+          matchedAdminRole = cleanEmail === 'beliziodos20@gmail.com' ? 'admin_sistema' : 'diretor_municipal';
           resolvedRole = 'admin';
-          resolvedCargoTitle = 'Director Municipal da Educação de Quessua';
-          resolvedPrefix = 'Dr.';
-        } else if (lowEmail.includes('prof') || lowEmail.includes('santar') || lowEmail.includes('docente')) {
+          resolvedCargoTitle =
+            cleanEmail === 'beliziodos20@gmail.com'
+              ? 'Administrador de Sistema Sigre (Super Admin)'
+              : 'Director Municipal da Educação de Quessua';
+          resolvedPrefix = cleanEmail === 'beliziodos20@gmail.com' ? 'Admin.' : 'Dr.';
+          resolvedFirst = cleanEmail === 'beliziodos20@gmail.com' ? 'Belízio' : 'Director Municipal';
+          resolvedLast = cleanEmail === 'beliziodos20@gmail.com' ? 'Administrador' : 'da Educação';
+          resolvedSchoolName = 'Direcção Municipal da Educação de Quêssua';
+          resolvedUserId = cleanEmail === 'beliziodos20@gmail.com' ? 'usr_belizio_admin' : 'usr_dme_quessua';
+        } else if (accountLookup.app) {
+          const app = accountLookup.app;
+          resolvedUserId = app.userId || app.id || resolvedUserId;
+          const nameParts = (app.fullName || '').trim().split(' ');
+          if (nameParts[0]) resolvedFirst = nameParts[0];
+          if (nameParts.length > 1) resolvedLast = nameParts.slice(1).join(' ');
+
+          const isDmeStaff =
+            app.scope === 'administracao' || app.type === 'membro_dme' || Boolean(app.adminRole);
+
+          if (isDmeStaff) {
+            // Pessoal da Direcção Municipal (Chefe de Repartição, Inspector Escolar, Técnico DME, etc.)
+            let detectedAdminRole: AdminStaffRole = app.adminRole || 'chefe_reparticao';
+            if (!app.adminRole && app.roleRequested) {
+              const reqLow = app.roleRequested.toLowerCase();
+              if (reqLow.includes('inspetor') || reqLow.includes('inspector')) {
+                detectedAdminRole = 'inspetor_escolar';
+              } else if (reqLow.includes('estatística') || reqLow.includes('estatistica') || reqLow.includes('planeamento')) {
+                detectedAdminRole = 'tecnico_estatistica';
+              } else if (reqLow.includes('recursos humanos') || reqLow.includes('secretaria')) {
+                detectedAdminRole = 'tecnico_recursos_humanos';
+              } else {
+                detectedAdminRole = 'chefe_reparticao';
+              }
+            }
+            const dmeCfg = ADMIN_ROLES_CONFIG.find((c) => c.id === detectedAdminRole) || ADMIN_ROLES_CONFIG[0];
+            matchedScope = 'administracao';
+            matchedAdminRole = detectedAdminRole;
+            matchedSchoolRole = undefined;
+            resolvedRole = 'admin';
+            resolvedCargoTitle = app.roleRequested || dmeCfg.label;
+            resolvedPrefix = dmeCfg.prefix;
+            resolvedSchoolName = 'Direcção Municipal da Educação de Quêssua';
+            resolvedSchoolId = undefined;
+          } else {
+            // Pessoal de Unidade Escolar (Director de Escola, Subdirector, Professor, Secretário Escolar)
+            const isProf = app.type === 'professor' || app.schoolRole === 'professor';
+            const detectedSchoolRole: SchoolStaffRole =
+              app.schoolRole || (isProf ? 'professor' : 'diretor_geral');
+            const schCfg = SCHOOL_ROLES_CONFIG.find((c) => c.id === detectedSchoolRole) || SCHOOL_ROLES_CONFIG[0];
+            matchedScope = 'escola';
+            matchedSchoolRole = detectedSchoolRole;
+            matchedAdminRole = undefined;
+            resolvedRole = isProf ? 'professor' : 'diretor';
+            resolvedCargoTitle = app.roleRequested || schCfg.label;
+            resolvedPrefix = schCfg.prefix;
+            resolvedSchoolName = app.schoolName || registeredSchools[0]?.name || 'Unidade Escolar';
+            resolvedSchoolId = app.schoolId || registeredSchools[0]?.id;
+          }
+        } else if (accountLookup.dmeStaff) {
+          const staff = accountLookup.dmeStaff;
+          const staffRole: AdminStaffRole = staff.role || 'chefe_reparticao';
+          const dmeCfg = ADMIN_ROLES_CONFIG.find((c) => c.id === staffRole) || ADMIN_ROLES_CONFIG[0];
+          const nameParts = (staff.name || '').trim().split(' ');
+          if (nameParts[0]) resolvedFirst = nameParts[0];
+          if (nameParts.length > 1) resolvedLast = nameParts.slice(1).join(' ');
+          matchedScope = 'administracao';
+          matchedAdminRole = staffRole;
+          matchedSchoolRole = undefined;
+          resolvedRole = 'admin';
+          resolvedCargoTitle = staff.cargoTitle || dmeCfg.label;
+          resolvedPrefix = dmeCfg.prefix;
+          resolvedSchoolName = staff.department || 'Direcção Municipal da Educação de Quêssua';
+          resolvedUserId = staff.id || resolvedUserId;
+        } else if (firestoreUser) {
+          resolvedUserId = firestoreUser.id || resolvedUserId;
+          resolvedFirst = firestoreUser.firstName || resolvedFirst;
+          resolvedLast = firestoreUser.lastName || resolvedLast;
+          matchedScope = firestoreUser.scope || (firestoreUser.role === 'admin' ? 'administracao' : 'escola');
+          matchedSchoolRole = firestoreUser.schoolRole;
+          matchedAdminRole = firestoreUser.adminRole;
+          resolvedRole =
+            firestoreUser.role === 'admin' || firestoreUser.role === 'diretor' || firestoreUser.role === 'professor'
+              ? firestoreUser.role
+              : 'diretor';
+          resolvedCargoTitle = firestoreUser.cargoTitle || 'Utilizador Institucional';
+          resolvedPrefix = firestoreUser.titlePrefix || '';
+          resolvedSchoolName = firestoreUser.schoolName || 'Unidade Escolar';
+          resolvedSchoolId = firestoreUser.schoolId;
+        } else if (accountLookup.teacher) {
+          const t = accountLookup.teacher;
+          const nameParts = (t.name || '').trim().split(' ');
+          if (nameParts[0]) resolvedFirst = nameParts[0];
+          if (nameParts.length > 1) resolvedLast = nameParts.slice(1).join(' ');
           matchedScope = 'escola';
           matchedSchoolRole = 'professor';
+          matchedAdminRole = undefined;
           resolvedRole = 'professor';
           resolvedCargoTitle = 'Professor(a) / Docente';
           resolvedPrefix = 'Prof.';
-        } else if (lowEmail.includes('pedagogico')) {
-          matchedScope = 'escola';
-          matchedSchoolRole = 'subdiretor_pedagogico';
-          resolvedRole = 'diretor';
-          resolvedCargoTitle = 'Subdirector(a) Pedagógico(a)';
-          resolvedPrefix = 'Subdiretor Pedagógico';
-        } else if (lowEmail.includes('adm') && lowEmail.includes('subdiretor')) {
-          matchedScope = 'escola';
-          matchedSchoolRole = 'subdiretor_administrativo';
-          resolvedRole = 'diretor';
-          resolvedCargoTitle = 'Subdirector(a) Administrativo(a)';
-          resolvedPrefix = 'Subdiretor Adm.';
-        } else if (lowEmail.includes('inspetor')) {
-          matchedScope = 'administracao';
-          matchedAdminRole = 'inspetor_escolar';
-          resolvedRole = 'admin';
-          resolvedCargoTitle = 'Inspetor(a) Escolar Municipal';
-          resolvedPrefix = 'Inspetor';
-        } else if (lowEmail.includes('diretor') && (lowEmail.includes('carl') || lowEmail.includes('escola'))) {
+          resolvedSchoolName = t.schoolName || registeredSchools[0]?.name || 'Unidade Escolar';
+          resolvedUserId = t.id || resolvedUserId;
+        } else if (accountLookup.director) {
+          const d = accountLookup.director;
+          const nameParts = (d.name || d.nomeCompleto || '').trim().split(' ');
+          if (nameParts[0]) resolvedFirst = nameParts[0];
+          if (nameParts.length > 1) resolvedLast = nameParts.slice(1).join(' ');
           matchedScope = 'escola';
           matchedSchoolRole = 'diretor_geral';
+          matchedAdminRole = undefined;
           resolvedRole = 'diretor';
-          resolvedCargoTitle = 'Director(a) Geral';
+          resolvedCargoTitle = 'Diretor(a) Geral';
           resolvedPrefix = 'Diretor Geral';
-        } else if (lowEmail.includes('dme') || lowEmail.includes('municipal')) {
-          matchedScope = 'administracao';
-          matchedAdminRole = 'diretor_municipal';
-          resolvedRole = 'admin';
-          resolvedCargoTitle = 'Director Municipal da Educação de Quessua';
-          resolvedPrefix = 'Dr.';
+          resolvedSchoolName = d.schoolName || d.nomeEscola || registeredSchools[0]?.name || 'Unidade Escolar';
+          resolvedUserId = d.id || resolvedUserId;
         }
 
-        const resolvedFirst = isDirectorMunicipal
-          ? 'Director Municipal'
-          : firstName.trim() || (resolvedRole === 'admin' ? 'Administrador' : resolvedRole === 'diretor' ? 'Director' : 'Professor');
-        const resolvedLast = isDirectorMunicipal ? 'da Educação' : (lastName.trim() || 'Sigre');
-        
-        const matchedSchool = registeredSchools.length > 0
-          ? (registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0])
-          : null;
-
         const loggedUser: UserAccount = {
-          id: isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_' + Date.now(),
+          id: resolvedUserId,
           firstName: resolvedFirst,
           lastName: resolvedLast,
-          email: email.trim(),
+          email: cleanEmail,
           role: resolvedRole,
           scope: matchedScope,
           schoolRole: matchedScope === 'escola' ? matchedSchoolRole : undefined,
           adminRole: matchedScope === 'administracao' ? matchedAdminRole : undefined,
           cargoTitle: resolvedCargoTitle,
-          schoolName: matchedScope === 'escola' ? (matchedSchool?.name || schoolOrUnitName || 'Unidade Escolar') : 'Direcção Municipal da Educação de Quessua',
-          schoolId: matchedScope === 'escola' ? (matchedSchool?.id) : undefined,
-          municipalityOrDepartment: selectedMunicipality || 'Quessua',
+          schoolName: resolvedSchoolName,
+          schoolId: matchedScope === 'escola' ? resolvedSchoolId : undefined,
+          municipalityOrDepartment: selectedMunicipality || 'Quêssua (Malanje)',
           titlePrefix: resolvedPrefix,
-          greeting: `Olá ${resolvedPrefix} ${resolvedFirst}`,
+          greeting: `Olá ${resolvedPrefix ? resolvedPrefix + ' ' : ''}${resolvedFirst}`,
           rememberMe,
         };
 
-        // Check if this account is pending approval
-        const approvalCheck = checkUserApprovalStatus(loggedUser.id, email.trim());
+        const approvalCheck = checkUserApprovalStatus(loggedUser.id, cleanEmail);
         if (approvalCheck.app) {
           const app = approvalCheck.app;
-          const nameParts = (app.fullName || '').trim().split(' ');
-          loggedUser.id = app.userId || loggedUser.id;
-          if (nameParts[0]) loggedUser.firstName = nameParts[0];
-          if (nameParts.length > 1) loggedUser.lastName = nameParts.slice(1).join(' ');
-          if (app.scope) loggedUser.scope = app.scope;
-          if (app.schoolRole) loggedUser.schoolRole = app.schoolRole;
-          if (app.adminRole) loggedUser.adminRole = app.adminRole;
-          if (app.roleRequested) loggedUser.cargoTitle = app.roleRequested;
-          if (app.schoolName) loggedUser.schoolName = app.schoolName;
-          if (app.schoolId) loggedUser.schoolId = app.schoolId;
           if (app.biNumber) loggedUser.biNumber = app.biNumber;
           if (app.phone) loggedUser.phone = app.phone;
           if (app.subject) loggedUser.subject = app.subject;
           if (app.gradeClass) loggedUser.gradeClass = app.gradeClass;
+          if (app.nivelAcademico) loggedUser.nivelAcademico = app.nivelAcademico;
+          if (typeof app.anosServico === 'number') loggedUser.anosServico = app.anosServico;
+          if (app.regimeTrabalho) loggedUser.regimeTrabalho = app.regimeTrabalho;
           loggedUser.approverTargetRole = app.targetApproverRole;
           loggedUser.approverTargetSchoolName = app.schoolName;
         }
-        if (approvalCheck.status === 'pendente') {
+
+        if (approvalCheck.status === 'pendente' && !isMasterAdmin) {
           loggedUser.status = 'pendente';
-          setSuccessMsg(`A sua candidatura continua em análise aguardando despacho. Redirecionando para a tela de espera...`);
-        } else if (approvalCheck.status === 'rejeitado') {
-          setErrorMsg(`A sua candidatura foi recusada pela administração: ${approvalCheck.app?.rejectionReason || 'Contacte a direcção'}`);
+          setSuccessMsg(
+            `A sua candidatura como ${loggedUser.cargoTitle} continua em análise na Direção Municipal da Educação. Redirecionando para o acompanhamento...`
+          );
+        } else if (approvalCheck.status === 'rejeitado' && !isMasterAdmin) {
+          setErrorMsg(
+            `A sua candidatura foi recusada pela administração: ${approvalCheck.app?.rejectionReason || 'Contacte a direcção'}`
+          );
           setLoading(false);
           onAuthLoadingChange?.(false);
           return;
         } else {
           loggedUser.status = 'ativo';
-          setSuccessMsg(`Bem-vindo, ${loggedUser.greeting}! Redirecionando para o ambiente de ${loggedUser.cargoTitle || resolvedCargoTitle}...`);
+          setSuccessMsg(
+            `Bem-vindo(a), ${loggedUser.greeting}! A aceder ao painel de ${loggedUser.cargoTitle}...`
+          );
         }
 
+        setLoading(false);
         setTimeout(() => {
           onAuthLoadingChange?.(false);
           onLoginSuccess(loggedUser);
-        }, 800);
-      }, 650);
+        }, 650);
+      } catch (err) {
+        console.error('Erro ao autenticar:', err);
+        setLoading(false);
+        onAuthLoadingChange?.(false);
+        setErrorMsg('Erro ao verificar as credenciais na base de dados. Tente novamente.');
+      }
     } else {
       // Register validation
       if (!firstName.trim()) {
@@ -906,10 +1042,50 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
       setLoading(true);
       setErrorMsg(null);
-      setSuccessMsg('A registrar a sua inscrição e a sincronizar na base de dados central...');
-      onAuthLoadingChange?.(true, 'register');
 
       try {
+        // Sync fresh applications from cloud before checking duplicate accounts or occupied DME cargos
+        await syncApplicationsFromServer().catch(() => {});
+
+        // 1. Block duplicate registration of an existing email or BI (no one can overwrite or hijack another user's account)
+        const dupCheck = checkDuplicateRegistration(email.trim(), biNumber.trim());
+        if (dupCheck.duplicate) {
+          setLoading(false);
+          onAuthLoadingChange?.(false);
+          setErrorMsg(dupCheck.reason || 'Este e-mail ou BI já pertence a outro utilizador registado.');
+          return;
+        }
+
+        // Also check Firestore directly for duplicate email
+        try {
+          const existingCloudUser = await fetchUserFromFirestore(email.trim().toLowerCase());
+          if (existingCloudUser && existingCloudUser.email) {
+            setLoading(false);
+            onAuthLoadingChange?.(false);
+            setErrorMsg(
+              `O e-mail "${email.trim()}" já pertence à conta de ${existingCloudUser.firstName} ${existingCloudUser.lastName}. Por segurança, ninguém pode aceder ou recriar a conta de outro utilizador.`
+            );
+            return;
+          }
+        } catch {}
+
+        // 2. If registering in Administração (DME), strictly block registering an already occupied cargo
+        if (institutionalScope === 'administracao') {
+          const freshOccupied = getOccupiedDmeCargos();
+          const chosenDmeConfig = ADMIN_ROLES_CONFIG.find((c) => c.id === adminRole) || ADMIN_ROLES_CONFIG[0];
+          if (freshOccupied[adminRole]?.occupied) {
+            setLoading(false);
+            onAuthLoadingChange?.(false);
+            setErrorMsg(
+              `O cargo de "${chosenDmeConfig.label}" na Direcção Municipal da Educação já se encontra ocupado (${freshOccupied[adminRole].holderName}). Através da existência da conta oficial da DME, não é permitido cadastrar outro utilizador com o mesmo cargo.`
+            );
+            return;
+          }
+        }
+
+        setSuccessMsg('A registrar a sua inscrição e a sincronizar na base de dados central...');
+        onAuthLoadingChange?.(true, 'register');
+
         const userFirst = firstName.trim();
 
         const chosenConfig = institutionalScope === 'escola'
@@ -924,21 +1100,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           : null;
         const resolvedSchoolName = institutionalScope === 'escola'
           ? (matchedSchool?.name || schoolOrUnitName || 'Unidade Escolar Municipal')
-          : `Direcção Municipal da Educação (${selectedMunicipality})`;
+          : 'Direcção Municipal da Educação de Quêssua';
         const resolvedSchoolId = institutionalScope === 'escola'
           ? (matchedSchool?.id || 'esc-default')
           : undefined;
 
-        // Regras de Homologação Central DME Quêssua:
-        // A Direcção Municipal da Educação (dmedoquessua@gmail.com) é a entidade homologadora máxima de todos os quadros (Diretores, Professores, Funcionários e Membros DME).
-        const isOfficialDmeMaster =
-          institutionalScope === 'administracao' &&
-          adminRole === 'diretor_municipal' &&
-          email.trim().toLowerCase() === 'dmedoquessua@gmail.com';
+        const isPending = true;
 
-        const isPending = !isOfficialDmeMaster;
-
-        const appType = (institutionalScope === 'administracao' && !isOfficialDmeMaster)
+        const appType = institutionalScope === 'administracao'
           ? 'membro_dme'
           : schoolRole === 'diretor_geral'
           ? 'diretor'
@@ -948,8 +1117,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         const newUserId = 'usr_' + Date.now();
 
-        // Save custom password in storage
-        updatePassword(email.trim(), password.trim());
+        // Save exact password and generate deterministic verifier token
+        const pwdRes = updatePassword(email.trim(), password);
+        const passwordVerifier = pwdRes.verifier || encodePasswordVerifier(email.trim(), password);
 
         // Create pending application record directly targeted to dmedoquessua@gmail.com
         if (isPending) {
@@ -972,15 +1142,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             targetApproverRole: 'admin',
             targetApproverEmail: 'dmedoquessua@gmail.com',
             approverDirectorName: 'Director Municipal da Educação (dmedoquessua@gmail.com)',
-            subject: schoolRole === 'professor' ? selectedSubject : undefined,
-            gradeClass: schoolRole === 'professor' ? selectedGradeClass : undefined,
+            subject: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedSubject : undefined,
+            gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
             status: 'pendente',
-            isPreRegistered: Boolean(preRegResult?.found),
-            preRegisteredDetails: preRegResult?.details,
+            isPreRegistered: institutionalScope === 'escola' ? Boolean(preRegResult?.found) : false,
+            preRegisteredDetails: institutionalScope === 'escola' ? preRegResult?.details : undefined,
             createdAt: new Date().toLocaleString('pt-AO'),
-            notes: preRegResult?.found
-              ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.`
-              : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente ao Administrador Central (DME - dmedoquessua@gmail.com) para homologação ministerial.`,
+            passwordVerifier,
+            notes:
+              institutionalScope === 'administracao'
+                ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Director Municipal (dmedoquessua@gmail.com) para homologação.`
+                : preRegResult?.found
+                ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.`
+                : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente ao Administrador Central (DME - dmedoquessua@gmail.com) para homologação ministerial.`,
           });
         }
 
@@ -1000,15 +1174,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           titlePrefix: prefix,
           greeting: `Olá ${prefix} ${userFirst}`,
           rememberMe: true,
-          status: isPending ? 'pendente' : 'ativo',
+          status: 'pendente',
           biNumber: biNumber.trim(),
           phone: phone.trim() || '+244 923 000 000',
-          subject: schoolRole === 'professor' ? selectedSubject : undefined,
-          gradeClass: schoolRole === 'professor' ? selectedGradeClass : undefined,
-          isPreRegistered: Boolean(preRegResult?.found),
+          subject: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedSubject : undefined,
+          gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
+          isPreRegistered: institutionalScope === 'escola' ? Boolean(preRegResult?.found) : false,
           submittedAt: new Date().toLocaleString('pt-AO'),
           approverTargetRole: 'admin',
           approverTargetSchoolName: resolvedSchoolName,
+          passwordVerifier,
         };
 
         // Persist user account directly to Firebase Firestore Cloud Database
@@ -1018,13 +1193,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           console.warn('[AuthPage] Erro ao sincronizar usuário no Firestore:', err);
         }
 
-        if (isPending) {
-          setSuccessMsg(
-            `Inscrição submetida! A sua conta de ${cargoTitle} foi enviada diretamente para a conta do Administrador Central (DME - dmedoquessua@gmail.com) para homologação.`
-          );
-        } else {
-          setSuccessMsg(`Conta criada com sucesso! Acessando ambiente de ${cargoTitle} (${userFirst})...`);
-        }
+        setSuccessMsg(
+          `Inscrição submetida! A sua conta com o cargo de ${cargoTitle} foi enviada diretamente para a Direcção Municipal da Educação (dmedoquessua@gmail.com) para homologação.`
+        );
 
         setTimeout(() => {
           onAuthLoadingChange?.(false);
@@ -1538,23 +1709,46 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           {ADMIN_ROLES_CONFIG.map((roleItem) => {
                             const isSelected = adminRole === roleItem.id;
                             const RoleIcon = roleItem.icon;
+                            const occInfo = occupiedDmeCargos[roleItem.id];
+                            const isOccupied = Boolean(occInfo?.occupied);
                             return (
                               <button
                                 key={roleItem.id}
                                 type="button"
-                                onClick={() => setAdminRole(roleItem.id)}
-                                className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col gap-1 ${
-                                  isSelected
-                                    ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
-                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                onClick={() => {
+                                  if (isOccupied) {
+                                    setErrorMsg(
+                                      `O cargo "${roleItem.label}" já se encontra ocupado (${occInfo.holderName}). Selecione um cargo disponível na Direcção Municipal.`
+                                    );
+                                    return;
+                                  }
+                                  setErrorMsg(null);
+                                  setAdminRole(roleItem.id);
+                                }}
+                                className={`p-2 rounded-xl text-left border transition-all flex flex-col gap-1 ${
+                                  isOccupied
+                                    ? 'bg-slate-100/90 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
+                                    : isSelected
+                                    ? 'bg-[#002133] text-white border-[#002133] shadow-xs cursor-pointer'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'
                                 }`}
                               >
-                                <div className="flex items-center justify-between">
-                                  <RoleIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-[#f75142]' : 'text-slate-500'}`} />
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                                  }`}>
-                                    {roleItem.badge}
+                                <div className="flex items-center justify-between gap-1">
+                                  {isOccupied ? (
+                                    <Lock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                  ) : (
+                                    <RoleIcon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#f75142]' : 'text-slate-500'}`} />
+                                  )}
+                                  <span
+                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate ${
+                                      isOccupied
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                        : isSelected
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-slate-100 text-slate-600'
+                                    }`}
+                                  >
+                                    {isOccupied ? 'Cargo Ocupado' : roleItem.badge}
                                   </span>
                                 </div>
                                 <span className="text-xs font-bold leading-tight">{roleItem.label}</span>
@@ -1564,11 +1758,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         </div>
                         {/* Selected Role Info Pill */}
                         {(() => {
-                          const active = ADMIN_ROLES_CONFIG.find(r => r.id === adminRole);
+                          const active = ADMIN_ROLES_CONFIG.find((r) => r.id === adminRole);
+                          const occ = active ? occupiedDmeCargos[active.id] : undefined;
                           return active ? (
-                            <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-                              <Info className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
-                              <span>{active.desc}</span>
+                            <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-start gap-2">
+                              <Info className="w-3.5 h-3.5 text-[#f75142] shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold text-slate-800 block">
+                                  Cargo na Direcção Municipal: {active.label}
+                                </span>
+                                <span>{active.desc}</span>
+                                {occ?.occupied && (
+                                  <span className="block text-rose-700 font-semibold mt-0.5">
+                                    Indisponível: já titularizado por {occ.holderName}.
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ) : null;
                         })()}

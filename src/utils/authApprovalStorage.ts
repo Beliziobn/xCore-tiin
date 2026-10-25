@@ -552,6 +552,43 @@ export function approveApplication(
       }
     }
 
+    // If a Municipal Directorate Staff member (Membro DME) is approved, save to DME Staff roster (never to School Directors)
+    if (target.type === 'membro_dme' || target.scope === 'administracao') {
+      try {
+        const rawDme = localStorage.getItem('ucore_dme_staff_list');
+        const dmeList = rawDme ? JSON.parse(rawDme) : [];
+        const dmeEntry = {
+          id: target.userId || target.id,
+          name: target.fullName,
+          role: target.adminRole || 'chefe_reparticao',
+          cargoTitle: target.roleRequested || 'Quadro Técnico da Direcção Municipal',
+          department: 'Direcção Municipal da Educação de Quêssua',
+          email: target.email,
+          phone: target.phone || '+244 923 000 000',
+          biNumber: target.biNumber,
+          status: 'Ativo' as const,
+          approvedAt: updatedApp.approvedAt,
+        };
+        const existingIdx = Array.isArray(dmeList)
+          ? dmeList.findIndex(
+              (m: any) =>
+                m.id === dmeEntry.id ||
+                (m.email && m.email.toLowerCase() === target.email.toLowerCase()) ||
+                (m.role && m.role === dmeEntry.role)
+            )
+          : -1;
+        const nextList = Array.isArray(dmeList) ? [...dmeList] : [];
+        if (existingIdx >= 0) {
+          nextList[existingIdx] = { ...nextList[existingIdx], ...dmeEntry };
+        } else {
+          nextList.unshift(dmeEntry);
+        }
+        localStorage.setItem('ucore_dme_staff_list', JSON.stringify(nextList));
+      } catch (err) {
+        console.warn('Erro ao integrar membro DME no quadro da Direcção Municipal:', err);
+      }
+    }
+
     // Update active user in localStorage if matching
     let activatedUser: UserAccount | undefined;
     const activeUserRaw = localStorage.getItem('ucore_active_user');
@@ -684,6 +721,233 @@ export function checkUserApprovalStatus(
 }
 
 /**
+ * Returns a map of occupied cargos in the Municipal Directorate (DME).
+ * Because the Master Admin account (dmedoquessua@gmail.com) already exists,
+ * 'diretor_municipal' and 'admin_sistema' are permanently occupied, and any other
+ * DME cargo ('chefe_reparticao', 'inspetor_escolar', 'tecnico_estatistica', 'tecnico_recursos_humanos')
+ * that has an active/pending registration or DME staff entry cannot be registered again.
+ */
+export function getOccupiedDmeCargos(): Record<
+  string,
+  { occupied: boolean; holderName: string; holderEmail: string; status: 'ativo' | 'pendente' }
+> {
+  const occupiedMap: Record<
+    string,
+    { occupied: boolean; holderName: string; holderEmail: string; status: 'ativo' | 'pendente' }
+  > = {
+    diretor_municipal: {
+      occupied: true,
+      holderName: 'Director Municipal da Educação (Conta Titular DME)',
+      holderEmail: OFFICIAL_DME_ADMIN_EMAIL,
+      status: 'ativo',
+    },
+    admin_sistema: {
+      occupied: true,
+      holderName: 'Administração Central do Sistema Sigre',
+      holderEmail: OFFICIAL_DME_ADMIN_EMAIL,
+      status: 'ativo',
+    },
+  };
+
+  try {
+    // 1. Check applications (pending or approved) for administration scope
+    const apps = getPendingApplications();
+    apps.forEach((app) => {
+      if (app.status === 'rejeitado') return;
+      if (app.scope === 'administracao' || app.type === 'membro_dme' || app.adminRole) {
+        let roleKey = app.adminRole;
+        if (!roleKey && app.roleRequested) {
+          const reqLow = app.roleRequested.toLowerCase();
+          if (reqLow.includes('chefe') || reqLow.includes('repartição') || reqLow.includes('reparticao')) {
+            roleKey = 'chefe_reparticao';
+          } else if (reqLow.includes('inspetor') || reqLow.includes('inspector')) {
+            roleKey = 'inspetor_escolar';
+          } else if (reqLow.includes('estatística') || reqLow.includes('estatistica') || reqLow.includes('planeamento')) {
+            roleKey = 'tecnico_estatistica';
+          } else if (reqLow.includes('recursos humanos') || reqLow.includes('secretaria')) {
+            roleKey = 'tecnico_recursos_humanos';
+          }
+        }
+        if (roleKey && !occupiedMap[roleKey]) {
+          occupiedMap[roleKey] = {
+            occupied: true,
+            holderName: app.fullName,
+            holderEmail: app.email,
+            status: app.status === 'aprovado' ? 'ativo' : 'pendente',
+          };
+        }
+      }
+    });
+
+    // 2. Check DME staff list in localStorage
+    const rawDme = localStorage.getItem('ucore_dme_staff_list');
+    if (rawDme) {
+      const dmeList = JSON.parse(rawDme);
+      if (Array.isArray(dmeList)) {
+        dmeList.forEach((member: any) => {
+          const roleKey = member?.role;
+          if (roleKey && !occupiedMap[roleKey]) {
+            occupiedMap[roleKey] = {
+              occupied: true,
+              holderName: member.name || 'Funcionário DME',
+              holderEmail: member.email || '',
+              status: 'ativo',
+            };
+          }
+        });
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return occupiedMap;
+}
+
+/**
+ * Checks whether an email or BI number is already registered in the system,
+ * preventing any user from overwriting, hijacking, or duplicating another person's account.
+ */
+export function checkDuplicateRegistration(
+  email: string,
+  biNumber?: string
+): { duplicate: boolean; reason?: string } {
+  const normEmail = (email || '').trim().toLowerCase();
+  const normBi = (biNumber || '').trim().toUpperCase();
+
+  if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
+    return {
+      duplicate: true,
+      reason:
+        'Este endereço de e-mail pertence à conta titular da Direcção Municipal da Educação e já se encontra registado. Ninguém pode criar uma nova conta com o e-mail de outro utilizador.',
+    };
+  }
+
+  // Check pending and approved applications
+  const apps = getPendingApplications();
+  for (const app of apps) {
+    if (app.status === 'rejeitado') continue;
+    if (normEmail && app.email && app.email.trim().toLowerCase() === normEmail) {
+      return {
+        duplicate: true,
+        reason: `O e-mail "${email.trim()}" já possui uma conta registada (${app.fullName} • ${app.roleRequested || 'Utilizador'}). Por segurança, não é permitido registar nem aceder à conta de outro utilizador.`,
+      };
+    }
+    if (normBi && normBi.length >= 5 && app.biNumber && app.biNumber.trim().toUpperCase() === normBi) {
+      return {
+        duplicate: true,
+        reason: `O Bilhete de Identidade "${biNumber?.trim()}" já se encontra vinculado à conta de ${app.fullName} (${app.roleRequested || 'Utilizador'}).`,
+      };
+    }
+  }
+
+  // Check DME staff list
+  try {
+    const rawDme = localStorage.getItem('ucore_dme_staff_list');
+    if (rawDme) {
+      const dmeList = JSON.parse(rawDme);
+      if (Array.isArray(dmeList)) {
+        const foundDme = dmeList.find(
+          (m: any) => m && m.email && m.email.trim().toLowerCase() === normEmail
+        );
+        if (foundDme) {
+          return {
+            duplicate: true,
+            reason: `Este e-mail já está registado no quadro da Direcção Municipal (${foundDme.name} • ${foundDme.cargoTitle}).`,
+          };
+        }
+      }
+    }
+  } catch {}
+
+  return { duplicate: false };
+}
+
+/**
+ * Looks up an existing registered account by email across all official stores
+ * so that login strictly authenticates existing users with their true role and cargo.
+ */
+export function findRegisteredAccountByEmail(email: string): {
+  exists: boolean;
+  isMasterAdmin?: boolean;
+  app?: PendingApplication;
+  dmeStaff?: any;
+  director?: any;
+  teacher?: any;
+} {
+  const normEmail = (email || '').trim().toLowerCase();
+  if (!normEmail) return { exists: false };
+
+  if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
+    return { exists: true, isMasterAdmin: true };
+  }
+
+  // 1. Check applications (pending, approved, or rejected)
+  const apps = getPendingApplications();
+  const matchedApp = apps.find((a) => a.email && a.email.trim().toLowerCase() === normEmail);
+  if (matchedApp) {
+    return { exists: true, app: matchedApp };
+  }
+
+  // 2. Check DME Staff list
+  try {
+    const rawDme = localStorage.getItem('ucore_dme_staff_list');
+    if (rawDme) {
+      const dmeList = JSON.parse(rawDme);
+      if (Array.isArray(dmeList)) {
+        const matchedDme = dmeList.find(
+          (m: any) => m && m.email && m.email.trim().toLowerCase() === normEmail
+        );
+        if (matchedDme) {
+          return { exists: true, dmeStaff: matchedDme };
+        }
+      }
+    }
+  } catch {}
+
+  // 3. Check registered school directors
+  for (const dirKey of ['ucore_admin_directors', 'ucore_registered_directors_v2']) {
+    try {
+      const rawDirs = localStorage.getItem(dirKey);
+      if (rawDirs) {
+        const parsedDirs = JSON.parse(rawDirs);
+        if (Array.isArray(parsedDirs)) {
+          const matchedDir = parsedDirs.find(
+            (d: any) =>
+              d &&
+              ((d.email && d.email.trim().toLowerCase() === normEmail) ||
+                (d.emailPessoal && d.emailPessoal.trim().toLowerCase() === normEmail))
+          );
+          if (matchedDir) {
+            return { exists: true, director: matchedDir };
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Check registered teachers
+  for (const tKey of ['ucore_admin_teachers', 'ucore_director_teachers_v1']) {
+    try {
+      const rawTeachers = localStorage.getItem(tKey);
+      if (rawTeachers) {
+        const parsedTeachers = JSON.parse(rawTeachers);
+        if (Array.isArray(parsedTeachers)) {
+          const matchedTeacher = parsedTeachers.find(
+            (t: any) => t && t.email && t.email.trim().toLowerCase() === normEmail
+          );
+          if (matchedTeacher) {
+            return { exists: true, teacher: matchedTeacher };
+          }
+        }
+      }
+    } catch {}
+  }
+
+  return { exists: false };
+}
+
+/**
  * Resolves the active Director's name for a given school from approved applications,
  * registered director dossiers, or the school record itself (e.g. "Carl").
  */
@@ -805,7 +1069,7 @@ export async function deleteApplication(applicationId: string): Promise<boolean>
     const remaining = list.filter((a) => a.id !== applicationId && a.userId !== applicationId);
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(remaining));
 
-    // Also remove from local director and teacher rosters if it was approved
+    // Also remove from local director, teacher, and DME staff rosters if it was approved
     if (target?.type === 'professor') {
       ['ucore_admin_teachers', 'ucore_director_teachers_v1'].forEach((k) => {
         try {
@@ -834,6 +1098,19 @@ export async function deleteApplication(applicationId: string): Promise<boolean>
           }
         } catch {}
       });
+    }
+
+    if (target?.type === 'membro_dme' || target?.scope === 'administracao') {
+      try {
+        const r = localStorage.getItem('ucore_dme_staff_list');
+        if (r) {
+          const arr = JSON.parse(r);
+          if (Array.isArray(arr)) {
+            const f = arr.filter((m: any) => m.id !== target.userId && m.id !== target.id && m.email !== target.email);
+            localStorage.setItem('ucore_dme_staff_list', JSON.stringify(f));
+          }
+        }
+      } catch {}
     }
 
     // Delete from Firestore cloud
@@ -865,7 +1142,7 @@ export async function deleteApplication(applicationId: string): Promise<boolean>
 
 /**
  * Permanently deletes all already homologated (approved) data across all layers:
- * applications, homologated directors, homologated teachers, and efectividade records.
+ * applications, homologated directors, homologated teachers, DME staff, and efectividade records.
  */
 export async function clearAllHomologatedData(): Promise<{ success: boolean; count: number; message?: string }> {
   try {
@@ -915,6 +1192,22 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
         }
       } catch {}
     });
+
+    // 3b. Clear homologated DME staff from local storage
+    try {
+      const rDme = localStorage.getItem('ucore_dme_staff_list');
+      if (rDme) {
+        const arrDme = JSON.parse(rDme);
+        if (Array.isArray(arrDme)) {
+          const fDme = arrDme.filter(
+            (m: any) =>
+              !m.approvedAt &&
+              !approved.some((a) => a.userId === m.id || a.id === m.id || a.email === m.email)
+          );
+          localStorage.setItem('ucore_dme_staff_list', JSON.stringify(fDme));
+        }
+      }
+    } catch {}
 
     // 4. Reset active user if it was homologated
     try {
@@ -975,4 +1268,5 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
     return { success: false, count: 0, message: 'Erro ao limpar dados homologados.' };
   }
 }
+
 

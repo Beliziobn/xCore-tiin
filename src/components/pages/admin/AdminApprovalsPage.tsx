@@ -237,22 +237,39 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   // Open approve modal
   const handleOpenApprove = (app: PendingApplication) => {
     setAppToApprove(app);
-    setTargetSchoolName(app.schoolName || (schools[0]?.name || ''));
+    const isDmeStaff = app.type === 'membro_dme' || app.scope === 'administracao';
+    setTargetSchoolName(
+      isDmeStaff
+        ? 'Direcção Municipal da Educação de Quêssua'
+        : app.schoolName || schools[0]?.name || ''
+    );
     setDispatchNumber(`Despacho de Homologação nº ${Math.floor(100 + Math.random() * 900)}/DME/2026`);
     setAppointmentYear(2026);
-    setApprovalNotes(`Homologado e empossado pela Direção Municipal da Educação.`);
+    setApprovalNotes(
+      isDmeStaff
+        ? `Homologado como ${app.roleRequested || 'Quadro Técnico da DME'} na Direcção Municipal da Educação de Quêssua.`
+        : `Homologado e empossado pela Direção Municipal da Educação.`
+    );
 
     // Intelligent default values for complementary fields based on candidate or role
     const defaultNivel = app.nivelAcademico || (
+      isDmeStaff ? 'Licenciado' :
       app.type === 'diretor' ? 'Licenciado' :
       app.type === 'professor' ? 'Licenciado' :
       '11.ª a 12.ª classe'
     );
     setNivelAcademico(defaultNivel);
     setNivelAcademicoOutro(app.nivelAcademicoOutro || '');
-    setAnosServico(typeof app.anosServico === 'number' ? app.anosServico : (app.type === 'diretor' ? 6 : 3));
+    setAnosServico(typeof app.anosServico === 'number' ? app.anosServico : (app.type === 'diretor' || isDmeStaff ? 6 : 3));
     setClassificacaoPedagogica(app.classificacaoPedagogica || 'Com magistério e com IMNE completo');
-    setEspecialidadeCurso(app.especialidadeCurso || (app.type === 'diretor' ? 'Gestão e Administração Escolar' : (app.subject || 'Educação Básica')));
+    setEspecialidadeCurso(
+      app.especialidadeCurso ||
+      (isDmeStaff
+        ? app.roleRequested || 'Administração e Inspecção Educativa'
+        : app.type === 'diretor'
+        ? 'Gestão e Administração Escolar'
+        : app.subject || 'Educação Básica')
+    );
     setRegimeTrabalho(app.regimeTrabalho || 'Efectivo');
     setNumeroMecanograficoOuNif(app.numeroMecanograficoOuNif || '');
     setNumeroCertificadoDiploma(app.numeroCertificadoDiploma || `DIP-MED-${Math.floor(100000 + Math.random() * 900000)}/2026`);
@@ -852,7 +869,14 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                           </h3>
 
                           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200/80">
-                            {app.roleRequested || 'Diretor Geral'}
+                            {app.roleRequested ||
+                              (app.type === 'membro_dme' || app.scope === 'administracao'
+                                ? 'Quadro Técnico da DME'
+                                : app.type === 'professor'
+                                ? 'Professor(a)'
+                                : app.type === 'funcionario'
+                                ? 'Funcionário(a)'
+                                : 'Director(a) de Escola')}
                           </span>
 
                           {isPending && (
@@ -995,7 +1019,15 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                             className="px-4 py-2 rounded-xl text-xs font-bold bg-[#002133] hover:bg-[#001726] text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                           >
                             <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Homologar Diretor(a)</span>
+                            <span>
+                              {app.type === 'membro_dme' || app.scope === 'administracao'
+                                ? 'Homologar Cargo DME'
+                                : app.type === 'professor'
+                                ? 'Homologar Professor(a)'
+                                : app.type === 'funcionario'
+                                ? 'Homologar Funcionário(a)'
+                                : 'Homologar Director(a)'}
+                            </span>
                           </button>
                         </>
                       )}
@@ -1036,7 +1068,16 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                             </div>
                             <div>
                               <strong className="block text-slate-900 font-bold">{app.fullName}</strong>
-                              <span className="text-[10px] text-slate-500">{app.roleRequested || 'Diretor(a) Geral'}</span>
+                              <span className="text-[10px] text-slate-500">
+                                {app.roleRequested ||
+                                  (app.type === 'membro_dme' || app.scope === 'administracao'
+                                    ? 'Quadro da DME'
+                                    : app.type === 'professor'
+                                    ? 'Professor(a)'
+                                    : app.type === 'funcionario'
+                                    ? 'Funcionário(a)'
+                                    : 'Director(a) Geral')}
+                              </span>
                             </div>
                           </div>
                         </td>
@@ -1127,13 +1168,17 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900">Homologação e Enquadramento de Direção</h3>
+                    <h3 className="text-base font-bold text-slate-900">
+                      {appToApprove.type === 'membro_dme' || appToApprove.scope === 'administracao'
+                        ? 'Homologação de Cargo na Direcção Municipal (DME)'
+                        : 'Homologação e Enquadramento Funcional'}
+                    </h3>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                       Administração Municipal
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Validação oficial de mandato e dados cadastrais para {appToApprove.fullName}
+                    Validação oficial de cargo e dados cadastrais para {appToApprove.fullName}
                   </p>
                 </div>
               </div>
@@ -1161,7 +1206,12 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block font-semibold text-[11px]">Cargo Solicitado</span>
-                    <span className="text-slate-800 text-xs font-medium">{appToApprove.roleRequested || 'Diretor(a) Geral'}</span>
+                    <span className="text-slate-800 text-xs font-medium">
+                      {appToApprove.roleRequested ||
+                        (appToApprove.type === 'membro_dme' || appToApprove.scope === 'administracao'
+                          ? 'Chefe de Repartição / Ensino Geral'
+                          : 'Director(a) Geral')}
+                    </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block font-semibold text-[11px]">Contacto</span>
@@ -1170,29 +1220,60 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </div>
               </div>
 
-              {/* SECTION 1: Nomeação Institucional & Escola */}
+              {/* SECTION 1: Nomeação Institucional */}
               <div className="p-3.5 bg-blue-50/40 rounded-xl border border-blue-100 space-y-3">
                 <div className="flex items-center gap-2 font-bold text-blue-900 text-xs">
                   <Building2 className="w-4 h-4 text-blue-700" />
-                  <span>1. Nomeação Institucional e Afetação Escolar</span>
+                  <span>
+                    {appToApprove.type === 'membro_dme' || appToApprove.scope === 'administracao'
+                      ? '1. Lotação na Direcção Municipal da Educação (DME)'
+                      : '1. Nomeação Institucional e Afetação Escolar'}
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Escola Afeta ao Mandato
-                  </label>
-                  <select
-                    value={targetSchoolName}
-                    onChange={(e) => setTargetSchoolName(e.target.value)}
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#002133]"
-                  >
-                    {schools.map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {appToApprove.type === 'membro_dme' || appToApprove.scope === 'administracao' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Órgão Central de Lotação
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value="Direcção Municipal da Educação de Quêssua"
+                        className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Cargo / Repartição na DME
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={appToApprove.roleRequested || 'Chefe de Repartição / Ensino Geral'}
+                        className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-[#002133] cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Escola Afeta ao Mandato
+                    </label>
+                    <select
+                      value={targetSchoolName}
+                      onChange={(e) => setTargetSchoolName(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#002133]"
+                    >
+                      {schools.map((s) => (
+                        <option key={s.id} value={s.name}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1449,7 +1530,15 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
                 <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                 <span>
-                  Ao confirmar a homologação, o status do Diretor muda para <strong>Ativo</strong>. O seu dossiê completo de direção é gerado com os dados acadêmicos e pedagógicos informados, liberando o acesso total à gestão escolar no Sigre.
+                  {appToApprove.type === 'membro_dme' || appToApprove.scope === 'administracao' ? (
+                    <>
+                      Ao confirmar a homologação, o funcionário passa a integrar o <strong>Quadro Técnico da Direcção Municipal da Educação (DME)</strong> no cargo de <strong>{appToApprove.roleRequested}</strong> (não sendo cadastrado como Director de Escola).
+                    </>
+                  ) : (
+                    <>
+                      Ao confirmar a homologação, o status do quadro muda para <strong>Ativo</strong> com os dados académicos e pedagógicos informados, liberando o acesso oficial no Sigre.
+                    </>
+                  )}
                 </span>
               </div>
             </div>

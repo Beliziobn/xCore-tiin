@@ -373,7 +373,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                         className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors mt-1 uppercase tracking-wider font-semibold cursor-pointer flex items-center gap-2.5"
                       >
                         <User className="w-4 h-4 text-slate-500" strokeWidth={2} />
-                        <span>Perfil do Administrador</span>
+                        <span>
+                          {currentUser?.adminStaffRole &&
+                          currentUser.adminStaffRole !== 'diretor_municipal' &&
+                          currentUser.adminStaffRole !== 'admin_sistema'
+                            ? `Perfil • ${currentUser.cargoTitle || 'Quadro da DME'}`
+                            : 'Perfil do Administrador'}
+                        </span>
                       </button>
                     </>
                   ) : activeRole === 'diretor' ? (
@@ -926,7 +932,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }}
                   className="text-left py-2 px-3 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
                 >
-                  Perfil do Administrador
+                  {currentUser?.adminStaffRole &&
+                  currentUser.adminStaffRole !== 'diretor_municipal' &&
+                  currentUser.adminStaffRole !== 'admin_sistema'
+                    ? `Perfil • ${currentUser.cargoTitle || 'Quadro da DME'}`
+                    : 'Perfil do Administrador'}
                 </button>
               </>
             ) : activeRole === 'diretor' ? (

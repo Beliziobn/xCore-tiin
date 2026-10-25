@@ -34,7 +34,11 @@ import {
   ProfileModalType,
 } from '../../profile/ProfileOptionsSection';
 import { AccessDeniedGuard } from '../../common/AccessDeniedGuard';
-import { syncApplicationsFromServer } from '../../../utils/authApprovalStorage';
+import {
+  syncApplicationsFromServer,
+  getOccupiedDmeCargos,
+  OFFICIAL_DME_ADMIN_EMAIL,
+} from '../../../utils/authApprovalStorage';
 import type {
   AdminSchool,
   AdminDirector,
@@ -193,31 +197,64 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
 
   const [isAddStaffModalOpen, setIsAddStaffModalOpen] = useState(false);
   const [newStaffName, setNewStaffName] = useState('');
-  const [newStaffRole, setNewStaffRole] = useState<AdminStaffRole>('inspetor_escolar');
+  const [newStaffRole, setNewStaffRole] = useState<AdminStaffRole>('chefe_reparticao');
   const [newStaffDept, setNewStaffDept] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffPhone, setNewStaffPhone] = useState('');
+  const [staffModalError, setStaffModalError] = useState<string | null>(null);
 
   const getRoleTitle = (role: AdminStaffRole): string => {
     switch (role) {
       case 'diretor_municipal':
         return 'Director(a) Municipal da Educação';
       case 'inspetor_escolar':
-        return 'Inspetor(a) Escolar Municipal';
+        return 'Inspector(a) Escolar Municipal';
       case 'chefe_reparticao':
         return 'Chefe de Repartição / Ensino Geral';
       case 'tecnico_estatistica':
         return 'Técnico(a) de Planeamento & Estatística';
+      case 'tecnico_recursos_humanos':
+        return 'Técnico(a) de Recursos Humanos / Secretaria';
       case 'admin_sistema':
         return 'Administrador(a) Geral do Sistema Sigre';
       default:
-        return 'Funcionário da Administração';
+        return 'Funcionário da Direcção Municipal';
     }
   };
 
+  const occupiedDmeCargos = getOccupiedDmeCargos();
+
   const handleAddStaff = (e: React.FormEvent) => {
     e.preventDefault();
+    setStaffModalError(null);
     if (!newStaffName.trim()) return;
+
+    if (newStaffRole === 'diretor_municipal' || newStaffRole === 'admin_sistema') {
+      setStaffModalError(
+        `O cargo de "${getRoleTitle(newStaffRole)}" já pertence exclusivamente à conta oficial (${OFFICIAL_DME_ADMIN_EMAIL}). Não é permitido cadastrar outro titular para este cargo.`
+      );
+      return;
+    }
+
+    const alreadyInList = dmeStaff.some((m) => m.role === newStaffRole);
+    if (alreadyInList || occupiedDmeCargos.has(newStaffRole)) {
+      setStaffModalError(
+        `O cargo "${getRoleTitle(newStaffRole)}" já se encontra ocupado na Direcção Municipal. Escolha outro cargo disponível.`
+      );
+      return;
+    }
+
+    const emailCandidate =
+      newStaffEmail.trim().toLowerCase() ||
+      `${newStaffName.toLowerCase().replace(/\s+/g, '.')}@sigre.edu.ao`;
+
+    if (
+      emailCandidate === OFFICIAL_DME_ADMIN_EMAIL.toLowerCase() ||
+      dmeStaff.some((m) => m.email.toLowerCase() === emailCandidate)
+    ) {
+      setStaffModalError('Este e-mail já pertence a outro titular registado na Direcção Municipal.');
+      return;
+    }
 
     const newMember: DMEStaffMember = {
       id: 'dme-' + Date.now(),
@@ -225,9 +262,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       role: newStaffRole,
       cargoTitle: getRoleTitle(newStaffRole),
       department: newStaffDept.trim() || 'Direcção Municipal da Educação de Quêssua',
-      email:
-        newStaffEmail.trim() ||
-        `${newStaffName.toLowerCase().replace(/\s+/g, '.')}@sigre.edu.ao`,
+      email: emailCandidate,
       phone: newStaffPhone.trim() || '+244 923 000 000',
       status: 'Ativo',
     };
@@ -244,6 +279,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     setNewStaffDept('');
     setNewStaffEmail('');
     setNewStaffPhone('');
+    setStaffModalError(null);
     setIsAddStaffModalOpen(false);
   };
 
@@ -257,6 +293,13 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     }
   };
 
+  const isMasterAdminUser =
+    !currentUser ||
+    currentUser.email?.toLowerCase() === OFFICIAL_DME_ADMIN_EMAIL.toLowerCase() ||
+    currentUser.email?.toLowerCase() === 'beliziodos20@gmail.com' ||
+    currentUser.adminStaffRole === 'diretor_municipal' ||
+    currentUser.adminStaffRole === 'admin_sistema';
+
   const buildDefaultAdminProfile = (user?: UserAccount | null): UserProfileData => {
     const fullName = user
       ? `${user.firstName} ${user.lastName}`.trim()
@@ -265,17 +308,22 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       fullName === 'Director Municipal da Educação' ||
       fullName === 'Dr. Fred Silva' ||
       fullName === 'Admin. Fred';
-    const resolvedName = isGenericName
-      ? 'Dr. Belízio Miguel dos Santos António'
-      : fullName;
+    const resolvedName =
+      isGenericName && isMasterAdminUser
+        ? 'Dr. Belízio Miguel dos Santos António'
+        : fullName;
+
+    const resolvedCargoTitle = user?.cargoTitle
+      ? user.cargoTitle
+      : user?.adminStaffRole && !isMasterAdminUser
+      ? getRoleTitle(user.adminStaffRole)
+      : 'Administrador Geral & Director Municipal da Educação de Quêssua';
 
     return {
       name: resolvedName,
       email: user?.email || 'dmedoquessua@gmail.com',
       phone: user?.phone || '+244 923 450 110',
-      roleTitle:
-        user?.cargoTitle ||
-        'Administrador Geral & Director Municipal da Educação de Quêssua',
+      roleTitle: resolvedCargoTitle,
       schoolName:
         user?.schoolName ||
         'Direcção Municipal da Educação de Quêssua',
@@ -308,17 +356,8 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
 
   useEffect(() => {
     if (!currentUser) return;
-    setAdminData((prev) => {
-      const isLegacy =
-        prev.name === 'Dr. Fred Silva' ||
-        prev.name === 'Admin. Fred' ||
-        prev.email === 'fred.admin@ucore.edu.ao';
-      if (isLegacy) {
-        return buildDefaultAdminProfile(currentUser);
-      }
-      return prev;
-    });
-  }, [currentUser]);
+    setAdminData(buildDefaultAdminProfile(currentUser));
+  }, [currentUser?.id, currentUser?.email, currentUser?.cargoTitle]);
 
   const handleUpdateAdminData = (updated: Partial<UserProfileData>) => {
     const next = {
@@ -451,7 +490,9 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
           <div className="flex flex-col-reverse sm:flex-row items-center sm:items-start justify-between gap-6">
             <div className="flex-1 text-center sm:text-left min-w-0">
               <p className="text-xs font-medium text-gray-500 mb-1">
-                Administrador Geral • Direcção Municipal da Educação de Quêssua
+                {isMasterAdminUser
+                  ? 'Administrador Geral • Direcção Municipal da Educação de Quêssua'
+                  : `${adminData.roleTitle} • Direcção Municipal da Educação de Quêssua`}
               </p>
               <h1 className="text-2xl sm:text-3xl font-bold text-[#002133] tracking-tight truncate">
                 {adminData.name}
@@ -566,7 +607,9 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                       Dados Institucionais & Governação
                     </h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Credenciais oficiais do Administrador Geral na Direcção Municipal
+                      {isMasterAdminUser
+                        ? 'Credenciais oficiais do Administrador Geral na Direcção Municipal'
+                        : `Credenciais funcionais de ${adminData.roleTitle} na Direcção Municipal`}
                     </p>
                   </div>
                   <Landmark className="w-4 h-4 text-gray-400" />
@@ -592,10 +635,12 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                     </span>
                   </div>
                   <div className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <span className="text-xs text-gray-500">Nível de Acesso no Sistema</span>
+                    <span className="text-xs text-gray-500">Enquadramento no Sistema</span>
                     <span className="font-semibold text-[#002133] inline-flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-[#f75142]" />
-                      Administrador Geral (Controlo Total da Rede)
+                      {isMasterAdminUser
+                        ? 'Administrador Geral & Director Municipal (Controlo Total da Rede)'
+                        : `${adminData.roleTitle} (Quadro da Direcção Municipal)`}
                     </span>
                   </div>
                   <div className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
@@ -935,29 +980,45 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
             </div>
 
             <form onSubmit={handleAddStaff} className="p-6 space-y-4">
+              {staffModalError && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                  {staffModalError}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-[#002133] mb-1.5">
-                  Cargo / Função na Administração *
+                  Cargo / Função na Direcção Municipal (DME) *
                 </label>
                 <select
                   value={newStaffRole}
-                  onChange={(e) => setNewStaffRole(e.target.value as AdminStaffRole)}
+                  onChange={(e) => {
+                    setNewStaffRole(e.target.value as AdminStaffRole);
+                    setStaffModalError(null);
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white text-sm text-[#002133] focus:outline-hidden focus:border-[#002133]"
                 >
-                  <option value="diretor_municipal">
-                    Director(a) Municipal da Educação
+                  <option value="chefe_reparticao">
+                    Chefe de Repartição / Ensino Geral{' '}
+                    {occupiedDmeCargos.has('chefe_reparticao') ? '(Já Ocupado)' : ''}
                   </option>
                   <option value="inspetor_escolar">
-                    Inspetor(a) Escolar Municipal
-                  </option>
-                  <option value="chefe_reparticao">
-                    Chefe de Repartição / Ensino Geral
+                    Inspector(a) Escolar Municipal{' '}
+                    {occupiedDmeCargos.has('inspetor_escolar') ? '(Já Ocupado)' : ''}
                   </option>
                   <option value="tecnico_estatistica">
-                    Técnico(a) de Planeamento & Estatística
+                    Técnico(a) de Planeamento & Estatística{' '}
+                    {occupiedDmeCargos.has('tecnico_estatistica') ? '(Já Ocupado)' : ''}
                   </option>
-                  <option value="admin_sistema">
-                    Administrador(a) Geral do Sistema Sigre
+                  <option value="tecnico_recursos_humanos">
+                    Técnico(a) de Recursos Humanos / Secretaria{' '}
+                    {occupiedDmeCargos.has('tecnico_recursos_humanos') ? '(Já Ocupado)' : ''}
+                  </option>
+                  <option value="diretor_municipal" disabled>
+                    Director(a) Municipal da Educação (Ocupado — dmedoquessua@gmail.com)
+                  </option>
+                  <option value="admin_sistema" disabled>
+                    Administrador(a) Geral do Sistema Sigre (Ocupado — dmedoquessua@gmail.com)
                   </option>
                 </select>
               </div>

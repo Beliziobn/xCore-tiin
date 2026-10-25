@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, UserCheck, ArrowRight, Sparkles, AlertTriangle, PlusCircle } from 'lucide-react';
+import { X, ShieldCheck, ArrowRight, AlertTriangle, PlusCircle, Lock } from 'lucide-react';
+import { verifyPassword } from '../../utils/passwordService';
+import { findRegisteredAccountByEmail, OFFICIAL_DME_ADMIN_EMAIL } from '../../utils/authApprovalStorage';
 
 interface GoogleAccountOption {
   email: string;
@@ -19,19 +21,11 @@ interface GoogleAccountPickerModalProps {
 
 const PRESET_ACCOUNTS: GoogleAccountOption[] = [
   {
-    email: 'beliziodos20@gmail.com',
-    name: 'Belízio',
-    avatarText: 'B',
-    avatarBg: 'bg-[#1a73e8]',
-    roleTitle: 'Administrador de Sistema Sigre (Super Admin)',
-    badge: 'Super Admin TI',
-  },
-  {
     email: 'dmedoquessua@gmail.com',
-    name: 'Direcção Municipal da Educação',
+    name: 'Dr. Belízio Miguel dos Santos António',
     avatarText: 'D',
     avatarBg: 'bg-[#0f9d58]',
-    roleTitle: 'Director Municipal da Educação de Quessua',
+    roleTitle: 'Director Municipal da Educação de Quêssua (Admin Geral)',
     badge: 'Conta Oficial DME',
   },
 ];
@@ -43,12 +37,45 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
   reason = 'direct',
 }) => {
   const [showCustomForm, setShowCustomForm] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<GoogleAccountOption | null>(null);
+  const [presetPassword, setPresetPassword] = useState('');
+  const [presetError, setPresetError] = useState<string | null>(null);
+
   const [customName, setCustomName] = useState('');
   const [customEmail, setCustomEmail] = useState('');
-  const [customRole, setCustomRole] = useState<'admin' | 'diretor' | 'professor'>('admin');
+  const [customPassword, setCustomPassword] = useState('');
+  const [customRole, setCustomRole] = useState<'admin' | 'diretor' | 'professor'>('diretor');
   const [customError, setCustomError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handlePresetSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPreset) return;
+    setPresetError(null);
+
+    if (!presetPassword) {
+      setPresetError('Introduza a palavra-passe oficial da conta para autenticar.');
+      return;
+    }
+
+    const registered = findRegisteredAccountByEmail(selectedPreset.email);
+    const isValid = verifyPassword(
+      selectedPreset.email,
+      presetPassword,
+      registered?.expectedVerifier
+    );
+
+    if (!isValid) {
+      setPresetError(
+        'Acesso bloqueado: A palavra-passe introduzida não coincide exatamente com a credencial desta conta.'
+      );
+      return;
+    }
+
+    setPresetPassword('');
+    onSelectAccount(selectedPreset.email, selectedPreset.name);
+  };
 
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +85,7 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
     const nameTrim = customName.trim();
 
     if (!emailTrim || !nameTrim) {
-      setCustomError('Por favor preencha o nome e o e-mail da conta Google.');
+      setCustomError('Por favor preencha o nome e o e-mail da conta.');
       return;
     }
 
@@ -67,7 +94,32 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
       return;
     }
 
-    onSelectAccount(emailTrim, nameTrim, customRole);
+    if (!customPassword) {
+      setCustomError('Por segurança, introduza a palavra-passe exata da sua conta.');
+      return;
+    }
+
+    const registered = findRegisteredAccountByEmail(emailTrim);
+    const isMasterEmail =
+      emailTrim === OFFICIAL_DME_ADMIN_EMAIL.toLowerCase() ||
+      emailTrim === 'beliziodos20@gmail.com';
+
+    if (registered.exists || isMasterEmail) {
+      const isValid = verifyPassword(
+        emailTrim,
+        customPassword,
+        registered.expectedVerifier
+      );
+      if (!isValid) {
+        setCustomError(
+          'Segurança Sigre: Palavra-passe incorreta para esta conta. Nenhum utilizador pode aceder à conta de outrem.'
+        );
+        return;
+      }
+    }
+
+    setCustomPassword('');
+    onSelectAccount(emailTrim, registered.fullName || nameTrim, customRole);
   };
 
   return (
@@ -91,7 +143,6 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
         {/* Modal Header */}
         <div className="p-6 pb-4 flex items-start justify-between border-b border-slate-100">
           <div className="flex items-center gap-3">
-            {/* Google Multicolor Logo */}
             <div className="w-10 h-10 rounded-2xl bg-white shadow-xs border border-slate-200/80 flex items-center justify-center p-2 shrink-0">
               <svg viewBox="0 0 48 48" className="w-6 h-6" aria-hidden="true">
                 <path
@@ -114,9 +165,9 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
             </div>
             <div>
               <h2 id="google-picker-title" className="text-lg font-bold text-[#202124] tracking-tight leading-snug">
-                Fazer login com o Google
+                Autenticação institucional Google
               </h2>
-              <p className="text-xs text-slate-500">Escolha uma conta para aceder ao Sigre</p>
+              <p className="text-xs text-slate-500">Verificação de credenciais protegida no Sigre</p>
             </div>
           </div>
           <button
@@ -129,29 +180,92 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
           </button>
         </div>
 
-        {/* Informative helper banner if triggered by popup constraint */}
         {reason !== 'direct' && (
           <div className="mx-6 mt-4 p-3 rounded-2xl bg-blue-50/80 border border-blue-200/80 text-blue-950 text-xs flex items-start gap-2.5 leading-relaxed">
             <ShieldCheck className="w-4 h-4 text-[#1a73e8] shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-[#1a73e8]">Autenticação Protegida: </span>
-              {reason === 'popup-blocked'
-                ? 'A janela de pop-up externo foi retida pela segurança do navegador. Selecione ou digite a sua conta Google abaixo para entrar instantaneamente.'
-                : 'Conexão direta integrada ao Google. Selecione uma conta abaixo para continuar com o seu perfil.'}
+              Selecione a sua conta e confirme a sua palavra-passe exclusiva para entrar.
             </div>
           </div>
         )}
 
         {/* Modal Body */}
         <div className="p-6 space-y-4">
-          {!showCustomForm ? (
+          {selectedPreset ? (
+            <form onSubmit={handlePresetSubmit} className="space-y-3.5 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800">Verificação de Segurança</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPreset(null);
+                    setPresetPassword('');
+                    setPresetError(null);
+                  }}
+                  className="text-xs font-semibold text-[#1a73e8] hover:underline cursor-pointer"
+                >
+                  ← Mudar conta
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                <div
+                  className={`w-9 h-9 rounded-full ${selectedPreset.avatarBg} text-white font-bold text-sm flex items-center justify-center shrink-0`}
+                >
+                  {selectedPreset.avatarText}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-slate-900 truncate">{selectedPreset.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate">{selectedPreset.email}</div>
+                </div>
+              </div>
+
+              {presetError && (
+                <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{presetError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Palavra-passe exclusiva desta conta *
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    autoFocus
+                    value={presetPassword}
+                    onChange={(e) => setPresetPassword(e.target.value)}
+                    placeholder="Introduza a palavra-passe exata"
+                    className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1a73e8] focus:ring-3 focus:ring-[#1a73e8]/10 text-sm outline-none transition-all shadow-xs"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full h-11 rounded-xl bg-[#002133] hover:bg-[#003049] text-white font-bold text-xs tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Confirmar e Entrar</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          ) : !showCustomForm ? (
             <>
               <div className="space-y-2.5">
                 {PRESET_ACCOUNTS.map((acc) => (
                   <button
                     key={acc.email}
                     type="button"
-                    onClick={() => onSelectAccount(acc.email, acc.name)}
+                    onClick={() => {
+                      setSelectedPreset(acc);
+                      setPresetPassword('');
+                      setPresetError(null);
+                    }}
                     className="w-full text-left p-3.5 rounded-2xl border border-slate-200/80 hover:border-[#1a73e8] hover:bg-blue-50/40 transition-all duration-150 cursor-pointer group flex items-center justify-between"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -178,21 +292,19 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
                 ))}
               </div>
 
-              {/* Action: Use another Google account */}
               <button
                 type="button"
                 onClick={() => setShowCustomForm(true)}
                 className="w-full py-3 px-4 rounded-2xl border border-dashed border-slate-300 hover:border-[#1a73e8] hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <PlusCircle className="w-4 h-4 text-[#1a73e8]" />
-                <span>Usar outra conta Google</span>
+                <span>Usar outra conta registada</span>
               </button>
             </>
           ) : (
-            /* Custom Google Account Form */
             <form onSubmit={handleCustomSubmit} className="space-y-3.5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-slate-800">Introduza os dados da sua conta Google:</span>
+                <span className="text-xs font-bold text-slate-800">Introduza os dados da sua conta:</span>
                 <button
                   type="button"
                   onClick={() => setShowCustomForm(false)}
@@ -216,32 +328,44 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
                   required
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="ex: Belízio dos Santos"
+                  placeholder="ex: João Baptista"
                   className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1a73e8] focus:ring-3 focus:ring-[#1a73e8]/10 text-sm outline-none transition-all shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">E-mail Google</label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">E-mail da Conta</label>
                 <input
                   type="email"
                   required
                   value={customEmail}
                   onChange={(e) => setCustomEmail(e.target.value)}
-                  placeholder="ex: beliziodos20@gmail.com"
+                  placeholder="ex: seu.email@gmail.com"
                   className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1a73e8] focus:ring-3 focus:ring-[#1a73e8]/10 text-sm outline-none transition-all shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Perfil de Acesso</label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Palavra-passe da Conta *</label>
+                <input
+                  type="password"
+                  required
+                  value={customPassword}
+                  onChange={(e) => setCustomPassword(e.target.value)}
+                  placeholder="Introduza a sua palavra-passe exata"
+                  className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1a73e8] focus:ring-3 focus:ring-[#1a73e8]/10 text-sm outline-none transition-all shadow-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Unidade / Perfil de Acesso</label>
                 <select
                   value={customRole}
                   onChange={(e) => setCustomRole(e.target.value as any)}
                   className="w-full h-11 px-3 rounded-xl border border-slate-200 focus:border-[#1a73e8] focus:ring-3 focus:ring-[#1a73e8]/10 text-xs font-semibold text-slate-800 outline-none transition-all shadow-xs bg-white"
                 >
-                  <option value="admin">Administrador Geral / Super Admin TI</option>
-                  <option value="diretor">Diretor(a) Geral de Escola</option>
+                  <option value="admin">Quadros da Direcção Municipal (DME)</option>
+                  <option value="diretor">Director(a) Geral de Escola</option>
                   <option value="professor">Professor(a) / Docente</option>
                 </select>
               </div>
@@ -250,18 +374,18 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
                 type="submit"
                 className="w-full h-11 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white font-bold text-xs tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
               >
-                <span>Continuar com esta conta</span>
+                <span>Autenticar com Segurança</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           )}
 
-          {/* Privacy Footnote matching Google standards */}
           <div className="pt-2 text-[11px] text-slate-400 text-center leading-normal">
-            Ao continuar, o Google autoriza o Sigre a verificar o seu e-mail e nome institucional para conceder acesso às ferramentas de gestão escolar.
+            Política de Isolamento de Contas: Cada conta requer validação estrita da sua palavra-passe.
           </div>
         </div>
       </div>
     </div>
   );
 };
+

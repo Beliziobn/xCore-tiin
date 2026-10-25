@@ -532,7 +532,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   <style>
     @page {
       size: A4 portrait;
-      margin: 14mm 18mm;
+      margin: 15mm 18mm;
     }
     * {
       box-sizing: border-box;
@@ -554,13 +554,17 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     }
     #print-sheet-root {
       width: 100% !important;
-      max-width: 174mm !important;
+      max-width: 100% !important;
+      min-height: 256mm !important;
       margin: 0 auto !important;
-      padding: 2mm 0 0 0 !important;
+      padding: 4mm 0 2mm 0 !important;
       border: 0 !important;
       outline: 0 !important;
       box-shadow: none !important;
       background: #ffffff !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
       page-break-after: avoid !important;
@@ -569,103 +573,104 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     .a4-header-block {
       text-align: center;
       font-family: Arial, Helvetica, sans-serif;
-      margin-bottom: 10px !important;
+      margin-bottom: 16px !important;
       padding-bottom: 0 !important;
       border: 0 !important;
     }
     .a4-header-block > div:first-child {
       display: flex;
       justify-content: center;
-      margin-bottom: 6px !important;
+      margin-bottom: 10px !important;
     }
     .a4-emblem-img {
-      width: 52px !important;
+      width: 68px !important;
       height: auto !important;
-      max-height: 52px !important;
+      max-height: 68px !important;
       object-fit: contain;
       display: block;
       margin: 0 auto;
     }
     .a4-header-block p {
-      margin: 2px 0 !important;
-      font-size: 9.5pt !important;
+      margin: 3.5px 0 !important;
+      font-size: 11pt !important;
       font-weight: 700 !important;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      line-height: 1.25 !important;
+      line-height: 1.35 !important;
       color: #000000 !important;
     }
     .a4-header-block p:first-of-type {
-      font-size: 10.5pt !important;
+      font-size: 13pt !important;
       font-weight: 800 !important;
       letter-spacing: 0.08em;
     }
     .a4-title-wrap {
-      padding-top: 12px !important;
-      padding-bottom: 2px !important;
+      padding-top: 22px !important;
+      padding-bottom: 6px !important;
       text-align: center;
     }
     .a4-title-wrap h1 {
       display: inline-block;
       margin: 0 !important;
-      padding-bottom: 2px !important;
+      padding-bottom: 3px !important;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 13.5pt !important;
+      font-size: 15.5pt !important;
       font-weight: 800 !important;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       color: #000000 !important;
-      border-bottom: 1.5px solid #000000 !important;
+      border-bottom: 2px solid #000000 !important;
     }
     .a4-body-copy {
-      margin-top: 12px !important;
+      margin-top: 20px !important;
       font-family: 'Times New Roman', Times, Georgia, serif;
-      font-size: 11.2pt !important;
-      line-height: 1.58 !important;
+      font-size: 13.5pt !important;
+      line-height: 1.85 !important;
       text-align: justify;
       color: #000000 !important;
     }
     .a4-body-copy p {
-      margin: 0 0 10px 0 !important;
-      text-indent: 28px !important;
+      margin: 0 0 18px 0 !important;
+      text-indent: 38px !important;
       text-align: justify;
     }
     .a4-body-copy strong {
       font-weight: 700;
     }
     .a4-footer-block {
-      margin-top: 16px !important;
-      padding-top: 8px !important;
+      margin-top: 24px !important;
+      padding-top: 12px !important;
+      padding-bottom: 8px !important;
       border: 0 !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
     .a4-date-line {
       text-align: right;
-      font-size: 11pt !important;
-      margin-bottom: 24px !important;
+      font-size: 13pt !important;
+      margin-bottom: 38px !important;
       color: #000000 !important;
     }
     .a4-sig-container {
       text-align: center;
-      width: 260px;
+      width: 280px;
       margin: 0 auto;
     }
     .a4-sig-role {
-      font-size: 11pt !important;
+      font-size: 13pt !important;
       font-weight: 700 !important;
-      margin: 0 0 26px 0 !important;
+      margin: 0 0 46px 0 !important;
       color: #000000 !important;
     }
     .a4-sig-line {
       border-bottom: 1px solid #000000 !important;
-      width: 240px;
+      width: 260px;
       margin: 0 auto;
     }
     .a4-sig-name {
-      font-size: 11pt !important;
+      font-size: 13pt !important;
       font-weight: 700 !important;
-      margin: 5px 0 0 0 !important;
+      margin: 8px 0 0 0 !important;
       color: #000000 !important;
     }
   </style>
@@ -732,12 +737,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
   return (
     <div id="declaracao-efectividade-page" className="w-full min-h-screen bg-[#fafafa] flex flex-col font-sans">
-      {/* Print CSS rules - ensures strict single-page A4 portrait format without frame (moldura) and hides all UI chrome */}
+      {/* Print CSS rules - ensures strict single-page A4 portrait format without frame (moldura) and full-sheet proportions matching preview */}
       <style>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 14mm 18mm;
+            margin: 15mm 18mm;
           }
           html,
           body,
@@ -754,7 +759,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             padding: 0 !important;
             min-height: 0 !important;
             height: auto !important;
-            max-height: 268mm !important;
+            max-height: 267mm !important;
             width: 100% !important;
             max-width: none !important;
             transform: none !important;
@@ -786,14 +791,16 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             outline: 0 !important;
             border-radius: 0 !important;
             background: #ffffff !important;
-            padding: 2mm 0 !important;
+            padding: 4mm 0 2mm 0 !important;
             margin: 0 auto !important;
             width: 100% !important;
-            max-width: 174mm !important;
-            min-height: 0 !important;
+            max-width: 100% !important;
+            min-height: 256mm !important;
             height: auto !important;
             max-height: 265mm !important;
-            display: block !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: avoid !important;
@@ -803,41 +810,53 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             overflow: hidden !important;
           }
           #oficial-a4-sheet .a4-emblem-img {
-            width: 52px !important;
+            width: 68px !important;
             height: auto !important;
-            max-height: 52px !important;
+            max-height: 68px !important;
           }
           #oficial-a4-sheet .a4-header-block {
-            margin-bottom: 10px !important;
+            margin-bottom: 16px !important;
             padding-bottom: 0 !important;
             border: 0 !important;
           }
+          #oficial-a4-sheet .a4-header-block p {
+            font-size: 11pt !important;
+            line-height: 1.35 !important;
+            margin: 3.5px 0 !important;
+          }
+          #oficial-a4-sheet .a4-header-block p:first-of-type {
+            font-size: 13pt !important;
+          }
           #oficial-a4-sheet .a4-title-wrap {
-            padding-top: 10px !important;
-            padding-bottom: 2px !important;
+            padding-top: 22px !important;
+            padding-bottom: 6px !important;
           }
           #oficial-a4-sheet .a4-title-wrap h1 {
-            font-size: 13.5pt !important;
+            font-size: 15.5pt !important;
           }
           #oficial-a4-sheet .a4-body-copy {
-            margin-top: 10px !important;
-            font-size: 11.2pt !important;
-            line-height: 1.58 !important;
+            margin-top: 20px !important;
+            font-size: 13.5pt !important;
+            line-height: 1.85 !important;
           }
           #oficial-a4-sheet .a4-body-copy > p + p {
-            margin-top: 9px !important;
+            margin-top: 18px !important;
           }
           #oficial-a4-sheet .a4-footer-block {
             padding-top: 12px !important;
-            margin-top: 12px !important;
+            padding-bottom: 8px !important;
+            margin-top: 24px !important;
           }
           #oficial-a4-sheet .a4-date-line {
-            margin-bottom: 20px !important;
-            font-size: 11pt !important;
+            margin-bottom: 38px !important;
+            font-size: 13pt !important;
           }
           #oficial-a4-sheet .a4-sig-role {
-            margin-bottom: 24px !important;
-            font-size: 11pt !important;
+            margin-bottom: 46px !important;
+            font-size: 13pt !important;
+          }
+          #oficial-a4-sheet .a4-sig-name {
+            font-size: 13pt !important;
           }
         }
       `}</style>
