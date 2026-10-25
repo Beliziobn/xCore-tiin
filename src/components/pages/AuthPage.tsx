@@ -46,8 +46,10 @@ import {
   searchPreRegisteredTeacher, 
   searchPreRegisteredDirector,
   savePendingApplication,
+  savePendingApplicationAsync,
   checkUserApprovalStatus,
-  resolveSchoolDirectorName
+  resolveSchoolDirectorName,
+  syncApplicationsFromServer
 } from '../../utils/authApprovalStorage';
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
@@ -601,7 +603,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setLoading(true);
       onAuthLoadingChange?.(true, 'login');
 
-      setTimeout(() => {
+      // Sync applications from server to ensure fresh approval status from any device
+      syncApplicationsFromServer().catch(() => {}).finally(() => {
         setLoading(false);
         
         // Find if matches preset or detect context
@@ -832,7 +835,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         // Create pending application record
         if (isPending) {
           const appId = `app-${appType}-${Date.now()}`;
-          savePendingApplication({
+          savePendingApplicationAsync({
             id: appId,
             userId: newUserId,
             type: appType,

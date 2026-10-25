@@ -35,35 +35,6 @@
       }
     },
     {
-      "id": "req_1792921439067_4540",
-      "protocol": "SR-2026-4540",
-      "serviceType": "BOLETIM_NOTAS",
-      "title": "Pedido de Boletim de Notas",
-      "status": "CONCLUIDO",
-      "createdAt": "2026-10-25T09:43:59.067Z",
-      "updatedAt": "2026-10-25T09:44:20.906Z",
-      "requesterName": "Pedro Sebastião",
-      "requesterPhone": "923456789",
-      "requesterEmail": "pedro.sebastiao@gmail.com",
-      "requesterRoleTitle": "Encarregado de Educação",
-      "targetRole": "DIRECTOR",
-      "targetSchoolId": "",
-      "targetSchoolName": "Complexo Escolar do Quêssua",
-      "targetDirectorEmail": "",
-      "targetAdminEmail": "dmedoquessua@gmail.com",
-      "details": {
-        "studentName": "Mateus Sebastião",
-        "studentBiOrProcesso": "002948192LA091",
-        "studentClasse": "8ª Classe",
-        "studentTurma": "A",
-        "studentPeriodo": "Manhã",
-        "trimestre": "1º Trimestre",
-        "responseMessage": "Boletim emitido com sucesso e assinado pelo Diretor Geral. Disponível na secretaria.",
-        "resolvedBy": "Fert Horlan (Diretor Geral)",
-        "resolvedAt": "2026-10-25T09:44:20.906Z"
-      }
-    },
-    {
       "id": "req_1792922100000_1932",
       "protocol": "SR-2026-1932",
       "serviceType": "DECLARACAO_MATRICULA",
@@ -119,5 +90,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-25T10:25:00.000Z"
+  "updatedAt": "2026-10-25T13:10:35.250Z"
 }

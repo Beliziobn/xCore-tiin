@@ -474,6 +474,17 @@ async function startServer() {
   });
 
   app.get("/api/network/applications", (req, res) => {
+    try {
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.applications)) {
+          networkStore.applications = parsed.applications;
+        }
+      }
+    } catch (e) {
+      console.warn("[NetworkStore] Error reading applications:", e);
+    }
     res.json({
       success: true,
       applications: networkStore.applications || [],
@@ -489,37 +500,83 @@ async function startServer() {
     if (Array.isArray(applications)) incoming.push(...applications);
 
     if (incoming.length > 0) {
+      try {
+        if (fs.existsSync(networkStoreFile)) {
+          const raw = fs.readFileSync(networkStoreFile, "utf-8");
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.applications)) {
+            networkStore.applications = parsed.applications;
+          }
+        }
+      } catch {}
+
       networkStore.applications = upsertByKey(
         networkStore.applications,
         incoming,
         (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
       );
 
-      // If any approved application is a School Director, also update the school's directorName in networkStore.schools
+      // Handle approved roles synchronization
       incoming.forEach((appItem) => {
-        if (appItem && appItem.type === "diretor" && appItem.status === "aprovado" && appItem.schoolName && appItem.fullName) {
-          const normSchool = String(appItem.schoolName).trim().toLowerCase();
-          networkStore.schools = networkStore.schools.map((sc) => {
-            const scName = String(sc.name || sc.nomeOficial || "").trim().toLowerCase();
-            if (scName && (scName === normSchool || scName.includes(normSchool) || normSchool.includes(scName))) {
-              return {
-                ...sc,
-                directorName: appItem.fullName,
-                registrationData: sc.registrationData
-                  ? {
-                      ...sc.registrationData,
-                      director: {
-                        ...(sc.registrationData.director || {}),
-                        nome: appItem.fullName,
-                        email: appItem.email || sc.registrationData.director?.email,
-                        contacto: appItem.phone || sc.registrationData.director?.contacto,
-                      },
-                    }
-                  : sc.registrationData,
-              };
-            }
-            return sc;
-          });
+        if (!appItem) return;
+
+        // If approved director, update schools and directors
+        if (appItem.type === "diretor" && appItem.status === "aprovado" && appItem.fullName) {
+          if (appItem.schoolName) {
+            const normSchool = String(appItem.schoolName).trim().toLowerCase();
+            networkStore.schools = networkStore.schools.map((sc) => {
+              const scName = String(sc.name || sc.nomeOficial || "").trim().toLowerCase();
+              if (scName && (scName === normSchool || scName.includes(normSchool) || normSchool.includes(scName))) {
+                return {
+                  ...sc,
+                  directorName: appItem.fullName,
+                  registrationData: sc.registrationData
+                    ? {
+                        ...sc.registrationData,
+                        director: {
+                          ...(sc.registrationData.director || {}),
+                          nome: appItem.fullName,
+                          email: appItem.email || sc.registrationData.director?.email,
+                          contacto: appItem.phone || sc.registrationData.director?.contacto,
+                        },
+                      }
+                    : sc.registrationData,
+                };
+              }
+              return sc;
+            });
+          }
+
+          const dirEntry = {
+            id: appItem.userId || appItem.id,
+            name: appItem.fullName,
+            schoolName: appItem.schoolName || "",
+            email: appItem.email,
+            phone: appItem.phone,
+            status: "Ativo",
+            approvedAt: appItem.approvedAt || new Date().toISOString(),
+          };
+          networkStore.directors = upsertByKey(networkStore.directors, [dirEntry], (d) =>
+            String(d.id || d.email || d.name).trim().toLowerCase()
+          );
+        }
+
+        // If approved teacher, update networkStore.teachers
+        if (appItem.type === "professor" && appItem.status === "aprovado" && appItem.fullName) {
+          const teacherEntry = {
+            id: appItem.userId || appItem.id,
+            name: appItem.fullName,
+            schoolName: appItem.schoolName || "Complexo Escolar do Quêssua",
+            subject: appItem.subject || "Língua Portuguesa",
+            gradeClass: appItem.gradeClass || "4ª Classe",
+            email: appItem.email,
+            phone: appItem.phone,
+            status: "Ativo",
+            approvedAt: appItem.approvedAt || new Date().toISOString(),
+          };
+          networkStore.teachers = upsertByKey(networkStore.teachers, [teacherEntry], (t) =>
+            String(t.id || t.email || t.name).trim().toLowerCase()
+          );
         }
       });
 
@@ -530,9 +587,133 @@ async function startServer() {
       success: true,
       applications: networkStore.applications,
       schools: networkStore.schools,
+      teachers: networkStore.teachers,
+      directors: networkStore.directors,
       updatedAt: networkStore.updatedAt,
     });
   });
+
+  // Delete individual application
+  app.delete("/api/network/applications/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim().toLowerCase();
+    const beforeCount = (networkStore.applications || []).length;
+    
+    // Find target application to see if it was approved
+    const targetApp = (networkStore.applications || []).find(
+      (a) => String(a.id || a.userId || "").trim().toLowerCase() === targetId
+    );
+
+    networkStore.applications = (networkStore.applications || []).filter((a) => {
+      const aId = String(a.id || "").trim().toLowerCase();
+      const uId = String(a.userId || "").trim().toLowerCase();
+      return aId !== targetId && uId !== targetId;
+    });
+
+    // Also remove from directors/teachers if it was linked
+    if (targetApp) {
+      if (targetApp.type === "diretor") {
+        networkStore.directors = (networkStore.directors || []).filter(
+          (d) => String(d.id || d.email || "").trim().toLowerCase() !== String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
+        );
+      } else if (targetApp.type === "professor") {
+        networkStore.teachers = (networkStore.teachers || []).filter(
+          (t) => String(t.id || t.email || "").trim().toLowerCase() !== String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
+        );
+      }
+    }
+
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      deleted: beforeCount !== (networkStore.applications || []).length,
+      applications: networkStore.applications,
+      directors: networkStore.directors,
+      teachers: networkStore.teachers,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // Bulk wipe all homologated / approved data across the network
+  const clearHomologadosHandler = (req: express.Request, res: express.Response) => {
+    const beforeApps = (networkStore.applications || []).length;
+    const beforeDirs = (networkStore.directors || []).length;
+    const beforeTeachers = (networkStore.teachers || []).length;
+
+    // Collect IDs of approved applications
+    const approvedAppUserIds = new Set<string>();
+    const approvedAppEmails = new Set<string>();
+    (networkStore.applications || []).forEach((a) => {
+      if (a.status === "aprovado" || a.approvedAt) {
+        if (a.userId) approvedAppUserIds.add(String(a.userId).trim().toLowerCase());
+        if (a.id) approvedAppUserIds.add(String(a.id).trim().toLowerCase());
+        if (a.email) approvedAppEmails.add(String(a.email).trim().toLowerCase());
+      }
+    });
+
+    // 1. Filter out approved applications
+    networkStore.applications = (networkStore.applications || []).filter(
+      (a) => a.status !== "aprovado" && !a.approvedAt
+    );
+
+    // 2. Filter out homologated directors
+    networkStore.directors = (networkStore.directors || []).filter((d) => {
+      if (d.approvedAt) return false;
+      const dId = String(d.id || "").trim().toLowerCase();
+      const dEmail = String(d.email || "").trim().toLowerCase();
+      if (approvedAppUserIds.has(dId) || approvedAppEmails.has(dEmail)) return false;
+      return true;
+    });
+
+    // 3. Filter out homologated teachers
+    networkStore.teachers = (networkStore.teachers || []).filter((t) => {
+      if (t.approvedAt) return false;
+      const tId = String(t.id || "").trim().toLowerCase();
+      const tEmail = String(t.email || "").trim().toLowerCase();
+      if (approvedAppUserIds.has(tId) || approvedAppEmails.has(tEmail)) return false;
+      return true;
+    });
+
+    // 4. Filter out homologated efectividade records
+    if (Array.isArray(networkStore.efectividade)) {
+      networkStore.efectividade = networkStore.efectividade.filter(
+        (e) => e.status !== "homologado" && e.status !== "HOMOLOGADO"
+      );
+    }
+
+    // 5. Filter out resolved/concluded quickRequests
+    if (Array.isArray(networkStore.quickRequests)) {
+      networkStore.quickRequests = networkStore.quickRequests.filter(
+        (q) => q.status !== "CONCLUIDO" && q.status !== "APROVADO"
+      );
+    }
+
+    persistNetworkStore();
+
+    const removedApps = beforeApps - networkStore.applications.length;
+    const removedDirs = beforeDirs - networkStore.directors.length;
+    const removedTeachers = beforeTeachers - networkStore.teachers.length;
+
+    res.json({
+      success: true,
+      message: "Todos os dados homologados foram eliminados com sucesso do sistema central.",
+      removed: {
+        applications: removedApps,
+        directors: removedDirs,
+        teachers: removedTeachers,
+        total: removedApps + removedDirs + removedTeachers,
+      },
+      applications: networkStore.applications,
+      directors: networkStore.directors,
+      teachers: networkStore.teachers,
+      efectividade: networkStore.efectividade,
+      quickRequests: networkStore.quickRequests,
+      updatedAt: networkStore.updatedAt,
+    });
+  };
+
+  app.delete("/api/network/homologados", clearHomologadosHandler);
+  app.post("/api/network/clear-homologated", clearHomologadosHandler);
 
   app.post("/api/network/sync", (req, res) => {
     const { schools, directors, teachers, students, applications, efectividade } = req.body || {};

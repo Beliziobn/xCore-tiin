@@ -24,11 +24,13 @@ import {
   BadgeCheck,
   UserCheck,
   Archive,
-  Lock
+  Lock,
+  Zap
 } from 'lucide-react';
 import { Hero } from '../Hero';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import { BackupManagerModal } from '../modals/BackupManagerModal';
+import { QuickRequestsManagementView } from '../quick-services/QuickRequestsManagementView';
 import type { UserAccount } from '../../types';
 import {
   CadastramentoEfectividadeRecord,
@@ -42,15 +44,17 @@ import {
   formatAngolanDateExtenso,
   syncEfectividadeFromServer,
 } from '../../utils/efectividadeStorage';
+import { fetchQuickRequests } from '../../utils/quickServicesStorage';
 
 interface DeclaracaoEfectividadePageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
   currentUser?: UserAccount | null;
   onNavigateHome?: () => void;
+  initialTab?: ActiveTab;
 }
 
-type ActiveTab = 'form' | 'database' | 'view-ficha';
+type ActiveTab = 'form' | 'database' | 'pedidos' | 'view-ficha';
 
 interface FormState {
   id?: string;
@@ -122,8 +126,10 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   isLoggedIn = false,
   currentUser,
   onNavigateHome,
+  initialTab = 'form',
 }) => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('form');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+  const [quickRequestsCount, setQuickRequestsCount] = useState<number>(0);
   const [records, setRecords] = useState<CadastramentoEfectividadeRecord[]>(() =>
     getStoredEfectividadeRecords()
   );
@@ -148,8 +154,19 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     setRecords(getStoredEfectividadeRecords());
   };
 
+  const reloadQuickRequests = () => {
+    fetchQuickRequests()
+      .then((reqs) => {
+        if (Array.isArray(reqs)) {
+          setQuickRequestsCount(reqs.filter((r) => r.status === 'PENDENTE' || r.status === 'EM_ANALISE').length);
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     reloadRecords();
+    reloadQuickRequests();
     syncEfectividadeFromServer().then((synced) => {
       if (Array.isArray(synced)) {
         setRecords(synced);
@@ -157,13 +174,29 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     }).catch(() => {});
 
     const handler = () => reloadRecords();
+    const quickHandler = () => reloadQuickRequests();
     window.addEventListener('sigre-efectividade-updated', handler);
     window.addEventListener('sigre-database-restored', handler);
+    window.addEventListener('sigre_quick_request_created', quickHandler);
+    window.addEventListener('sigre_quick_request_updated', quickHandler);
     window.addEventListener('storage', handler);
+
+    const pollInterval = setInterval(() => {
+      syncEfectividadeFromServer().then((synced) => {
+        if (Array.isArray(synced)) {
+          setRecords(synced);
+        }
+      }).catch(() => {});
+      reloadQuickRequests();
+    }, 4500);
+
     return () => {
       window.removeEventListener('sigre-efectividade-updated', handler);
       window.removeEventListener('sigre-database-restored', handler);
+      window.removeEventListener('sigre_quick_request_created', quickHandler);
+      window.removeEventListener('sigre_quick_request_updated', quickHandler);
       window.removeEventListener('storage', handler);
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -544,6 +577,24 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               <span className="text-[11px] bg-[#002133] text-white px-2 py-0.5 rounded-full font-bold">
                 {records.length}
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('pedidos')}
+              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+                activeTab === 'pedidos'
+                  ? 'border-[#f75142] text-[#f75142]'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+              <span>Pedidos dos Usuários (Serviços Rápidos)</span>
+              {quickRequestsCount > 0 && (
+                <span className="text-[11px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-black animate-pulse">
+                  {quickRequestsCount}
+                </span>
+              )}
             </button>
 
             {selectedRecordForView && (
@@ -1358,6 +1409,21 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 4: PEDIDOS DOS USUÁRIOS (SERVIÇOS RÁPIDOS & EFECTIVIDADE) */}
+        {/* ============================================================== */}
+        {activeTab === 'pedidos' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <QuickRequestsManagementView
+              currentUser={currentUser}
+              activeRole={currentUser?.role === 'admin' || currentUser?.email === 'dmedoquessua@gmail.com' ? 'admin' : (currentUser?.role || 'diretor') as any}
+              schoolName={currentUser?.schoolName || ''}
+              onNavigateToDeclaracaoEfectividade={() => setActiveTab('form')}
+              showToast={showToast}
+            />
           </div>
         )}
 

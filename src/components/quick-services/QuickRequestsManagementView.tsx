@@ -39,6 +39,7 @@ interface QuickRequestsManagementViewProps {
   activeRole: 'admin' | 'diretor' | 'professor';
   schoolName?: string;
   onNavigateToDeclaracaoEfectividade?: () => void;
+  onOpenNewRequestModal?: () => void;
   showToast?: (msg: string) => void;
 }
 
@@ -47,6 +48,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   activeRole,
   schoolName = '',
   onNavigateToDeclaracaoEfectividade,
+  onOpenNewRequestModal,
   showToast,
 }) => {
   const [requests, setRequests] = useState<QuickServiceRequest[]>([]);
@@ -278,6 +280,18 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onOpenNewRequestModal && (
+            <button
+              type="button"
+              onClick={onOpenNewRequestModal}
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+              title="Registar nova solicitação de cidadão/utente"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>+ Novo Pedido</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={loadRequests}
@@ -285,7 +299,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Actualizar Dados</span>
+            <span>Actualizar</span>
           </button>
 
           {isMasterAdmin && onNavigateToDeclaracaoEfectividade && (
@@ -295,7 +309,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               className="px-4 py-2.5 bg-[#002133] hover:bg-[#00314a] text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-xs"
             >
               <FileCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>Módulo Efectividade</span>
+              <span>Emitir Efectividade</span>
             </button>
           )}
         </div>

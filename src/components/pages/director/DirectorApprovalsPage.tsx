@@ -115,11 +115,11 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
     try {
       const all = await syncApplicationsFromServer();
       // Filter for applications directed to School Directors (Teachers and School Staff)
-      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor');
+      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor' || a.type === 'funcionario');
       setApplications(directorApps);
     } catch {
       const all = getPendingApplications();
-      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor');
+      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor' || a.type === 'funcionario');
       setApplications(directorApps);
     }
   };

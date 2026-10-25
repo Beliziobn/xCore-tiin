@@ -46,6 +46,28 @@ export const OFFICIAL_DME_ADMIN_EMAIL = 'dmedoquessua@gmail.com';
 
 const STORAGE_KEY_APPLICATIONS = 'ucore_pending_applications';
 const STORAGE_KEY_USERS = 'ucore_registered_users';
+const STORAGE_KEY_DELETED_APPLICATIONS = 'sigre_deleted_application_ids_v1';
+
+function getDeletedApplicationIds(): Set<string> {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED_APPLICATIONS);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function addDeletedApplicationId(id: string) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined' || !id) return;
+  try {
+    const set = getDeletedApplicationIds();
+    set.add(id.trim().toLowerCase());
+    localStorage.setItem(STORAGE_KEY_DELETED_APPLICATIONS, JSON.stringify(Array.from(set)));
+  } catch {}
+}
 
 // Seed initial demo applications if not already present
 export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [];
@@ -57,7 +79,13 @@ export function getPendingApplications(type?: string): PendingApplication[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        list = parsed;
+        const deletedIds = getDeletedApplicationIds();
+        list = parsed.filter((a) => {
+          if (!a) return false;
+          const aId = String(a.id || '').trim().toLowerCase();
+          const uId = String(a.userId || '').trim().toLowerCase();
+          return !deletedIds.has(aId) && !deletedIds.has(uId);
+        });
       }
     }
   } catch {
@@ -69,6 +97,7 @@ export function getPendingApplications(type?: string): PendingApplication[] {
 /**
  * Synchronizes pending applications from the server's persistent disk store
  * so applications created in any session/browser are instantly visible to their supervisor.
+ * Includes bidirectional syncing for pending applications while respecting server purges.
  */
 export async function syncApplicationsFromServer(): Promise<PendingApplication[]> {
   try {
@@ -78,28 +107,55 @@ export async function syncApplicationsFromServer(): Promise<PendingApplication[]
     if (data && Array.isArray(data.applications)) {
       const serverApps: PendingApplication[] = data.applications;
       const localApps = getPendingApplications();
+      const deletedIds = getDeletedApplicationIds();
+
+      // If server has no approved applications, clean local approved applications to stay in lockstep
+      const serverApprovedKeys = new Set(
+        serverApps
+          .filter((sa) => sa.status === 'aprovado' || sa.approvedAt)
+          .map((sa) => String(sa.id || sa.userId || sa.email).trim().toLowerCase())
+      );
 
       const map = new Map<string, PendingApplication>();
-      localApps.forEach((a) => {
-        const key = String(a.id || a.userId || a.email).trim().toLowerCase();
-        if (key) map.set(key, a);
-      });
 
+      // Server applications are authoritative
       serverApps.forEach((sa) => {
         const key = String(sa.id || sa.userId || sa.email).trim().toLowerCase();
-        if (!key) return;
-        const existing = map.get(key);
-        if (!existing) {
-          map.set(key, sa);
-        } else {
-          // If server state was approved or rejected, take it
-          if (sa.status !== 'pendente' && existing.status === 'pendente') {
-            map.set(key, sa);
-          } else {
-            map.set(key, { ...existing, ...sa });
+        if (!key || deletedIds.has(key)) return;
+        map.set(key, sa);
+      });
+
+      // Local applications: only keep if not in deleted set and, if approved, it must exist on server
+      localApps.forEach((la) => {
+        const key = String(la.id || la.userId || la.email).trim().toLowerCase();
+        if (!key || deletedIds.has(key)) return;
+        if (la.status === 'aprovado' && !serverApprovedKeys.has(key)) {
+          // Server already purged this approved record; discard from local
+          return;
+        }
+        if (!map.has(key)) {
+          // If it's a pending application not yet on server, keep it
+          if (la.status === 'pendente') {
+            map.set(key, la);
           }
         }
       });
+
+      // BIDIRECTIONAL SYNC: Only push PENDING applications that are missing from server
+      const missingOnServer = Array.from(map.values()).filter((item) => {
+        if (item.status !== 'pendente') return false;
+        const key = String(item.id || item.userId || item.email).trim().toLowerCase();
+        return !serverApps.some((sa) => String(sa.id || sa.userId || sa.email).trim().toLowerCase() === key);
+      });
+
+      if (missingOnServer.length > 0) {
+        fetch('/api/network/applications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applications: missingOnServer }),
+          keepalive: true,
+        }).catch(() => {});
+      }
 
       const merged = Array.from(map.values());
       localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(merged));
@@ -113,12 +169,12 @@ export async function syncApplicationsFromServer(): Promise<PendingApplication[]
 
 /**
  * Returns applications targeted for the school director, optionally filtered by school name.
- * Teachers always route here.
+ * Teachers and school staff route here.
  */
 export function getApplicationsForDirector(schoolName?: string): PendingApplication[] {
   const all = getPendingApplications();
   return all.filter((a) => {
-    const isTarget = a.targetApproverRole === 'diretor' || a.type === 'professor';
+    const isTarget = a.targetApproverRole === 'diretor' || a.type === 'professor' || a.type === 'funcionario';
     if (!isTarget) return false;
     if (!schoolName) return true;
     const normA = (a.schoolName || '').trim().toLowerCase();
@@ -128,27 +184,20 @@ export function getApplicationsForDirector(schoolName?: string): PendingApplicat
 }
 
 /**
- * Returns applications targeted for the central administrator (dmedoquessua@gmail.com).
- * Administration members and school general directors always route here.
+ * Returns applications visible to the central administrator (DME Quêssua).
+ * The municipal director oversees ALL applications across the entire municipality,
+ * while allowing filtering by role.
  */
-export function getApplicationsForAdmin(): PendingApplication[] {
+export function getApplicationsForAdmin(filterType?: string): PendingApplication[] {
   const all = getPendingApplications();
-  return all.filter((a) => {
-    return (
-      a.targetApproverRole === 'admin' ||
-      a.type === 'diretor' ||
-      a.type === 'membro_dme' ||
-      a.scope === 'administracao' ||
-      a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
-    );
-  });
+  if (filterType && filterType !== 'todos') {
+    return all.filter((a) => a.type === filterType);
+  }
+  return all;
 }
 
 export function savePendingApplication(app: PendingApplication): void {
   try {
-    // Explicit Supervisor Assignment:
-    // 1. Administration staff & School General Directors -> Master Admin (dmedoquessua@gmail.com)
-    // 2. Teachers & School staff -> School Director of that specific school
     const isAdminTarget =
       app.scope === 'administracao' ||
       app.type === 'diretor' ||
@@ -176,12 +225,53 @@ export function savePendingApplication(app: PendingApplication): void {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application: normalizedApp }),
+        keepalive: true,
       }).catch(() => {});
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     }
   } catch (e) {
     console.error('Erro ao salvar candidatura:', e);
   }
+}
+
+/**
+ * Async version that ensures the application is physically persisted on the backend server
+ */
+export async function savePendingApplicationAsync(app: PendingApplication): Promise<PendingApplication> {
+  savePendingApplication(app);
+
+  const isAdminTarget =
+    app.scope === 'administracao' ||
+    app.type === 'diretor' ||
+    app.type === 'membro_dme' ||
+    app.targetApproverRole === 'admin';
+
+  const normalizedApp: PendingApplication = {
+    ...app,
+    targetApproverRole: isAdminTarget ? 'admin' : 'diretor',
+    targetApproverEmail: isAdminTarget ? OFFICIAL_DME_ADMIN_EMAIL : undefined,
+    approverDirectorName: isAdminTarget
+      ? `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`
+      : app.approverDirectorName || resolveSchoolDirectorName(null, app.schoolName),
+  };
+
+  try {
+    const res = await fetch('/api/network/applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ application: normalizedApp }),
+      keepalive: true,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.applications)) {
+        localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(data.applications));
+      }
+    }
+  } catch (err) {
+    console.warn('Falha ao comunicar com o servidor ao salvar candidatura:', err);
+  }
+  return normalizedApp;
 }
 
 /**
@@ -427,6 +517,7 @@ export function approveApplication(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application: updatedApp }),
+        keepalive: true,
       }).catch(() => {});
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     }
@@ -482,6 +573,7 @@ export function rejectApplication(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application: updatedApp }),
+        keepalive: true,
       }).catch(() => {});
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     }
@@ -618,3 +710,178 @@ export function resolveSchoolDirectorName(
 export function getDirectorForSchool(schoolName: string): string {
   return resolveSchoolDirectorName(null, schoolName);
 }
+
+/**
+ * Permanently deletes a single application (and rolls back linked records if needed)
+ */
+export async function deleteApplication(applicationId: string): Promise<boolean> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
+    const list: PendingApplication[] = raw ? JSON.parse(raw) : [];
+    const target = list.find((a) => a.id === applicationId || a.userId === applicationId);
+
+    addDeletedApplicationId(applicationId);
+    if (target?.userId) addDeletedApplicationId(target.userId);
+    if (target?.email) addDeletedApplicationId(target.email);
+
+    const remaining = list.filter((a) => a.id !== applicationId && a.userId !== applicationId);
+    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(remaining));
+
+    // Also remove from local director and teacher rosters if it was approved
+    if (target?.type === 'professor') {
+      ['ucore_admin_teachers', 'ucore_director_teachers_v1'].forEach((k) => {
+        try {
+          const r = localStorage.getItem(k);
+          if (r) {
+            const arr = JSON.parse(r);
+            if (Array.isArray(arr)) {
+              const f = arr.filter((t: any) => t.id !== target.userId && t.id !== target.id && t.email !== target.email);
+              localStorage.setItem(k, JSON.stringify(f));
+            }
+          }
+        } catch {}
+      });
+    }
+
+    if (target?.type === 'diretor') {
+      ['sigre_admin_directors', 'ucore_registered_directors_v2'].forEach((k) => {
+        try {
+          const r = localStorage.getItem(k);
+          if (r) {
+            const arr = JSON.parse(r);
+            if (Array.isArray(arr)) {
+              const f = arr.filter((d: any) => d.id !== target.userId && d.id !== target.id && d.email !== target.email && d.emailPessoal !== target.email);
+              localStorage.setItem(k, JSON.stringify(f));
+            }
+          }
+        } catch {}
+      });
+    }
+
+    // Call server DELETE
+    try {
+      await fetch(`/api/network/applications/${encodeURIComponent(applicationId)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      console.warn('Falha ao comunicar exclusão ao servidor:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Erro ao eliminar candidatura:', err);
+    return false;
+  }
+}
+
+/**
+ * Permanently deletes all already homologated (approved) data across all layers:
+ * applications, homologated directors, homologated teachers, and efectividade records.
+ */
+export async function clearAllHomologatedData(): Promise<{ success: boolean; count: number; message?: string }> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
+    const list: PendingApplication[] = raw ? JSON.parse(raw) : [];
+
+    // Collect IDs of approved applications to mark them as permanently deleted
+    const approved = list.filter((a) => a.status === 'aprovado' || a.approvedAt);
+    approved.forEach((a) => {
+      if (a.id) addDeletedApplicationId(a.id);
+      if (a.userId) addDeletedApplicationId(a.userId);
+      if (a.email) addDeletedApplicationId(a.email);
+    });
+
+    // 1. Keep only pending or rejected applications locally
+    const remaining = list.filter((a) => a.status !== 'aprovado' && !a.approvedAt);
+    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(remaining));
+
+    // 2. Clear homologated teachers from local rosters
+    ['ucore_admin_teachers', 'ucore_director_teachers_v1'].forEach((k) => {
+      try {
+        const r = localStorage.getItem(k);
+        if (r) {
+          const arr = JSON.parse(r);
+          if (Array.isArray(arr)) {
+            const f = arr.filter((t: any) => !t.approvedAt && !approved.some((a) => a.userId === t.id || a.email === t.email));
+            localStorage.setItem(k, JSON.stringify(f));
+          }
+        }
+      } catch {}
+    });
+
+    // 3. Clear homologated directors from local storage
+    ['sigre_admin_directors', 'ucore_registered_directors_v2'].forEach((k) => {
+      try {
+        const r = localStorage.getItem(k);
+        if (r) {
+          const arr = JSON.parse(r);
+          if (Array.isArray(arr)) {
+            const f = arr.filter((d: any) => {
+              if (d.approvedAt) return false;
+              if (d.id && approved.some((a) => a.userId === d.id || a.id === d.id || a.email === d.email || a.email === d.emailPessoal)) return false;
+              return true;
+            });
+            localStorage.setItem(k, JSON.stringify(f));
+          }
+        }
+      } catch {}
+    });
+
+    // 4. Reset active user if it was homologated
+    try {
+      const activeRaw = localStorage.getItem('ucore_active_user');
+      if (activeRaw) {
+        const activeUser = JSON.parse(activeRaw);
+        if (activeUser && (activeUser.status === 'ativo' || activeUser.approvedAt)) {
+          const wasApprovedApp = approved.some(
+            (a) => a.userId === activeUser.id || (a.email && a.email.toLowerCase() === (activeUser.email || '').toLowerCase())
+          );
+          if (wasApprovedApp) {
+            activeUser.status = 'pendente';
+            delete activeUser.approvedAt;
+            delete activeUser.approvedBy;
+            localStorage.setItem('ucore_active_user', JSON.stringify(activeUser));
+          }
+        }
+      }
+    } catch {}
+
+    // 5. Call server to clear disk store
+    let serverCount = approved.length;
+    try {
+      const res = await fetch('/api/network/clear-homologated', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.removed?.total) {
+          serverCount = data.removed.total;
+        }
+      }
+    } catch (err) {
+      console.warn('Falha na chamada ao servidor para limpar homologados:', err);
+    }
+
+    // 6. Broadcast event so UI everywhere updates instantly
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+      window.dispatchEvent(new CustomEvent('sigre-homologados-cleared', { detail: { count: serverCount } }));
+    }
+
+    return {
+      success: true,
+      count: serverCount,
+      message: 'Todos os registos homologados foram eliminados com sucesso do sistema.',
+    };
+  } catch (err) {
+    console.error('Erro ao limpar dados homologados:', err);
+    return { success: false, count: 0, message: 'Erro ao limpar dados homologados.' };
+  }
+}
+

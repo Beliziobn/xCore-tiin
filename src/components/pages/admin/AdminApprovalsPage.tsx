@@ -23,6 +23,7 @@ import {
   MapPin,
   Calendar,
   AlertCircle,
+  AlertTriangle,
   GraduationCap,
   Briefcase,
   BookOpen,
@@ -30,7 +31,8 @@ import {
   List,
   FileCheck,
   Filter,
-  CheckCheck
+  CheckCheck,
+  Trash2
 } from 'lucide-react';
 import type { 
   PendingApplication, 
@@ -44,6 +46,8 @@ import {
   rejectApplication,
   savePendingApplication,
   syncApplicationsFromServer,
+  deleteApplication,
+  clearAllHomologatedData,
   OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
 import { buildInitialDirectorDossier, saveDirector } from '../../../utils/directorStorage';
@@ -56,6 +60,7 @@ interface AdminApprovalsPageProps {
   directors?: AdminDirector[];
   schools?: AdminSchool[];
   onAddDirectorGlobal?: (director: AdminDirector) => void;
+  onAddTeacherGlobal?: (teacher: any) => void;
   showToast?: (msg: string) => void;
 }
 
@@ -66,11 +71,13 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   directors = [],
   schools = [],
   onAddDirectorGlobal,
+  onAddTeacherGlobal,
   showToast,
 }) => {
   const [applications, setApplications] = useState<PendingApplication[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'aprovado' | 'rejeitado'>('pendente');
+  const [roleScopeFilter, setRoleScopeFilter] = useState<'todos' | 'diretor' | 'professor' | 'funcionario' | 'membro_dme'>('todos');
   const [selectedSchoolFilter, setSelectedSchoolFilter] = useState<string>('todas');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
@@ -101,36 +108,59 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [appToReject, setAppToReject] = useState<PendingApplication | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
+  // Clear Homologados Modal State
+  const [isClearHomologadosModalOpen, setIsClearHomologadosModalOpen] = useState(false);
+  const [isClearingHomologados, setIsClearingHomologados] = useState(false);
+
+  // Delete Individual Application State
+  const [appToDelete, setAppToDelete] = useState<PendingApplication | null>(null);
+  const [isDeletingApp, setIsDeletingApp] = useState(false);
+
   // Simulate director application
   const [showSimModal, setShowSimModal] = useState(false);
   const [simName, setSimName] = useState('');
   const [simSchool, setSimSchool] = useState('');
   const [simBi, setSimBi] = useState('');
 
+  const handleClearAllHomologados = async () => {
+    setIsClearingHomologados(true);
+    try {
+      const result = await clearAllHomologatedData();
+      await loadApplications();
+      const notify = showToast || alert;
+      notify(result.message || 'Todos os dados homologados foram eliminados com sucesso!');
+    } catch (e) {
+      console.error('Erro ao limpar homologados:', e);
+    } finally {
+      setIsClearingHomologados(false);
+      setIsClearHomologadosModalOpen(false);
+    }
+  };
+
+  const handleConfirmDeleteApp = async () => {
+    if (!appToDelete) return;
+    setIsDeletingApp(true);
+    try {
+      await deleteApplication(appToDelete.id);
+      await loadApplications();
+      const notify = showToast || alert;
+      notify(`Registo de "${appToDelete.fullName}" eliminado com sucesso.`);
+    } catch (e) {
+      console.error('Erro ao eliminar:', e);
+    } finally {
+      setIsDeletingApp(false);
+      setAppToDelete(null);
+    }
+  };
+
   const loadApplications = async () => {
     try {
       const all = await syncApplicationsFromServer();
-      // In admin approval center, show all applications where target is admin (School General Directors + Municipal Direction DME members)
-      const adminApps = all.filter(
-        (a) =>
-          a.targetApproverRole === 'admin' ||
-          a.type === 'diretor' ||
-          a.type === 'membro_dme' ||
-          a.scope === 'administracao' ||
-          a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
-      );
-      setApplications(adminApps);
+      // In DME Quêssua Admin portal, the Administrator oversees ALL applications across the entire municipality
+      setApplications(all);
     } catch {
       const all = getPendingApplications();
-      const adminApps = all.filter(
-        (a) =>
-          a.targetApproverRole === 'admin' ||
-          a.type === 'diretor' ||
-          a.type === 'membro_dme' ||
-          a.scope === 'administracao' ||
-          a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
-      );
-      setApplications(adminApps);
+      setApplications(all);
     }
   };
 
@@ -138,7 +168,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     loadApplications();
     const handleSync = () => loadApplications();
     window.addEventListener('sigre-data-synced', handleSync);
-    const interval = setInterval(loadApplications, 4500);
+    const interval = setInterval(loadApplications, 3500);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       clearInterval(interval);
@@ -151,23 +181,32 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       // Status filter
       if (statusFilter !== 'todos' && app.status !== statusFilter) return false;
 
+      // Role Scope filter
+      if (roleScopeFilter !== 'todos') {
+        if (roleScopeFilter === 'diretor' && app.type !== 'diretor') return false;
+        if (roleScopeFilter === 'professor' && app.type !== 'professor') return false;
+        if (roleScopeFilter === 'funcionario' && app.type !== 'funcionario') return false;
+        if (roleScopeFilter === 'membro_dme' && app.type !== 'membro_dme' && app.scope !== 'administracao') return false;
+      }
+
       // School filter
       if (selectedSchoolFilter !== 'todas' && app.schoolName !== selectedSchoolFilter) return false;
 
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesName = app.fullName.toLowerCase().includes(q);
-        const matchesBi = app.biNumber.toLowerCase().includes(q);
-        const matchesEmail = app.email.toLowerCase().includes(q);
-        const matchesSchool = app.schoolName?.toLowerCase().includes(q);
-        const matchesPhone = app.phone.toLowerCase().includes(q);
-        return matchesName || matchesBi || matchesEmail || matchesSchool || matchesPhone;
+        const matchesName = (app.fullName || '').toLowerCase().includes(q);
+        const matchesBi = (app.biNumber || '').toLowerCase().includes(q);
+        const matchesEmail = (app.email || '').toLowerCase().includes(q);
+        const matchesSchool = (app.schoolName || '').toLowerCase().includes(q);
+        const matchesPhone = (app.phone || '').toLowerCase().includes(q);
+        const matchesRole = (app.roleRequested || '').toLowerCase().includes(q);
+        return matchesName || matchesBi || matchesEmail || matchesSchool || matchesPhone || matchesRole;
       }
 
       return true;
     });
-  }, [applications, statusFilter, selectedSchoolFilter, searchQuery]);
+  }, [applications, statusFilter, roleScopeFilter, selectedSchoolFilter, searchQuery]);
 
   // Metric counts
   const counts = useMemo(() => {
@@ -175,12 +214,20 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     const pendentes = applications.filter((a) => a.status === 'pendente').length;
     const aprovados = applications.filter((a) => a.status === 'aprovado').length;
     const rejeitados = applications.filter((a) => a.status === 'rejeitado').length;
+    const directores = applications.filter((a) => a.type === 'diretor').length;
+    const professores = applications.filter((a) => a.type === 'professor').length;
+    const funcionarios = applications.filter((a) => a.type === 'funcionario').length;
+    const membrosDme = applications.filter((a) => a.type === 'membro_dme' || a.scope === 'administracao').length;
     const taxaAprovacao = total > 0 ? Math.round((aprovados / total) * 100) : 100;
     return {
       total,
       pendentes,
       aprovados,
       rejeitados,
+      directores,
+      professores,
+      funcionarios,
+      membrosDme,
       taxaAprovacao,
     };
   }, [applications]);
@@ -304,6 +351,28 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           saveDirector(fullRegistrationData, adminName);
         }
 
+        // Add to global teachers state if Teacher
+        if (onAddTeacherGlobal && updated.type === 'professor') {
+          const teacherEntry: any = {
+            id: updated.userId || updated.id,
+            name: updated.fullName,
+            schoolName: targetSchoolName || updated.schoolName || 'Complexo Escolar do Quêssua',
+            subject: updated.subject || 'Língua Portuguesa',
+            classAssigned: updated.gradeClass || '4ª Classe',
+            gradeClass: updated.gradeClass || '4ª Classe',
+            room: 'Sala 01',
+            turma: 'Turma A',
+            shift: 'Manhã',
+            directorName: adminName,
+            status: 'Ativo',
+            email: updated.email,
+            phone: updated.phone,
+            qualification: compData?.nivelAcademico || 'Licenciado',
+            gender: 'M',
+          };
+          onAddTeacherGlobal(teacherEntry);
+        }
+
         const notify = showToast || alert;
         notify(`Registo de "${updated.fullName}" (${updated.roleRequested || 'Quadros DME'}) homologado com sucesso pelo Administrador Central (DME)! Acesso liberado.`);
       }
@@ -417,6 +486,21 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Sincronizar</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsClearHomologadosModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all border border-rose-200/90 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Eliminar todos os registos e credenciais já homologados no sistema"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Apagar Homologados</span>
+                  {counts.aprovados > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-rose-200/80 text-rose-900 text-[10px] font-black">
+                      {counts.aprovados}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -511,6 +595,98 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           </div>
         </section>
 
+        {/* Role Category Tabs (Toda a Rede Municipal, Directores, Professores, Funcionários, Membros DME) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-thin">
+          <button
+            type="button"
+            onClick={() => setRoleScopeFilter('todos')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
+              roleScopeFilter === 'todos'
+                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <span>Toda a Rede Municipal</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              roleScopeFilter === 'todos' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {counts.total}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setRoleScopeFilter('diretor')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
+              roleScopeFilter === 'diretor'
+                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Directores Escolares</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              roleScopeFilter === 'diretor' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {counts.directores}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setRoleScopeFilter('professor')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
+              roleScopeFilter === 'professor'
+                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Professores & Docentes</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              roleScopeFilter === 'professor' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {counts.professores}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setRoleScopeFilter('funcionario')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
+              roleScopeFilter === 'funcionario'
+                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Funcionários & Secretaria</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              roleScopeFilter === 'funcionario' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {counts.funcionarios}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setRoleScopeFilter('membro_dme')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
+              roleScopeFilter === 'membro_dme'
+                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
+            <span>Membros DME</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              roleScopeFilter === 'membro_dme' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {counts.membrosDme}
+            </span>
+          </button>
+        </div>
+
         {/* Filter & View Switcher Bar */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs mb-6">
           <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
@@ -593,9 +769,15 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
             <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-4">
               <CheckCircle2 className="w-7 h-7" />
             </div>
-            <h3 className="text-base font-bold text-slate-900 mb-1">Nenhum registo de homologação encontrado</h3>
+            <h3 className="text-base font-bold text-slate-900 mb-1">
+              {statusFilter === 'aprovado'
+                ? 'Sem registos homologados no sistema'
+                : 'Nenhum registo de homologação encontrado'}
+            </h3>
             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-              Não existem pedidos com os filtros ativos. Tente selecionar outro estado ou limpar o campo de busca.
+              {statusFilter === 'aprovado'
+                ? 'Todos os dados homologados foram eliminados da base municipal ou não existem deliberações ativas no momento.'
+                : 'Não existem pedidos com os filtros ativos. Tente selecionar outro estado ou limpar o campo de busca.'}
             </p>
             <button
               type="button"
@@ -770,6 +952,18 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                         <span>Ver Dossiê</span>
                       </button>
 
+                      {isApproved && (
+                        <button
+                          type="button"
+                          onClick={() => setAppToDelete(app)}
+                          className="px-3.5 py-2 rounded-xl text-xs font-bold border border-rose-200 text-rose-700 hover:bg-rose-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          title="Eliminar este registo homologado"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Eliminar Homologação</span>
+                        </button>
+                      )}
+
                       {isPending && (
                         <>
                           <button
@@ -873,6 +1067,16 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
+                            {isApproved && (
+                              <button
+                                type="button"
+                                onClick={() => setAppToDelete(app)}
+                                className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 transition-colors cursor-pointer"
+                                title="Eliminar Homologação"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             {isPending && (
                               <button
                                 type="button"
@@ -1569,6 +1773,149 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 className="px-5 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl shadow-xs cursor-pointer"
               >
                 Criar Inscrição
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CLEAR ALL HOMOLOGADOS CONFIRMATION MODAL */}
+      {isClearHomologadosModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-rose-100">
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-rose-600" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Apagar Dados Homologados</h3>
+                  <p className="text-xs text-rose-600 font-medium">Acção irreversível de limpeza central</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClearHomologadosModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Tem a certeza que deseja <strong>apagar todos os dados já homologados</strong> no sistema?
+              </p>
+              
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-rose-950">
+                  <ShieldCheck className="w-4 h-4 text-rose-700" />
+                  <span>Elementos que serão eliminados:</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-[11px] text-rose-800">
+                  <li>Todas as candidaturas aprovadas / homologadas ({counts.aprovados} registo(s)).</li>
+                  <li>Directores e professores homologados registados na base central.</li>
+                  <li>Declarações e registos com estatuto homologado na rede DME Quêssua.</li>
+                </ul>
+              </div>
+
+              <p className="text-[11px] text-slate-400">
+                Os pedidos ainda <em>pendentes</em> de avaliação serão preservados intactos.
+              </p>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isClearingHomologados}
+                onClick={() => setIsClearHomologadosModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isClearingHomologados}
+                onClick={handleClearAllHomologados}
+                className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                {isClearingHomologados ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>A eliminar...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Todos os Homologados</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE INDIVIDUAL APPLICATION MODAL */}
+      {appToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-rose-600" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Eliminar Registo Homologado</h3>
+                  <p className="text-xs text-slate-500">Remover homologação de quadro</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAppToDelete(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Deseja eliminar a homologação de <strong>{appToDelete.fullName}</strong> ({appToDelete.roleRequested || 'Quadro'}) afeto(a) à escola <strong>{appToDelete.schoolName}</strong>?
+              </p>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+                <div><span className="text-slate-400">BI:</span> <strong className="text-slate-800 font-mono">{appToDelete.biNumber}</strong></div>
+                <div><span className="text-slate-400">Homologado por:</span> <span className="text-slate-700">{appToDelete.approvedBy || 'DME'}</span></div>
+                {appToDelete.approvedAt && <div><span className="text-slate-400">Data:</span> <span className="text-slate-700">{appToDelete.approvedAt}</span></div>}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeletingApp}
+                onClick={() => setAppToDelete(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingApp}
+                onClick={handleConfirmDeleteApp}
+                className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                {isDeletingApp ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>A eliminar...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Registo</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText, Archive, Zap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications, syncApplicationsFromServer, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
+import { fetchQuickRequests } from '../utils/quickServicesStorage';
 
 interface NavbarProps {
   onOpenGetStarted: () => void;
@@ -67,11 +68,20 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [navLoadingAction, setNavLoadingAction] = useState<'login' | 'register' | null>(null);
   const [pendingAppsCount, setPendingAppsCount] = useState({ director: 0, admin: 0 });
+  const [pendingQuickRequestsCount, setPendingQuickRequestsCount] = useState(0);
 
   useEffect(() => {
-    const updateCounts = () => {
+    const updateQuickRequests = async () => {
       try {
-        const all = getPendingApplications();
+        const reqs = await fetchQuickRequests();
+        const pending = reqs.filter((r) => r.status === 'PENDENTE' || r.status === 'EM_ANALISE').length;
+        setPendingQuickRequestsCount(pending);
+      } catch {}
+    };
+
+    const updateCounts = () => {
+      updateQuickRequests();
+      syncApplicationsFromServer().then((all) => {
         const userSchool = currentUser?.schoolName?.trim().toLowerCase();
         
         const dirPending = all.filter((a) => {
@@ -84,29 +94,41 @@ export const Navbar: React.FC<NavbarProps> = ({
           return true;
         }).length;
 
-        const admPending = all.filter((a) => {
-          if (a.status !== 'pendente') return false;
-          return (
-            a.targetApproverRole === 'admin' ||
-            a.type === 'diretor' ||
-            a.type === 'membro_dme' ||
-            a.scope === 'administracao' ||
-            a.targetApproverEmail === OFFICIAL_DME_ADMIN_EMAIL
-          );
-        }).length;
+        // Municipal Admin DME oversees all pending homologations in the municipality
+        const admPending = all.filter((a) => a.status === 'pendente').length;
 
         setPendingAppsCount({ director: dirPending, admin: admPending });
-      } catch {
-        // ignore
-      }
+      }).catch(() => {
+        try {
+          const all = getPendingApplications();
+          const userSchool = currentUser?.schoolName?.trim().toLowerCase();
+          
+          const dirPending = all.filter((a) => {
+            if (a.status !== 'pendente') return false;
+            if (a.targetApproverRole !== 'diretor' && a.type !== 'professor') return false;
+            if (currentUser?.role === 'diretor' && userSchool) {
+              const aSchool = (a.schoolName || '').trim().toLowerCase();
+              return !aSchool || aSchool === userSchool || aSchool.includes(userSchool) || userSchool.includes(aSchool);
+            }
+            return true;
+          }).length;
+
+          const admPending = all.filter((a) => a.status === 'pendente').length;
+          setPendingAppsCount({ director: dirPending, admin: admPending });
+        } catch {}
+      });
     };
 
     updateCounts();
     const handleSync = () => updateCounts();
     window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('sigre_quick_request_created', updateQuickRequests);
+    window.addEventListener('sigre_quick_request_updated', updateQuickRequests);
     const interval = setInterval(updateCounts, 3000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('sigre_quick_request_created', updateQuickRequests);
+      window.removeEventListener('sigre_quick_request_updated', updateQuickRequests);
       clearInterval(interval);
     };
   }, [currentUser?.role, currentUser?.schoolName]);
@@ -557,9 +579,52 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </span>
                     <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Em Branco</span>
                   </button>
+
+                  {/* Serviços Rápidos & Pedidos dos Usuários no Dropdown */}
+                  <button
+                    onClick={() => {
+                      onSelectPage(activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos'));
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-amber-950 bg-amber-50/80 hover:bg-amber-100 transition-colors border-t border-amber-200/60 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
+                      <span>Serviços Rápidos (Pedidos)</span>
+                    </span>
+                    {pendingQuickRequestsCount > 0 && (
+                      <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                        {pendingQuickRequestsCount}
+                      </span>
+                    )}
+                  </button>
                 </div>
               )}
             </div>
+
+            {/* Botão Direto na Barra Superior: Serviços Rápidos & Efectividade (Pedidos dos Usuários) */}
+            <button
+              id="navbar-servicos-rapidos-efectividade-btn"
+              type="button"
+              onClick={() => onSelectPage(activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos'))}
+              className={`flex items-center gap-2 transition-all cursor-pointer py-1.5 px-3.5 rounded-full text-[14px] font-bold ${
+                currentView === 'admin-servicos-rapidos' ||
+                currentView === 'servicos-rapidos' ||
+                currentView === 'diretor-servicos-rapidos' ||
+                currentView === 'pedidos-rapidos'
+                  ? 'bg-[#002133] text-white shadow-md ring-2 ring-white/30'
+                  : 'text-[#002133] hover:text-white hover:bg-black/10'
+              }`}
+              title="Aceder aos Pedidos que os Usuários estão a fazer"
+            >
+              <Zap className="w-4 h-4 text-amber-300 fill-amber-300 shrink-0" />
+              <span>Serviços Rápidos & Efectividade</span>
+              {pendingQuickRequestsCount > 0 && (
+                <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black animate-pulse shadow-xs">
+                  {pendingQuickRequestsCount}
+                </span>
+              )}
+            </button>
           </div>
         )}
 
@@ -626,36 +691,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </span>
                     )}
                   </button>
-
-                  <button
-                    id="navbar-admin-quick-services-btn"
-                    onClick={() => onSelectPage('admin-servicos-rapidos')}
-                    className={`hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                      currentView === 'admin-servicos-rapidos'
-                        ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
-                        : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
-                    }`}
-                    title="Demandas de Serviços Rápidos & Efectividade"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Serviços Rápidos</span>
-                  </button>
                 </>
-              )}
-
-              {/* Quick Backup Vault Button for Admin */}
-              {activeRole === 'admin' && (
-                <button
-                  id="navbar-admin-quick-backup-btn"
-                  onClick={() => {
-                    if (onOpenBackupManager) onOpenBackupManager();
-                  }}
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-400/40"
-                  title="Cofre de Backups & Restauração 1-Click"
-                >
-                  <Archive className="w-3.5 h-3.5 text-white" />
-                  <span>Cofre de Backups</span>
-                </button>
               )}
 
               {/* Notification Bell */}
@@ -1119,6 +1155,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Declaração de Efectividade</span>
             </div>
             <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Em Branco</span>
+          </button>
+
+          <button
+            onClick={() => {
+              onSelectPage(activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos'));
+              setMobileMenuOpen(false);
+            }}
+            className="text-left py-2 px-3 text-amber-950 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-600 fill-amber-600" />
+              <span>Serviços Rápidos & Efectividade (Pedidos)</span>
+            </div>
+            {pendingQuickRequestsCount > 0 && (
+              <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                {pendingQuickRequestsCount}
+              </span>
+            )}
           </button>
           {onOpenChat && (
             <button
