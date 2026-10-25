@@ -53,6 +53,10 @@ import {
   getPreposicaoProvincia,
   formatFinalidadeWithPreposition,
 } from '../../utils/genderGrammar';
+import {
+  downloadDeclaracaoEfectividadePdf,
+  printSinglePageA4Clean,
+} from '../../utils/declaracaoPdfGenerator';
 
 interface DeclaracaoEfectividadePageProps {
   onOpenGetStarted: () => void;
@@ -489,222 +493,20 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   };
 
   const handlePrintDocument = () => {
-    const sheetEl = document.getElementById('oficial-a4-sheet');
-    if (!sheetEl) {
-      window.print();
-      return;
-    }
+    printSinglePageA4Clean('oficial-a4-sheet');
+  };
 
-    const existingIframe = document.getElementById('sigre-isolated-a4-print-frame');
-    if (existingIframe && existingIframe.parentNode) {
-      existingIframe.parentNode.removeChild(existingIframe);
-    }
-
-    const iframe = document.createElement('iframe');
-    iframe.id = 'sigre-isolated-a4-print-frame';
-    iframe.setAttribute('title', 'Impressão Oficial A4');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.visibility = 'hidden';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
-    if (!iframeDoc || !iframe.contentWindow) {
-      window.print();
-      return;
-    }
-
-    const docTitle = selectedRecordForView?.nome
-      ? `Declaracao_Efectividade_${selectedRecordForView.nome.replace(/\s+/g, '_')}`
-      : 'Declaracao_Efectividade_DME_Quessua';
-
-    iframeDoc.open();
-    iframeDoc.write(`<!DOCTYPE html>
-<html lang="pt">
-<head>
-  <meta charset="utf-8" />
-  <base href="${window.location.origin}/" />
-  <title>${docTitle}</title>
-  <style>
-    @page {
-      size: A4 portrait;
-      margin: 15mm 18mm;
-    }
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-      height: auto !important;
-      background: #ffffff !important;
-      color: #000000 !important;
-      font-family: 'Times New Roman', Times, Georgia, serif;
-      border: 0 !important;
-      outline: 0 !important;
-      box-shadow: none !important;
-      overflow: hidden !important;
-    }
-    #print-sheet-root {
-      width: 100% !important;
-      max-width: 100% !important;
-      min-height: 256mm !important;
-      margin: 0 auto !important;
-      padding: 4mm 0 2mm 0 !important;
-      border: 0 !important;
-      outline: 0 !important;
-      box-shadow: none !important;
-      background: #ffffff !important;
-      display: flex !important;
-      flex-direction: column !important;
-      justify-content: space-between !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-      page-break-after: avoid !important;
-      break-after: avoid !important;
-    }
-    .a4-header-block {
-      text-align: center;
-      font-family: Arial, Helvetica, sans-serif;
-      margin-bottom: 16px !important;
-      padding-bottom: 0 !important;
-      border: 0 !important;
-    }
-    .a4-header-block > div:first-child {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 10px !important;
-    }
-    .a4-emblem-img {
-      width: 68px !important;
-      height: auto !important;
-      max-height: 68px !important;
-      object-fit: contain;
-      display: block;
-      margin: 0 auto;
-    }
-    .a4-header-block p {
-      margin: 3.5px 0 !important;
-      font-size: 11pt !important;
-      font-weight: 700 !important;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      line-height: 1.35 !important;
-      color: #000000 !important;
-    }
-    .a4-header-block p:first-of-type {
-      font-size: 13pt !important;
-      font-weight: 800 !important;
-      letter-spacing: 0.08em;
-    }
-    .a4-title-wrap {
-      padding-top: 22px !important;
-      padding-bottom: 6px !important;
-      text-align: center;
-    }
-    .a4-title-wrap h1 {
-      display: inline-block;
-      margin: 0 !important;
-      padding-bottom: 3px !important;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 15.5pt !important;
-      font-weight: 800 !important;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #000000 !important;
-      border-bottom: 2px solid #000000 !important;
-    }
-    .a4-body-copy {
-      margin-top: 20px !important;
-      font-family: 'Times New Roman', Times, Georgia, serif;
-      font-size: 13.5pt !important;
-      line-height: 1.85 !important;
-      text-align: justify;
-      color: #000000 !important;
-    }
-    .a4-body-copy p {
-      margin: 0 0 18px 0 !important;
-      text-indent: 38px !important;
-      text-align: justify;
-    }
-    .a4-body-copy strong {
-      font-weight: 700;
-    }
-    .a4-footer-block {
-      margin-top: 24px !important;
-      padding-top: 12px !important;
-      padding-bottom: 8px !important;
-      border: 0 !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-    }
-    .a4-date-line {
-      text-align: right;
-      font-size: 13pt !important;
-      margin-bottom: 38px !important;
-      color: #000000 !important;
-    }
-    .a4-sig-container {
-      text-align: center;
-      width: 280px;
-      margin: 0 auto;
-    }
-    .a4-sig-role {
-      font-size: 13pt !important;
-      font-weight: 700 !important;
-      margin: 0 0 46px 0 !important;
-      color: #000000 !important;
-    }
-    .a4-sig-line {
-      border-bottom: 1px solid #000000 !important;
-      width: 260px;
-      margin: 0 auto;
-    }
-    .a4-sig-name {
-      font-size: 13pt !important;
-      font-weight: 700 !important;
-      margin: 8px 0 0 0 !important;
-      color: #000000 !important;
-    }
-  </style>
-</head>
-<body>
-  <div id="print-sheet-root">${sheetEl.innerHTML}</div>
-</body>
-</html>`);
-    iframeDoc.close();
-
-    const triggerPrint = () => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch {
-        window.print();
-      }
-    };
-
-    const images = Array.from(iframeDoc.images || []);
-    if (images.length === 0 || images.every((img) => img.complete)) {
-      setTimeout(triggerPrint, 80);
-    } else {
-      let settled = false;
-      const done = () => {
-        if (settled) return;
-        settled = true;
-        setTimeout(triggerPrint, 60);
-      };
-      images.forEach((img) => {
-        img.addEventListener('load', done, { once: true });
-        img.addEventListener('error', done, { once: true });
-      });
-      setTimeout(done, 400);
+  const handleDownloadPdf = async (recordOverride?: CadastramentoEfectividadeRecord) => {
+    const targetRecord = recordOverride || selectedRecordForView;
+    if (!targetRecord) return;
+    try {
+      await downloadDeclaracaoEfectividadePdf(
+        targetRecord,
+        recordOverride ? null : viewGenderOverride
+      );
+      showToast(`Declaração de Efectividade de ${targetRecord.nome} baixada em PDF (1 página A4).`);
+    } catch {
+      showToast('Erro ao gerar o ficheiro PDF. Tente novamente.');
     }
   };
 
@@ -737,15 +539,153 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
   return (
     <div id="declaracao-efectividade-page" className="w-full min-h-screen bg-[#fafafa] flex flex-col font-sans">
-      {/* Print CSS rules - ensures strict single-page A4 portrait format without frame (moldura) and full-sheet proportions matching preview */}
+      {/* Print CSS rules - ensures strict single-page A4 portrait format without frame (moldura), 100% Times New Roman, 14pt titles, and 12pt texts */}
       <style>{`
+        #oficial-a4-sheet,
+        #oficial-a4-sheet * {
+          font-family: 'Times New Roman', Times, serif !important;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-emblem-img {
+          width: 60px;
+          height: auto;
+          max-height: 60px;
+          object-fit: contain;
+          display: block;
+          margin: 0 auto 6px auto;
+        }
+        #oficial-a4-sheet .a4-header-block {
+          text-align: center;
+          font-family: 'Times New Roman', Times, serif !important;
+          margin-bottom: 10pt;
+          padding-bottom: 0;
+          border: 0;
+        }
+        #oficial-a4-sheet .a4-header-block p.a4-republic-title {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 14pt;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          line-height: 1.25;
+          margin: 0 0 2pt 0;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-header-block p.a4-inst-line {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.01em;
+          line-height: 1.25;
+          margin: 1.5pt 0;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-title-wrap {
+          padding-top: 12pt;
+          padding-bottom: 4pt;
+          text-align: center;
+        }
+        #oficial-a4-sheet .a4-title-wrap h1 {
+          display: inline-block;
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 14pt;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          line-height: 1.25;
+          color: #000000;
+          border-bottom: 1.5px solid #000000;
+          padding-bottom: 2pt;
+          margin: 0;
+        }
+        #oficial-a4-sheet .a4-body-copy {
+          margin-top: 10pt;
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          line-height: 1.42;
+          text-align: justify;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-body-copy p {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          line-height: 1.42;
+          text-align: justify;
+          text-indent: 1.25cm;
+          margin: 0 0 8pt 0;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-body-copy strong {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          font-weight: 700;
+        }
+        #oficial-a4-sheet .a4-footer-block {
+          margin-top: 14pt;
+          padding-top: 2pt;
+          border: 0;
+        }
+        #oficial-a4-sheet .a4-date-line,
+        #oficial-a4-sheet .a4-date-line span {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          line-height: 1.35;
+          text-align: right;
+          margin-bottom: 20pt;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-sig-container {
+          text-align: center;
+          width: 280px;
+          margin: 0 auto;
+        }
+        #oficial-a4-sheet .a4-sig-role {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 0 0 26pt 0;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-sig-line {
+          border-bottom: 1px solid #000000;
+          width: 250px;
+          margin: 0 auto;
+        }
+        #oficial-a4-sheet .a4-sig-name {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 5pt 0 0 0;
+          color: #000000;
+        }
+
         @media print {
           @page {
             size: A4 portrait;
-            margin: 15mm 18mm;
+            margin: 0mm !important;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           html,
-          body,
+          body {
+            display: block !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 210mm !important;
+            height: 296mm !important;
+            max-height: 296mm !important;
+            overflow: hidden !important;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
+          }
           #root,
           #root > div,
           #main-content,
@@ -753,16 +693,19 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #declaracao-efectividade-page > main,
           #declaracao-efectividade-page > main > div,
           #declaracao-efectividade-page > main > div > div {
+            display: block !important;
             background: #ffffff !important;
             background-color: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
             min-height: 0 !important;
             height: auto !important;
-            max-height: 267mm !important;
+            max-height: 296mm !important;
             width: 100% !important;
-            max-width: none !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
             transform: none !important;
+            zoom: 1 !important;
             overflow: hidden !important;
             border: 0 !important;
             outline: 0 !important;
@@ -776,87 +719,111 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #system-toast-notification,
           .skip-to-content-link,
           .no-print,
+          header,
           footer,
           nav {
             display: none !important;
             visibility: hidden !important;
             height: 0 !important;
+            width: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
+            overflow: hidden !important;
+          }
+          #oficial-a4-sheet,
+          #oficial-a4-sheet * {
+            font-family: 'Times New Roman', Times, serif !important;
           }
           #oficial-a4-sheet {
+            display: block !important;
             box-sizing: border-box !important;
             box-shadow: none !important;
             border: 0 !important;
             outline: 0 !important;
             border-radius: 0 !important;
             background: #ffffff !important;
-            padding: 4mm 0 2mm 0 !important;
+            padding: 15mm 20mm !important;
             margin: 0 auto !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-height: 256mm !important;
-            height: auto !important;
-            max-height: 265mm !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: space-between !important;
+            width: 210mm !important;
+            max-width: 210mm !important;
+            min-height: 0 !important;
+            height: 296mm !important;
+            max-height: 296mm !important;
+            overflow: hidden !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
             page-break-before: avoid !important;
             break-before: avoid !important;
-            overflow: hidden !important;
           }
           #oficial-a4-sheet .a4-emblem-img {
-            width: 68px !important;
+            width: 60px !important;
             height: auto !important;
-            max-height: 68px !important;
+            max-height: 60px !important;
+            margin: 0 auto 6px auto !important;
           }
           #oficial-a4-sheet .a4-header-block {
-            margin-bottom: 16px !important;
+            margin-bottom: 10pt !important;
             padding-bottom: 0 !important;
             border: 0 !important;
           }
-          #oficial-a4-sheet .a4-header-block p {
-            font-size: 11pt !important;
-            line-height: 1.35 !important;
-            margin: 3.5px 0 !important;
+          #oficial-a4-sheet .a4-header-block p.a4-republic-title {
+            font-size: 14pt !important;
+            font-weight: 700 !important;
+            line-height: 1.25 !important;
+            margin: 0 0 2pt 0 !important;
           }
-          #oficial-a4-sheet .a4-header-block p:first-of-type {
-            font-size: 13pt !important;
+          #oficial-a4-sheet .a4-header-block p.a4-inst-line {
+            font-size: 12pt !important;
+            font-weight: 700 !important;
+            line-height: 1.25 !important;
+            margin: 1.5pt 0 !important;
           }
           #oficial-a4-sheet .a4-title-wrap {
-            padding-top: 22px !important;
-            padding-bottom: 6px !important;
+            padding-top: 12pt !important;
+            padding-bottom: 4pt !important;
           }
           #oficial-a4-sheet .a4-title-wrap h1 {
-            font-size: 15.5pt !important;
+            font-size: 14pt !important;
+            font-weight: 700 !important;
+            line-height: 1.25 !important;
+            border-bottom: 1.5px solid #000000 !important;
+            padding-bottom: 2pt !important;
           }
           #oficial-a4-sheet .a4-body-copy {
-            margin-top: 20px !important;
-            font-size: 13.5pt !important;
-            line-height: 1.85 !important;
+            margin-top: 10pt !important;
+            font-size: 12pt !important;
+            line-height: 1.42 !important;
           }
-          #oficial-a4-sheet .a4-body-copy > p + p {
-            margin-top: 18px !important;
+          #oficial-a4-sheet .a4-body-copy p {
+            font-size: 12pt !important;
+            line-height: 1.42 !important;
+            text-indent: 1.25cm !important;
+            margin: 0 0 8pt 0 !important;
+          }
+          #oficial-a4-sheet .a4-body-copy strong {
+            font-size: 12pt !important;
           }
           #oficial-a4-sheet .a4-footer-block {
-            padding-top: 12px !important;
-            padding-bottom: 8px !important;
-            margin-top: 24px !important;
+            margin-top: 14pt !important;
+            padding-top: 2pt !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
-          #oficial-a4-sheet .a4-date-line {
-            margin-bottom: 38px !important;
-            font-size: 13pt !important;
+          #oficial-a4-sheet .a4-date-line,
+          #oficial-a4-sheet .a4-date-line span {
+            font-size: 12pt !important;
+            line-height: 1.35 !important;
+            margin-bottom: 20pt !important;
           }
           #oficial-a4-sheet .a4-sig-role {
-            margin-bottom: 46px !important;
-            font-size: 13pt !important;
+            font-size: 12pt !important;
+            margin-bottom: 26pt !important;
           }
           #oficial-a4-sheet .a4-sig-name {
-            font-size: 13pt !important;
+            font-size: 12pt !important;
+            margin-top: 5pt !important;
           }
         }
       `}</style>
@@ -1717,10 +1684,20 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                                 type="button"
                                 onClick={() => handleOpenViewFicha(item)}
                                 className="btn--secondary text-[11px] py-1 px-2.5 flex items-center gap-1"
-                                title="Ver e exportar Declaração / Ficha em PDF"
+                                title="Ver Declaração na folha A4"
                               >
                                 <Eye className="w-3.5 h-3.5 text-[#52606d]" />
                                 <span>Ficha</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadPdf(item)}
+                                className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold py-1 px-2.5 rounded-[10px] cursor-pointer transition-colors"
+                                title="Baixar Declaração de Efectividade em PDF (1 Página A4)"
+                              >
+                                <FileDown className="w-3.5 h-3.5" />
+                                <span>Baixar PDF</span>
                               </button>
 
                               <button
@@ -1837,12 +1814,22 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
                 <button
                   type="button"
-                  onClick={handlePrintDocument}
-                  className="inline-flex items-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer"
-                  title="Exportar documento completo em PDF numa única página A4 através do diálogo de impressão"
+                  onClick={() => handleDownloadPdf()}
+                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer"
+                  title="Baixar diretamente o ficheiro PDF da Declaração de Efectividade numa única página A4, sem cabeçalhos extra do sistema"
                 >
                   <FileDown className="w-4 h-4" />
-                  <span>Exportar em PDF / Imprimir</span>
+                  <span>Baixar Declaração (PDF)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintDocument}
+                  className="inline-flex items-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer"
+                  title="Imprimir Declaração em 1 única página A4 sem informações extra do sistema"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimir (1 Página A4)</span>
                 </button>
 
                 <button
@@ -1929,81 +1916,81 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               const directorNome = selectedRecordForView.director?.trim() || 'Belizio Miguel dos Santos António';
 
               return (
-                <div className="flex justify-center w-full print:m-0 print:p-0">
+                <div className="flex justify-center w-full print:block print:m-0 print:p-0">
                   <div
                     id="oficial-a4-sheet"
-                    className="bg-white w-full max-w-[210mm] p-8 sm:p-10 md:p-12 border-0 outline-none shadow-sm print:p-0 print:shadow-none print:border-0 text-slate-950 flex flex-col justify-between mx-auto"
-                    style={{ fontFamily: "'Times New Roman', Times, 'Source Serif 4', Georgia, serif" }}
+                    className="bg-white w-full max-w-[210mm] p-8 sm:p-12 md:px-[20mm] md:py-[15mm] border-0 outline-none shadow-sm print:p-0 print:shadow-none print:border-0 text-black mx-auto"
+                    style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
                   >
                     <div>
                       {/* 1. Official Angolan Government Header */}
-                      <div className="a4-header-block text-center pb-1 mb-3 font-sans">
+                      <div className="a4-header-block">
                         {/* Insígnia da República de Angola */}
-                        <div className="flex justify-center mb-1.5">
+                        <div className="flex justify-center">
                           <img
                             src={emblemAngolaImg}
                             alt="Insígnia da República de Angola"
-                            className="a4-emblem-img w-14 sm:w-16 h-auto max-h-16 object-contain mx-auto"
+                            className="a4-emblem-img"
                           />
                         </div>
 
-                        <p className="text-[12px] sm:text-[13px] font-black uppercase tracking-widest text-slate-900 leading-tight">
+                        <p className="a4-republic-title">
                           REPÚBLICA DE ANGOLA
                         </p>
-                        <p className="text-[10.5px] sm:text-[11.5px] font-bold text-slate-800 uppercase tracking-wide leading-tight mt-0.5">
+                        <p className="a4-inst-line">
                           GOVERNO PROVINCIAL DE {selectedRecordForView.governoProv ? selectedRecordForView.governoProv.toUpperCase() : 'MALANJE'}
                         </p>
-                        <p className="text-[10.5px] sm:text-[11.5px] font-bold uppercase text-slate-800 tracking-wide leading-tight mt-0.5">
+                        <p className="a4-inst-line">
                           ADMINISTRAÇÃO MUNICIPAL DO {selectedRecordForView.administracao ? selectedRecordForView.administracao.toUpperCase() : 'QUÊSSUA'}
                         </p>
-                        <p className="text-[10.5px] sm:text-[11.5px] font-bold uppercase text-slate-800 tracking-wide leading-tight mt-0.5">
+                        <p className="a4-inst-line">
                           DIRECÇÃO MUNICIPAL DE {selectedRecordForView.direccao ? selectedRecordForView.direccao.toUpperCase() : 'EDUCAÇÃO'}
                         </p>
 
-                        <div className="a4-title-wrap pt-3.5 pb-1">
-                          <h1 className="text-base sm:text-lg font-black uppercase tracking-wider text-slate-950 inline-block border-b-2 border-slate-900 pb-0.5">
+                        <div className="a4-title-wrap">
+                          <h1>
                             DECLARAÇÃO DE EFECTIVIDADE
                           </h1>
                         </div>
                       </div>
 
-                      {/* 2. Official Declaration Text Content */}
-                      <div className="a4-body-copy mt-3 text-[13px] sm:text-[14px] text-justify leading-[1.62] text-slate-900 space-y-3">
-                        <p className="indent-8 sm:indent-10">
-                          Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do Quêssua declara, para os fins a que se destina, que {artigoTratamento} <strong>{selectedRecordForView.nome}</strong>, {filhoFilha} de <strong>{selectedRecordForView.pai}</strong> e de <strong>{selectedRecordForView.mae}</strong>, natural de <strong>{selectedRecordForView.naturalidade}</strong>, Província {prepProvincia} <strong>{selectedRecordForView.provNat}</strong>, {nascidoNascida} aos <strong>{nascimentoExtenso}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong className="font-mono tracking-wide">{selectedRecordForView.bi}</strong>, emitido aos <strong>{biEmissaoExtenso}</strong>, é {funcionarioFuncionaria} do Sector da Educação, exercendo {funcaoTexto} no Município do {selectedRecordForView.municipio}, onde se encontra {colocadoColocada} {prepEscola} <strong>{selectedRecordForView.escola}</strong>, {enquadradoEnquadrada} na categoria profissional de <strong>{adaptedCategoria}</strong> do <strong>{selectedRecordForView.grau}</strong>, {inscritoInscrita} sob o número de agente <strong>{selectedRecordForView.agente}</strong>.
+                      {/* 2. Official Declaration Text Content (12pt) */}
+                      <div className="a4-body-copy">
+                        <p>
+                          Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do Quêssua declara, para os fins a que se destina, que {artigoTratamento} <strong>{selectedRecordForView.nome}</strong>, {filhoFilha} de <strong>{selectedRecordForView.pai}</strong> e de <strong>{selectedRecordForView.mae}</strong>, natural de <strong>{selectedRecordForView.naturalidade}</strong>, Província {prepProvincia} <strong>{selectedRecordForView.provNat}</strong>, {nascidoNascida} aos <strong>{nascimentoExtenso}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong>{selectedRecordForView.bi}</strong>, emitido aos <strong>{biEmissaoExtenso}</strong>, é {funcionarioFuncionaria} do Sector da Educação, exercendo {funcaoTexto} no Município do {selectedRecordForView.municipio}, onde se encontra {colocadoColocada} {prepEscola} <strong>{selectedRecordForView.escola}</strong>, {enquadradoEnquadrada} na categoria profissional de <strong>{adaptedCategoria}</strong> do <strong>{selectedRecordForView.grau}</strong>, {inscritoInscrita} sob o número de agente <strong>{selectedRecordForView.agente}</strong>.
                         </p>
 
-                        <p className="indent-8 sm:indent-10">
+                        <p>
                           Mais se declara que {referidoFuncionario} se encontra no efectivo exercício das suas funções e que a presente declaração é emitida para efeitos de comprovação da sua efectividade no Sector da Educação, destinando-se, especificamente, {finalidadeFormatted.preposition} {finalidadeFormatted.text}, para os fins administrativos e profissionais legalmente previstos.
                         </p>
 
-                        <p className="indent-8 sm:indent-10">
+                        <p>
                           A presente declaração comprova os elementos de identificação e de enquadramento profissional {doDaFuncionario} acima indicados, devendo ser utilizada exclusivamente {peloMesmoPelaMesma} para a finalidade que motivou a sua emissão, sem prejuízo da apresentação de outros documentos exigidos pelas entidades competentes no âmbito do referido processo concursal.
                         </p>
 
-                        <p className="indent-8 sm:indent-10">
+                        <p>
                           Por corresponder à verdade e por ter sido solicitada {interessadoInteressada}, mandei passar a presente declaração, que vai por mim assinada e autenticada com o carimbo a óleo em uso nesta Direcção, para que produza os efeitos administrativos a que se destina.
                         </p>
                       </div>
                     </div>
 
-                    {/* 3. Footer, Date and Official Signatures Block */}
-                    <div className="a4-footer-block pt-5 mt-3">
+                    {/* 3. Footer, Date and Official Signatures Block (12pt) */}
+                    <div className="a4-footer-block">
                       {/* Date line */}
-                      <div className="a4-date-line text-right text-[12.5px] sm:text-[13.5px] mb-6">
+                      <div className="a4-date-line">
                         <span>
                           Direcção Municipal de Educação do Quêssua, Quêssua aos {dataEmissaoExtenso}.
                         </span>
                       </div>
 
                       {/* Signatures */}
-                      <div className="flex flex-col items-center justify-center pt-1">
-                        <div className="a4-sig-container text-center min-w-[240px] sm:min-w-[280px]">
-                          <p className="a4-sig-role text-[13px] sm:text-[14px] font-bold text-slate-900 mb-6 font-serif">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="a4-sig-container">
+                          <p className="a4-sig-role">
                             O Director Municipal
                           </p>
-                          <div className="a4-sig-line border-b border-slate-900 mx-auto w-full max-w-[240px]"></div>
-                          <p className="a4-sig-name text-[13px] sm:text-[14px] font-bold text-slate-950 mt-1.5 font-serif">
+                          <div className="a4-sig-line"></div>
+                          <p className="a4-sig-name">
                             {directorNome}
                           </p>
                         </div>

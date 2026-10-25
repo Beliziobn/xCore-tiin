@@ -15,19 +15,12 @@ service cloud.firestore {
       return id is string && id.size() > 0 && id.size() <= 128;
     }
 
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (request.auth.token.email != null && (
           request.auth.token.email == 'dmedoquessua@gmail.com' ||
+          request.auth.token.email == 'beliziodos20@gmail.com' ||
           request.auth.token.email == 'socienciadaeduca2018@gmail.com'
         ))
       );
@@ -35,7 +28,7 @@ service cloud.firestore {
 
     // ==========================================
     // Collection: /applications/{applicationId}
-    // Cross-device cloud homologation for directors & teachers
+    // Cross-device cloud homologation for directors, teachers & DME staff
     // ==========================================
     match /applications/{applicationId} {
       allow read: if true;
@@ -57,7 +50,7 @@ service cloud.firestore {
 
     // ==========================================
     // Collection: /schools/{schoolId}
-    // School directory & director assignments
+    // School directory & full 7-section registration data
     // ==========================================
     match /schools/{schoolId} {
       allow read: if true;
@@ -65,10 +58,100 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // Collection: /directors/{directorId}
+    // School directors & management dossiers
+    // ==========================================
+    match /directors/{directorId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /dme_staff/{staffId}
+    // Municipal Directorate (DME) technical & inspection staff
+    // ==========================================
+    match /dme_staff/{staffId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
     // Collection: /teachers/{teacherId}
-    // Teacher rosters
+    // Teacher rosters & ministerial registration data
     // ==========================================
     match /teachers/{teacherId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /students/{studentId}
+    // Student enrollments & academic profiles
+    // ==========================================
+    match /students/{studentId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /efectividade/{recordId}
+    // Official personnel effectiveness cadastros
+    // ==========================================
+    match /efectividade/{recordId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /grades/{gradeId}
+    // Teacher Mini-Pautas & Consolidated Turma Pautas
+    // ==========================================
+    match /grades/{gradeId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /attendance/{recordId}
+    // Student & Teacher daily attendance records
+    // ==========================================
+    match /attendance/{recordId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /announcements/{announcementId}
+    // Municipal & School announcements and deadlines
+    // ==========================================
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /rooms/{roomId}
+    // School classrooms & laboratories
+    // ==========================================
+    match /rooms/{roomId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /classes/{classId}
+    // School classes & turmas
+    // ==========================================
+    match /classes/{classId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /chatMessages/{messageId}
+    // Real-time institutional & support chat messages
+    // ==========================================
+    match /chatMessages/{messageId} {
       allow read: if true;
       allow write: if true;
     }
@@ -94,28 +177,12 @@ service cloud.firestore {
 
     // ==========================================
     // Collection: /audit_logs/{logId}
-    // Audit logs
+    // Immutable append-only audit logs
     // ==========================================
     match /audit_logs/{logId} {
       allow read: if true;
       allow create: if isValidId(logId);
       allow update, delete: if false;
-    }
-
-    // ==========================================
-    // Collection: /students/{studentId}
-    // ==========================================
-    match /students/{studentId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // ==========================================
-    // Collection: /grades/{gradeId}
-    // ==========================================
-    match /grades/{gradeId} {
-      allow read: if true;
-      allow write: if true;
     }
 
     // Connection test document

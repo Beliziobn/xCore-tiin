@@ -10,6 +10,14 @@ import type {
   SchoolAuditHistoryItem,
   SchoolDeficiencia,
 } from '../types';
+import {
+  saveSchoolToFirestore,
+  deleteSchoolFromFirestore,
+  deleteTeacherFromFirestore,
+  deleteStudentFromFirestore,
+  deleteDirectorFromFirestore,
+  fetchSchoolsFromFirestore,
+} from './firestoreSync';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
 
@@ -668,6 +676,18 @@ export function deleteSchoolAndRelatedData(schoolId: string, schoolName?: string
     window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
 
+    // Also delete from Firestore cloud database in real time
+    deleteSchoolFromFirestore(targetId || matchedSchool?.id || '', schoolName || matchedSchool?.name).catch(() => {});
+    removedStudentIds.forEach((sid) => {
+      deleteStudentFromFirestore(sid).catch(() => {});
+    });
+    removedTeacherIds.forEach((tid) => {
+      deleteTeacherFromFirestore(tid).catch(() => {});
+    });
+    if (matchedSchool?.id) {
+      deleteDirectorFromFirestore(`dir-${matchedSchool.id}`).catch(() => {});
+    }
+
     // Also delete from backend network store so all other users/sessions see the removal
     fetch(`/api/network/schools/${encodeURIComponent(targetId || 'by-name')}?name=${encodeURIComponent(targetNameNorm)}`, {
       method: 'DELETE',
@@ -739,11 +759,15 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
 
     localStorage.setItem('sigre_school_registrations', JSON.stringify(nextRegList));
 
-    // 3. Push to shared backend store so other users/browsers signing up see this school immediately
+    // 3. Persist immediately to Firebase Firestore cloud database in real time
+    const schoolWithReg: AdminSchool = { ...school, registrationData: regData };
+    saveSchoolToFirestore(schoolWithReg).catch(() => {});
+
+    // 4. Push to shared backend store so other users/browsers signing up see this school immediately
     fetch('/api/network/schools', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ school: { ...school, registrationData: regData } }),
+      body: JSON.stringify({ school: schoolWithReg }),
     }).catch(() => {});
 
     window.dispatchEvent(new CustomEvent('sigre-data-synced'));
@@ -778,6 +802,12 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     const localRawApps = localStorage.getItem('ucore_pending_applications');
     const localApps = localRawApps ? JSON.parse(localRawApps) : [];
 
+    // 0. Pull authoritative schools from Firestore first
+    let firestoreSchools: AdminSchool[] = [];
+    try {
+      firestoreSchools = await fetchSchoolsFromFirestore();
+    } catch {}
+
     const res = await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -797,14 +827,22 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     const data = await res.json();
     let changed = false;
 
-    if (Array.isArray(data.schools) && data.schools.length > 0) {
+    if ((Array.isArray(data.schools) && data.schools.length > 0) || firestoreSchools.length > 0) {
       const mergedMap = new Map<string, AdminSchool>();
       (Array.isArray(localSchools) ? localSchools : []).forEach((s) => {
         if (s && s.name && !isModeloCentralSchool(s.name)) {
           mergedMap.set(norm(s.name), s);
         }
       });
-      data.schools.forEach((s: AdminSchool) => {
+      if (Array.isArray(data.schools)) {
+        data.schools.forEach((s: AdminSchool) => {
+          if (s && s.name && !isModeloCentralSchool(s.name)) {
+            const existing = mergedMap.get(norm(s.name));
+            mergedMap.set(norm(s.name), existing ? { ...existing, ...s } : s);
+          }
+        });
+      }
+      firestoreSchools.forEach((s: AdminSchool) => {
         if (s && s.name && !isModeloCentralSchool(s.name)) {
           const existing = mergedMap.get(norm(s.name));
           mergedMap.set(norm(s.name), existing ? { ...existing, ...s } : s);

@@ -1,4 +1,8 @@
 import { SchoolAnnouncement, SchoolDemandType } from '../types';
+import {
+  saveAnnouncementToFirestore,
+  deleteAnnouncementFromFirestore,
+} from './firestoreSync';
 
 const STORAGE_KEY = 'ucore_school_announcements_v1';
 
@@ -65,6 +69,10 @@ export function saveAnnouncement(announcement: SchoolAnnouncement): SchoolAnnoun
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    saveAnnouncementToFirestore(announcement).catch(() => {});
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (err) {
     console.warn('Erro ao salvar anúncio:', err);
   }
@@ -76,6 +84,10 @@ export function deleteAnnouncement(id: string): SchoolAnnouncement[] {
   const updated = current.filter((a) => a.id !== id);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    deleteAnnouncementFromFirestore(id).catch(() => {});
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (err) {
     console.warn('Erro ao excluir anúncio:', err);
   }

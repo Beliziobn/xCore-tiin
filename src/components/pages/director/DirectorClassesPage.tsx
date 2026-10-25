@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Filter, BookOpen, Layers, Users, ChevronDown, CheckCircle2, Award, Ban, AlertCircle, FileDown } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorClassesData as initialClasses } from '../../../data/directorData';
@@ -8,6 +8,7 @@ import type { DirectorClass } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
 import { getDisciplinasForClass, getGradingScaleForClass } from '../../../utils/miniPautaStorage';
+import { saveClassToFirestore } from '../../../utils/firestoreSync';
 
 interface DirectorClassesPageProps {
   onOpenGetStarted: () => void;
@@ -20,7 +21,16 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
   isLoggedIn,
   onNavigateToPautas,
 }) => {
-  const [classesList, setClassesList] = useState<DirectorClass[]>(initialClasses);
+  const [classesList, setClassesList] = useState<DirectorClass[]>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_director_classes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return initialClasses;
+  });
   const [selectedClassId, setSelectedClassId] = useState<string>(classesList[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCycle, setFilterCycle] = useState<string>('all');
@@ -29,6 +39,20 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [pdfModalClass, setPdfModalClass] = useState<string>('');
   const [pdfModalTurma, setPdfModalTurma] = useState<string>('');
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('ucore_director_classes');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) setClassesList(parsed);
+        }
+      } catch {}
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    return () => window.removeEventListener('sigre-data-synced', handleSync);
+  }, []);
 
   // Filtered classes
   const filteredClasses = useMemo(() => {
@@ -70,7 +94,15 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
         { name: 'Turma A', studentCount: 0, maxCapacity: 45, shift: 'Manhã', room: newClass.room || 'A definir', isFull: false },
       ],
     };
-    setClassesList((prev) => [formatted, ...prev]);
+    setClassesList((prev) => {
+      const next = [formatted, ...prev];
+      try {
+        localStorage.setItem('ucore_director_classes', JSON.stringify(next));
+        localStorage.setItem('sigre_director_classes', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    saveClassToFirestore(formatted).catch(() => {});
     setSelectedClassId(formatted.id);
   };
 

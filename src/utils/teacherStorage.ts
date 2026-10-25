@@ -13,6 +13,11 @@ import type {
   TeacherTeachingLevel,
   TeacherAuditLog,
 } from '../types';
+import {
+  saveTeacherToFirestore,
+  deleteTeacherFromFirestore,
+  clearAllTeachersFromFirestore,
+} from './firestoreSync';
 
 export const STORAGE_KEY_TEACHERS = 'ucore_registered_teachers_v2';
 
@@ -309,6 +314,15 @@ export function saveTeacher(
       }
       localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(dirTeachers));
 
+      // 3) Persist immediately to Firebase Firestore and backend network store
+      saveTeacherToFirestore(savedRecord).catch(() => {});
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teachers: adminTeachers }),
+      }).catch(() => {});
+
+      window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch (e) {
       console.error('Failed to persist teachers to localStorage', e);
@@ -361,6 +375,13 @@ export function deleteTeacher(id: string, teacherName?: string): TeacherRegistra
         localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(filteredDir));
       }
 
+      // Remover do Firestore em tempo real
+      deleteTeacherFromFirestore(id).catch(() => {});
+      if (targetName) {
+        deleteTeacherFromFirestore(targetName).catch(() => {});
+      }
+
+      window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch (e) {
       console.error('Failed to delete teacher from localStorage', e);
@@ -375,6 +396,8 @@ export function deleteAllTeachers(): void {
       localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify([]));
       localStorage.setItem('ucore_admin_teachers', JSON.stringify([]));
       localStorage.setItem('ucore_director_teachers_v1', JSON.stringify([]));
+      clearAllTeachersFromFirestore().catch(() => {});
+      window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch (e) {
       console.error('Failed to clear all teachers', e);

@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { saveMiniPautaToFirestore } from './firestoreSync';
 
 export type ClassGradingScaleType = 'qualitativo' | 'escala_0_10' | 'escala_0_20';
 
@@ -470,6 +471,7 @@ export function saveTeacherMiniPauta(record: TeacherMiniPautaRecord): TeacherMin
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      saveMiniPautaToFirestore(updatedRecord).catch(() => {});
       window.dispatchEvent(new CustomEvent('sigre-minipautas-updated'));
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch {

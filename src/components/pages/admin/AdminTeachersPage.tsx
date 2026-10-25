@@ -67,14 +67,18 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
   const [detailModalTeacher, setDetailModalTeacher] = useState<TeacherRegistrationData | null>(null);
   const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
 
-  // Sync stored teachers on mount and local changes
+  // Sync stored teachers on mount and local/cloud real-time changes
   useEffect(() => {
     const refresh = () => {
       setDetailedTeachers(getStoredTeachers());
     };
     refresh();
     window.addEventListener('ucore-teachers-updated', refresh);
-    return () => window.removeEventListener('ucore-teachers-updated', refresh);
+    window.addEventListener('sigre-data-synced', refresh);
+    return () => {
+      window.removeEventListener('ucore-teachers-updated', refresh);
+      window.removeEventListener('sigre-data-synced', refresh);
+    };
   }, []);
 
   // Lista de escolas cadastradas no sistema com status de quota docente (Declarados vs Cadastrados vs Pendentes)

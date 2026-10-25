@@ -67,6 +67,14 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
     return getStoredStudents();
   });
 
+  useEffect(() => {
+    const refresh = () => {
+      setDetailedStudents(getStoredStudents());
+    };
+    window.addEventListener('sigre-data-synced', refresh);
+    return () => window.removeEventListener('sigre-data-synced', refresh);
+  }, []);
+
   // Compute student quota reconciliation & gender summary per school (Total, Feminino, Masculino, Declarados, Pendentes)
   const schoolStudentQuotaList = useMemo(() => {
     return schools.map((sc) => ({

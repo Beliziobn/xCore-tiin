@@ -105,6 +105,22 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
 
   useEffect(() => {
     refreshPending();
+    const handleSync = () => {
+      refreshPending();
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_DIRECTOR_TEACHERS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setTeachers(parsed);
+        }
+      } catch {}
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('ucore-teachers-updated', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('ucore-teachers-updated', handleSync);
+    };
   }, []);
 
   const handleApproveTeacherApplication = (appId: string, assignedData: { room: string; turma: string; shift: 'Manhã' | 'Tarde' }) => {
@@ -201,6 +217,12 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
     };
     persistTeachers([formatted, ...teachers]);
     setSelectedTeacherId(formatted.id);
+
+    // Ensure full unified persistence in teacherStorage and Firestore
+    try {
+      const regData = getRegistrationDataFromDirectorTeacher(formatted, schoolName, directorName);
+      saveTeacher(regData, directorName);
+    } catch {}
 
     if (onAddTeacherGlobal) {
       const adminFormatted: AdminTeacher = {

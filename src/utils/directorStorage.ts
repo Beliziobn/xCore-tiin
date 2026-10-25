@@ -19,6 +19,7 @@ import {
   NIVEL_ACADEMICO_OPTIONS
 } from './teacherStorage';
 import { initialAdminSchools } from '../data/adminData';
+import { saveDirectorToFirestore } from './firestoreSync';
 
 export const STORAGE_KEY_DIRECTORS = 'ucore_registered_directors_v2';
 
@@ -150,6 +151,44 @@ export function saveDirector(
     }
 
     localStorage.setItem(STORAGE_KEY_DIRECTORS, JSON.stringify(current));
+
+    // Also sync ucore_admin_directors so AdminDirectorsPage immediately sees the updated dossier
+    try {
+      const rawAdminDirs = localStorage.getItem('ucore_admin_directors');
+      const adminDirsList = rawAdminDirs ? JSON.parse(rawAdminDirs) : [];
+      const safeAdminDirs = Array.isArray(adminDirsList) ? [...adminDirsList] : [];
+      const adminEntry = {
+        id: updatedDirector.id,
+        name: updatedDirector.nomeCompleto,
+        phone: updatedDirector.telefone || '+244 923 000 000',
+        email: updatedDirector.emailInstitucional || updatedDirector.emailPessoal || '',
+        schoolName: updatedDirector.nomeEscola || 'Escola Municipal de Quêssua',
+        schoolId: updatedDirector.escolaId,
+        location: `${updatedDirector.municipioEscola || 'Quêssua'} (${updatedDirector.provinciaEscola || 'Malanje'})`,
+        yearsInRole: updatedDirector.anosExperienciaDirector || 1,
+        presenceRate: 100,
+        schoolPerformance: 92,
+        status: 'Ativo' as const,
+        registrationData: updatedDirector,
+      };
+      const existingAdminIdx = safeAdminDirs.findIndex(
+        (d: any) =>
+          d.id === updatedDirector.id ||
+          String(d.name || '').trim().toLowerCase() === updatedDirector.nomeCompleto.trim().toLowerCase()
+      );
+      if (existingAdminIdx >= 0) {
+        safeAdminDirs[existingAdminIdx] = { ...safeAdminDirs[existingAdminIdx], ...adminEntry };
+      } else {
+        safeAdminDirs.unshift(adminEntry);
+      }
+      localStorage.setItem('ucore_admin_directors', JSON.stringify(safeAdminDirs));
+    } catch {}
+
+    // Persist immediately to Firebase Firestore and backend network store
+    saveDirectorToFirestore(updatedDirector).catch(() => {});
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (err) {
     console.error('Erro ao gravar director:', err);
   }

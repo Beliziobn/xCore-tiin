@@ -80,11 +80,15 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
     setPendingApplications(getPendingApplications('diretor').filter((a) => a.status === 'pendente'));
   };
 
-  // Sync stored directors and pending candidacies on mount and updates
+  // Sync stored directors and pending candidacies on mount and real-time updates
   useEffect(() => {
-    const list = getStoredDirectors();
-    setDetailedDirectors(list);
-    refreshPending();
+    const handleSync = () => {
+      setDetailedDirectors(getStoredDirectors());
+      refreshPending();
+    };
+    handleSync();
+    window.addEventListener('sigre-data-synced', handleSync);
+    return () => window.removeEventListener('sigre-data-synced', handleSync);
   }, []);
 
   const handleApproveApplication = (appId: string) => {

@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Filter, Home, Layers, Calendar, Users, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorRoomsData as initialRooms } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorRoom } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
+import { saveRoomToFirestore } from '../../../utils/firestoreSync';
 
 interface DirectorRoomsPageProps {
   onOpenGetStarted: () => void;
@@ -32,6 +33,20 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('ucore_director_rooms');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setRooms(parsed);
+        }
+      } catch {}
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    return () => window.removeEventListener('sigre-data-synced', handleSync);
+  }, []);
 
   // Filtered rooms
   const filteredRooms = useMemo(() => {
@@ -101,9 +116,14 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
         };
         next = [formatted, ...prev];
         setSelectedRoomId(formatted.id);
+        saveRoomToFirestore(formatted).catch(() => {});
+      }
+      if (existingIdx >= 0 && next[existingIdx]) {
+        saveRoomToFirestore(next[existingIdx]).catch(() => {});
       }
       try {
         localStorage.setItem('ucore_director_rooms', JSON.stringify(next));
+        localStorage.setItem('sigre_director_rooms', JSON.stringify(next));
       } catch {
         // ignore
       }

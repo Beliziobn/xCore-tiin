@@ -201,10 +201,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       <a href="#main-content" className="skip-to-content-link">
         Saltar para o conteúdo principal
       </a>
-      {isScrolled && <div className="w-full h-[76px]" aria-hidden="true" />}
+      {isScrolled && <div className="no-print print:hidden w-full h-[76px]" aria-hidden="true" />}
       <header
         id="siteHeader"
-        className={`site-header w-full transition-all duration-300 ${
+        className={`no-print print:hidden site-header w-full transition-all duration-300 ${
           isScrolled
             ? 'fixed top-0 left-0 right-0 z-50 bg-[#f75142] shadow-[0_8px_30px_rgba(247,81,66,0.25)] border-b border-[#e54536] is-scrolled'
             : 'relative z-30 bg-[#f75142] border-b border-[#e54536]'

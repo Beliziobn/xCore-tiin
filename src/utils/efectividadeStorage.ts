@@ -1,3 +1,10 @@
+import {
+  saveEfectividadeToFirestore,
+  deleteEfectividadeFromFirestore,
+  clearAllEfectividadeFromFirestore,
+  fetchEfectividadeFromFirestore,
+} from './firestoreSync';
+
 export interface CadastramentoEfectividadeRecord {
   id: string;
   // 1. Identificação pessoal
@@ -171,6 +178,7 @@ export async function clearAllEfectividadeRecords(
 
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify([]));
     localStorage.removeItem(STORAGE_KEY_DELETED);
+    await clearAllEfectividadeFromFirestore().catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { cleared: true } }));
     return { success: true };
   } catch (err: any) {
@@ -191,21 +199,33 @@ export async function syncEfectividadeFromServer(schoolFilter?: string): Promise
   try {
     const localRecords = getStoredEfectividadeRecords();
     const deletedIds = getDeletedIds();
+    const recordMap = new Map<string, CadastramentoEfectividadeRecord>();
+
+    // 1. Pull authoritative records from Firebase Firestore
+    try {
+      const cloudRecords = await fetchEfectividadeFromFirestore();
+      if (Array.isArray(cloudRecords)) {
+        cloudRecords.forEach((cr: any) => {
+          if (cr && cr.id && !deletedIds.has(cr.id)) {
+            recordMap.set(cr.id, cr as CadastramentoEfectividadeRecord);
+          }
+        });
+      }
+    } catch {}
 
     const url = schoolFilter && schoolFilter !== 'ALL'
       ? `/api/efectividade?school=${encodeURIComponent(schoolFilter)}`
       : '/api/efectividade';
 
     const res = await fetch(url);
-    if (!res.ok) {
+    if (!res.ok && recordMap.size === 0) {
       return localRecords;
     }
-    const data = await res.json();
+    const data = res.ok ? await res.json() : { records: [] };
     if (data && Array.isArray(data.records)) {
       const serverRecords: CadastramentoEfectividadeRecord[] = data.records;
-      const recordMap = new Map<string, CadastramentoEfectividadeRecord>();
 
-      // Load server records first, excluding locally deleted ones
+      // Load server records, excluding locally deleted ones
       serverRecords.forEach((sr) => {
         if (sr && sr.id && !deletedIds.has(sr.id)) {
           recordMap.set(sr.id, sr);
@@ -341,6 +361,9 @@ export function saveEfectividadeRecord(
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(nextRecords));
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: savedRecord }));
 
+    // Persist immediately to Firebase Firestore cloud database in real time
+    saveEfectividadeToFirestore(savedRecord).catch(() => {});
+
     // Persist immediately on the shared backend database so it never disappears and is shared
     fetch('/api/efectividade', {
       method: 'POST',
@@ -368,6 +391,9 @@ export function deleteEfectividadeRecord(id: string): boolean {
   try {
     localStorage.setItem(STORAGE_KEY_EFECTIVIDADE, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { id, deleted: true } }));
+
+    // Delete immediately on Firebase Firestore cloud database
+    deleteEfectividadeFromFirestore(id).catch(() => {});
 
     // Delete immediately on the shared backend database
     fetch(`/api/efectividade/${encodeURIComponent(id)}`, {

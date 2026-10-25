@@ -8,6 +8,13 @@ import {
   deleteApplicationFromFirestore,
   clearApprovedApplicationsFromFirestore,
   subscribeToApplications,
+  saveSchoolToFirestore,
+  saveTeacherToFirestore,
+  saveDirectorToFirestore,
+  saveDmeStaffToFirestore,
+  deleteTeacherFromFirestore,
+  deleteDirectorFromFirestore,
+  deleteDmeStaffFromFirestore,
 } from './firestoreSync';
 
 export const UCORE_MUNICIPALITIES = [
@@ -489,12 +496,35 @@ export function approveApplication(
                 return sc;
               });
               localStorage.setItem(storageKey, JSON.stringify(nextSchools));
+              nextSchools.forEach((sc: any) => {
+                const scName = (sc.name || sc.nomeOficial || '').trim().toLowerCase();
+                if (scName && (scName === normSchool || scName.includes(normSchool) || normSchool.includes(scName))) {
+                  saveSchoolToFirestore(sc).catch(() => {});
+                }
+              });
             }
           }
         } catch {
           // ignore
         }
       });
+
+      // Also persist approved Director record to Firestore directors collection
+      saveDirectorToFirestore({
+        id: target.userId || target.id,
+        name: target.fullName,
+        nomeCompleto: target.fullName,
+        phone: target.phone || '+244 923 000 000',
+        email: target.email,
+        schoolName: target.schoolName,
+        nomeEscola: target.schoolName,
+        location: target.municipality || 'Quêssua',
+        yearsInRole: target.anosServico || 1,
+        presenceRate: 100,
+        schoolPerformance: 92,
+        status: 'Ativo',
+        approvedAt: updatedApp.approvedAt,
+      }).catch(() => {});
     }
 
     // If a Teacher (Professor) is approved, ensure their record is saved to teacher rosters
@@ -547,6 +577,7 @@ export function approveApplication(
           dirTeachers.unshift(teacherEntry);
         }
         localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(dirTeachers));
+        saveTeacherToFirestore(teacherEntry).catch(() => {});
       } catch (err) {
         console.warn('Erro ao integrar professor no quadro após aprovação:', err);
       }
@@ -584,6 +615,7 @@ export function approveApplication(
           nextList.unshift(dmeEntry);
         }
         localStorage.setItem('ucore_dme_staff_list', JSON.stringify(nextList));
+        saveDmeStaffToFirestore(dmeEntry).catch(() => {});
       } catch (err) {
         console.warn('Erro ao integrar membro DME no quadro da Direcção Municipal:', err);
       }
@@ -1117,6 +1149,15 @@ export async function deleteApplication(applicationId: string): Promise<boolean>
     deleteApplicationFromFirestore(applicationId).catch(() => {});
     if (target?.userId && target.userId !== applicationId) {
       deleteApplicationFromFirestore(target.userId).catch(() => {});
+    }
+    if (target?.type === 'professor') {
+      deleteTeacherFromFirestore(target.userId || target.id).catch(() => {});
+    }
+    if (target?.type === 'diretor') {
+      deleteDirectorFromFirestore(target.userId || target.id).catch(() => {});
+    }
+    if (target?.type === 'membro_dme' || target?.scope === 'administracao') {
+      deleteDmeStaffFromFirestore(target.userId || target.id).catch(() => {});
     }
 
     // Call server DELETE

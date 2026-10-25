@@ -546,6 +546,60 @@
         "$ref": "#/entities/Student"
       },
       "description": "Registo de alunos vinculados a escolas e turmas com integridade referencial"
+    },
+    "/directors/{directorId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Quadro de diretores de escola homologados e dossiês de direção"
+    },
+    "/dme_staff/{staffId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Quadro técnico e de inspeção da Direção Municipal da Educação (DME)"
+    },
+    "/efectividade/{recordId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Registos oficiais de cadastramento de efectividade de pessoal"
+    },
+    "/grades/{gradeId}": {
+      "schema": {
+        "$ref": "#/entities/Student"
+      },
+      "description": "Mini-pautas trimestrais e pautas consolidadas por turma e disciplina"
+    },
+    "/attendance/{recordId}": {
+      "schema": {
+        "$ref": "#/entities/Student"
+      },
+      "description": "Registos diários de assiduidade e livro de ponto de alunos e professores"
+    },
+    "/announcements/{announcementId}": {
+      "schema": {
+        "$ref": "#/entities/School"
+      },
+      "description": "Anúncios, circulares, editais e prazos normativos"
+    },
+    "/rooms/{roomId}": {
+      "schema": {
+        "$ref": "#/entities/School"
+      },
+      "description": "Salas de aula e laboratórios das unidades escolares"
+    },
+    "/classes/{classId}": {
+      "schema": {
+        "$ref": "#/entities/School"
+      },
+      "description": "Classes, níveis de ensino e turmas ativas"
+    },
+    "/chatMessages/{messageId}": {
+      "schema": {
+        "$ref": "#/entities/AuditLog"
+      },
+      "description": "Mensagens em tempo real do chat institucional e suporte"
     }
   }
 }

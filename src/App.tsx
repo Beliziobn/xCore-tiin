@@ -54,6 +54,14 @@ import {
 } from './utils/schoolStorage';
 import { syncApplicationsFromServer, initRealtimeApplicationsSync } from './utils/authApprovalStorage';
 import { initRealtimeQuickRequestsSync } from './utils/quickServicesStorage';
+import {
+  initUnifiedRealtimeDatabaseSync,
+  saveTeacherToFirestore,
+  saveStudentToFirestore,
+  saveDirectorToFirestore,
+  saveUserToFirestore,
+} from './utils/firestoreSync';
+import { saveStudent } from './utils/studentStorage';
 
 // Teacher & Student Pages
 import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
@@ -329,6 +337,7 @@ export default function App() {
     syncApplicationsFromServer().catch(() => {});
     const unsubApps = initRealtimeApplicationsSync();
     const unsubQuick = initRealtimeQuickRequestsSync();
+    const unsubUnifiedDb = initUnifiedRealtimeDatabaseSync();
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
     const pollInterval = setInterval(() => {
@@ -340,6 +349,7 @@ export default function App() {
       clearInterval(pollInterval);
       if (typeof unsubApps === 'function') unsubApps();
       if (typeof unsubQuick === 'function') unsubQuick();
+      if (typeof unsubUnifiedDb === 'function') unsubUnifiedDb();
     };
   }, []);
 
@@ -726,6 +736,7 @@ export default function App() {
       if (prev.some((m) => m.id === newMsg.id)) return prev;
       return [...prev, newMsg];
     });
+    realtimeChat.sendMessage(newMsg);
 
     setChatChannels((prev) =>
       prev.map((c) =>
@@ -867,6 +878,7 @@ export default function App() {
       // ignore
     }
     setCurrentUser(user);
+    saveUserToFirestore(user).catch(() => {});
     if (user.role === 'admin' || user.role === 'diretor' || user.role === 'professor') {
       setActiveRole(user.role);
     }
@@ -1863,6 +1875,30 @@ export default function App() {
                 })),
               };
               setTeacherStudents((prev) => [newStudent, ...prev]);
+              saveStudent({
+                id: newStudent.id,
+                name: newStudent.name,
+                nomeCompleto: newStudent.name,
+                genero: newStudent.genero === 'Masculino' ? 'M' : 'F',
+                dataNascimento: newStudent.dataNascimento || '2016-05-10',
+                idade: newStudent.idade || 10,
+                tipoDocumento: (newStudent.tipoDocumento as any) || (hasDocs ? 'BI' : 'sem Documento'),
+                numeroDocumento: newStudent.numeroDocumento,
+                naturezaEscola: 'Pública',
+                tipoEscolaModalidade: 'primario_regular',
+                classeEtapaModulo: newStudent.classe || '4.ª Classe',
+                classe: newStudent.classe || '4ª Classe',
+                turma: newStudent.turma || 'Turma A',
+                sala: newStudent.sala || 'Sala 04',
+                periodo: (newStudent.periodo as any) || 'Manhã',
+                turno: (newStudent.periodo as any) || 'Manhã',
+                escola: currentUser?.schoolName || adminSchools[0]?.name || 'Escola Municipal de Quêssua',
+                condicaoMatricula: (newStudent.condicaoMatricula as any) || 'primeira_vez',
+                alunoRepetente: newStudent.condicaoMatricula === 'repetente',
+                encarregado: newStudent.encarregado || 'Encarregado de Educação',
+                telefone: newStudent.telefone || '+244 923 000 000',
+                endereco: newStudent.endereco || 'Quêssua, Malanje',
+              });
               showToast(`Aluno(a) ${newStudent.name} matriculado(a) com sucesso!`);
             }}
             students={teacherStudents}
@@ -2680,6 +2716,7 @@ export default function App() {
         }}
         onAddTeacher={(newTeacher) => {
           setAdminTeachers((prev) => [newTeacher, ...prev]);
+          saveTeacherToFirestore(newTeacher).catch(() => {});
           showToast(`Docente "${newTeacher.name}" registrado com sucesso!`);
         }}
         onAddStudent={(newStudent) => {
@@ -2692,6 +2729,7 @@ export default function App() {
             }
             return [newStudent, ...prev];
           });
+          saveStudentToFirestore(newStudent).catch(() => {});
           setAdminSchools((prevSchools) =>
             prevSchools.map((sc) => {
               const isMatch =
@@ -2713,6 +2751,7 @@ export default function App() {
         }}
         onAddDirector={(newDirector) => {
           setAdminDirectors((prev) => [newDirector, ...prev]);
+          saveDirectorToFirestore(newDirector).catch(() => {});
           showToast(`Diretor(a) "${newDirector.name}" homologado(a) com sucesso!`);
         }}
         availableSchools={adminSchools.map((s) => s.name)}

@@ -1,3 +1,8 @@
+import {
+  saveAttendanceToFirestore,
+  saveBatchAttendanceToFirestore,
+} from './firestoreSync';
+
 export interface StudentAttendanceRecord {
   id: string;
   studentId: string;
@@ -72,6 +77,10 @@ export function saveStudentAttendanceRecord(record: StudentAttendanceRecord): St
   
   try {
     localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(updated));
+    saveAttendanceToFirestore(lockedRecord, 'student').catch(() => {});
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (err) {
     console.warn('Erro ao persistir presença do aluno:', err);
   }
@@ -104,6 +113,10 @@ export function saveBatchStudentAttendance(records: StudentAttendanceRecord[]): 
   const updated = Array.from(currentMap.values());
   try {
     localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(updated));
+    saveBatchAttendanceToFirestore(records, 'student').catch(() => {});
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (err) {
     console.warn('Erro ao persistir lote de presenças de alunos:', err);
   }
@@ -147,6 +160,10 @@ export function saveTeacherAttendanceRecord(record: TeacherAttendanceRecord): Te
 
   try {
     localStorage.setItem(TEACHER_STORAGE_KEY, JSON.stringify(updated));
+    saveAttendanceToFirestore(lockedRecord, 'teacher').catch(() => {});
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (err) {
     console.warn('Erro ao persistir presença do professor:', err);
   }
@@ -177,6 +194,10 @@ export function saveBatchTeacherAttendance(records: TeacherAttendanceRecord[]): 
   const updated = Array.from(currentMap.values());
   try {
     localStorage.setItem(TEACHER_STORAGE_KEY, JSON.stringify(updated));
+    saveBatchAttendanceToFirestore(records, 'teacher').catch(() => {});
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
   } catch (err) {
     console.warn('Erro ao persistir lote de presenças de professores:', err);
   }

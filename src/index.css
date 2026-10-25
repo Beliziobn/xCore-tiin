@@ -1091,52 +1091,105 @@ html.lenis.lenis-stopped {
   color: var(--danger-text, #c8002f);
 }
 
+/* Official A4 Document Typography: 100% Times New Roman on all elements (including spans, headings, strong, date line) */
+#oficial-a4-sheet,
+#oficial-a4-sheet *,
+#official-modal-print-sheet,
+#official-modal-print-sheet * {
+  font-family: 'Times New Roman', Times, serif !important;
+}
+
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm 16mm;
+    margin: 0mm !important;
   }
 
   html,
-  body,
-  #root,
-  #root > div,
-  #main-content {
+  body {
+    display: block !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
-    min-height: 0 !important;
-    height: auto !important;
+    width: 210mm !important;
+    height: 296mm !important;
+    max-height: 296mm !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
     outline: 0 !important;
     box-shadow: none !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+  }
+
+  #root,
+  #root > div,
+  #main-content,
+  #declaracao-efectividade-page,
+  #declaracao-efectividade-page > main,
+  #declaracao-efectividade-page > main > div,
+  #declaracao-efectividade-page > main > div > div {
+    display: block !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: 296mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    zoom: 1 !important;
+    overflow: hidden !important;
   }
 
   #siteHeader,
+  #ucore-hero-section,
   #ucore-cloud-footer,
   #btn-floating-support-chat,
   #system-toast-notification,
   #page-tabs-bar,
   .skip-to-content-link,
   .no-print,
+  header,
   footer,
   nav {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
+    width: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
   #oficial-a4-sheet,
   #official-modal-print-sheet {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    height: 296mm !important;
+    max-height: 296mm !important;
+    margin: 0 auto !important;
+    padding: 15mm 20mm !important;
     border: 0 !important;
     outline: 0 !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     background: #ffffff !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
   }
 }
+
+
 

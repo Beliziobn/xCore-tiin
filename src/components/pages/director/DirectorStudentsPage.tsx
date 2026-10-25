@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -30,6 +30,7 @@ import { StudentDetailModal } from '../../modals/StudentDetailModal';
 import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
 import {
   getStoredStudents,
+  saveStudent,
   deleteStudent,
   getRegisteredSchoolsFromStorage,
   getSchoolStudentQuotaStatus,
@@ -75,6 +76,20 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentRegistrationData | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('ucore_director_students');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setStudents(parsed);
+        }
+      } catch {}
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    return () => window.removeEventListener('sigre-data-synced', handleSync);
+  }, []);
 
   const handleConfirmDeleteDirectorStudent = () => {
     if (!studentToDelete) return;
@@ -230,6 +245,31 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
     };
     setStudents((prev) => [formatted, ...prev]);
     setSelectedStudentId(formatted.id);
+
+    // Ensure full unified persistence across localStorage and Firestore
+    saveStudent({
+      id: formatted.id,
+      name: formatted.name,
+      nomeCompleto: newStudent.nomeCompleto || formatted.name,
+      genero: newStudent.genero === 'M' ? 'M' : 'F',
+      dataNascimento: formatted.dataNascimento || '2016-05-10',
+      idade: formatted.idade || 10,
+      tipoDocumento: (formatted.documentType as any) || (hasDocs ? 'BI' : 'sem Documento'),
+      numeroDocumento: formatted.numeroDocumento,
+      naturezaEscola: newStudent.naturezaEscola || 'Pública',
+      tipoEscolaModalidade: newStudent.tipoEscolaModalidade || 'primario_regular',
+      classeEtapaModulo: newStudent.classeEtapaModulo || formatted.gradeClass,
+      classe: formatted.gradeClass,
+      turma: formatted.turma,
+      sala: formatted.room,
+      escola: newStudent.escola || directorSchoolQuota.schoolName || '',
+      schoolId: newStudent.schoolId || activeDirectorSchool?.id,
+      condicaoMatricula: (formatted.condicaoMatricula as any) || 'primeira_vez',
+      alunoRepetente: formatted.condicaoMatricula === 'repetente',
+      encarregado: formatted.guardianName,
+      telefone: newStudent.telefone || '+244 923 000 000',
+      endereco: formatted.location,
+    });
 
     if (onAddStudentGlobal) {
       const adminFormatted: AdminStudent = {

@@ -1,4 +1,8 @@
 import type { ChatMessage } from '../types';
+import {
+  saveChatMessageToFirestore,
+  subscribeToChatMessages,
+} from './firestoreSync';
 
 export interface RealtimeTypingEvent {
   channelId: string;
@@ -13,6 +17,7 @@ class RealtimeChatManager {
   private channel: BroadcastChannel | null = null;
   private messageListeners: Set<MessageListener> = new Set();
   private typingListeners: Set<TypingListener> = new Set();
+  private seenMessageIds: Set<string> = new Set();
 
   constructor() {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -49,10 +54,26 @@ class RealtimeChatManager {
           }
         }
       });
+
+      // Cloud real-time Firestore subscription for cross-device messages
+      try {
+        subscribeToChatMessages((cloudMessages) => {
+          cloudMessages.forEach((msg) => {
+            if (msg && msg.id && !this.seenMessageIds.has(msg.id)) {
+              this.seenMessageIds.add(msg.id);
+              this.messageListeners.forEach((fn) => fn(msg));
+            }
+          });
+        });
+      } catch {}
     }
   }
 
   public sendMessage(message: ChatMessage) {
+    if (message?.id) {
+      this.seenMessageIds.add(message.id);
+    }
+    saveChatMessageToFirestore(message).catch(() => {});
     const payload = {
       type: 'CHAT_MESSAGE',
       payload: message,

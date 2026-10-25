@@ -7,8 +7,15 @@ import type {
   AdminSchool,
   AdminStudent,
   SchoolRegistrationData,
+  DirectorStudent,
 } from '../types';
 import { convertRegistrationDataToAdminSchool } from './schoolStorage';
+import {
+  saveStudentToFirestore,
+  deleteStudentFromFirestore,
+  clearAllStudentsFromFirestore,
+  saveSchoolToFirestore,
+} from './firestoreSync';
 
 export interface StudentModalityConfig {
   key: StudentModalidadeKey;
@@ -890,6 +897,68 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
       }
       localStorage.setItem('ucore_admin_students', JSON.stringify(nextAdminStudents));
 
+      // Sync with ucore_director_students so Director portal immediately sees the student
+      const rawDirStudents = localStorage.getItem('ucore_director_students');
+      const dirStudentsList: DirectorStudent[] = rawDirStudents ? JSON.parse(rawDirStudents) : [];
+      const syncedDirStudent: DirectorStudent = {
+        id: syncedAdminStudent.id,
+        name: syncedAdminStudent.name,
+        age: ensuredData.idade || 10,
+        gender: syncedAdminStudent.gender,
+        gradeClass: syncedAdminStudent.gradeClass,
+        room: syncedAdminStudent.room,
+        turma: syncedAdminStudent.turma,
+        shift: (ensuredData.turno === 'Tarde' || ensuredData.periodo === 'Tarde' ? 'Tarde' : 'Manhã') as 'Manhã' | 'Tarde',
+        teacherName: 'Docente Titular',
+        guardianName: syncedAdminStudent.guardianName,
+        guardianPhone: ensuredData.telefone || '+244 923 000 000',
+        hasDocuments: syncedAdminStudent.hasDocuments,
+        presenceRate: syncedAdminStudent.presenceRate,
+        averageGrade: 14,
+        registrationData: ensuredData,
+      };
+      const existingDirIdx = Array.isArray(dirStudentsList)
+        ? dirStudentsList.findIndex(
+            (s) => s.id === syncedDirStudent.id || s.name.trim().toLowerCase() === syncedDirStudent.name.trim().toLowerCase()
+          )
+        : -1;
+      const nextDirStudents = Array.isArray(dirStudentsList) ? [...dirStudentsList] : [];
+      if (existingDirIdx >= 0) {
+        nextDirStudents[existingDirIdx] = { ...nextDirStudents[existingDirIdx], ...syncedDirStudent };
+      } else {
+        nextDirStudents.unshift(syncedDirStudent);
+      }
+      localStorage.setItem('ucore_director_students', JSON.stringify(nextDirStudents));
+
+      // Sync with ucore_teacher_students so Teacher portal immediately sees the student
+      const rawTeacherStudents = localStorage.getItem('ucore_teacher_students');
+      const teacherStudentsList: any[] = rawTeacherStudents ? JSON.parse(rawTeacherStudents) : [];
+      const existingTeachIdx = Array.isArray(teacherStudentsList)
+        ? teacherStudentsList.findIndex(
+            (s) => s.id === syncedAdminStudent.id || String(s.name || '').trim().toLowerCase() === syncedAdminStudent.name.trim().toLowerCase()
+          )
+        : -1;
+      const nextTeachStudents = Array.isArray(teacherStudentsList) ? [...teacherStudentsList] : [];
+      const teacherStudentEntry = {
+        id: syncedAdminStudent.id,
+        name: syncedAdminStudent.name,
+        age: ensuredData.idade || 10,
+        gender: syncedAdminStudent.gender === 'F' ? 'Feminino' : 'Masculino',
+        turma: `${syncedAdminStudent.gradeClass} - ${syncedAdminStudent.turma}`,
+        attendance: syncedAdminStudent.presenceRate,
+        status: 'Ativo' as const,
+        guardian: syncedAdminStudent.guardianName,
+        phone: ensuredData.telefone || '+244 923 000 000',
+        grades: existingTeachIdx >= 0 ? nextTeachStudents[existingTeachIdx]?.grades || [] : [],
+        notes: ensuredData.observacoes || '',
+      };
+      if (existingTeachIdx >= 0) {
+        nextTeachStudents[existingTeachIdx] = { ...nextTeachStudents[existingTeachIdx], ...teacherStudentEntry };
+      } else {
+        nextTeachStudents.unshift(teacherStudentEntry);
+      }
+      localStorage.setItem('ucore_teacher_students', JSON.stringify(nextTeachStudents));
+
       // Also sync school student counters in ucore_admin_schools
       const rawSchools = localStorage.getItem('ucore_admin_schools');
       if (rawSchools) {
@@ -915,18 +984,28 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
                   : (sc.studentsWithDocs || 0) + (sc.studentsWithoutDocs || 0);
               const withDocs = belongsToSchool.filter((st) => st.hasDocuments).length;
               const withoutDocs = belongsToSchool.length - withDocs;
-              return {
+              const updatedSc = {
                 ...sc,
                 declaredStudentsCount: preservedDeclared,
                 studentsWithDocs: withDocs,
                 studentsWithoutDocs: withoutDocs,
               };
+              saveSchoolToFirestore(updatedSc).catch(() => {});
+              return updatedSc;
             }
             return sc;
           });
           localStorage.setItem('ucore_admin_schools', JSON.stringify(updatedSchools));
         }
       }
+
+      // Persist immediately to Firebase Firestore and backend network store
+      saveStudentToFirestore(ensuredData).catch(() => {});
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: nextAdminStudents }),
+      }).catch(() => {});
 
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     } catch (err) {
@@ -1030,6 +1109,12 @@ export function deleteStudent(id: string, studentName?: string): boolean {
         }
       }
 
+      // Delete from Firestore in real time
+      deleteStudentFromFirestore(id).catch(() => {});
+      if (targetName) {
+        deleteStudentFromFirestore(targetName).catch(() => {});
+      }
+
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
       return true;
     } catch (err) {
@@ -1047,6 +1132,7 @@ export function deleteAllStudents(): boolean {
       localStorage.setItem('ucore_admin_students', JSON.stringify([]));
       localStorage.setItem('ucore_director_students', JSON.stringify([]));
       localStorage.setItem('ucore_teacher_students', JSON.stringify([]));
+      clearAllStudentsFromFirestore().catch(() => {});
 
       const rawSchools = localStorage.getItem('ucore_admin_schools');
       if (rawSchools) {
