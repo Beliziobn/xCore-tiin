@@ -106,9 +106,24 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 10mm 12mm;
+            margin: 12mm 16mm;
+          }
+          html,
+          body,
+          #root,
+          #root > div,
+          #main-content {
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            overflow: hidden !important;
           }
           #siteHeader,
+          #ucore-cloud-footer,
           #btn-floating-support-chat,
           #system-toast-notification,
           .no-print,
@@ -120,13 +135,15 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
           #official-modal-print-sheet {
             box-sizing: border-box !important;
             box-shadow: none !important;
-            border: none !important;
-            outline: none !important;
-            padding: 4mm 2mm !important;
+            border: 0 !important;
+            outline: 0 !important;
+            border-radius: 0 !important;
+            background: #ffffff !important;
+            padding: 2mm 0 !important;
             margin: 0 auto !important;
             width: 100% !important;
-            max-width: 178mm !important;
-            max-height: 268mm !important;
+            max-width: 174mm !important;
+            max-height: 265mm !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: avoid !important;
@@ -135,7 +152,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
           }
         }
       `}</style>
-      <div className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden print:max-h-none print:border-none print:shadow-none print:rounded-none">
+      <div className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden print:max-h-none print:border-0 print:shadow-none print:rounded-none">
         {/* Top Control Bar (Hidden during print) */}
         <div className="px-6 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden">
           <div className="flex items-center gap-3">
@@ -220,7 +237,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
           <div
             id="official-modal-print-sheet"
             ref={printRef}
-            className="bg-white mx-auto max-w-3xl p-8 sm:p-12 border border-slate-300 shadow-lg rounded-xl print:border-none print:shadow-none print:p-6 print:max-w-none text-slate-900 leading-relaxed font-serif"
+            className="bg-white mx-auto max-w-3xl p-8 sm:p-10 border-0 outline-none shadow-sm print:border-0 print:shadow-none print:p-0 print:max-w-none text-slate-900 leading-relaxed font-serif"
           >
             {/* Header: Republic of Angola */}
             <div className="text-center space-y-1 mb-6 border-b-2 border-slate-900/80 pb-5">

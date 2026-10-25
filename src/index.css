@@ -1092,11 +1092,51 @@ html.lenis.lenis-stopped {
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 16mm;
+  }
+
+  html,
+  body,
+  #root,
+  #root > div,
+  #main-content {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  #siteHeader,
+  #ucore-cloud-footer,
   #btn-floating-support-chat,
   #system-toast-notification,
+  #page-tabs-bar,
   .skip-to-content-link,
-  .no-print {
+  .no-print,
+  footer,
+  nav {
     display: none !important;
     visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #oficial-a4-sheet,
+  #official-modal-print-sheet {
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
   }
 }
+
