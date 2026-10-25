@@ -220,9 +220,11 @@ export async function downloadDeclaracaoEfectividadePdf(
   const rawFuncao = (record.funcao || 'Docente').trim();
   const adaptedFuncao = adaptOccupationalTextToGender(rawFuncao, isFeminino);
   const funcaoTexto = rawFuncao.toLowerCase().includes('docente')
-    ? 'funções docentes'
+    ? 'função docente'
     : rawFuncao.toLowerCase().startsWith('funções')
-    ? `funções ${adaptedFuncao.replace(/^funções\s+/i, '')}`
+    ? `função ${adaptedFuncao.replace(/^funções\s+/i, '').replace(/s\b/g, '')}`
+    : rawFuncao.toLowerCase().startsWith('função')
+    ? adaptedFuncao
     : `a função de ${adaptedFuncao}`;
 
   const adaptedCategoria = adaptOccupationalTextToGender(
@@ -317,7 +319,7 @@ export async function downloadDeclaracaoEfectividadePdf(
       text: `, é ${funcionarioFuncionaria} do Sector da Educação, exercendo ${funcaoTexto} no Município do ${record.municipio}, onde se encontra ${colocadoColocada} ${prepEscola} `,
     },
     { text: record.escola, bold: true },
-    { text: `, ${enquadradoEnquadrada} na categoria profissional de ` },
+    { text: `, ${enquadradoEnquadrada} na categoria de ` },
     { text: adaptedCategoria, bold: true },
     { text: ' do ' },
     { text: record.grau, bold: true },
@@ -327,7 +329,7 @@ export async function downloadDeclaracaoEfectividadePdf(
 
   const p2: TextSegment[] = [
     {
-      text: `Mais se declara que ${referidoFuncionario} se encontra no efectivo exercício das suas funções e que a presente declaração é emitida para efeitos de comprovação da sua efectividade no Sector da Educação, destinando-se, especificamente, ${finalidadeFormatted.preposition} ${finalidadeFormatted.text}, para os fins administrativos e profissionais legalmente previstos.`,
+      text: `Mais se declara que ${referidoFuncionario} se encontra no efectivo exercício da sua função e que a presente declaração é emitida para efeitos de comprovação da sua efectividade no Sector da Educação, destinando-se, especificamente, ${finalidadeFormatted.preposition} ${finalidadeFormatted.text}, para os fins administrativos e profissionais legalmente previstos.`,
     },
   ];
 
@@ -778,7 +780,7 @@ export async function downloadQuickServiceDocumentPdf(
 
   const p2: TextSegment[] = [
     {
-      text: 'Mais se declara que se encontra no pleno exercício das suas funções nesta circunscrição municipal, mantendo ',
+      text: 'Mais se declara que se encontra no pleno exercício da sua função nesta circunscrição municipal, mantendo ',
     },
     { text: 'EFECTIVIDADE PLENA', bold: true },
     { text: ' e assiduidade ininterrupta no período de referência de ' },

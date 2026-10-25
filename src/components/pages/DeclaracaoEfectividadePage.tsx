@@ -1894,9 +1894,11 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               const rawFuncao = (selectedRecordForView.funcao || 'Docente').trim();
               const adaptedFuncao = adaptOccupationalTextToGender(rawFuncao, isFeminino);
               const funcaoTexto = rawFuncao.toLowerCase().includes('docente')
-                ? 'funções docentes'
+                ? 'função docente'
                 : rawFuncao.toLowerCase().startsWith('funções')
-                ? `funções ${adaptedFuncao.replace(/^funções\s+/i, '')}`
+                ? `função ${adaptedFuncao.replace(/^funções\s+/i, '').replace(/s\b/g, '')}`
+                : rawFuncao.toLowerCase().startsWith('função')
+                ? adaptedFuncao
                 : `a função de ${adaptedFuncao}`;
 
               const adaptedCategoria = adaptOccupationalTextToGender(
@@ -1957,11 +1959,11 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       {/* 2. Official Declaration Text Content (12pt) */}
                       <div className="a4-body-copy">
                         <p>
-                          Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do Quêssua declara, para os fins a que se destina, que {artigoTratamento} <strong>{selectedRecordForView.nome}</strong>, {filhoFilha} de <strong>{selectedRecordForView.pai}</strong> e de <strong>{selectedRecordForView.mae}</strong>, natural de <strong>{selectedRecordForView.naturalidade}</strong>, Província {prepProvincia} <strong>{selectedRecordForView.provNat}</strong>, {nascidoNascida} aos <strong>{nascimentoExtenso}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong>{selectedRecordForView.bi}</strong>, emitido aos <strong>{biEmissaoExtenso}</strong>, é {funcionarioFuncionaria} do Sector da Educação, exercendo {funcaoTexto} no Município do {selectedRecordForView.municipio}, onde se encontra {colocadoColocada} {prepEscola} <strong>{selectedRecordForView.escola}</strong>, {enquadradoEnquadrada} na categoria profissional de <strong>{adaptedCategoria}</strong> do <strong>{selectedRecordForView.grau}</strong>, {inscritoInscrita} sob o número de agente <strong>{selectedRecordForView.agente}</strong>.
+                          Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do Quêssua declara, para os fins a que se destina, que {artigoTratamento} <strong>{selectedRecordForView.nome}</strong>, {filhoFilha} de <strong>{selectedRecordForView.pai}</strong> e de <strong>{selectedRecordForView.mae}</strong>, natural de <strong>{selectedRecordForView.naturalidade}</strong>, Província {prepProvincia} <strong>{selectedRecordForView.provNat}</strong>, {nascidoNascida} aos <strong>{nascimentoExtenso}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong>{selectedRecordForView.bi}</strong>, emitido aos <strong>{biEmissaoExtenso}</strong>, é {funcionarioFuncionaria} do Sector da Educação, exercendo {funcaoTexto} no Município do {selectedRecordForView.municipio}, onde se encontra {colocadoColocada} {prepEscola} <strong>{selectedRecordForView.escola}</strong>, {enquadradoEnquadrada} na categoria de <strong>{adaptedCategoria}</strong> do <strong>{selectedRecordForView.grau}</strong>, {inscritoInscrita} sob o número de agente <strong>{selectedRecordForView.agente}</strong>.
                         </p>
 
                         <p>
-                          Mais se declara que {referidoFuncionario} se encontra no efectivo exercício das suas funções e que a presente declaração é emitida para efeitos de comprovação da sua efectividade no Sector da Educação, destinando-se, especificamente, {finalidadeFormatted.preposition} {finalidadeFormatted.text}, para os fins administrativos e profissionais legalmente previstos.
+                          Mais se declara que {referidoFuncionario} se encontra no efectivo exercício da sua função e que a presente declaração é emitida para efeitos de comprovação da sua efectividade no Sector da Educação, destinando-se, especificamente, {finalidadeFormatted.preposition} {finalidadeFormatted.text}, para os fins administrativos e profissionais legalmente previstos.
                         </p>
 
                         <p>

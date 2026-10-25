@@ -363,7 +363,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                 </p>
 
                 <p style={{ textIndent: '1.25cm' }}>
-                  Mais se declara que se encontra no pleno exercício das suas funções nesta circunscrição municipal, mantendo <strong>EFECTIVIDADE PLENA</strong> e assiduidade ininterrupta no período de referência de <strong>{details.referenceMonthYear || 'Fevereiro / 2026'}</strong>, sem registo de faltas injustificadas nem quaisquer sanções disciplinares averbadas no processo individual {doDaFuncionario}.
+                  Mais se declara que se encontra no pleno exercício da sua função nesta circunscrição municipal, mantendo <strong>EFECTIVIDADE PLENA</strong> e assiduidade ininterrupta no período de referência de <strong>{details.referenceMonthYear || 'Fevereiro / 2026'}</strong>, sem registo de faltas injustificadas nem quaisquer sanções disciplinares averbadas no processo individual {doDaFuncionario}.
                 </p>
 
                 <p style={{ textIndent: '1.25cm' }}>
