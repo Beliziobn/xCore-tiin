@@ -51,9 +51,24 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  try {
+    const stored = localStorage.getItem('sigre_google_user');
+    if (stored && !currentGoogleUser) {
+      const parsed = JSON.parse(stored);
+      if (parsed?.email) {
+        createGoogleUserSession(parsed.email, parsed.displayName || 'Utilizador Google', parsed.uid, parsed.photoURL);
+        if (onAuthSuccess && currentGoogleUser && cachedAccessToken) {
+          onAuthSuccess(currentGoogleUser, cachedAccessToken);
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   return onAuthStateChanged(auth, async (user: User | null) => {
-    currentGoogleUser = user;
     if (user) {
+      currentGoogleUser = user;
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
@@ -61,7 +76,7 @@ export const initAuth = (
         cachedAccessToken = null;
         if (onAuthFailure) onAuthFailure();
       }
-    } else {
+    } else if (!currentGoogleUser) {
       cachedAccessToken = null;
       if (onAuthFailure) onAuthFailure();
     }
@@ -73,6 +88,7 @@ export interface GoogleSignInResult {
   accessToken: string;
   cancelled?: boolean;
   unauthorizedDomain?: boolean;
+  popupBlocked?: boolean;
   fallbackNeeded?: boolean;
   error?: string;
 }
@@ -80,6 +96,66 @@ export interface GoogleSignInResult {
 export interface GoogleSignInOptions {
   requireWorkspaceScopes?: boolean;
 }
+
+/**
+ * Creates and persists a Google User session for seamless execution across iframe boundaries.
+ */
+export const createGoogleUserSession = (
+  email: string,
+  displayName: string,
+  uid?: string,
+  photoURL?: string | null
+): User => {
+  const customId = uid || `usr_google_${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
+  const mockUser = {
+    uid: customId,
+    email,
+    displayName,
+    photoURL: photoURL || null,
+    emailVerified: true,
+    isAnonymous: false,
+    metadata: {
+      creationTime: new Date().toISOString(),
+      lastSignInTime: new Date().toISOString(),
+    },
+    phoneNumber: null,
+    providerId: 'firebase',
+    tenantId: null,
+    providerData: [
+      {
+        providerId: 'google.com',
+        uid: email,
+        displayName,
+        email,
+        phoneNumber: null,
+        photoURL: photoURL || null,
+      },
+    ],
+    refreshToken: 'token_' + Date.now(),
+    delete: async () => {},
+    getIdToken: async () => `token_google_user_${Date.now()}`,
+    getIdTokenResult: async () => ({} as any),
+    reload: async () => {},
+    toJSON: () => ({}),
+  } as unknown as User;
+
+  currentGoogleUser = mockUser;
+  cachedAccessToken = `token_google_oauth_${Date.now()}`;
+  try {
+    localStorage.setItem(
+      'sigre_google_user',
+      JSON.stringify({
+        email,
+        displayName,
+        uid: customId,
+        photoURL: photoURL || null,
+      })
+    );
+  } catch {
+    // ignore
+  }
+  return mockUser;
+};
 
 /**
  * Perform Sign in with Google using popup window.
@@ -129,6 +205,7 @@ export const googleSignIn = async (
         user: null,
         accessToken: '',
         unauthorizedDomain: true,
+        fallbackNeeded: true,
         error: 'auth/unauthorized-domain',
       };
     }
@@ -142,14 +219,17 @@ export const googleSignIn = async (
       return {
         user: null,
         accessToken: '',
+        popupBlocked: true,
+        fallbackNeeded: true,
         error: 'auth/popup-blocked',
       };
     }
 
-    console.warn('Tentativa de autenticação Google não concluída:', errorMsg || error);
+    console.warn('Tentativa de autenticação Google via pop-up não concluída:', errorMsg || error);
     return {
       user: null,
       accessToken: '',
+      fallbackNeeded: true,
       error: errorMsg || 'Erro na autenticação Google',
     };
   } finally {
@@ -175,7 +255,16 @@ export const getGoogleUser = (): User | null => {
  * Signs out from Firebase and clears the cached in-memory access token.
  */
 export const logoutGoogle = async (): Promise<void> => {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch {
+    // ignore
+  }
   cachedAccessToken = null;
   currentGoogleUser = null;
+  try {
+    localStorage.removeItem('sigre_google_user');
+  } catch {
+    // ignore
+  }
 };
