@@ -2834,16 +2834,18 @@ export default function App() {
         }}
       />
 
-      {/* Real-time Video/Voice Meetings & Zoom Conference Modal */}
-      <ZoomMeetingModal
-        isOpen={activeMeeting.isOpen}
-        onClose={handleCloseMeeting}
-        roomId={activeMeeting.roomId}
-        roomTitle={activeMeeting.roomTitle}
-        currentUser={currentUser}
-        initialVideo={activeMeeting.initialVideo}
-        initialAudio={activeMeeting.initialAudio}
-      />
+      {/* Real-time Video/Voice Meetings & Zoom Conference Modal — mounted only during an active call */}
+      {activeMeeting.isOpen && (
+        <ZoomMeetingModal
+          isOpen={activeMeeting.isOpen}
+          onClose={handleCloseMeeting}
+          roomId={activeMeeting.roomId}
+          roomTitle={activeMeeting.roomTitle}
+          currentUser={currentUser}
+          initialVideo={activeMeeting.initialVideo}
+          initialAudio={activeMeeting.initialAudio}
+        />
+      )}
 
       {/* Intelligent RAG Vector Knowledge Center Modal (MED Angola & Sigre) */}
       <RagIntelligenceModal

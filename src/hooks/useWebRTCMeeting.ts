@@ -26,6 +26,7 @@ interface UseWebRTCMeetingOptions {
   };
   initialVideo?: boolean;
   initialAudio?: boolean;
+  enabled?: boolean;
   onKicked?: () => void;
   onMeetingEnded?: () => void;
 }
@@ -47,6 +48,7 @@ export function useWebRTCMeeting({
   user,
   initialVideo = true,
   initialAudio = true,
+  enabled = true,
   onKicked,
   onMeetingEnded,
 }: UseWebRTCMeetingOptions) {
@@ -384,8 +386,21 @@ export function useWebRTCMeeting({
     return { stream: null, error: friendlyError };
   }, []);
 
-  // 1. Initialize Local Media (Camera & Mic)
+  // 1. Initialize Local Media (Camera & Mic) — ONLY when call is actively open (enabled && cleanRoomId)
   useEffect(() => {
+    if (!enabled || !cleanRoomId) {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
+      }
+      if (cameraTrackRef.current) {
+        cameraTrackRef.current.stop();
+        cameraTrackRef.current = null;
+      }
+      setLocalStream(null);
+      return;
+    }
+
     let active = true;
 
     async function initMedia() {
@@ -440,7 +455,7 @@ export function useWebRTCMeeting({
 
     initMedia();
 
-    // Listen for plugged/unplugged devices
+    // Listen for plugged/unplugged devices only during active call
     if (navigator?.mediaDevices?.addEventListener) {
       navigator.mediaDevices.addEventListener('devicechange', refreshDeviceList);
     }
@@ -454,6 +469,14 @@ export function useWebRTCMeeting({
         localStreamRef.current.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
       }
+      if (cameraTrackRef.current) {
+        cameraTrackRef.current.stop();
+        cameraTrackRef.current = null;
+      }
+      if (screenTrackRef.current) {
+        screenTrackRef.current.stop();
+        screenTrackRef.current = null;
+      }
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
         audioContextRef.current = null;
@@ -462,7 +485,7 @@ export function useWebRTCMeeting({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, []);
+  }, [enabled, cleanRoomId]);
 
   // Attach local tracks to existing peer connections when local stream becomes available
   useEffect(() => {
@@ -622,7 +645,7 @@ export function useWebRTCMeeting({
 
   // 2. Setup Socket.io Signaling Connection
   useEffect(() => {
-    if (!cleanRoomId) return;
+    if (!enabled || !cleanRoomId) return;
 
     let active = true;
     console.log('[Socket.io] Connecting to signaling server for room:', cleanRoomId);
@@ -828,15 +851,19 @@ export function useWebRTCMeeting({
         socket.disconnect();
       }
     };
-  }, [cleanRoomId]);
+  }, [enabled, cleanRoomId]);
 
   // Duration Timer
   useEffect(() => {
+    if (!enabled || !cleanRoomId) {
+      setDurationSeconds(0);
+      return;
+    }
     const timer = setInterval(() => {
       setDurationSeconds((sec) => sec + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [enabled, cleanRoomId]);
 
   // Retry requesting media permissions and re-activating camera and microphone
   const retryMediaPermissions = async () => {

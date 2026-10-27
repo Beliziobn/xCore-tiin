@@ -140,6 +140,7 @@ export const ZoomMeetingModal: React.FC<ZoomMeetingModalProps> = ({
     user: userPayload,
     initialVideo,
     initialAudio,
+    enabled: Boolean(isOpen && cleanRoomId),
     onKicked: () => {
       alert('Foi desconectado da reunião pelo anfitrião.');
       onClose();

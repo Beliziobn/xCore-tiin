@@ -1,6 +1,6 @@
 {
-  "summary":  "Plano arquitetural e de engenharia visual combinando a filosofia de subtração e determinismo Masakula v2.0 com o Prompt Mestre v4 sobre os módulos do Sigre Angola, preservando a identidade institucional e os documentos oficiais A4.",
-  "updatedAt":  "2026-10-25T16:35:22.373167654Z",
+  "summary":  "Plano para corrigir o pedido automático de permissão de microfone e câmara fora das chamadas, garantindo que o hardware de áudio/vídeo só seja solicitado quando o utilizador iniciar ou entrar efectivamente numa chamada de voz ou vídeo e seja totalmente libertado ao encerrar a chamada.",
+  "updatedAt":  "2026-10-27T23:46:26.661659697Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
