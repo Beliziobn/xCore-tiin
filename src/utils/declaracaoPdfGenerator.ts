@@ -1,6 +1,8 @@
 import { jsPDF } from 'jspdf';
 import emblemAngolaImg from '../assets/images/Emblem_of_Angola.svg.webp';
 import type { CadastramentoEfectividadeRecord } from './efectividadeStorage';
+import type { DeclaracaoServicoRecord } from './declaracaoServicoStorage';
+import { fmtDateDeclaracaoServico, fmtKz } from './declaracaoServicoStorage';
 import type { QuickServiceRequest } from '../types';
 import { formatAngolanDateExtenso } from './efectividadeStorage';
 import {
@@ -530,16 +532,16 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
     .doc-text-12 {
       margin-top: 10pt !important;
       font-size: 12pt !important;
-      line-height: 1.42 !important;
+      line-height: ${elementId === 'declaracao-servico-a4-sheet' ? '1.5' : '1.42'} !important;
       text-align: justify !important;
     }
     .a4-body-copy p,
     .doc-text-12 p {
       font-size: 12pt !important;
-      line-height: 1.42 !important;
+      line-height: ${elementId === 'declaracao-servico-a4-sheet' ? '1.5' : '1.42'} !important;
       text-align: justify !important;
       text-indent: 1.25cm !important;
-      margin: 0 0 8pt 0 !important;
+      margin: 0 0 ${elementId === 'declaracao-servico-a4-sheet' ? '10pt' : '8pt'} 0 !important;
     }
     .a4-body-copy strong,
     .doc-text-12 strong {
@@ -843,4 +845,158 @@ export async function downloadQuickServiceDocumentPdf(
 
   doc.save(`Declaracao_${safeName}.pdf`);
 }
+
+/**
+ * Gera e descarrega a Declaração de Serviço (Módulo Independente • Conta Bancária e Salário)
+ * em formato PDF nativo, garantido em 1 única página A4, 100% Times New Roman (14pt títulos / 12pt texto).
+ */
+export async function downloadDeclaracaoServicoPdf(
+  record: DeclaracaoServicoRecord
+): Promise<void> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const pageWidth = 210;
+  const marginX = 20;
+  const usableWidth = pageWidth - marginX * 2;
+  const centerX = pageWidth / 2;
+  const firstLineIndent = 12.5;
+  const lineHeightMm = 6.8;
+  const paragraphGapMm = 5.2;
+
+  const isFem = record.tratamento === 'Senhora';
+
+  let y = 18;
+
+  const emblemData = await loadEmblemPngDataUrl(emblemAngolaImg);
+  if (emblemData) {
+    const emblemHeight = 16.5;
+    const emblemWidth = emblemHeight * emblemData.ratio;
+    doc.addImage(
+      emblemData.dataUrl,
+      'PNG',
+      centerX - emblemWidth / 2,
+      y,
+      emblemWidth,
+      emblemHeight
+    );
+    y += emblemHeight + 5.5;
+  } else {
+    y += 10;
+  }
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text('REPÚBLICA DE ANGOLA', centerX, y, { align: 'center' });
+  y += 5.4;
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  if (record.provEmissao) {
+    doc.text(`GOVERNO PROVINCIAL DE ${record.provEmissao.toUpperCase()}`, centerX, y, { align: 'center' });
+    y += 5.0;
+  }
+  if (record.municipioAdm) {
+    doc.text(`ADMINISTRAÇÃO MUNICIPAL DE ${record.municipioAdm.toUpperCase()}`, centerX, y, { align: 'center' });
+    y += 5.0;
+  }
+  if (record.direccao) {
+    doc.text(record.direccao.toUpperCase(), centerX, y, { align: 'center' });
+    y += 5.0;
+  }
+  y += 6.5;
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(14);
+  const titleText = 'DECLARAÇÃO DE SERVIÇO';
+  doc.text(titleText, centerX, y, { align: 'center' });
+  const titleW = doc.getTextWidth(titleText);
+  doc.setLineWidth(0.45);
+  doc.line(centerX - titleW / 2, y + 1.2, centerX + titleW / 2, y + 1.2);
+
+  y += 12;
+
+  const filiacao =
+    (isFem ? 'filha' : 'filho') +
+    ' de ' +
+    (record.pai && record.pai.trim() ? `${record.pai.trim()} e de ${record.mae}` : record.mae);
+
+  const p1: TextSegment[] = [
+    { text: `Para os devidos efeitos achados convenientes, declara-se que ${isFem ? 'a senhora ' : 'o senhor '}` },
+    { text: record.nome, bold: true },
+    { text: `, ${filiacao}, natural de ${record.naturalidade}, Província de ${record.provNat}, ${isFem ? 'nascida' : 'nascido'} aos ${fmtDateDeclaracaoServico(record.nascimento)}, ${isFem ? 'portadora' : 'portador'} do BI nº ` },
+    { text: record.bi, bold: true },
+    { text: `, emitido aos ${fmtDateDeclaracaoServico(record.biData)}, ${record.profissao} do ${record.grau}, ${isFem ? 'colocada' : 'colocado'} no Município de ${record.municipio}, local de trabalho: ` },
+    { text: record.escola, bold: true },
+    { text: `, com a categoria de ${record.categoria}, Agente nº ` },
+    { text: record.agente, bold: true },
+    { text: `, é cliente do ` },
+    { text: record.bancoNome, bold: true },
+    { text: `, titular da conta bancária nº ` },
+    { text: record.conta, bold: true },
+    { text: `, auferindo o salário líquido de ` },
+    { text: `${fmtKz(record.salarioKz)} Kz (${record.extenso}).`, bold: true },
+  ];
+
+  const p2: TextSegment[] = [
+    { text: 'Observação: ', bold: true },
+    { text: `A presente declaração destina-se ${record.finalidade.replace(/\.$/, '')}.` },
+  ];
+
+  const p3: TextSegment[] = [
+    {
+      text: 'Por ser verdade e me ter sido pedido, mandei passar a presente declaração, que vai por mim assinada e autenticada com carimbo a óleo em uso nesta Direcção.',
+    },
+  ];
+
+  y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+  y += paragraphGapMm;
+  y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+  y += paragraphGapMm;
+  y = renderJustifiedParagraph(doc, p3, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+
+  y += 12;
+  const localParts = [record.direccao, record.localEmissao].filter(Boolean).join(', ');
+  const dateLine =
+    (localParts ? `${localParts} ` : '') +
+    (record.dataEmissao ? `aos ${fmtDateDeclaracaoServico(record.dataEmissao)}.` : '');
+
+  if (dateLine) {
+    doc.setFont('times', 'normal');
+    doc.setFontSize(12);
+    doc.text(dateLine, centerX, y, { align: 'center' });
+    y += 14;
+  } else {
+    y += 10;
+  }
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  doc.text('O Director Municipal', centerX, y, { align: 'center' });
+
+  y += 15;
+  doc.setLineWidth(0.35);
+  doc.line(centerX - 35, y, centerX + 35, y);
+
+  if (record.director) {
+    y += 5.5;
+    doc.setFont('times', 'normal');
+    doc.setFontSize(12);
+    doc.text(record.director, centerX, y, { align: 'center' });
+  }
+
+  const safeName = (record.nome || record.ref || 'Funcionario')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  doc.save(`Declaracao_Servico_${safeName}.pdf`);
+}
+
 

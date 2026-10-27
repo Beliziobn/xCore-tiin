@@ -1,0 +1,718 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Cadastro de Pessoal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky section index on the left, one long ruled form on the right, like an official civil-service form. */
+:root {
+  --bg: #EEF1F2;
+  --surface: #FFFFFF;
+  --fg: #101C2B;
+  --muted: #566475;
+  --line: #D3DADF;
+  --accent: #A8231B;
+  --accent-ink: #FFFFFF;
+  --focus: #1B5FAA;
+  --ok: #1D7048;
+  --danger: #B3261E;
+  --paper: #FBFBF8;
+  --font-display: "Bricolage Grotesque", "Segoe UI", Arial, sans-serif;
+  --font-body: "Public Sans", "Segoe UI", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1520; --surface: #142131; --fg: #E7ECF1; --muted: #93A2B2; --line: #2A3B4D;
+    --accent: #E4574B; --accent-ink: #1B0805; --focus: #6AA9EE; --ok: #5CC28D; --danger: #F2827A; --paper: #182739;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1520; --surface: #142131; --fg: #E7ECF1; --muted: #93A2B2; --line: #2A3B4D;
+  --accent: #E4574B; --accent-ink: #1B0805; --focus: #6AA9EE; --ok: #5CC28D; --danger: #F2827A; --paper: #182739;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+  padding-block: 20px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.page { max-width: 1160px; margin: 0 auto; }
+.top { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.flag { width: 22px; height: 22px; background: linear-gradient(135deg, var(--accent) 50%, var(--fg) 50%); flex: none; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.shell { display: grid; gap: 32px; padding-top: 32px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 960px) { .shell { grid-template-columns: 300px minmax(0, 1fr); gap: 56px; } }
+.side { min-width: 0; }
+@media (min-width: 960px) { .side-inner { position: sticky; top: 24px; } }
+h1 {
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(2.5rem, 6vw, 3.9rem);
+  line-height: .98; letter-spacing: -.025em; margin: 0 0 16px; text-wrap: balance;
+}
+.lead { color: var(--muted); max-width: 34ch; margin: 0 0 24px; }
+.rail { display: none; list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+@media (min-width: 960px) { .rail { display: block; } }
+.rail a {
+  display: grid; grid-template-columns: 34px 1fr auto; align-items: baseline; gap: 4px;
+  padding: 10px 2px; border-bottom: 1px solid var(--line); color: var(--fg); text-decoration: none; font-size: 14px;
+}
+.rail a:hover .rt { text-decoration: underline; }
+.rail a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); letter-spacing: .06em; }
+.rc { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rail .done .rc { color: var(--ok); }
+.overall { font-family: var(--font-mono); font-size: 13px; color: var(--muted); margin: 16px 0 0; font-variant-numeric: tabular-nums; }
+.meter { height: 4px; background: var(--line); margin-top: 8px; max-width: 300px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .25s ease; }
+@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+
+form { display: grid; gap: 28px; min-width: 0; }
+.sec { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 24px; min-width: 0; scroll-margin-top: 16px; }
+.sh { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; margin-bottom: 20px; }
+.sh .rn { font-size: 14px; padding-top: 6px; color: var(--accent); }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; letter-spacing: -.01em; margin: 0; line-height: 1.2; }
+.sh p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.grid { display: grid; gap: 18px 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.field.wide { grid-column: 1 / -1; }
+label { font-size: 13px; font-weight: 600; }
+.req { color: var(--accent); margin-left: 3px; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+input, select, textarea {
+  font: inherit; font-size: 16px; color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-height: 44px; width: 100%; min-width: 0;
+}
+textarea { min-height: 84px; resize: vertical; }
+input:hover, select:hover, textarea:hover { border-color: var(--muted); }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--danger); }
+.mono { font-family: var(--font-mono); font-size: 15px; letter-spacing: .02em; }
+.err { color: var(--danger); font-size: 13px; margin: 0; }
+.words { font-size: 13px; color: var(--muted); margin: 0; min-height: 1.4em; }
+.unit { position: relative; }
+.unit input { padding-right: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+.unit span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-family: var(--font-mono); font-size: 13px; color: var(--muted); pointer-events: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-size: 13px; background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+.chip:hover { border-color: var(--fg); }
+
+.btn { font: inherit; font-weight: 600; font-size: 15px; border-radius: 6px; padding: 12px 20px; min-height: 46px; cursor: pointer; border: 1px solid var(--fg); background: transparent; color: var(--fg); }
+.btn:hover { background: var(--line); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); background: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.submitbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.submitbar p { margin: 0; color: var(--muted); font-size: 14px; max-width: 46ch; }
+.formerr { color: var(--danger); font-weight: 600; font-size: 14px; margin: 0; }
+
+.result { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 24px; display: grid; gap: 18px; min-width: 0; }
+.status { font-size: 14px; font-weight: 600; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--line); }
+.status.ok { color: var(--ok); border-color: var(--ok); }
+.status.warn { color: var(--danger); border-color: var(--danger); }
+.refline { margin: 0; color: var(--muted); font-size: 14px; }
+.refline b { font-family: var(--font-mono); font-weight: 500; color: var(--fg); font-size: 16px; letter-spacing: .04em; }
+.paper { background: var(--paper); border: 1px solid var(--line); padding: clamp(18px, 4vw, 40px); display: grid; gap: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.paper p { margin: 0; }
+.paper .ph { text-align: center; font-weight: 600; }
+.paper .pt { text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; letter-spacing: .04em; margin: 8px 0; }
+.paper .pb { text-align: justify; text-indent: 2em; }
+.paper .ps { text-align: center; font-weight: 700; margin-top: 12px; }
+.paper .pl { text-align: center; }
+
+.admin { margin-top: 40px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 24px; display: grid; gap: 16px; min-width: 0; }
+.admin .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.admin .bar h2 { margin-right: auto; }
+.admin .bar input { width: min(100%, 260px); }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 760px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-family: var(--font-mono); font-weight: 500; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+td.mono { font-size: 13px; }
+tr:last-child td { border-bottom: 0; }
+.empty { color: var(--muted); font-size: 14px; margin: 0; }
+</style>
+
+<div class="page">
+  <header class="top">
+    <span class="flag" aria-hidden="true"></span>
+    <span class="eyebrow">República de Angola</span>
+  </header>
+
+  <div class="shell">
+    <aside class="side">
+      <div class="side-inner">
+        <h1>Cadastro de Pessoal</h1>
+        <p class="lead">Preencha os dados uma vez. Eles servem para emitir a Declaração de Serviço.</p>
+        <ol class="rail" id="rail">
+          <li><a href="#s1" data-rail="s1"><span class="rn">I</span><span class="rt">Identificação</span><span class="rc"></span></a></li>
+          <li><a href="#s2" data-rail="s2"><span class="rn">II</span><span class="rt">Filiação</span><span class="rc"></span></a></li>
+          <li><a href="#s3" data-rail="s3"><span class="rn">III</span><span class="rt">Bilhete de Identidade</span><span class="rc"></span></a></li>
+          <li><a href="#s4" data-rail="s4"><span class="rn">IV</span><span class="rt">Situação profissional</span><span class="rc"></span></a></li>
+          <li><a href="#s5" data-rail="s5"><span class="rn">V</span><span class="rt">Conta e salário</span><span class="rc"></span></a></li>
+          <li><a href="#s6" data-rail="s6"><span class="rn">VI</span><span class="rt">Finalidade</span><span class="rc"></span></a></li>
+          <li><a href="#s7" data-rail="s7"><span class="rn">VII</span><span class="rt">Dados da emissão</span><span class="rc"></span></a></li>
+        </ol>
+        <p class="overall" id="overall" aria-live="polite">0 de 0 campos obrigatórios</p>
+        <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+      </div>
+    </aside>
+
+    <main>
+      <form id="cadastro" novalidate>
+
+        <section class="sec" id="s1" data-sec="s1">
+          <div class="sh"><span class="rn">I</span><div><h2>Identificação pessoal</h2><p>Escreva como consta no Bilhete de Identidade.</p></div></div>
+          <div class="grid">
+            <div class="field">
+              <label for="f-tratamento">Tratamento<span class="req" aria-hidden="true">*</span></label>
+              <select id="f-tratamento" name="tratamento" required aria-describedby="e-tratamento" data-empty="Escolha o tratamento.">
+                <option value="">Escolha</option>
+                <option value="Senhor">Senhor</option>
+                <option value="Senhora">Senhora</option>
+              </select>
+              <p class="err" id="e-tratamento" hidden></p>
+            </div>
+            <div class="field wide">
+              <label for="f-nome">Nome completo<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-nome" name="nome" type="text" autocomplete="name" required data-kind="name" data-empty="Indique o nome completo." placeholder="Ex.: Maria Teresa Domingos" aria-describedby="e-nome">
+              <p class="err" id="e-nome" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-nascimento">Data de nascimento<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-nascimento" name="nascimento" type="date" required data-kind="past" data-empty="Indique a data de nascimento." aria-describedby="e-nascimento">
+              <p class="err" id="e-nascimento" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-naturalidade">Natural de (município)<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-naturalidade" name="naturalidade" type="text" required data-empty="Indique o município de naturalidade." placeholder="Ex.: Cacuso" aria-describedby="e-naturalidade">
+              <p class="err" id="e-naturalidade" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-provNat">Província de naturalidade<span class="req" aria-hidden="true">*</span></label>
+              <select id="f-provNat" name="provNat" class="prov" required data-empty="Escolha a província." aria-describedby="e-provNat"></select>
+              <p class="err" id="e-provNat" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" id="s2" data-sec="s2">
+          <div class="sh"><span class="rn">II</span><div><h2>Filiação</h2><p>Nomes dos pais, como constam no registo.</p></div></div>
+          <div class="grid">
+            <div class="field">
+              <label for="f-pai">Nome do pai</label>
+              <input id="f-pai" name="pai" type="text" autocomplete="off" placeholder="Ex.: Domingos Manuel" aria-describedby="e-pai">
+              <p class="hint">Pode ficar em branco se não constar.</p>
+              <p class="err" id="e-pai" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-mae">Nome da mãe<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-mae" name="mae" type="text" autocomplete="off" required data-empty="Indique o nome da mãe." placeholder="Ex.: Ana Paula Gomes" aria-describedby="e-mae">
+              <p class="err" id="e-mae" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" id="s3" data-sec="s3">
+          <div class="sh"><span class="rn">III</span><div><h2>Bilhete de Identidade</h2><p>O número tem 14 caracteres: 9 números, 2 letras e 3 números.</p></div></div>
+          <div class="grid">
+            <div class="field">
+              <label for="f-bi">BI nº<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-bi" name="bi" type="text" class="mono" maxlength="14" autocomplete="off" spellcheck="false" required data-kind="bi" data-empty="Indique o número do BI." placeholder="000000000AA000" aria-describedby="e-bi">
+              <p class="err" id="e-bi" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-biData">Data de emissão<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-biData" name="biData" type="date" required data-kind="past" data-empty="Indique a data de emissão do BI." aria-describedby="e-biData">
+              <p class="err" id="e-biData" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" id="s4" data-sec="s4">
+          <div class="sh"><span class="rn">IV</span><div><h2>Situação profissional</h2><p>Dados do cargo e do local onde está colocado.</p></div></div>
+          <div class="grid">
+            <div class="field wide">
+              <label for="f-profissao">Profissão<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-profissao" name="profissao" type="text" required data-empty="Indique a profissão." placeholder="Ex.: Professor do Ensino Primário" aria-describedby="e-profissao">
+              <p class="err" id="e-profissao" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-grau">Grau<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-grau" name="grau" type="text" required data-empty="Indique o grau." placeholder="Ex.: 12º Grau" aria-describedby="e-grau">
+              <p class="hint">A declaração lê: profissão do grau indicado.</p>
+              <p class="err" id="e-grau" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-categoria">Categoria<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-categoria" name="categoria" type="text" required data-empty="Indique a categoria." placeholder="Ex.: P.E.P.E.S do 12º" aria-describedby="e-categoria">
+              <p class="err" id="e-categoria" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-agente">Agente nº<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-agente" name="agente" type="text" inputmode="numeric" class="mono" autocomplete="off" required data-kind="agent" data-empty="Indique o número de agente." placeholder="00000000" aria-describedby="e-agente">
+              <p class="err" id="e-agente" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-municipio">Município de colocação<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-municipio" name="municipio" type="text" required data-empty="Indique o município de colocação." placeholder="Ex.: Quêssua" aria-describedby="e-municipio">
+              <p class="err" id="e-municipio" hidden></p>
+            </div>
+            <div class="field wide">
+              <label for="f-escola">Escola ou local de trabalho<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-escola" name="escola" type="text" required data-empty="Indique a escola ou o local de trabalho." placeholder="Ex.: Escola Primária n.º 000 – Nome do bairro – Município" aria-describedby="e-escola">
+              <p class="err" id="e-escola" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" id="s5" data-sec="s5">
+          <div class="sh"><span class="rn">V</span><div><h2>Conta bancária e salário</h2><p>Valores em kwanzas (Kz).</p></div></div>
+          <div class="grid">
+            <div class="field">
+              <label for="f-banco">Banco<span class="req" aria-hidden="true">*</span></label>
+              <select id="f-banco" name="banco" required data-empty="Escolha o banco." aria-describedby="e-banco">
+                <option value="">Escolha</option>
+                <option>BPC</option><option>BAI</option><option>BFA</option><option>BIC</option>
+                <option>Banco Sol</option><option>Standard Bank</option><option>Atlântico</option>
+                <option>BCI</option><option>Keve</option><option value="Outro">Outro</option>
+              </select>
+              <p class="err" id="e-banco" hidden></p>
+            </div>
+            <div class="field" id="w-bancoOutro" hidden>
+              <label for="f-bancoOutro">Nome do banco<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-bancoOutro" name="bancoOutro" type="text" data-empty="Indique o nome do banco." aria-describedby="e-bancoOutro">
+              <p class="err" id="e-bancoOutro" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-conta">Conta bancária nº<span class="req" aria-hidden="true">*</span></label>
+              <input id="f-conta" name="conta" type="text" class="mono" autocomplete="off" spellcheck="false" required data-kind="account" data-empty="Indique o número da conta." placeholder="0000-X00000-000" aria-describedby="e-conta">
+              <p class="err" id="e-conta" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-salario">Salário líquido<span class="req" aria-hidden="true">*</span></label>
+              <div class="unit"><input id="f-salario" name="salario" type="text" inputmode="decimal" autocomplete="off" required data-kind="money" data-empty="Indique o salário líquido." placeholder="0,00" aria-describedby="e-salario w-extenso"><span>Kz</span></div>
+              <p class="words" id="w-extenso"></p>
+              <p class="err" id="e-salario" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" id="s6" data-sec="s6">
+          <div class="sh"><span class="rn">VI</span><div><h2>Finalidade</h2><p>A observação que aparece no fim da declaração.</p></div></div>
+          <div class="grid">
+            <div class="field wide">
+              <label for="f-finalidade">A presente declaração destina-se<span class="req" aria-hidden="true">*</span></label>
+              <textarea id="f-finalidade" name="finalidade" required data-empty="Indique a finalidade da declaração." placeholder="à regularização da conta" aria-describedby="e-finalidade"></textarea>
+              <div class="chips" role="group" aria-label="Sugestões de finalidade">
+                <button type="button" class="chip" data-fill="à regularização da conta">Regularização da conta</button>
+                <button type="button" class="chip" data-fill="à abertura de conta bancária">Abertura de conta</button>
+                <button type="button" class="chip" data-fill="ao pedido de crédito bancário">Pedido de crédito</button>
+              </div>
+              <p class="err" id="e-finalidade" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" id="s7" data-sec="s7">
+          <div class="sh"><span class="rn">VII</span><div><h2>Dados da emissão</h2><p>Preenchimento da Direcção. Pode ficar em branco no cadastro.</p></div></div>
+          <div class="grid">
+            <div class="field">
+              <label for="f-provEmissao">Governo Provincial de</label>
+              <select id="f-provEmissao" name="provEmissao" class="prov" aria-describedby="e-provEmissao"></select>
+              <p class="err" id="e-provEmissao" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-municipioAdm">Administração Municipal de</label>
+              <input id="f-municipioAdm" name="municipioAdm" type="text" placeholder="Ex.: Quêssua" aria-describedby="e-municipioAdm">
+              <p class="err" id="e-municipioAdm" hidden></p>
+            </div>
+            <div class="field wide">
+              <label for="f-direccao">Direcção</label>
+              <input id="f-direccao" name="direccao" type="text" placeholder="Ex.: Direcção Municipal de Educação" aria-describedby="e-direccao">
+              <p class="err" id="e-direccao" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-localEmissao">Local de emissão</label>
+              <input id="f-localEmissao" name="localEmissao" type="text" placeholder="Ex.: Quêssua" aria-describedby="e-localEmissao">
+              <p class="err" id="e-localEmissao" hidden></p>
+            </div>
+            <div class="field">
+              <label for="f-dataEmissao">Data de emissão da declaração</label>
+              <input id="f-dataEmissao" name="dataEmissao" type="date" aria-describedby="e-dataEmissao">
+              <p class="err" id="e-dataEmissao" hidden></p>
+            </div>
+            <div class="field wide">
+              <label for="f-director">Nome do Director Municipal</label>
+              <input id="f-director" name="director" type="text" autocomplete="off" placeholder="Nome de quem assina" aria-describedby="e-director">
+              <p class="err" id="e-director" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <div class="submitbar">
+          <p>Confira os dados. Depois de enviar, o texto da declaração aparece para conferência.</p>
+          <div class="actions">
+            <button type="reset" class="btn" id="btn-reset">Limpar</button>
+            <button type="submit" class="btn primary">Enviar cadastro</button>
+          </div>
+        </div>
+        <p class="formerr" id="formerr" role="alert" hidden></p>
+      </form>
+
+      <section class="result" id="result" hidden aria-live="polite">
+        <div class="status" id="r-status"></div>
+        <h2>Cadastro recebido</h2>
+        <p class="refline">Referência <b id="r-ref"></b></p>
+        <div class="paper" id="r-paper"></div>
+        <div class="actions">
+          <button type="button" class="btn primary" id="btn-copy">Copiar texto</button>
+          <button type="button" class="btn" id="btn-txt" hidden>Descarregar .txt</button>
+          <button type="button" class="btn" id="btn-new">Novo cadastro</button>
+        </div>
+        <p class="hint" id="r-note" hidden></p>
+      </section>
+
+      <section class="admin" id="admin" hidden>
+        <div class="bar">
+          <h2>Registos recebidos</h2>
+          <input id="a-q" type="search" placeholder="Procurar nome, BI ou agente" aria-label="Procurar registos">
+          <button type="button" class="btn" id="btn-csv" hidden>Exportar CSV</button>
+        </div>
+        <p class="hint" id="a-count">A carregar registos.</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Ref.</th><th>Nome</th><th>BI</th><th>Agente</th><th>Município</th><th>Banco</th><th>Salário (Kz)</th><th>Data</th></tr></thead>
+            <tbody id="a-body"></tbody>
+          </table>
+        </div>
+        <p class="empty" id="a-empty" hidden>Ainda não há registos. Quando alguém enviar o cadastro, ele aparece aqui.</p>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var form = $('#cadastro');
+  var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var PROVS = ['Bengo','Benguela','Bié','Cabinda','Cuando','Cubango','Cuanza Norte','Cuanza Sul','Cunene','Huambo','Huíla','Icolo e Bengo','Luanda','Lunda Norte','Lunda Sul','Malanje','Moxico','Moxico Leste','Namibe','Uíge','Zaire'];
+
+  /* ---------- helpers ---------- */
+  var now = new Date();
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var todayISO = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+  function fmtDate(v) {
+    if (!v) return '';
+    var p = v.split('-').map(Number);
+    return p[0] ? p[2] + ' de ' + MESES[p[1] - 1] + ' de ' + p[0] : '';
+  }
+  function parseKz(s) {
+    s = String(s || '').replace(/[^\d,.]/g, '');
+    if (!s) return NaN;
+    if (s.indexOf(',') > -1) s = s.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+    return parseFloat(s);
+  }
+  function fmtKz(n) { return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  var UN = ['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','catorze','quinze','dezasseis','dezassete','dezoito','dezanove'];
+  var DZ = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  var CT = ['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  function ate999(n) {
+    if (n === 100) return 'cem';
+    var c = Math.floor(n / 100), r = n % 100, parts = [];
+    if (c) parts.push(CT[c]);
+    if (r) {
+      if (r < 20) parts.push(UN[r]);
+      else { var d = Math.floor(r / 10), u = r % 10; parts.push(DZ[d] + (u ? ' e ' + UN[u] : '')); }
+    }
+    return parts.join(' e ');
+  }
+  function inteiro(n) {
+    if (n >= 1e9) return '';
+    var m = Math.floor(n / 1e6), t = Math.floor((n % 1e6) / 1000), u = n % 1000, parts = [], last = 0;
+    if (m) { parts.push(m === 1 ? 'um milhão' : ate999(m) + ' milhões'); last = m * 1e6; }
+    if (t) { parts.push(t === 1 ? 'mil' : ate999(t) + ' mil'); last = t; }
+    if (u) { parts.push(ate999(u)); last = u; }
+    if (parts.length < 2) return parts[0] || '';
+    var head = parts.slice(0, -1).join(', ');
+    var tail = parts[parts.length - 1];
+    return head + ((last < 100 || last % 100 === 0) ? ' e ' : ', ') + tail;
+  }
+  function extenso(n) {
+    if (!(n > 0)) return '';
+    var total = Math.round(n * 100), kz = Math.floor(total / 100), cts = total % 100, out = '';
+    if (kz) { var w = inteiro(kz); if (!w) return ''; out = w + (kz === 1 ? ' kwanza' : ' kwanzas'); }
+    if (cts) out += (out ? ' e ' : '') + ate999(cts) + (cts === 1 ? ' cêntimo' : ' cêntimos');
+    return out.charAt(0).toUpperCase() + out.slice(1);
+  }
+
+  /* ---------- provinces ---------- */
+  $$('.prov').forEach(function (sel) {
+    var first = document.createElement('option');
+    first.value = ''; first.textContent = 'Escolha';
+    sel.appendChild(first);
+    PROVS.forEach(function (p) { var o = document.createElement('option'); o.textContent = p; sel.appendChild(o); });
+  });
+  $('#f-dataEmissao').value = todayISO;
+  $('#f-nascimento').max = todayISO;
+  $('#f-biData').max = todayISO;
+
+  /* ---------- validation ---------- */
+  function check(el) {
+    var v = el.value.trim();
+    if (el.required && !v) return el.dataset.empty || 'Preencha este campo.';
+    if (!v) return '';
+    switch (el.dataset.kind) {
+      case 'name': if (v.split(/\s+/).length < 2) return 'Escreva o nome e o apelido.'; break;
+      case 'bi': if (!/^\d{9}[A-Z]{2}\d{3}$/.test(v)) return 'O BI tem 9 números, 2 letras e 3 números. Exemplo: 000000000AA000.'; break;
+      case 'past': if (v > todayISO) return 'A data não pode ser futura.'; break;
+      case 'money': if (!(parseKz(v) > 0)) return 'Indique um valor maior que zero.'; break;
+      case 'agent': if (!/^\d{4,12}$/.test(v)) return 'Use só números, entre 4 e 12 dígitos.'; break;
+      case 'account': if (!/^[0-9A-Za-z][0-9A-Za-z\- ]{5,}$/.test(v)) return 'Confira o número da conta. Use letras, números e hífens.'; break;
+    }
+    return '';
+  }
+  function showErr(el, msg) {
+    var p = $('#e-' + el.name);
+    if (p) { p.textContent = msg; p.hidden = !msg; }
+    el.setAttribute('aria-invalid', msg ? 'true' : 'false');
+  }
+
+  /* ---------- progress ---------- */
+  var ROMAN = ['I','II','III','IV','V','VI','VII'];
+  function progress() {
+    var tot = 0, filled = 0;
+    $$('[data-sec]').forEach(function (sec) {
+      var reqs = $$('[name]', sec).filter(function (e) { return e.required; });
+      var f = reqs.filter(function (e) { return e.value.trim() !== ''; }).length;
+      tot += reqs.length; filled += f;
+      var link = $('[data-rail="' + sec.dataset.sec + '"]');
+      if (link) {
+        var done = reqs.length > 0 && f === reqs.length;
+        link.classList.toggle('done', done);
+        $('.rc', link).textContent = reqs.length ? (done ? '✓ ' : '') + f + '/' + reqs.length : 'opcional';
+      }
+    });
+    $('#overall').textContent = filled + ' de ' + tot + ' campos obrigatórios';
+    $('#meter').style.width = (tot ? Math.round(filled / tot * 100) : 0) + '%';
+  }
+
+  form.addEventListener('input', function (e) {
+    var el = e.target;
+    if (el.name === 'bi') el.value = el.value.toUpperCase().replace(/\s/g, '');
+    if (el.name === 'salario') {
+      var n = parseKz(el.value);
+      $('#w-extenso').textContent = n > 0 ? (extenso(n) ? 'Por extenso: ' + extenso(n) : '') : '';
+    }
+    if (el.getAttribute('aria-invalid') === 'true') showErr(el, check(el));
+    progress();
+  });
+  form.addEventListener('change', function (e) {
+    var el = e.target;
+    if (el.name === 'banco') {
+      var other = el.value === 'Outro';
+      $('#w-bancoOutro').hidden = !other;
+      var o = $('#f-bancoOutro'); o.required = other;
+      if (!other) { o.value = ''; showErr(o, ''); }
+    }
+    if (el.name) showErr(el, check(el));
+    progress();
+  });
+  form.addEventListener('focusout', function (e) {
+    var el = e.target;
+    if (!el.name) return;
+    if (el.name === 'salario') {
+      var n = parseKz(el.value);
+      if (n > 0) el.value = fmtKz(n);
+    }
+    if (el.value.trim() !== '' || el.getAttribute('aria-invalid') === 'true') showErr(el, check(el));
+  });
+  $$('.chip').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = $('#f-finalidade'); t.value = b.dataset.fill; showErr(t, ''); progress();
+    });
+  });
+  form.addEventListener('reset', function () {
+    setTimeout(function () {
+      $$('[name]', form).forEach(function (el) { showErr(el, ''); });
+      $('#w-bancoOutro').hidden = true; $('#f-bancoOutro').required = false;
+      $('#w-extenso').textContent = '';
+      $('#formerr').hidden = true;
+      $('#f-dataEmissao').value = todayISO;
+      progress();
+    }, 0);
+  });
+
+  /* ---------- declaration text ---------- */
+  function declaracao(r) {
+    var f = r.tratamento === 'Senhora', lines = [];
+    lines.push({ c: 'ph', t: 'República de Angola' });
+    if (r.provEmissao) lines.push({ c: 'ph', t: 'Governo Provincial de ' + r.provEmissao });
+    if (r.municipioAdm) lines.push({ c: 'ph', t: 'Administração Municipal de ' + r.municipioAdm });
+    if (r.direccao) lines.push({ c: 'ph', t: r.direccao });
+    lines.push({ c: 'pt', t: 'DECLARAÇÃO DE SERVIÇO' });
+    var fil = (f ? 'filha' : 'filho') + ' de ' + (r.pai ? r.pai + ' e de ' + r.mae : r.mae);
+    var corpo = 'Para os devidos efeitos achados convenientes, declara-se que ' + (f ? 'a senhora ' : 'o senhor ') + r.nome +
+      ', ' + fil + ', natural de ' + r.naturalidade + ', Província de ' + r.provNat +
+      ', ' + (f ? 'nascida' : 'nascido') + ' aos ' + fmtDate(r.nascimento) +
+      ', ' + (f ? 'portadora' : 'portador') + ' do BI nº ' + r.bi + ', emitido aos ' + fmtDate(r.biData) +
+      ', ' + r.profissao + ' do ' + r.grau + ', ' + (f ? 'colocada' : 'colocado') + ' no Município de ' + r.municipio +
+      ', local de trabalho: ' + r.escola + ', com a categoria de ' + r.categoria + ', Agente nº ' + r.agente +
+      ', é cliente do ' + r.bancoNome + ', titular da conta bancária nº ' + r.conta +
+      ', auferindo o salário líquido de ' + fmtKz(r.salarioKz) + ' Kz (' + r.extenso + ').';
+    lines.push({ c: 'pb', t: corpo });
+    lines.push({ c: 'pb', t: 'Observação: A presente declaração destina-se ' + r.finalidade.replace(/\.$/, '') + '.' });
+    lines.push({ c: 'pb', t: 'Por ser verdade e me ter sido pedido, mandei passar a presente declaração, que vai por mim assinada e autenticada com carimbo a óleo em uso nesta Direcção.' });
+    var local = [r.direccao, r.localEmissao].filter(Boolean).join(', ');
+    if (local || r.dataEmissao) lines.push({ c: 'pl', t: (local ? local + ' ' : '') + (r.dataEmissao ? 'aos ' + fmtDate(r.dataEmissao) + '.' : '') });
+    lines.push({ c: 'ps', t: 'O Director Municipal' });
+    if (r.director) lines.push({ c: 'pl', t: r.director });
+    return lines;
+  }
+
+  /* ---------- capabilities ---------- */
+  var db = null, userNS = null, dl = null;
+  var ready = (async function () {
+    if (!(window.claude && window.claude.use)) return;
+    try { db = await window.claude.use('db'); } catch (e) { db = null; }
+    try { userNS = await window.claude.use('user'); } catch (e) { userNS = null; }
+    try { dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+    if (dl) { $('#btn-txt').hidden = false; $('#btn-csv').hidden = false; }
+    var admin = false;
+    try { admin = !!(userNS && (userNS.canEdit() || userNS.isOwner())); } catch (e) { admin = false; }
+    if (db && admin) startAdmin();
+  })();
+
+  /* ---------- submit ---------- */
+  var current = null;
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var first = null;
+    $$('[name]', form).forEach(function (el) {
+      var m = check(el); showErr(el, m); if (m && !first) first = el;
+    });
+    var fe = $('#formerr');
+    if (first) {
+      fe.textContent = 'Há campos por corrigir. Confira as mensagens a vermelho.'; fe.hidden = false;
+      first.focus(); return;
+    }
+    fe.hidden = true;
+    var r = {};
+    $$('[name]', form).forEach(function (el) { r[el.name] = el.value.trim(); });
+    r.bi = r.bi.toUpperCase();
+    r.salarioKz = parseKz(r.salario);
+    r.extenso = extenso(r.salarioKz);
+    r.bancoNome = r.banco === 'Outro' ? r.bancoOutro : r.banco;
+    var id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    r.ref = 'CP-' + id.slice(-6).toUpperCase();
+    r.criadoEm = new Date().toISOString();
+    var btn = $('button[type="submit"]', form); btn.disabled = true;
+    await ready;
+    var state = 'local';
+    if (db && userNS) {
+      try {
+        var uid = await userNS.id();
+        if (uid) {
+          var ref = db.doc('registos/' + uid), snap = await ref.get();
+          var patch = { items: {} }; patch.items[id] = r;
+          if (snap.exists) await ref.update(patch); else await ref.set(patch);
+          state = 'saved';
+        }
+      } catch (err) { state = 'failed'; }
+    }
+    btn.disabled = false;
+    showResult(r, state);
+  });
+
+  function showResult(r, state) {
+    current = r;
+    var st = $('#r-status');
+    if (state === 'saved') { st.className = 'status ok'; st.textContent = 'Cadastro guardado. Anote a referência abaixo.'; }
+    else { st.className = 'status warn'; st.textContent = 'Este cadastro não foi guardado online. Copie ou descarregue o texto e entregue-o à Direcção.'; }
+    $('#r-ref').textContent = r.ref;
+    var paper = $('#r-paper'); paper.replaceChildren();
+    declaracao(r).forEach(function (l) {
+      var p = document.createElement('p'); p.className = l.c; p.textContent = l.t; paper.appendChild(p);
+    });
+    $('#r-note').hidden = true;
+    form.hidden = true; $('#result').hidden = false;
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    $('#result').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }
+  function plainText() {
+    return $$('#r-paper p').map(function (p) { return p.textContent; }).join('\n\n');
+  }
+  function note(t) { var n = $('#r-note'); n.textContent = t; n.hidden = false; }
+  $('#btn-copy').addEventListener('click', function () {
+    var txt = plainText();
+    var fallback = function () {
+      var rng = document.createRange(); rng.selectNodeContents($('#r-paper'));
+      var sel = getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+      note('Texto selecionado. Use Copiar no menu do seu aparelho.');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { note('Texto copiado.'); }, fallback);
+    } else fallback();
+  });
+  $('#btn-txt').addEventListener('click', async function () {
+    if (!dl || !current) return;
+    try { await dl.save({ filename: 'declaracao-' + current.ref + '.txt', data: plainText() }); note('Ficheiro guardado.'); }
+    catch (err) { if (!err || err.code !== 'declined') note('Não foi possível guardar o ficheiro aqui. Use Copiar texto.'); }
+  });
+  $('#btn-new').addEventListener('click', function () {
+    form.reset(); form.hidden = false; $('#result').hidden = true; current = null;
+    window.scrollTo(0, 0); $('#f-tratamento').focus();
+  });
+
+  /* ---------- admin list ---------- */
+  var rows = [];
+  function startAdmin() {
+    $('#admin').hidden = false;
+    db.collection('registos').limit(500).onSnapshot(function (snap) {
+      rows = [];
+      snap.docs.forEach(function (d) {
+        var items = (d.data() || {}).items || {};
+        Object.keys(items).forEach(function (k) { rows.push(items[k]); });
+      });
+      rows.sort(function (a, b) { return String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')); });
+      renderAdmin();
+    }, function () { $('#a-count').textContent = 'Não foi possível carregar os registos.'; });
+    $('#a-q').addEventListener('input', renderAdmin);
+  }
+  function renderAdmin() {
+    var q = $('#a-q').value.trim().toLowerCase();
+    var list = rows.filter(function (r) {
+      return !q || [r.nome, r.bi, r.agente, r.municipio, r.escola].join(' ').toLowerCase().indexOf(q) > -1;
+    });
+    var body = $('#a-body'); body.replaceChildren();
+    list.forEach(function (r) {
+      var tr = document.createElement('tr');
+      [r.ref, r.nome, r.bi, r.agente, r.municipio, r.bancoNome, typeof r.salarioKz === 'number' ? fmtKz(r.salarioKz) : '', (r.criadoEm || '').slice(0, 10)].forEach(function (v, i) {
+        var td = document.createElement('td'); td.textContent = v == null ? '' : v;
+        if (i === 0 || i === 2 || i === 3 || i === 6) td.className = 'mono';
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    $('#a-empty').hidden = rows.length > 0;
+    $('#a-count').textContent = rows.length ? list.length + ' de ' + rows.length + ' registos' : '';
+  }
+  $('#btn-csv').addEventListener('click', async function () {
+    if (!dl || !rows.length) return;
+    var cols = ['ref','criadoEm','tratamento','nome','nascimento','naturalidade','provNat','pai','mae','bi','biData','profissao','grau','categoria','agente','municipio','escola','bancoNome','conta','salarioKz','extenso','finalidade','provEmissao','municipioAdm','direccao','localEmissao','dataEmissao','director'];
+    var esc = function (v) { v = v == null ? '' : String(v); return '"' + v.replace(/"/g, '""') + '"'; };
+    var csv = '﻿' + cols.join(';') + '\n' + rows.map(function (r) { return cols.map(function (c) { return esc(r[c]); }).join(';'); }).join('\n');
+    try { await dl.save({ filename: 'cadastro-pessoal.csv', data: csv }); } catch (err) { /* declined or unavailable */ }
+  });
+
+  progress();
+})();
+</script>
+
+</body></html>

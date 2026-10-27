@@ -589,6 +589,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </span>
                     <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
                   </button>
+
+                  {/* Declaração de Serviço Oficial */}
+                  <button
+                    id="dropdown-declaracao-servico-btn"
+                    onClick={() => {
+                      onSelectPage('declaracao-servico');
+                      setShowPagesDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-sky-50 hover:text-sky-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Declaração de Serviço</span>
+                    </span>
+                    <span className="text-[9px] bg-sky-100 text-sky-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -1146,7 +1162,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <FileText className="w-4 h-4 text-[#f75142]" />
               <span>Declaração de Efectividade</span>
             </div>
-            <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Em Branco</span>
+            <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+          </button>
+          <button
+            onClick={() => {
+              onSelectPage('declaracao-servico');
+              setMobileMenuOpen(false);
+            }}
+            className="text-left py-2 px-3 text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-sky-600" />
+              <span>Declaração de Serviço</span>
+            </div>
+            <span className="text-[9px] bg-sky-100 text-sky-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
           </button>
 
           <button

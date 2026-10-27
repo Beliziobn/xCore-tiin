@@ -2051,6 +2051,28 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
           currentUser={currentUser}
+          initialTab="form"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+
+    // Declaração de Serviço (Nova Aba Oficial em Branco)
+    if (
+      currentView === 'declaracao-servico' ||
+      currentView === 'declaracao-de-servico' ||
+      currentView === 'servico'
+    ) {
+      return (
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          initialTab="declaracao-servico"
           onNavigateHome={() => {
             setCurrentView('home');
             setCurrentPage('home');

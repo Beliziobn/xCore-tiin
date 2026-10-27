@@ -31,6 +31,7 @@ import { Hero } from '../Hero';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import { BackupManagerModal } from '../modals/BackupManagerModal';
 import { QuickRequestsManagementView } from '../quick-services/QuickRequestsManagementView';
+import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
 import type { UserAccount } from '../../types';
 import {
   CadastramentoEfectividadeRecord,
@@ -66,7 +67,7 @@ interface DeclaracaoEfectividadePageProps {
   initialTab?: ActiveTab;
 }
 
-type ActiveTab = 'form' | 'database' | 'pedidos' | 'view-ficha';
+type ActiveTab = 'form' | 'declaracao-servico' | 'database' | 'pedidos' | 'view-ficha';
 
 interface FormState {
   id?: string;
@@ -141,6 +142,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   initialTab = 'form',
 }) => {
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [quickRequestsCount, setQuickRequestsCount] = useState<number>(0);
   const [records, setRecords] = useState<CadastramentoEfectividadeRecord[]>(() =>
     getStoredEfectividadeRecords()
@@ -542,11 +549,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       {/* Print CSS rules - ensures strict single-page A4 portrait format without frame (moldura), 100% Times New Roman, 14pt titles, and 12pt texts */}
       <style>{`
         #oficial-a4-sheet,
-        #oficial-a4-sheet * {
+        #oficial-a4-sheet *,
+        #declaracao-servico-a4-sheet,
+        #declaracao-servico-a4-sheet * {
           font-family: 'Times New Roman', Times, serif !important;
           color: #000000;
         }
-        #oficial-a4-sheet .a4-emblem-img {
+        #oficial-a4-sheet .a4-emblem-img,
+        #declaracao-servico-a4-sheet .a4-emblem-img {
           width: 60px;
           height: auto;
           max-height: 60px;
@@ -554,14 +564,16 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           display: block;
           margin: 0 auto 6px auto;
         }
-        #oficial-a4-sheet .a4-header-block {
+        #oficial-a4-sheet .a4-header-block,
+        #declaracao-servico-a4-sheet .a4-header-block {
           text-align: center;
           font-family: 'Times New Roman', Times, serif !important;
           margin-bottom: 10pt;
           padding-bottom: 0;
           border: 0;
         }
-        #oficial-a4-sheet .a4-header-block p.a4-republic-title {
+        #oficial-a4-sheet .a4-header-block p.a4-republic-title,
+        #declaracao-servico-a4-sheet .a4-header-block p.a4-republic-title {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 14pt;
           font-weight: 700;
@@ -571,7 +583,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin: 0 0 2pt 0;
           color: #000000;
         }
-        #oficial-a4-sheet .a4-header-block p.a4-inst-line {
+        #oficial-a4-sheet .a4-header-block p.a4-inst-line,
+        #declaracao-servico-a4-sheet .a4-header-block p.a4-inst-line {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -581,12 +594,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin: 1.5pt 0;
           color: #000000;
         }
-        #oficial-a4-sheet .a4-title-wrap {
+        #oficial-a4-sheet .a4-title-wrap,
+        #declaracao-servico-a4-sheet .a4-title-wrap {
           padding-top: 12pt;
           padding-bottom: 4pt;
           text-align: center;
         }
-        #oficial-a4-sheet .a4-title-wrap h1 {
+        #oficial-a4-sheet .a4-title-wrap h1,
+        #declaracao-servico-a4-sheet .a4-title-wrap h1 {
           display: inline-block;
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 14pt;
@@ -607,6 +622,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           text-align: justify;
           color: #000000;
         }
+        #declaracao-servico-a4-sheet .a4-body-copy {
+          margin-top: 12pt;
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          line-height: 1.5;
+          text-align: justify;
+          color: #000000;
+        }
         #oficial-a4-sheet .a4-body-copy p {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
@@ -616,18 +639,31 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin: 0 0 8pt 0;
           color: #000000;
         }
-        #oficial-a4-sheet .a4-body-copy strong {
+        #declaracao-servico-a4-sheet .a4-body-copy p {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          line-height: 1.5;
+          text-align: justify;
+          text-indent: 1.25cm;
+          margin: 0 0 10pt 0;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-body-copy strong,
+        #declaracao-servico-a4-sheet .a4-body-copy strong {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
         }
-        #oficial-a4-sheet .a4-footer-block {
+        #oficial-a4-sheet .a4-footer-block,
+        #declaracao-servico-a4-sheet .a4-footer-block {
           margin-top: 14pt;
           padding-top: 2pt;
           border: 0;
         }
         #oficial-a4-sheet .a4-date-line,
-        #oficial-a4-sheet .a4-date-line span {
+        #oficial-a4-sheet .a4-date-line span,
+        #declaracao-servico-a4-sheet .a4-date-line,
+        #declaracao-servico-a4-sheet .a4-date-line span {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           line-height: 1.35;
@@ -635,12 +671,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin-bottom: 20pt;
           color: #000000;
         }
-        #oficial-a4-sheet .a4-sig-container {
+        #oficial-a4-sheet .a4-sig-container,
+        #declaracao-servico-a4-sheet .a4-sig-container {
           text-align: center;
           width: 280px;
           margin: 0 auto;
         }
-        #oficial-a4-sheet .a4-sig-role {
+        #oficial-a4-sheet .a4-sig-role,
+        #declaracao-servico-a4-sheet .a4-sig-role {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -648,12 +686,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin: 0 0 26pt 0;
           color: #000000;
         }
-        #oficial-a4-sheet .a4-sig-line {
+        #oficial-a4-sheet .a4-sig-line,
+        #declaracao-servico-a4-sheet .a4-sig-line {
           border-bottom: 1px solid #000000;
           width: 250px;
           margin: 0 auto;
         }
-        #oficial-a4-sheet .a4-sig-name {
+        #oficial-a4-sheet .a4-sig-name,
+        #declaracao-servico-a4-sheet .a4-sig-name {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -731,10 +771,13 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             overflow: hidden !important;
           }
           #oficial-a4-sheet,
-          #oficial-a4-sheet * {
+          #oficial-a4-sheet *,
+          #declaracao-servico-a4-sheet,
+          #declaracao-servico-a4-sheet * {
             font-family: 'Times New Roman', Times, serif !important;
           }
-          #oficial-a4-sheet {
+          #oficial-a4-sheet,
+          #declaracao-servico-a4-sheet {
             display: block !important;
             box-sizing: border-box !important;
             box-shadow: none !important;
@@ -832,13 +875,30 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       <div className="no-print">
         <Hero
           onOpenGetStarted={onOpenGetStarted}
-          customTitle="Cadastramento de Pessoal"
-          customSubtitle="Ficha oficial de cadastro individual e Declaração de Efectividade do Sector da Educação • Município do Quêssua."
-          badge="Declaração de Efectividade"
+          customTitle={
+            activeTab === 'declaracao-servico'
+              ? 'Declaração de Serviço'
+              : 'Cadastramento de Pessoal'
+          }
+          customSubtitle={
+            activeTab === 'declaracao-servico'
+              ? 'Cadastro de pessoal e emissão oficial de Declaração de Serviço (Conta Bancária e Salário Líquido) • Município do Quêssua.'
+              : 'Ficha oficial de cadastro individual e Declaração de Efectividade do Sector da Educação • Município do Quêssua.'
+          }
+          badge={
+            activeTab === 'declaracao-servico'
+              ? 'Declaração de Serviço'
+              : 'Declaração de Efectividade'
+          }
           breadcrumbs={[
             { label: 'Início', onClick: onNavigateHome },
             { label: 'Documentos Escolares' },
-            { label: 'Declaração de Efectividade & Cadastro' },
+            {
+              label:
+                activeTab === 'declaracao-servico'
+                  ? 'Declaração de Serviço (Conta & Salário)'
+                  : 'Declaração de Efectividade & Cadastro',
+            },
           ]}
           isLoggedIn={isLoggedIn}
         />
@@ -865,12 +925,29 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                   : 'border-transparent text-[#52606d] hover:text-[#002133]'
               }`}
             >
-              <span>Formulário de Cadastro</span>
+              <span>Declaração de Efectividade</span>
               {formData.id && (
                 <span className="text-[10px] badge--warning px-2 py-0.5 rounded-full font-semibold">
                   A Editar
                 </span>
               )}
+            </button>
+
+            <button
+              id="tab-declaracao-servico"
+              type="button"
+              onClick={() => setActiveTab('declaracao-servico')}
+              className={`py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+                activeTab === 'declaracao-servico'
+                  ? 'border-[#A8231B] text-[#101C2B]'
+                  : 'border-transparent text-[#52606d] hover:text-[#002133]'
+              }`}
+            >
+              <FileText className="w-4 h-4 text-[#A8231B]" />
+              <span>Declaração de Serviço</span>
+              <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                Conta & Salário
+              </span>
             </button>
 
             <button
@@ -882,7 +959,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                   : 'border-transparent text-[#52606d] hover:text-[#002133]'
               }`}
             >
-              <span>Pessoal Cadastrado (Base de Dados)</span>
+              <span>Base de Dados (Efectividade)</span>
               <span className="text-[11px] bg-[#f4f4f6] text-[#002133] px-2 py-0.5 rounded-full font-semibold numeric">
                 {records.length}
               </span>
@@ -2004,6 +2081,11 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             })()}
           </div>
         )}
+
+        {/* ============================================================== */}
+        {/* TAB: DECLARAÇÃO DE SERVIÇO (MÓDULO INDEPENDENTE)               */}
+        {/* ============================================================== */}
+        {activeTab === 'declaracao-servico' && <DeclaracaoServicoSection />}
       </main>
 
       {/* Modal de Confirmação para Eliminar Registo Individual */}

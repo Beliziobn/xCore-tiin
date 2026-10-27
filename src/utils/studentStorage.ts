@@ -903,18 +903,16 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
       const syncedDirStudent: DirectorStudent = {
         id: syncedAdminStudent.id,
         name: syncedAdminStudent.name,
-        age: ensuredData.idade || 10,
-        gender: syncedAdminStudent.gender,
+        idade: ensuredData.idade || 10,
         gradeClass: syncedAdminStudent.gradeClass,
         room: syncedAdminStudent.room,
         turma: syncedAdminStudent.turma,
-        shift: (ensuredData.turno === 'Tarde' || ensuredData.periodo === 'Tarde' ? 'Tarde' : 'Manhã') as 'Manhã' | 'Tarde',
         teacherName: 'Docente Titular',
         guardianName: syncedAdminStudent.guardianName,
-        guardianPhone: ensuredData.telefone || '+244 923 000 000',
+        location: 'Complexo Escolar Central',
         hasDocuments: syncedAdminStudent.hasDocuments,
         presenceRate: syncedAdminStudent.presenceRate,
-        averageGrade: 14,
+        performanceScore: 8.5,
         registrationData: ensuredData,
       };
       const existingDirIdx = Array.isArray(dirStudentsList)

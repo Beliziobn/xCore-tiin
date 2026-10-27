@@ -496,6 +496,64 @@
         }
       },
       "required": ["id", "nomeCompleto", "schoolId", "turma", "classe"]
+    },
+    "StaffMember": {
+      "title": "StaffMember",
+      "description": "Registo de outros funcionários do sector da educação (pessoal administrativo, secretariado, auxiliares, vigilância/segurança, limpeza e apoio técnico)",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único do funcionário",
+          "maxLength": 128
+        },
+        "nomeCompleto": {
+          "type": "string",
+          "description": "Nome completo do funcionário",
+          "maxLength": 120
+        },
+        "bi": {
+          "type": "string",
+          "description": "Número do Bilhete de Identidade",
+          "maxLength": 30
+        },
+        "agente": {
+          "type": "string",
+          "description": "Número de agente da função pública",
+          "maxLength": 30
+        },
+        "funcao": {
+          "type": "string",
+          "description": "Função desempenhada (Administrativo, Secretário, Auxiliar de Limpeza, Segurança, Técnico, etc.)",
+          "maxLength": 100
+        },
+        "categoria": {
+          "type": "string",
+          "description": "Categoria e grau funcional",
+          "maxLength": 100
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Escola ou repartição municipal de colocação",
+          "maxLength": 150
+        },
+        "municipio": {
+          "type": "string",
+          "description": "Município de colocação",
+          "maxLength": 100
+        },
+        "telefone": {
+          "type": "string",
+          "description": "Contacto telefónico",
+          "maxLength": 30
+        },
+        "status": {
+          "type": "string",
+          "description": "Situação funcional",
+          "maxLength": 40
+        }
+      },
+      "required": ["id", "nomeCompleto", "funcao", "schoolName"]
     }
   },
   "firestore": {
@@ -559,11 +617,23 @@
       },
       "description": "Quadro técnico e de inspeção da Direção Municipal da Educação (DME)"
     },
+    "/staff/{staffId}": {
+      "schema": {
+        "$ref": "#/entities/StaffMember"
+      },
+      "description": "Quadro de outros funcionários não-docentes (administrativos, secretariado, auxiliares, segurança e apoio escolar)"
+    },
     "/efectividade/{recordId}": {
       "schema": {
         "$ref": "#/entities/Teacher"
       },
       "description": "Registos oficiais de cadastramento de efectividade de pessoal"
+    },
+    "/declaracao_servico/{recordId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Registos oficiais de Declaração de Serviço (dados bancários e salário líquido)"
     },
     "/grades/{gradeId}": {
       "schema": {

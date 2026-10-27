@@ -29,8 +29,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // SSD: Strict Request Payload Limit (prevents memory buffer overflow / DoS)
-  app.use(express.json({ limit: "500kb" }));
+  // SSD: High-Capacity Request Payload Limit (50MB for large batches of alunos, professores & outros funcionários)
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // SSD: Essential Security Headers
   app.use((req, res, next) => {
@@ -95,8 +96,10 @@ async function startServer() {
     directors: any[];
     teachers: any[];
     students: any[];
+    staff?: any[];
     applications: any[];
     efectividade: any[];
+    declaracaoServico?: any[];
     quickRequests: any[];
     updatedAt: string;
   }
@@ -115,8 +118,10 @@ async function startServer() {
             directors: Array.isArray(parsed.directors) ? parsed.directors : [],
             teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
             students: Array.isArray(parsed.students) ? parsed.students : [],
+            staff: Array.isArray(parsed.staff) ? parsed.staff : [],
             applications: Array.isArray(parsed.applications) ? parsed.applications : [],
             efectividade: Array.isArray(parsed.efectividade) ? parsed.efectividade : [],
+            declaracaoServico: Array.isArray(parsed.declaracaoServico) ? parsed.declaracaoServico : [],
             quickRequests: Array.isArray(parsed.quickRequests) ? parsed.quickRequests : [],
             updatedAt: parsed.updatedAt || new Date().toISOString(),
           };
@@ -130,8 +135,10 @@ async function startServer() {
       directors: [],
       teachers: [],
       students: [],
+      staff: [],
       applications: [],
       efectividade: [],
+      declaracaoServico: [],
       quickRequests: [],
       updatedAt: new Date().toISOString(),
     };
@@ -716,7 +723,7 @@ async function startServer() {
   app.post("/api/network/clear-homologated", clearHomologadosHandler);
 
   app.post("/api/network/sync", (req, res) => {
-    const { schools, directors, teachers, students, applications, efectividade } = req.body || {};
+    const { schools, directors, teachers, students, staff, applications, efectividade, declaracaoServico } = req.body || {};
     let changed = false;
 
     if (Array.isArray(schools) && schools.length > 0) {
@@ -766,6 +773,18 @@ async function startServer() {
       changed = true;
     }
 
+    if (Array.isArray(staff) && staff.length > 0) {
+      if (!Array.isArray(networkStore.staff)) {
+        networkStore.staff = [];
+      }
+      networkStore.staff = upsertByKey(
+        networkStore.staff,
+        staff,
+        (st) => String(st.id || st.bi || st.agente || st.nomeCompleto || st.name || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
     if (Array.isArray(applications) && applications.length > 0) {
       networkStore.applications = upsertByKey(
         networkStore.applications,
@@ -783,6 +802,18 @@ async function startServer() {
         networkStore.efectividade,
         efectividade,
         (e) => String(e.id || `${e.bi || ''}::${e.agente || ''}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(declaracaoServico) && declaracaoServico.length > 0) {
+      if (!Array.isArray(networkStore.declaracaoServico)) {
+        networkStore.declaracaoServico = [];
+      }
+      networkStore.declaracaoServico = upsertByKey(
+        networkStore.declaracaoServico,
+        declaracaoServico,
+        (rec) => String(rec.id || rec.ref || `${rec.bi || ""}::${rec.agente || ""}`).trim().toLowerCase()
       );
       changed = true;
     }
@@ -905,6 +936,170 @@ async function startServer() {
       message: "Base de dados de efectividade esvaziada pelo Administrador Máximo. Ponto de restauração gerado com sucesso.",
       records: [],
       count: 0,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // ============================================================================
+  // DECLARAÇÃO DE SERVIÇO (MÓDULO INDEPENDENTE • CONTA BANCÁRIA & SALÁRIO)
+  // ============================================================================
+  app.get("/api/declaracao-servico", (req, res) => {
+    try {
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.declaracaoServico)) {
+          networkStore.declaracaoServico = parsed.declaracaoServico;
+        }
+      }
+    } catch {}
+    const records = Array.isArray(networkStore.declaracaoServico) ? networkStore.declaracaoServico : [];
+    res.json({
+      success: true,
+      records,
+      count: records.length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/declaracao-servico", (req, res) => {
+    const { record, records } = req.body || {};
+    const incoming: any[] = [];
+    if (record && typeof record === "object") incoming.push(record);
+    if (Array.isArray(records)) incoming.push(...records);
+
+    if (incoming.length > 0) {
+      if (!Array.isArray(networkStore.declaracaoServico)) {
+        networkStore.declaracaoServico = [];
+      }
+      networkStore.declaracaoServico = upsertByKey(
+        networkStore.declaracaoServico,
+        incoming,
+        (rec) => String(rec.id || rec.ref || `${rec.bi || ""}::${rec.agente || ""}::${rec.nome || ""}`).trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.declaracaoServico || [],
+      count: (networkStore.declaracaoServico || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/declaracao-servico/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim();
+    if (Array.isArray(networkStore.declaracaoServico) && targetId) {
+      const initialCount = networkStore.declaracaoServico.length;
+      networkStore.declaracaoServico = networkStore.declaracaoServico.filter((r) => {
+        const rId = String(r.id || "").trim();
+        const rRef = String(r.ref || "").trim();
+        const rBi = String(r.bi || "").trim().toUpperCase();
+        const rAgente = String(r.agente || "").trim();
+        if (
+          rId === targetId ||
+          rRef.toUpperCase() === targetId.toUpperCase() ||
+          rBi === targetId.toUpperCase() ||
+          rAgente === targetId
+        ) {
+          return false;
+        }
+        return true;
+      });
+      if (networkStore.declaracaoServico.length !== initialCount) {
+        persistNetworkStore();
+      }
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.declaracaoServico || [],
+      count: (networkStore.declaracaoServico || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // ============================================================================
+  // OUTROS FUNCIONÁRIOS (ADMINISTRATIVOS, SECRETARIADO, AUXILIARES, SEGURANÇA E APOIO)
+  // ============================================================================
+  app.get("/api/staff", (req, res) => {
+    const records = Array.isArray(networkStore.staff) ? networkStore.staff : [];
+    res.json({
+      success: true,
+      records,
+      count: records.length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/staff", (req, res) => {
+    const { record, records } = req.body || {};
+    const incoming: any[] = [];
+    if (record && typeof record === "object") incoming.push(record);
+    if (Array.isArray(records)) incoming.push(...records);
+
+    if (incoming.length > 0) {
+      if (!Array.isArray(networkStore.staff)) {
+        networkStore.staff = [];
+      }
+      networkStore.staff = upsertByKey(
+        networkStore.staff,
+        incoming,
+        (rec) => String(rec.id || rec.bi || rec.agente || rec.nomeCompleto || rec.name || "").trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.staff || [],
+      count: (networkStore.staff || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/staff/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim().toLowerCase();
+    if (Array.isArray(networkStore.staff) && targetId) {
+      const initialCount = networkStore.staff.length;
+      networkStore.staff = networkStore.staff.filter((r) => {
+        const rId = String(r.id || "").trim().toLowerCase();
+        const rBi = String(r.bi || "").trim().toLowerCase();
+        const rAgente = String(r.agente || "").trim().toLowerCase();
+        return rId !== targetId && rBi !== targetId && rAgente !== targetId;
+      });
+      if (networkStore.staff.length !== initialCount) {
+        persistNetworkStore();
+      }
+    }
+    res.json({
+      success: true,
+      records: networkStore.staff || [],
+      count: (networkStore.staff || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // ============================================================================
+  // CAPACIDADE E ESTADO UNIFICADO DA BASE DE DADOS (ALUNOS, PROFESSORES E OUTROS FUNCIONÁRIOS)
+  // ============================================================================
+  app.get("/api/database/capacity-status", (_req, res) => {
+    res.json({
+      success: true,
+      engine: "Firestore Enterprise Cloud + Servidor Persistente (Dual-Sync)",
+      maxPayloadSizeMb: 50,
+      batchChunkCapacity: 450,
+      collections: {
+        students: (networkStore.students || []).length,
+        teachers: (networkStore.teachers || []).length,
+        staff: (networkStore.staff || []).length,
+        directors: (networkStore.directors || []).length,
+        schools: (networkStore.schools || []).length,
+        efectividade: (networkStore.efectividade || []).length,
+        declaracaoServico: (networkStore.declaracaoServico || []).length,
+        quickRequests: (networkStore.quickRequests || []).length,
+      },
       updatedAt: networkStore.updatedAt,
     });
   });

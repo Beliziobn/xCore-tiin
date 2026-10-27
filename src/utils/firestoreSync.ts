@@ -36,9 +36,11 @@ const USERS_COL = 'users';
 const SCHOOLS_COL = 'schools';
 const DIRECTORS_COL = 'directors';
 const DME_STAFF_COL = 'dme_staff';
+const STAFF_COL = 'staff';
 const TEACHERS_COL = 'teachers';
 const STUDENTS_COL = 'students';
 const EFECTIVIDADE_COL = 'efectividade';
+const DECLARACAO_SERVICO_COL = 'declaracao_servico';
 const GRADES_COL = 'grades';
 const ATTENDANCE_COL = 'attendance';
 const ANNOUNCEMENTS_COL = 'announcements';
@@ -703,6 +705,171 @@ export function subscribeToDmeStaff(onUpdate: (staff: any[]) => void): Unsubscri
 }
 
 // ============================================================================
+// 7B. OUTROS FUNCIONÁRIOS (ADMINISTRATIVOS, SECRETARIADO, AUXILIARES, SEGURANÇA)
+// ============================================================================
+
+export async function saveStaffToFirestore(staffMember: Record<string, any>): Promise<void> {
+  try {
+    const id = sanitizeDocId(
+      staffMember.id || staffMember.bi || staffMember.agente || staffMember.nomeCompleto || staffMember.name
+    );
+    if (!id) return;
+    removeEntityTombstone(STAFF_COL, id);
+    const nomeCompleto = staffMember.nomeCompleto || staffMember.name || 'Funcionário';
+    const funcao = staffMember.funcao || staffMember.role || staffMember.cargo || 'Administrativo / Apoio';
+    const schoolName =
+      staffMember.schoolName || staffMember.escola || staffMember.nomeEscola || 'Direcção Municipal de Educação';
+    const ref = doc(db, STAFF_COL, id);
+    await setDoc(
+      ref,
+      cleanObject({
+        ...staffMember,
+        id,
+        nomeCompleto,
+        name: nomeCompleto,
+        funcao,
+        schoolName,
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn('[Firestore] Erro ao gravar funcionário no Firestore:', error);
+  }
+}
+
+export async function deleteStaffFromFirestore(staffId: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(staffId);
+    if (!docId) return;
+    addEntityTombstone(STAFF_COL, docId);
+    await deleteDoc(doc(db, STAFF_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar funcionário no Firestore:', error);
+  }
+}
+
+export async function fetchStaffFromFirestore(): Promise<any[]> {
+  try {
+    const snapshot = await getDocs(collection(db, STAFF_COL));
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeToStaff(onUpdate: (staff: any[]) => void): Unsubscribe {
+  try {
+    return onSnapshot(
+      collection(db, STAFF_COL),
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => list.push(d.data()));
+        onUpdate(list);
+      },
+      (err) => console.warn('[Firestore] Staff subscription error:', err)
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+// High-capacity chunked batch writers (supports thousands of records in chunks of 450)
+export async function saveBatchStudentsToFirestore(students: Record<string, any>[]): Promise<number> {
+  if (!Array.isArray(students) || students.length === 0) return 0;
+  let saved = 0;
+  const CHUNK_SIZE = 450;
+  for (let i = 0; i < students.length; i += CHUNK_SIZE) {
+    const chunk = students.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach((student) => {
+      const id = sanitizeDocId(student.id || student.nomeCompleto || student.name);
+      if (!id) return;
+      const nomeCompleto = student.nomeCompleto || student.name || 'Estudante';
+      const schoolId = student.schoolId || student.escola || student.schoolName || 'escola_municipal';
+      const turma = student.turma || 'Turma A';
+      const classe = student.classe || student.gradeClass || student.classeEtapaModulo || '1ª Classe';
+      const ref = doc(db, STUDENTS_COL, id);
+      batch.set(
+        ref,
+        cleanObject({
+          ...student,
+          id,
+          nomeCompleto,
+          name: nomeCompleto,
+          schoolId,
+          turma,
+          classe,
+          updatedAt: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+      saved++;
+    });
+    await batch.commit();
+  }
+  return saved;
+}
+
+export async function saveBatchTeachersToFirestore(teachers: Record<string, any>[]): Promise<number> {
+  if (!Array.isArray(teachers) || teachers.length === 0) return 0;
+  let saved = 0;
+  const CHUNK_SIZE = 450;
+  for (let i = 0; i < teachers.length; i += CHUNK_SIZE) {
+    const chunk = teachers.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach((teacher) => {
+      const id = sanitizeDocId(teacher.id || teacher.nomeCompleto || teacher.name);
+      if (!id) return;
+      const ref = doc(db, TEACHERS_COL, id);
+      batch.set(ref, cleanObject({ ...teacher, id, updatedAt: new Date().toISOString() }), { merge: true });
+      saved++;
+    });
+    await batch.commit();
+  }
+  return saved;
+}
+
+export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]): Promise<number> {
+  if (!Array.isArray(staffList) || staffList.length === 0) return 0;
+  let saved = 0;
+  const CHUNK_SIZE = 450;
+  for (let i = 0; i < staffList.length; i += CHUNK_SIZE) {
+    const chunk = staffList.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach((staffMember) => {
+      const id = sanitizeDocId(
+        staffMember.id || staffMember.bi || staffMember.agente || staffMember.nomeCompleto || staffMember.name
+      );
+      if (!id) return;
+      const nomeCompleto = staffMember.nomeCompleto || staffMember.name || 'Funcionário';
+      const funcao = staffMember.funcao || staffMember.role || staffMember.cargo || 'Administrativo / Apoio';
+      const schoolName =
+        staffMember.schoolName || staffMember.escola || staffMember.nomeEscola || 'Direcção Municipal de Educação';
+      const ref = doc(db, STAFF_COL, id);
+      batch.set(
+        ref,
+        cleanObject({
+          ...staffMember,
+          id,
+          nomeCompleto,
+          name: nomeCompleto,
+          funcao,
+          schoolName,
+          updatedAt: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+      saved++;
+    });
+    await batch.commit();
+  }
+  return saved;
+}
+
+// ============================================================================
 // 8. EFECTIVIDADE - FIRESTORE CLOUD STORE
 // ============================================================================
 
@@ -768,6 +935,78 @@ export function subscribeToEfectividade(onUpdate: (records: any[]) => void): Uns
         onUpdate(list);
       },
       (err) => console.warn('[Firestore] Efectividade subscription error:', err)
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+// ============================================================================
+// 8B. DECLARAÇÃO DE SERVIÇO - FIRESTORE CLOUD STORE (INDEPENDENT OF EFECTIVIDADE)
+// ============================================================================
+
+export async function saveDeclaracaoServicoToFirestore(record: Record<string, any>): Promise<void> {
+  try {
+    const docId = sanitizeDocId(record.id || record.ref || record.bi || record.agente);
+    if (!docId) return;
+    removeEntityTombstone(DECLARACAO_SERVICO_COL, docId);
+    const ref = doc(db, DECLARACAO_SERVICO_COL, docId);
+    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+  } catch (error) {
+    console.warn('[Firestore] Erro ao gravar Declaração de Serviço no Firestore:', error);
+  }
+}
+
+export async function deleteDeclaracaoServicoFromFirestore(id: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(id);
+    if (!docId) return;
+    addEntityTombstone(DECLARACAO_SERVICO_COL, docId);
+    await deleteDoc(doc(db, DECLARACAO_SERVICO_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar Declaração de Serviço no Firestore:', error);
+  }
+}
+
+export async function clearAllDeclaracaoServicoFromFirestore(): Promise<number> {
+  try {
+    const snapshot = await getDocs(collection(db, DECLARACAO_SERVICO_COL));
+    const batch = writeBatch(db);
+    let count = 0;
+    snapshot.forEach((d) => {
+      addEntityTombstone(DECLARACAO_SERVICO_COL, d.id);
+      batch.delete(d.ref);
+      count++;
+    });
+    if (count > 0) await batch.commit();
+    return count;
+  } catch (error) {
+    console.warn('[Firestore] Erro ao esvaziar Declaração de Serviço no Firestore:', error);
+    return 0;
+  }
+}
+
+export async function fetchDeclaracaoServicoFromFirestore(): Promise<any[]> {
+  try {
+    const snapshot = await getDocs(collection(db, DECLARACAO_SERVICO_COL));
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeToDeclaracaoServico(onUpdate: (records: any[]) => void): Unsubscribe {
+  try {
+    return onSnapshot(
+      collection(db, DECLARACAO_SERVICO_COL),
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => list.push(d.data()));
+        onUpdate(list);
+      },
+      (err) => console.warn('[Firestore] Declaração de Serviço subscription error:', err)
     );
   } catch {
     return () => {};
@@ -1562,6 +1801,80 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         }
       } catch (e) {
         console.warn('[UnifiedSync] Erro ao unificar efectividade:', e);
+      }
+    })
+  );
+
+  // 5B. REAL-TIME DECLARAÇÃO DE SERVIÇO UNIFICATION (ISOLATED FROM EFECTIVIDADE)
+  unsubs.push(
+    subscribeToDeclaracaoServico((cloudRecords) => {
+      try {
+        const localRecs = safeReadJsonArray<any>('sigre_declaracao_servico_v1');
+        const deletedRaw = safeReadJsonArray<string>('sigre_deleted_declaracao_servico_ids_v1');
+        const deletedSet = new Set(deletedRaw.map((id) => norm(id)));
+        const map = new Map<string, any>();
+
+        localRecs.forEach((lr) => {
+          if (!lr || !lr.id) return;
+          if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, lr.id)) return;
+          map.set(lr.id, lr);
+          const inCloud = cloudRecords.some((cr) => cr && cr.id === lr.id);
+          if (!inCloud) {
+            saveDeclaracaoServicoToFirestore(lr).catch(() => {});
+          }
+        });
+
+        cloudRecords.forEach((cr) => {
+          if (!cr || !cr.id) return;
+          if (deletedSet.has(norm(cr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, cr.id)) return;
+          map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
+        });
+
+        const merged = Array.from(map.values());
+        if (safeWriteJsonIfChanged('sigre_declaracao_servico_v1', merged)) {
+          window.dispatchEvent(new CustomEvent('sigre-declaracao-servico-updated', { detail: { records: merged } }));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
+      } catch (e) {
+        console.warn('[UnifiedSync] Erro ao unificar Declaração de Serviço:', e);
+      }
+    })
+  );
+
+  // 5C. REAL-TIME OUTROS FUNCIONÁRIOS (STAFF) UNIFICATION
+  unsubs.push(
+    subscribeToStaff((cloudStaff) => {
+      try {
+        const localStaff = safeReadJsonArray<any>('ucore_registered_staff_v1');
+        const map = new Map<string, any>();
+
+        localStaff.forEach((ls) => {
+          if (!ls) return;
+          const k = norm(ls.id || ls.bi || ls.agente || ls.nomeCompleto || ls.name);
+          if (!k || isEntityTombstoned(STAFF_COL, k)) return;
+          map.set(k, ls);
+          const inCloud = cloudStaff.some(
+            (cs) => norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name) === k
+          );
+          if (!inCloud) {
+            saveStaffToFirestore(ls).catch(() => {});
+          }
+        });
+
+        cloudStaff.forEach((cs) => {
+          if (!cs) return;
+          const k = norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name);
+          if (!k || isEntityTombstoned(STAFF_COL, k)) return;
+          map.set(k, { ...(map.get(k) || {}), ...cs });
+        });
+
+        const merged = Array.from(map.values());
+        if (safeWriteJsonIfChanged('ucore_registered_staff_v1', merged)) {
+          window.dispatchEvent(new CustomEvent('sigre-staff-updated', { detail: { records: merged } }));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
+      } catch (e) {
+        console.warn('[UnifiedSync] Erro ao unificar outros funcionários:', e);
       }
     })
   );

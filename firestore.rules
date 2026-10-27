@@ -94,10 +94,28 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // Collection: /staff/{staffId}
+    // Administrative, auxiliary, security & support personnel
+    // ==========================================
+    match /staff/{staffId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
     // Collection: /efectividade/{recordId}
     // Official personnel effectiveness cadastros
     // ==========================================
     match /efectividade/{recordId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /declaracao_servico/{recordId}
+    // Official service declaration cadastros (independent of efectividade)
+    // ==========================================
+    match /declaracao_servico/{recordId} {
       allow read: if true;
       allow write: if true;
     }
