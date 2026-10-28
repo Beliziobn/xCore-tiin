@@ -1427,17 +1427,68 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
                     {/* Escola ou complexo escolar de colocação */}
                     <div className="sm:col-span-2 lg:col-span-3">
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-2">
                         Escola ou Complexo Escolar de Colocação <span className="text-red-500">*</span>
                       </label>
-                      <input
+                      <div
                         id="field-escola"
-                        type="text"
-                        value={formData.escola}
-                        onChange={(e) => handleInputChange('escola', e.target.value)}
-                        placeholder="Nome completo do estabelecimento de ensino"
-                        className="w-full h-11 px-3.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 outline-none focus:border-[#f75142]"
-                      />
+                        role="radiogroup"
+                        aria-label="Escola ou Complexo Escolar de Colocação"
+                        className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-80 overflow-y-auto p-3 rounded-xl border border-slate-300 bg-slate-50/60"
+                      >
+                        {[
+                          'Complexo Escolar Católico n.º 269 MJE – Lar Nazaré – Quêssua',
+                          'Complexo Escolar Católico n.º 274 MJE – Nossa Senhora de Guadalupe – Quêssua',
+                          'Complexo Escolar Católico n.º 282 MJE – Kudyelela – Quêssua',
+                          'Complexo Escolar Católico n.º 290 MJE – Paz e Amor – Quêssua',
+                          'Complexo Escolar Católico n.º 293 MJE – São Francisco de Assis – Quêssua',
+                          'Complexo Escolar Metodista n.º 294 MJE – Missão do Quêssua – Quêssua',
+                          'Complexo Escolar Metodista Sião n.º 288 MJE – Episcopal Africana – Quêssua',
+                          'Complexo Escolar Metodista Sião n.º 289 MJE – Monte Sinai – Quêssua',
+                          'Complexo Escolar Missionário n.º 263 MJE – Bom Deus – Quêssua',
+                          'Complexo Escolar n.º 285 MJE – Cambondo – Quêssua',
+                          'Complexo Escolar n.º 291 MJE – Quissol – Quêssua',
+                          'Complexo Escolar n.º 292 MJE – Samora Machel – Quêssua',
+                          'Escola Primária Metodista n.º 209 MJE – São Paulo – Quêssua',
+                          'Escola Primária Metodista Sião n.º 207 MJE – Rei Salomão – Quêssua',
+                          'Escola Primária Católica n.º 202 MJE – Edith Al MJEida De Sousa - Quéssua',
+                          'Escola Primária Católica n.º 208 MJE – Santa Teresinha – Quêssua',
+                          'Escola Primária Católica n.º 210 MJE – Vila Matilde – Quêssua',
+                          'Escola Primária IEPA n.º 163 MJE – Rev. Ferreira Francisco – Quêssua',
+                          'Escola Primária n.º 115 MJE – Cabuabuata – Quêssua',
+                          'Escola Primária n.º 199 MJE – Campo da Vitória – Quêssua',
+                          'Escola Primária n.º 200 MJE – Comandante Gika – Quêssua',
+                          'Escola Primária n.º 201 MJE – Dr. António Agostinho Neto – Quêssua',
+                          'Escola Primária n.º 203 MJE – Luzia Inglês Van – Quêssua',
+                          'Escola Primária n.º 204 MJE – Major Kanhangulo – Quêssua',
+                          'Escola Primária n.º 205 MJE – Quizanga – Quêssua',
+                          'Escola Primária n.º 206 MJE – Quizanga da Barraca – Quêssua',
+                          'Escola Primária n.º 125 – Cazeta – Quêssua',
+                          'Complexo Escolar Católico n.º 166 MJE São Pedro Quêssua',
+                        ].map((escolaOption) => {
+                          const isSelected = formData.escola === escolaOption;
+                          return (
+                            <label
+                              key={escolaOption}
+                              className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                isSelected
+                                  ? 'border-[#f75142] bg-[#f75142]/5 text-slate-900 font-semibold'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="escola-colocacao"
+                                value={escolaOption}
+                                checked={isSelected}
+                                onChange={(e) => handleInputChange('escola', e.target.value)}
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-[#f75142] cursor-pointer"
+                              />
+                              <span className="leading-snug">{escolaOption}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                       {formErrors.escola && (
                         <p className="text-red-600 text-[11px] mt-1 font-semibold">{formErrors.escola}</p>
                       )}
