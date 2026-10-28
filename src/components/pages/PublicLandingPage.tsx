@@ -122,14 +122,24 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           <div className="mt-12 pt-8 border-t border-slate-200/60 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-semibold text-slate-500">
             <div 
               id="hero-quessua-logo-badge"
-              className="flex items-center gap-2 transition-all cursor-default group"
+              className="flex items-center"
               title="Administração Municipal de Quêssua"
             >
-              <QuessuaMunicipalLogo className="h-7 sm:h-8 w-auto text-[#002133] transition-transform group-hover:scale-102" />
+              <img
+                src="/assets/aistudio/Gemini_Generated_Image_mmen8fmmen8fmmen-removebg-preview_b954a220.png"
+                alt="Administração Municipal de Quêssua"
+                className="h-20 sm:h-24 w-auto object-contain"
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-indigo-600" />
-              <span>Segurança & Sigilo Institucional</span>
+            <div
+              className="flex items-center"
+              title="Governo de Angola - Governo Provincial de Malanje"
+            >
+              <img
+                src="/assets/aistudio/images__7_-removebg-preview_14177cad.png"
+                alt="Governo de Angola - Governo Provincial de Malanje"
+                className="h-20 sm:h-24 w-auto object-contain"
+              />
             </div>
           </div>
 

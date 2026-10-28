@@ -39,6 +39,13 @@ import {
   printSinglePageA4Clean,
 } from '../../utils/declaracaoPdfGenerator';
 import { subscribeToDeclaracaoServico } from '../../utils/firestoreSync';
+import type { UserAccount } from '../../types';
+import { submitQuickServiceRequest } from '../../utils/quickServicesStorage';
+
+export interface DeclaracaoServicoSectionProps {
+  isLoggedIn?: boolean;
+  currentUser?: UserAccount | null;
+}
 
 interface DeclaracaoServicoFormState {
   id?: string;
@@ -123,7 +130,15 @@ function getInitialServicoFormState(): DeclaracaoServicoFormState {
   };
 }
 
-export const DeclaracaoServicoSection: React.FC = () => {
+export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> = ({
+  isLoggedIn = false,
+  currentUser,
+}) => {
+  const isAdminOrDirector = Boolean(
+    isLoggedIn &&
+      currentUser &&
+      (currentUser.role === 'admin' || currentUser.role === 'diretor')
+  );
   const [records, setRecords] = useState<DeclaracaoServicoRecord[]>(() =>
     getStoredDeclaracaoServicoRecords()
   );
@@ -138,8 +153,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [recordToDelete, setRecordToDelete] = useState<DeclaracaoServicoRecord | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [isDbCollapsed, setIsDbCollapsed] = useState(false);
-  const [isPreviewExpanded, setIsPreviewExpanded] = useState(true);
+  const [servicoSubView, setServicoSubView] = useState<'database' | 'preview' | 'form'>('form');
 
   const todayISO = useMemo(() => getTodayIso(), []);
 
@@ -377,6 +391,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
     setFormErrorBanner(null);
     setSubmittedRecord(null);
     setCopyNote(null);
+    setServicoSubView('form');
     showToast('Formulário de Declaração de Serviço limpo.');
   };
 
@@ -427,6 +442,34 @@ export const DeclaracaoServicoSection: React.FC = () => {
 
     setFormErrorBanner(null);
 
+    // Regra de privacidade: Cidadão sem sessão iniciada apenas preenche o seu e envia para a Admin
+    if (!isAdminOrDirector) {
+      submitQuickServiceRequest({
+        serviceType: 'DECLARACAO_SERVICO',
+        title: `Declaração de Serviço - ${formData.nome.trim()}`,
+        requesterName: formData.nome.trim(),
+        requesterPhone: formData.bi.trim(),
+        requesterRoleTitle: formData.profissao || 'Docente',
+        targetRole: 'ADMIN',
+        targetAdminEmail: 'dmedoquessua@gmail.com',
+        details: {
+          employeeName: formData.nome.trim(),
+          employeeBi: formData.bi.trim().toUpperCase(),
+          employeeAgente: formData.agente.trim(),
+          employeeSchoolOrDepartment: formData.escola,
+          employeeCategory: formData.categoria,
+          referenceMonthYear: formData.dataEmissao,
+          purpose: formData.finalidade,
+        },
+      }).then((req) => {
+        showToast(`Pedido de Declaração de Serviço enviado com sucesso para a Admin Municipal! Protocolo: ${req.protocol}`);
+        handleResetForm();
+      }).catch(() => {
+        showToast('Erro ao enviar para a Administração.');
+      });
+      return;
+    }
+
     const salKz = parseKz(formData.salario);
     const ext = extensoKz(salKz);
     const bancoFinal = formData.banco === 'Outro' ? formData.bancoOutro.trim() : formData.banco.trim();
@@ -473,18 +516,13 @@ export const DeclaracaoServicoSection: React.FC = () => {
 
     reloadRecords();
     setSubmittedRecord(saveRes.record);
-    setIsPreviewExpanded(true);
+    setServicoSubView('preview');
     setCopyNote(null);
     showToast(
       formData.id
         ? `Declaração de Serviço de ${saveRes.record.nome} actualizada!`
         : `Declaração de Serviço registada com sucesso (${saveRes.record.ref})!`
     );
-
-    setTimeout(() => {
-      const resEl = document.getElementById('servico-live-preview-panel');
-      if (resEl) resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 80);
   };
 
   const handleExportCsv = () => {
@@ -576,6 +614,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
     setSubmittedRecord(null);
     setErrors({});
     setFormErrorBanner(null);
+    setServicoSubView('form');
     showToast(`Registo de ${r.nome} (${r.ref}) carregado para edição e pré-visualização.`);
   };
 
@@ -619,99 +658,140 @@ export const DeclaracaoServicoSection: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Declaração de Serviço
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500">
-              Dados bancários, salário líquido em Kwanzas (Kz) e emissão oficial A4
-            </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleResetForm}
-            className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Novo Registo</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => downloadDeclaracaoServicoPdf(livePreviewRecord)}
-            className="h-10 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-          >
-            <FileDown className="w-3.5 h-3.5" />
-            <span>Baixar PDF</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => printSinglePageA4Clean('declaracao-servico-a4-sheet')}
-            className="h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Imprimir A4</span>
-          </button>
-        </div>
+        {isAdminOrDirector ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleResetForm}
+              className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Novo Registo</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadDeclaracaoServicoPdf(livePreviewRecord)}
+              className="h-10 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Baixar PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => printSinglePageA4Clean('declaracao-servico-a4-sheet')}
+              className="h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir A4</span>
+            </button>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold">
+            <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
+            <span>Envio Direto para a Admin Municipal</span>
+          </div>
+        )}
       </div>
 
       {/* ================================================================= */}
-      {/* ENCIMA 1: BASE DE DADOS DA DECLARAÇÃO DE SERVIÇO                  */}
+      {/* BARRA DE OPÇÕES NO TOPO: Base de Dados | Pré-visualização | Formulário */}
       {/* ================================================================= */}
-      <section
-        id="servico-admin-list"
-        className="no-print bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
-              <Database className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                Base de Dados — Declaração de Serviço ({records.length})
-              </h2>
-              <p className="text-xs text-slate-500">
-                Selecione qualquer funcionário cadastrado para carregar ou imprimir a declaração
-              </p>
-            </div>
-          </div>
+      {isAdminOrDirector && (
+        <div className="no-print flex flex-wrap items-center gap-2 bg-white p-2 rounded-full border border-slate-200 w-fit shadow-xs">
+          <button
+            type="button"
+            onClick={() => setServicoSubView('database')}
+            className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+              servicoSubView === 'database'
+                ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <Database className="w-4 h-4 shrink-0" />
+            <span>Base de Dados ({records.length})</span>
+          </button>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Procurar nome, BI ou agente..."
-                aria-label="Procurar registos"
-                className="w-full h-9 pl-9 pr-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-900 outline-none focus:border-slate-900"
-              />
-            </div>
+          <button
+            type="button"
+            onClick={() => setServicoSubView('preview')}
+            className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+              servicoSubView === 'preview'
+                ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <FileText className="w-4 h-4 shrink-0" />
+            <span>Pré-visualização</span>
+          </button>
 
-            {records.length > 0 && (
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                className="h-9 px-3.5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Exportar CSV</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsDbCollapsed((prev) => !prev)}
-              className="h-9 px-3 rounded-full bg-[#f2f4f7] hover:bg-slate-200/70 text-xs font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
-            >
-              <span>{isDbCollapsed ? 'Mostrar Tabela' : 'Recolher'}</span>
-              {isDbCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setServicoSubView('form')}
+            className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+              servicoSubView === 'form'
+                ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <Edit className="w-4 h-4 shrink-0" />
+            <span>Formulário</span>
+          </button>
         </div>
+      )}
 
-        {!isDbCollapsed && (
-          <div className="overflow-x-auto max-h-[260px] overflow-y-auto border border-slate-200 rounded-2xl">
+      {/* ================================================================= */}
+      {/* OPÇÃO 1: BASE DE DADOS DA DECLARAÇÃO DE SERVIÇO                   */}
+      {/* ================================================================= */}
+      {servicoSubView === 'database' && (
+        <section
+          id="servico-admin-list"
+          className="no-print bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+                <Database className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Base de Dados — Declaração de Serviço ({records.length})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Selecione qualquer funcionário cadastrado para carregar ou imprimir a declaração
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Procurar nome, BI ou agente..."
+                  aria-label="Procurar registos"
+                  className="w-full h-9 pl-9 pr-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-900 outline-none focus:border-slate-900"
+                />
+              </div>
+
+              {records.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="h-9 px-3.5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar CSV</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[460px] overflow-y-auto border border-slate-200 rounded-2xl">
             <table className="w-full border-collapse text-xs min-w-[780px]">
               <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
                 <tr>
@@ -778,13 +858,13 @@ export const DeclaracaoServicoSection: React.FC = () => {
                             type="button"
                             onClick={() => {
                               handleEditRecord(r);
-                              setIsPreviewExpanded(true);
+                              setServicoSubView('preview');
                             }}
                             className="px-2.5 py-1 rounded-full bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer inline-flex items-center gap-1"
-                            title="Carregar nos campos e pré-visualizar documento"
+                            title="Ver pré-visualização da declaração"
                           >
                             <Eye className="w-3 h-3" />
-                            <span>Carregar</span>
+                            <span>Ver Documento</span>
                           </button>
                           <button
                             type="button"
@@ -799,7 +879,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
                             type="button"
                             onClick={() => handleEditRecord(r)}
                             className="p-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
-                            title="Editar cadastro"
+                            title="Editar no formulário"
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </button>
@@ -819,16 +899,18 @@ export const DeclaracaoServicoSection: React.FC = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ================================================================= */}
-      {/* ENCIMA 2: PRÉ-VISUALIZAÇÃO DO DOCUMENTO SENDO PREENCHIDO (A4)     */}
+      {/* OPÇÃO 2: PRÉ-VISUALIZAÇÃO DO DOCUMENTO SENDO PREENCHIDO (A4)      */}
       {/* ================================================================= */}
       <section
         id="servico-live-preview-panel"
         aria-live="polite"
-        className="bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 print:border-0 print:p-0 print:shadow-none"
+        className={`${
+          servicoSubView === 'preview' ? 'block' : 'hidden print:block'
+        } bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 print:border-0 print:p-0 print:shadow-none`}
       >
         <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -845,7 +927,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                O documento A4 abaixo é preenchido automaticamente enquanto digita no formulário ou seleciona da base de dados
+                Folha A4 oficial preenchida automaticamente com os dados do formulário
               </p>
             </div>
           </div>
@@ -893,144 +975,130 @@ export const DeclaracaoServicoSection: React.FC = () => {
               <Printer className="w-3.5 h-3.5" />
               <span>Imprimir A4</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => setIsPreviewExpanded((prev) => !prev)}
-              className="h-9 px-3 rounded-full bg-[#f2f4f7] hover:bg-slate-200/70 text-xs font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
-            >
-              <span>{isPreviewExpanded ? 'Ocultar Folha' : 'Expandir Folha'}</span>
-              {isPreviewExpanded ? (
-                <ChevronUp className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
-              )}
-            </button>
           </div>
         </div>
 
-        {isPreviewExpanded && (
-          <div className="flex justify-center w-full bg-[#f8f9fa] p-3 sm:p-6 rounded-2xl border border-slate-200/70 print:bg-white print:block print:m-0 print:p-0 print:border-0">
-            <div
-              id="declaracao-servico-a4-sheet"
-              className="bg-white w-full max-w-[210mm] p-6 sm:p-10 md:px-[20mm] md:py-[14mm] border border-slate-200/90 print:border-0 shadow-xs print:shadow-none text-black mx-auto"
-              style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
-            >
-              <div style={{ lineHeight: 1.5 }}>
-                <div className="a4-header-block">
-                  <div className="flex justify-center">
-                    <img
-                      src={emblemAngolaImg}
-                      alt="Insígnia da República de Angola"
-                      className="a4-emblem-img"
-                    />
-                  </div>
-                  <p className="a4-republic-title">REPÚBLICA DE ANGOLA</p>
-                  {livePreviewRecord.provEmissao && (
-                    <p className="a4-inst-line">
-                      GOVERNO PROVINCIAL DE {livePreviewRecord.provEmissao.toUpperCase()}
-                    </p>
-                  )}
-                  {livePreviewRecord.municipioAdm && (
-                    <p className="a4-inst-line">
-                      ADMINISTRAÇÃO MUNICIPAL DE {livePreviewRecord.municipioAdm.toUpperCase()}
-                    </p>
-                  )}
-                  {livePreviewRecord.direccao && (
-                    <p className="a4-inst-line">{livePreviewRecord.direccao.toUpperCase()}</p>
-                  )}
+        <div className="flex justify-center w-full bg-[#f8f9fa] p-3 sm:p-6 rounded-2xl border border-slate-200/70 print:bg-white print:block print:m-0 print:p-0 print:border-0">
+          <div
+            id="declaracao-servico-a4-sheet"
+            className="bg-white w-full max-w-[210mm] p-6 sm:p-10 md:px-[20mm] md:py-[14mm] border border-slate-200/90 print:border-0 shadow-xs print:shadow-none text-black mx-auto"
+            style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
+          >
+            <div style={{ lineHeight: 1.5 }}>
+              <div className="a4-header-block">
+                <div className="flex justify-center">
+                  <img
+                    src={emblemAngolaImg}
+                    alt="Insígnia da República de Angola"
+                    className="a4-emblem-img"
+                  />
                 </div>
+                <p className="a4-republic-title">REPÚBLICA DE ANGOLA</p>
+                {livePreviewRecord.provEmissao && (
+                  <p className="a4-inst-line">
+                    GOVERNO PROVINCIAL DE {livePreviewRecord.provEmissao.toUpperCase()}
+                  </p>
+                )}
+                {livePreviewRecord.municipioAdm && (
+                  <p className="a4-inst-line">
+                    ADMINISTRAÇÃO MUNICIPAL DE {livePreviewRecord.municipioAdm.toUpperCase()}
+                  </p>
+                )}
+                {livePreviewRecord.direccao && (
+                  <p className="a4-inst-line">{livePreviewRecord.direccao.toUpperCase()}</p>
+                )}
+              </div>
 
-                <div className="a4-title-wrap">
-                  <h1>DECLARAÇÃO DE SERVIÇO</h1>
-                </div>
+              <div className="a4-title-wrap">
+                <h1>DECLARAÇÃO DE SERVIÇO</h1>
+              </div>
 
-                {(() => {
-                  const f = livePreviewRecord.tratamento === 'Senhora';
-                  const fil = `${f ? 'filha' : 'filho'} de ${
-                    livePreviewRecord.pai && livePreviewRecord.pai.trim()
-                      ? `${livePreviewRecord.pai.trim()} e de ${livePreviewRecord.mae}`
-                      : livePreviewRecord.mae
-                  }`;
-                  const local = [livePreviewRecord.direccao, livePreviewRecord.localEmissao]
-                    .filter(Boolean)
-                    .join(', ');
+              {(() => {
+                const f = livePreviewRecord.tratamento === 'Senhora';
+                const fil = `${f ? 'filha' : 'filho'} de ${
+                  livePreviewRecord.pai && livePreviewRecord.pai.trim()
+                    ? `${livePreviewRecord.pai.trim()} e de ${livePreviewRecord.mae}`
+                    : livePreviewRecord.mae
+                }`;
+                const local = [livePreviewRecord.direccao, livePreviewRecord.localEmissao]
+                  .filter(Boolean)
+                  .join(', ');
 
-                  return (
-                    <>
-                      <div className="a4-body-copy mt-6 space-y-5" style={{ lineHeight: 1.5 }}>
-                        <p style={{ lineHeight: 1.5 }}>
-                          Para os devidos efeitos achados convenientes, declara-se que{' '}
-                          {f ? 'a senhora ' : 'o senhor '}
-                          <strong>{livePreviewRecord.nome}</strong>, {fil}, natural de{' '}
-                          {livePreviewRecord.naturalidade}, Província de {livePreviewRecord.provNat},{' '}
-                          {f ? 'nascida' : 'nascido'} aos{' '}
-                          {fmtDateDeclaracaoServico(livePreviewRecord.nascimento)},{' '}
-                          {f ? 'portadora' : 'portador'} do BI nº{' '}
-                          <strong>{livePreviewRecord.bi}</strong>, emitido aos{' '}
-                          {fmtDateDeclaracaoServico(livePreviewRecord.biData)},{' '}
-                          {livePreviewRecord.profissao} do {livePreviewRecord.grau},{' '}
-                          {f ? 'colocada' : 'colocado'} no Município de{' '}
-                          {livePreviewRecord.municipio}, local de trabalho:{' '}
-                          <strong>{livePreviewRecord.escola}</strong>, com a categoria de{' '}
-                          {livePreviewRecord.categoria}, Agente nº{' '}
-                          <strong>{livePreviewRecord.agente}</strong>, é cliente do{' '}
-                          <strong>{livePreviewRecord.bancoNome}</strong>, titular da conta bancária
-                          nº <strong>{livePreviewRecord.conta}</strong>, auferindo o salário líquido
-                          de{' '}
-                          <strong>
-                            {fmtKz(livePreviewRecord.salarioKz)} Kz ({livePreviewRecord.extenso})
-                          </strong>
-                          .
-                        </p>
+                return (
+                  <>
+                    <div className="a4-body-copy mt-6 space-y-5" style={{ lineHeight: 1.5 }}>
+                      <p style={{ lineHeight: 1.5 }}>
+                        Para os devidos efeitos achados convenientes, declara-se que{' '}
+                        {f ? 'a senhora ' : 'o senhor '}
+                        <strong>{livePreviewRecord.nome}</strong>, {fil}, natural de{' '}
+                        {livePreviewRecord.naturalidade}, Província de {livePreviewRecord.provNat},{' '}
+                        {f ? 'nascida' : 'nascido'} aos{' '}
+                        {fmtDateDeclaracaoServico(livePreviewRecord.nascimento)},{' '}
+                        {f ? 'portadora' : 'portador'} do BI nº{' '}
+                        <strong>{livePreviewRecord.bi}</strong>, emitido aos{' '}
+                        {fmtDateDeclaracaoServico(livePreviewRecord.biData)},{' '}
+                        {livePreviewRecord.profissao} do {livePreviewRecord.grau},{' '}
+                        {f ? 'colocada' : 'colocado'} no Município de{' '}
+                        {livePreviewRecord.municipio}, local de trabalho:{' '}
+                        <strong>{livePreviewRecord.escola}</strong>, com a categoria de{' '}
+                        {livePreviewRecord.categoria}, Agente nº{' '}
+                        <strong>{livePreviewRecord.agente}</strong>, é cliente do{' '}
+                        <strong>{livePreviewRecord.bancoNome}</strong>, titular da conta bancária
+                        nº <strong>{livePreviewRecord.conta}</strong>, auferindo o salário líquido
+                        de{' '}
+                        <strong>
+                          {fmtKz(livePreviewRecord.salarioKz)} Kz ({livePreviewRecord.extenso})
+                        </strong>
+                        .
+                      </p>
 
-                        <p style={{ lineHeight: 1.5 }}>
-                          <strong>Observação:</strong> A presente declaração destina-se{' '}
-                          {livePreviewRecord.finalidade.replace(/\.$/, '')}.
-                        </p>
+                      <p style={{ lineHeight: 1.5 }}>
+                        <strong>Observação:</strong> A presente declaração destina-se{' '}
+                        {livePreviewRecord.finalidade.replace(/\.$/, '')}.
+                      </p>
 
-                        <p style={{ lineHeight: 1.5 }}>
-                          Por ser verdade e me ter sido pedido, mandei passar a presente
-                          declaração, que vai por mim assinada e autenticada com carimbo a óleo em
-                          uso nesta Direcção.
-                        </p>
-                      </div>
+                      <p style={{ lineHeight: 1.5 }}>
+                        Por ser verdade e me ter sido pedido, mandei passar a presente
+                        declaração, que vai por mim assinada e autenticada com carimbo a óleo em
+                        uso nesta Direcção.
+                      </p>
+                    </div>
 
-                      <div className="a4-footer-block">
-                        {(local || livePreviewRecord.dataEmissao) && (
-                          <div className="a4-date-line" style={{ textAlign: 'center' }}>
-                            <span>
-                              {local ? `${local} ` : ''}
-                              {livePreviewRecord.dataEmissao
-                                ? `aos ${fmtDateDeclaracaoServico(livePreviewRecord.dataEmissao)}.`
-                                : ''}
-                            </span>
-                          </div>
-                        )}
+                    <div className="a4-footer-block">
+                      {(local || livePreviewRecord.dataEmissao) && (
+                        <div className="a4-date-line" style={{ textAlign: 'center' }}>
+                          <span>
+                            {local ? `${local} ` : ''}
+                            {livePreviewRecord.dataEmissao
+                              ? `aos ${fmtDateDeclaracaoServico(livePreviewRecord.dataEmissao)}.`
+                              : ''}
+                          </span>
+                        </div>
+                      )}
 
-                        <div className="flex flex-col items-center justify-center">
-                          <div className="a4-sig-container">
-                            <p className="a4-sig-role">O Director Municipal</p>
-                            <div className="a4-sig-line"></div>
-                            {livePreviewRecord.director && (
-                              <p className="a4-sig-name">{livePreviewRecord.director}</p>
-                            )}
-                          </div>
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="a4-sig-container">
+                          <p className="a4-sig-role">O Director Municipal</p>
+                          <div className="a4-sig-line"></div>
+                          {livePreviewRecord.director && (
+                            <p className="a4-sig-name">{livePreviewRecord.director}</p>
+                          )}
                         </div>
                       </div>
-                    </>
-                  );
-                })()}
-              </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
-        )}
+        </div>
       </section>
 
       {/* ================================================================= */}
-      {/* FORMULÁRIO NO ESTILO DO EXEMPLAR (Pills + Divisores Horizontais)  */}
+      {/* OPÇÃO 3: FORMULÁRIO NO ESTILO DO EXEMPLAR                         */}
       {/* ================================================================= */}
-      <div className="no-print bg-white rounded-[24px] border border-slate-200 p-6 sm:p-8 shadow-xs space-y-7">
+      {servicoSubView === 'form' && (
+        <div className="no-print bg-white rounded-[24px] border border-slate-200 p-6 sm:p-8 shadow-xs space-y-7">
         {/* Duplicate Alert */}
         {duplicateWarning && duplicateWarning.duplicateRecord && (
           <div
@@ -1607,7 +1675,13 @@ export const DeclaracaoServicoSection: React.FC = () => {
                 className="h-11 px-7 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs"
               >
                 <Check className="w-4 h-4" />
-                <span>{formData.id ? 'Guardar alterações no registo' : 'Guardar na Base de Dados & Gerar Declaração'}</span>
+                <span>
+                  {!isAdminOrDirector
+                    ? 'Enviar Requerimento à Administração Municipal'
+                    : formData.id
+                    ? 'Guardar alterações no registo'
+                    : 'Guardar na Base de Dados & Gerar Declaração'}
+                </span>
               </button>
 
               <button
@@ -1621,7 +1695,8 @@ export const DeclaracaoServicoSection: React.FC = () => {
             </div>
           </div>
         </form>
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {recordToDelete && (

@@ -574,9 +574,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </>
                   )}
 
-                  {/* Declarações de Efectividade Oficial */}
+                  {/* Serviços SIGRE Oficial */}
                   <button
-                    id="dropdown-declaracao-efectividade-btn"
+                    id="dropdown-servicos-sigre-btn"
                     onClick={() => {
                       onSelectPage('declaracao-efectividade');
                       setShowPagesDropdown(false);
@@ -585,25 +585,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     <span className="flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Declarações de Efectividade</span>
+                      <span>Serviços SIGRE</span>
                     </span>
                     <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
                   </button>
 
-                  {/* Declaração de Serviço Oficial */}
+                  {/* Serviços Rápidos ao Cidadão (Sem Login) */}
                   <button
-                    id="dropdown-declaracao-servico-btn"
+                    id="dropdown-servicos-rapidos-btn"
                     onClick={() => {
-                      onSelectPage('declaracao-servico');
+                      onSelectPage('servicos-rapidos');
                       setShowPagesDropdown(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-sky-50 hover:text-sky-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-amber-50 hover:text-amber-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-black cursor-pointer flex items-center justify-between"
                   >
                     <span className="flex items-center gap-2">
-                      <FileText className="w-3.5 h-3.5 text-sky-600" />
-                      <span>Declaração de Serviço</span>
+                      <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      <span>Serviços Rápidos</span>
                     </span>
-                    <span className="text-[9px] bg-sky-100 text-sky-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+                    <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Sem login</span>
                   </button>
                 </div>
               )}
@@ -797,6 +797,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              <button
+                id="navbar-public-quick-services-btn"
+                type="button"
+                onClick={() => onSelectPage('servicos-rapidos')}
+                className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold tracking-wide bg-amber-400/20 hover:bg-amber-400/30 text-[#002133] border border-amber-500/40 transition-all cursor-pointer shadow-xs active:scale-95 mr-1"
+                title="Serviços Rápidos Sem Login: Boletim, Declaração e Guia"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                <span className="hidden sm:inline">Serviços Rápidos</span>
+                <span className="sm:hidden">Serviços</span>
+                <span className="text-[9px] uppercase font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full border border-emerald-200">
+                  Sem login
+                </span>
+              </button>
+
               <button
                 id="navbar-entrar-btn"
                 type="button"
@@ -1152,6 +1167,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
           <button
+            id="mobile-menu-servicos-sigre-btn"
             onClick={() => {
               onSelectPage('declaracao-efectividade');
               setMobileMenuOpen(false);
@@ -1160,40 +1176,31 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#f75142]" />
-              <span>Declaração de Efectividade</span>
+              <span>Serviços SIGRE</span>
             </div>
             <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
-          </button>
-          <button
-            onClick={() => {
-              onSelectPage('declaracao-servico');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-sky-600" />
-              <span>Declaração de Serviço</span>
-            </div>
-            <span className="text-[9px] bg-sky-100 text-sky-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
           </button>
 
           <button
             onClick={() => {
-              onSelectPage(activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos'));
+              onSelectPage(!currentUser ? 'servicos-rapidos' : (activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos')));
               setMobileMenuOpen(false);
             }}
             className="text-left py-2 px-3 text-amber-950 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-600 fill-amber-600" />
-              <span>Serviços Rápidos & Efectividade (Pedidos)</span>
+              <span>Serviços Rápidos {!currentUser ? '(Sem login)' : '& Efectividade (Pedidos)'}</span>
             </div>
-            {pendingQuickRequestsCount > 0 && (
+            {!currentUser ? (
+              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
+                Acesso Livre
+              </span>
+            ) : pendingQuickRequestsCount > 0 ? (
               <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
                 {pendingQuickRequestsCount}
               </span>
-            )}
+            ) : null}
           </button>
           {onOpenChat && (
             <button

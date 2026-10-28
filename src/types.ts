@@ -1026,6 +1026,8 @@ export interface RagStatsClient {
 export type QuickServiceType = 
   | 'BOLETIM_NOTAS' 
   | 'DECLARACAO_EFECTIVIDADE' 
+  | 'DECLARACAO_SERVICO'
+  | 'GUIA_FERIAS'
   | 'DECLARACAO_MATRICULA' 
   | 'GUIA_TRANSFERENCIA';
 

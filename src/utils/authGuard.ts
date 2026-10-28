@@ -259,13 +259,27 @@ export function canUserAccessView(user: UserAccount | null, view: string): ViewA
     view === 'casos-de-sucesso' ||
     view === 'obrigado' ||
     view === 'thank-you' ||
+    view === 'agradecimento' ||
     view === 'faq' ||
     view === 'perguntas' ||
     view === 'mapas' ||
     view === 'rotas' ||
     view === 'mapa' ||
     view === '404' ||
-    view === 'not-found'
+    view === 'not-found' ||
+    view === 'reunioes' ||
+    view === 'reunioes-salas' ||
+    view === 'servicos-rapidos' ||
+    view === 'servicos-sem-login' ||
+    view === 'servicos-cidadao' ||
+    view === 'balcao-rapido' ||
+    view === 'pedidos-rapidos' ||
+    view === 'declaracao-efectividade' ||
+    view === 'declaracao-servico' ||
+    view === 'declaracao-de-servico' ||
+    view === 'efectividade' ||
+    view === 'servico' ||
+    view === 'mapa-efectividade'
   ) {
     return { allowed: true, userOwnProfileView: getOwnProfileViewForUser(user) };
   }

@@ -79,33 +79,35 @@ export const Hero: React.FC<HeroProps> = ({
         />
         <div className="max-w-6xl mx-auto relative z-10 text-white">
           {/* Breadcrumb Trail & Optional Role Badge */}
-          <div className={`flex flex-wrap items-center gap-2.5 ${compact ? 'mb-2' : 'mb-3'}`}>
-            {badge && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-white text-[11px] font-black uppercase tracking-wider">
-                {badge}
-              </span>
-            )}
-            {breadcrumbs && breadcrumbs.length > 0 && (
-              <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-semibold text-white/80 flex-wrap">
-                {breadcrumbs.map((crumb, i) => (
-                  <React.Fragment key={i}>
-                    {i > 0 && <span className="opacity-50">/</span>}
-                    {crumb.onClick ? (
-                      <button
-                        type="button"
-                        onClick={crumb.onClick}
-                        className="hover:text-white transition-colors cursor-pointer hover:underline text-white/85"
-                      >
-                        {crumb.label}
-                      </button>
-                    ) : (
-                      <span className="text-white font-bold">{crumb.label}</span>
-                    )}
-                  </React.Fragment>
-                ))}
-              </nav>
-            )}
-          </div>
+          {(badge || (breadcrumbs && breadcrumbs.length > 0)) && (
+            <div className={`flex flex-wrap items-center gap-2.5 ${compact ? 'mb-2' : 'mb-3'}`}>
+              {badge && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-white text-[11px] font-black uppercase tracking-wider">
+                  {badge}
+                </span>
+              )}
+              {breadcrumbs && breadcrumbs.length > 0 && (
+                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-semibold text-white/80 flex-wrap">
+                  {breadcrumbs.map((crumb, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <span className="opacity-50">/</span>}
+                      {crumb.onClick ? (
+                        <button
+                          type="button"
+                          onClick={crumb.onClick}
+                          className="hover:text-white transition-colors cursor-pointer hover:underline text-white/85"
+                        >
+                          {crumb.label}
+                        </button>
+                      ) : (
+                        <span className="text-white font-bold">{crumb.label}</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </nav>
+              )}
+            </div>
+          )}
 
           <h1 className={`font-black tracking-tight leading-[1.1] ${
             compact ? 'text-2xl sm:text-3xl lg:text-3xl' : 'text-3xl sm:text-4xl lg:text-5xl'

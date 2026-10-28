@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText,
   Printer,
@@ -22,12 +22,17 @@ import {
   Database,
   ChevronDown,
   ChevronUp,
+  School,
+  X,
+  Sparkles,
+  CalendarRange,
 } from 'lucide-react';
 import { Hero } from '../Hero';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import { BackupManagerModal } from '../modals/BackupManagerModal';
 import { QuickRequestsManagementView } from '../quick-services/QuickRequestsManagementView';
 import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
+import { GuiaFeriasSection } from './GuiaFeriasSection';
 import type { UserAccount } from '../../types';
 import {
   CadastramentoEfectividadeRecord,
@@ -40,7 +45,7 @@ import {
   formatAngolanDateExtenso,
   syncEfectividadeFromServer,
 } from '../../utils/efectividadeStorage';
-import { fetchQuickRequests } from '../../utils/quickServicesStorage';
+import { fetchQuickRequests, submitQuickServiceRequest } from '../../utils/quickServicesStorage';
 import {
   isFemaleFirstName,
   resolveIsFeminino,
@@ -62,7 +67,7 @@ interface DeclaracaoEfectividadePageProps {
   initialTab?: ActiveTab;
 }
 
-type ActiveTab = 'form' | 'declaracao-servico' | 'database' | 'pedidos' | 'view-ficha';
+type ActiveTab = 'form' | 'declaracao-servico' | 'guia-ferias' | 'database' | 'pedidos' | 'view-ficha';
 
 interface FormState {
   id?: string;
@@ -103,6 +108,8 @@ interface FormState {
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
 const ESCOLAS_QUESSUA_LIST = [
+  'Liceu Nº 314 MJE - 4 de Janeiro – Quêssua',
+  'Instituto Técnico Agrário do Quêssua-27009 - MJE',
   'Complexo Escolar Católico n.º 166 MJE São Pedro – Quêssua',
   'Complexo Escolar Católico n.º 269 MJE – Lar Nazaré – Quêssua',
   'Complexo Escolar Católico n.º 274 MJE – Nossa Senhora de Guadalupe – Quêssua',
@@ -189,9 +196,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   const [manualTratamento, setManualTratamento] = useState(false);
   const [viewGenderOverride, setViewGenderOverride] = useState<boolean>(false);
 
-  // Top Database & Live Preview collapsible states
-  const [isTopDbCollapsed, setIsTopDbCollapsed] = useState(false);
-  const [isLivePreviewExpanded, setIsLivePreviewExpanded] = useState(true);
+  // Top sub-view selector inside Declaração de Efectividade: Base de Dados, Pré-visualização, Formulário
+  const [efectividadeSubView, setEfectividadeSubView] = useState<'database' | 'preview' | 'form'>('form');
 
   // Database search, filters & safety backup states
   const [searchQuery, setSearchQuery] = useState('');
@@ -202,6 +208,11 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   const isSuperAdmin = currentUser?.email?.toLowerCase().trim() === 'beliziodos20@gmail.com';
+  const isAdminOrDirector = Boolean(
+    isLoggedIn &&
+      currentUser &&
+      (currentUser.role === 'admin' || currentUser.role === 'diretor')
+  );
 
   const reloadRecords = () => {
     setRecords(getStoredEfectividadeRecords());
@@ -263,6 +274,59 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  // Estado do combobox/autocomplete com sugestões dinâmicas de escolas
+  const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
+  const schoolDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        schoolDropdownRef.current &&
+        !schoolDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowSchoolSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Consolidação de todas as escolas disponíveis (lista oficial + registos existentes + escolas do sistema)
+  const allAvailableSchools = useMemo(() => {
+    const set = new Set<string>(ESCOLAS_QUESSUA_LIST);
+    records.forEach((r) => {
+      if (r.escola && r.escola.trim()) set.add(r.escola.trim());
+    });
+    try {
+      const saved = localStorage.getItem('ucore_admin_schools');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((s: any) => {
+            if (s?.name && s.name.trim()) set.add(s.name.trim());
+          });
+        }
+      }
+    } catch {}
+    return Array.from(set);
+  }, [records]);
+
+  // Sugestões filtradas dinamicamente à medida que a pessoa digita
+  const schoolSuggestions = useMemo(() => {
+    const q = (formData.escola || '').trim().toLowerCase();
+    if (!q) return allAvailableSchools;
+    return allAvailableSchools.filter((school) => school.toLowerCase().includes(q));
+  }, [formData.escola, allAvailableSchools]);
+
+  // Verifica se a escola digitada corresponde exactamente a uma já cadastrada
+  const isExactRegisteredSchool = useMemo(() => {
+    const q = (formData.escola || '').trim().toLowerCase();
+    if (!q) return false;
+    return allAvailableSchools.some((s) => s.toLowerCase() === q);
+  }, [formData.escola, allAvailableSchools]);
 
   // Real-time duplicate check based on current typed BI and Agente
   const currentDuplicate = useMemo(() => {
@@ -412,6 +476,34 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       return;
     }
 
+    // Regra de privacidade: Usuários sem privilégio de administração apenas fazem o seu pedido e enviam para a Admin
+    if (!isAdminOrDirector) {
+      submitQuickServiceRequest({
+        serviceType: 'DECLARACAO_EFECTIVIDADE',
+        title: `Declaração de Efectividade - ${formData.nome.trim()}`,
+        requesterName: formData.nome.trim(),
+        requesterPhone: formData.bi.trim(),
+        requesterRoleTitle: formData.funcao || 'Docente',
+        targetRole: 'ADMIN',
+        targetAdminEmail: 'dmedoquessua@gmail.com',
+        details: {
+          employeeName: formData.nome.trim(),
+          employeeBi: formData.bi.trim().toUpperCase(),
+          employeeAgente: formData.agente.trim(),
+          employeeSchoolOrDepartment: formData.escola,
+          employeeCategory: formData.categoria,
+          referenceMonthYear: formData.dataEmissao,
+          purpose: formData.finalidade,
+        },
+      }).then((req) => {
+        showToast(`Pedido enviado com sucesso para a Admin Municipal! Protocolo: ${req.protocol}`);
+        handleClearForm();
+      }).catch(() => {
+        showToast('Erro ao submeter o pedido. Tente novamente.');
+      });
+      return;
+    }
+
     const saveResult = saveEfectividadeRecord({
       ...formData,
       bi: formData.bi.trim().toUpperCase(),
@@ -427,17 +519,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     const saved = saveResult.record!;
     reloadRecords();
     setSelectedRecordForView(saved);
-    setIsLivePreviewExpanded(true);
+    setEfectividadeSubView('preview');
     showToast(
       formData.id
         ? `Registo de ${saved.nome} actualizado com sucesso!`
         : `Novo funcionário "${saved.nome}" cadastrado com sucesso!`
     );
-
-    const previewEl = document.getElementById('efectividade-live-preview-panel');
-    if (previewEl) {
-      previewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
   };
 
   const handleStartEditRecord = (record: CadastramentoEfectividadeRecord) => {
@@ -471,6 +558,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     setFormSubmitted(false);
     setFormErrors({});
     setActiveTab('form');
+    setEfectividadeSubView('form');
     showToast(`Dados de ${record.nome} carregados no formulário e na pré-visualização A4.`);
   };
 
@@ -479,6 +567,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     setManualTratamento(false);
     setFormSubmitted(false);
     setFormErrors({});
+    setEfectividadeSubView('form');
     showToast('Formulário limpo com sucesso.');
   };
 
@@ -762,12 +851,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet,
         #oficial-a4-sheet *,
         #declaracao-servico-a4-sheet,
-        #declaracao-servico-a4-sheet * {
+        #declaracao-servico-a4-sheet *,
+        #guia-ferias-a4-sheet,
+        #guia-ferias-a4-sheet * {
           font-family: 'Times New Roman', Times, serif !important;
           color: #000000;
         }
         #oficial-a4-sheet .a4-emblem-img,
-        #declaracao-servico-a4-sheet .a4-emblem-img {
+        #declaracao-servico-a4-sheet .a4-emblem-img,
+        #guia-ferias-a4-sheet .a4-emblem-img {
           width: 60px;
           height: auto;
           max-height: 60px;
@@ -776,7 +868,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin: 0 auto 6px auto;
         }
         #oficial-a4-sheet .a4-header-block,
-        #declaracao-servico-a4-sheet .a4-header-block {
+        #declaracao-servico-a4-sheet .a4-header-block,
+        #guia-ferias-a4-sheet .a4-header-block {
           text-align: center;
           font-family: 'Times New Roman', Times, serif !important;
           margin-bottom: 10pt;
@@ -784,7 +877,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           border: 0;
         }
         #oficial-a4-sheet .a4-header-block p.a4-republic-title,
-        #declaracao-servico-a4-sheet .a4-header-block p.a4-republic-title {
+        #declaracao-servico-a4-sheet .a4-header-block p.a4-republic-title,
+        #guia-ferias-a4-sheet .a4-header-block p.a4-republic-title {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 14pt;
           font-weight: 700;
@@ -795,7 +889,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           color: #000000;
         }
         #oficial-a4-sheet .a4-header-block p.a4-inst-line,
-        #declaracao-servico-a4-sheet .a4-header-block p.a4-inst-line {
+        #declaracao-servico-a4-sheet .a4-header-block p.a4-inst-line,
+        #guia-ferias-a4-sheet .a4-header-block p.a4-inst-line {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -806,13 +901,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           color: #000000;
         }
         #oficial-a4-sheet .a4-title-wrap,
-        #declaracao-servico-a4-sheet .a4-title-wrap {
+        #declaracao-servico-a4-sheet .a4-title-wrap,
+        #guia-ferias-a4-sheet .a4-title-wrap {
           padding-top: 12pt;
           padding-bottom: 4pt;
           text-align: center;
         }
         #oficial-a4-sheet .a4-title-wrap h1,
-        #declaracao-servico-a4-sheet .a4-title-wrap h1 {
+        #declaracao-servico-a4-sheet .a4-title-wrap h1,
+        #guia-ferias-a4-sheet .a4-title-wrap h1 {
           display: inline-block;
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 14pt;
@@ -833,7 +930,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           text-align: justify;
           color: #000000;
         }
-        #declaracao-servico-a4-sheet .a4-body-copy {
+        #declaracao-servico-a4-sheet .a4-body-copy,
+        #guia-ferias-a4-sheet .a4-body-copy {
           margin-top: 12pt;
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
@@ -850,7 +948,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin: 0 0 8pt 0;
           color: #000000;
         }
-        #declaracao-servico-a4-sheet .a4-body-copy p {
+        #declaracao-servico-a4-sheet .a4-body-copy p,
+        #guia-ferias-a4-sheet .a4-body-copy p {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           line-height: 1.5;
@@ -860,13 +959,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           color: #000000;
         }
         #oficial-a4-sheet .a4-body-copy strong,
-        #declaracao-servico-a4-sheet .a4-body-copy strong {
+        #declaracao-servico-a4-sheet .a4-body-copy strong,
+        #guia-ferias-a4-sheet .a4-body-copy strong {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
         }
         #oficial-a4-sheet .a4-footer-block,
-        #declaracao-servico-a4-sheet .a4-footer-block {
+        #declaracao-servico-a4-sheet .a4-footer-block,
+        #guia-ferias-a4-sheet .a4-footer-block {
           margin-top: 14pt;
           padding-top: 2pt;
           border: 0;
@@ -874,7 +975,9 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-date-line,
         #oficial-a4-sheet .a4-date-line span,
         #declaracao-servico-a4-sheet .a4-date-line,
-        #declaracao-servico-a4-sheet .a4-date-line span {
+        #declaracao-servico-a4-sheet .a4-date-line span,
+        #guia-ferias-a4-sheet .a4-date-line,
+        #guia-ferias-a4-sheet .a4-date-line span {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           line-height: 1.35;
@@ -883,13 +986,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           color: #000000;
         }
         #oficial-a4-sheet .a4-sig-container,
-        #declaracao-servico-a4-sheet .a4-sig-container {
+        #declaracao-servico-a4-sheet .a4-sig-container,
+        #guia-ferias-a4-sheet .a4-sig-container {
           text-align: center;
           width: 280px;
           margin: 0 auto;
         }
         #oficial-a4-sheet .a4-sig-role,
-        #declaracao-servico-a4-sheet .a4-sig-role {
+        #declaracao-servico-a4-sheet .a4-sig-role,
+        #guia-ferias-a4-sheet .a4-sig-role {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -898,13 +1003,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           color: #000000;
         }
         #oficial-a4-sheet .a4-sig-line,
-        #declaracao-servico-a4-sheet .a4-sig-line {
+        #declaracao-servico-a4-sheet .a4-sig-line,
+        #guia-ferias-a4-sheet .a4-sig-line {
           border-bottom: 1px solid #000000;
           width: 250px;
           margin: 0 auto;
         }
         #oficial-a4-sheet .a4-sig-name,
-        #declaracao-servico-a4-sheet .a4-sig-name {
+        #declaracao-servico-a4-sheet .a4-sig-name,
+        #guia-ferias-a4-sheet .a4-sig-name {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -986,11 +1093,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #oficial-a4-sheet,
           #oficial-a4-sheet *,
           #declaracao-servico-a4-sheet,
-          #declaracao-servico-a4-sheet * {
+          #declaracao-servico-a4-sheet *,
+          #guia-ferias-a4-sheet,
+          #guia-ferias-a4-sheet * {
             font-family: 'Times New Roman', Times, serif !important;
           }
           #oficial-a4-sheet,
-          #declaracao-servico-a4-sheet {
+          #declaracao-servico-a4-sheet,
+          #guia-ferias-a4-sheet {
             display: block !important;
             box-sizing: border-box !important;
             box-shadow: none !important;
@@ -1016,35 +1126,17 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         }
       `}</style>
 
-      {/* Hero Banner with Breadcrumbs */}
+      {/* Hero Banner */}
       <div className="no-print">
         <Hero
           onOpenGetStarted={onOpenGetStarted}
           customTitle={
             activeTab === 'declaracao-servico'
               ? 'Declaração de Serviço'
+              : activeTab === 'guia-ferias'
+              ? 'Guia de Férias'
               : 'Cadastramento e Declarações Oficiais'
           }
-          customSubtitle={
-            activeTab === 'declaracao-servico'
-              ? 'Cadastro de pessoal, conta bancária, salário líquido e emissão oficial de Declaração de Serviço • Município do Quêssua.'
-              : 'Painel integrado de emissão de Declaração de Efectividade, Declaração de Serviço e Base de Dados • Município do Quêssua.'
-          }
-          badge={
-            activeTab === 'declaracao-servico'
-              ? 'Declaração de Serviço'
-              : 'Declaração de Efectividade'
-          }
-          breadcrumbs={[
-            { label: 'Início', onClick: onNavigateHome },
-            { label: 'Documentos Escolares' },
-            {
-              label:
-                activeTab === 'declaracao-servico'
-                  ? 'Declaração de Serviço (Conta & Salário)'
-                  : 'Declaração de Efectividade & Serviços',
-            },
-          ]}
           compact="ultra"
           isLoggedIn={isLoggedIn}
         />
@@ -1101,105 +1193,19 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                   <Landmark className="w-4 h-4 text-slate-700 shrink-0" />
                   <span className="truncate">Declaração de Serviço</span>
                 </button>
-              </div>
-            </div>
-
-            {/* Group 2: Operação */}
-            <div>
-              <p className="text-xs font-medium text-slate-500 px-3 mb-1.5">
-                Operação
-              </p>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={handlePrintDocument}
-                  className="w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm text-slate-700 hover:bg-slate-50 font-medium transition-colors cursor-pointer"
-                >
-                  <Printer className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Caixa e impressão A4</span>
-                </button>
 
                 <button
+                  id="tab-guia-ferias"
                   type="button"
-                  onClick={() => setActiveTab('pedidos')}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
-                    activeTab === 'pedidos'
+                  onClick={() => setActiveTab('guia-ferias')}
+                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                    activeTab === 'guia-ferias'
                       ? 'bg-[#f2f4f7] text-slate-950 font-bold'
                       : 'text-slate-700 hover:bg-slate-50 font-medium'
                   }`}
                 >
-                  <span className="flex items-center gap-3 truncate">
-                    <Clock className="w-4 h-4 text-slate-700 shrink-0" />
-                    <span className="truncate">Pedidos dos Usuários</span>
-                  </span>
-                  {quickRequestsCount > 0 && (
-                    <span className="text-xs font-bold text-amber-800 tabular-nums">
-                      {quickRequestsCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Group 3: Acesso e segurança */}
-            <div>
-              <p className="text-xs font-medium text-slate-500 px-3 mb-1.5">
-                Acesso e segurança
-              </p>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('database')}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
-                    activeTab === 'database'
-                      ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <span className="flex items-center gap-3 truncate">
-                    <Users className="w-4 h-4 text-slate-700 shrink-0" />
-                    <span className="truncate">Utilizadores ({records.length})</span>
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('database');
-                    showToast(
-                      `Auditoria activa: ${records.length} registos protegidos contra duplicação de B.I. e Agente.`
-                    );
-                  }}
-                  className="w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm text-slate-700 hover:bg-slate-50 font-medium transition-colors cursor-pointer"
-                >
-                  <ShieldCheck className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Auditoria</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 4: Dados */}
-            <div>
-              <p className="text-xs font-medium text-slate-500 px-3 mb-1.5">
-                Dados
-              </p>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={handleClearForm}
-                  className="w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm text-slate-700 hover:bg-slate-50 font-medium transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Limpar formulário</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsBackupModalOpen(true)}
-                  className="w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm text-slate-700 hover:bg-slate-50 font-medium transition-colors cursor-pointer"
-                >
-                  <Database className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Banco local e backup</span>
+                  <CalendarRange className="w-4 h-4 text-slate-700 shrink-0" />
+                  <span className="truncate">Guia de Férias</span>
                 </button>
               </div>
             </div>
@@ -1222,101 +1228,147 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                         Declaração de Efectividade
                       </h1>
-                      <p className="text-xs sm:text-sm text-slate-500">
-                        Dados do funcionário e conformidade com a Direcção Municipal da Educação
-                      </p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleClearForm}
-                      className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Novo Registo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadPdf()}
-                      className="h-10 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-                    >
-                      <FileDown className="w-3.5 h-3.5" />
-                      <span>Baixar PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handlePrintDocument}
-                      className="h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Imprimir A4</span>
-                    </button>
-                  </div>
+                  {isAdminOrDirector ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleClearForm}
+                        className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Novo Registo</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadPdf()}
+                        className="h-10 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        <span>Baixar PDF</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePrintDocument}
+                        className="h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Imprimir A4</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Envio Direto para a Admin Municipal</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* ========================================================== */}
-                {/* ENCIMA 1: BASE DE DADOS DA DECLARAÇÃO DE EFECTIVIDADE       */}
+                {/* BARRA DE OPÇÕES NO TOPO: Base de Dados | Pré-visualização | Formulário */}
                 {/* ========================================================== */}
-                <section className="no-print bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
-                        <Database className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                          Base de Dados — Declaração de Efectividade ({records.length})
-                        </h2>
-                        <p className="text-xs text-slate-500">
-                          Consulte ou selecione qualquer funcionário para carregar automaticamente no documento
-                        </p>
-                      </div>
-                    </div>
+                {isAdminOrDirector && (
+                  <div className="no-print flex flex-wrap items-center gap-2 bg-white p-2 rounded-full border border-slate-200 w-fit shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setEfectividadeSubView('database')}
+                      className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                        efectividadeSubView === 'database'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Database className="w-4 h-4 shrink-0" />
+                      <span>Base de Dados ({records.length})</span>
+                    </button>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="relative w-full sm:w-64">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                          type="search"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Pesquisar nome, B.I. ou agente..."
-                          className="w-full h-9 pl-9 pr-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-900 outline-none focus:border-slate-900"
-                        />
-                      </div>
+                    <button
+                      type="button"
+                      onClick={() => setEfectividadeSubView('preview')}
+                      className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                        efectividadeSubView === 'preview'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4 shrink-0" />
+                      <span>Pré-visualização</span>
+                    </button>
 
-                      <select
-                        value={schoolFilter}
-                        onChange={(e) => setSchoolFilter(e.target.value)}
-                        className="h-9 px-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-slate-900 max-w-[200px] truncate cursor-pointer"
-                      >
-                        <option value="ALL">Todas as Escolas</option>
-                        {uniqueSchools.map((sc) => (
-                          <option key={sc} value={sc}>
-                            {sc}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsTopDbCollapsed((prev) => !prev)}
-                        className="h-9 px-3 rounded-full bg-[#f2f4f7] hover:bg-slate-200/70 text-xs font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>{isTopDbCollapsed ? 'Mostrar Base' : 'Recolher'}</span>
-                        {isTopDbCollapsed ? (
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        ) : (
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEfectividadeSubView('form')}
+                      className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                        efectividadeSubView === 'form'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Edit className="w-4 h-4 shrink-0" />
+                      <span>Formulário</span>
+                    </button>
                   </div>
+                )}
 
-                  {!isTopDbCollapsed && (
-                    <div className="overflow-x-auto max-h-[260px] overflow-y-auto border border-slate-200 rounded-2xl">
+                {/* ========================================================== */}
+                {/* OPÇÃO 1: BASE DE DADOS DA DECLARAÇÃO DE EFECTIVIDADE       */}
+                {/* ========================================================== */}
+                {efectividadeSubView === 'database' && (
+                  <section className="no-print bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+                          <Database className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                            Base de Dados — Declaração de Efectividade ({records.length})
+                          </h2>
+                          <p className="text-xs text-slate-500">
+                            Consulte ou selecione qualquer funcionário para carregar automaticamente no documento
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative w-full sm:w-64">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Pesquisar nome, B.I. ou agente..."
+                            className="w-full h-9 pl-9 pr-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-900 outline-none focus:border-slate-900"
+                          />
+                        </div>
+
+                        <select
+                          value={schoolFilter}
+                          onChange={(e) => setSchoolFilter(e.target.value)}
+                          className="h-9 px-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-slate-900 max-w-[200px] truncate cursor-pointer"
+                        >
+                          <option value="ALL">Todas as Escolas</option>
+                          {uniqueSchools.map((sc) => (
+                            <option key={sc} value={sc}>
+                              {sc}
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsBackupModalOpen(true)}
+                          className="h-9 px-3.5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          <span>Cofre de Backups</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto max-h-[460px] overflow-y-auto border border-slate-200 rounded-2xl">
                       <table className="w-full border-collapse text-xs min-w-[780px]">
                         <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
                           <tr>
@@ -1379,13 +1431,13 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                                       type="button"
                                       onClick={() => {
                                         handleStartEditRecord(item);
-                                        setIsLivePreviewExpanded(true);
+                                        setEfectividadeSubView('preview');
                                       }}
                                       className="px-2.5 py-1 rounded-full bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer inline-flex items-center gap-1"
-                                      title="Carregar nos campos e pré-visualizar documento"
+                                      title="Ver pré-visualização da declaração"
                                     >
                                       <Eye className="w-3 h-3" />
-                                      <span>Carregar</span>
+                                      <span>Ver Documento</span>
                                     </button>
                                     <button
                                       type="button"
@@ -1398,11 +1450,11 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenViewFicha(item)}
+                                      onClick={() => handleStartEditRecord(item)}
                                       className="p-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
-                                      title="Abrir em ecrã inteiro"
+                                      title="Editar no formulário"
                                     >
-                                      <FileText className="w-3.5 h-3.5" />
+                                      <Edit className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
@@ -1420,15 +1472,17 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                         </tbody>
                       </table>
                     </div>
-                  )}
-                </section>
+                  </section>
+                )}
 
                 {/* ========================================================== */}
-                {/* ENCIMA 2: PRÉ-VISUALIZAÇÃO DO DOCUMENTO SENDO PREENCHIDO    */}
+                {/* OPÇÃO 2: PRÉ-VISUALIZAÇÃO DO DOCUMENTO SENDO PREENCHIDO    */}
                 {/* ========================================================== */}
                 <section
                   id="efectividade-live-preview-panel"
-                  className="bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 print:border-0 print:p-0 print:shadow-none"
+                  className={`${
+                    efectividadeSubView === 'preview' ? 'block' : 'hidden print:block'
+                  } bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 print:border-0 print:p-0 print:shadow-none`}
                 >
                   <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
                     <div className="flex items-center gap-2.5">
@@ -1445,7 +1499,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                           </span>
                         </div>
                         <p className="text-xs text-slate-500">
-                          Acompanhe o preenchimento oficial da folha A4 em tempo real enquanto preenche os campos abaixo
+                          Folha A4 oficial preenchida automaticamente com os dados do formulário
                         </p>
                       </div>
                     </div>
@@ -1493,33 +1547,19 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                         <Printer className="w-3.5 h-3.5" />
                         <span>Imprimir A4</span>
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsLivePreviewExpanded((prev) => !prev)}
-                        className="h-9 px-3 rounded-full bg-[#f2f4f7] hover:bg-slate-200/70 text-xs font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>{isLivePreviewExpanded ? 'Ocultar Folha' : 'Expandir Folha'}</span>
-                        {isLivePreviewExpanded ? (
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        )}
-                      </button>
                     </div>
                   </div>
 
-                  {isLivePreviewExpanded && (
-                    <div className="bg-[#f8f9fa] p-3 sm:p-6 rounded-2xl border border-slate-200/70 print:bg-white print:p-0 print:border-0">
-                      {renderOfficialEfectividadeSheet(liveEfectividadeRecord, manualTratamento)}
-                    </div>
-                  )}
+                  <div className="bg-[#f8f9fa] p-3 sm:p-6 rounded-2xl border border-slate-200/70 print:bg-white print:p-0 print:border-0">
+                    {renderOfficialEfectividadeSheet(liveEfectividadeRecord, manualTratamento)}
+                  </div>
                 </section>
 
                 {/* ========================================================== */}
-                {/* ABAIXO: FORMULÁRIO NO ESTILO DO EXEMPLAR                   */}
+                {/* OPÇÃO 3: FORMULÁRIO NO ESTILO DO EXEMPLAR                   */}
                 {/* ========================================================== */}
-                <div className="no-print bg-white rounded-[24px] border border-slate-200 p-6 sm:p-8 shadow-xs space-y-7">
+                {efectividadeSubView === 'form' && (
+                  <div className="no-print bg-white rounded-[24px] border border-slate-200 p-6 sm:p-8 shadow-xs space-y-7">
                   {/* Real-Time Duplicate Warning Alert */}
                   {currentDuplicate && currentDuplicate.duplicateRecord && (
                     <div
@@ -1890,28 +1930,185 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                         </div>
 
                         <div className="md:col-span-2">
-                          <label
-                            htmlFor="field-escola"
-                            className="block text-[13px] font-semibold text-slate-800 mb-1.5"
-                          >
-                            Escola ou Complexo Escolar de colocação{' '}
-                            <span className="text-[#d92d20]">*</span>
-                          </label>
-                          <select
-                            id="field-escola"
-                            value={formData.escola}
-                            onChange={(e) => handleInputChange('escola', e.target.value)}
-                            className={pillInputClass(Boolean(formErrors.escola))}
-                          >
-                            {ESCOLAS_QUESSUA_LIST.map((esc) => (
-                              <option key={esc} value={esc}>
-                                {esc}
-                              </option>
-                            ))}
-                            {!ESCOLAS_QUESSUA_LIST.includes(formData.escola) && formData.escola && (
-                              <option value={formData.escola}>{formData.escola}</option>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label
+                              htmlFor="field-escola"
+                              className="block text-[13px] font-semibold text-slate-800"
+                            >
+                              Escola ou Complexo Escolar de colocação{' '}
+                              <span className="text-[#d92d20]">*</span>
+                            </label>
+                            <span className="text-[11px] text-slate-500">
+                              (Pode escrever ou escolher das sugestões)
+                            </span>
+                          </div>
+
+                          <div className="relative" ref={schoolDropdownRef}>
+                            <div className="relative flex items-center">
+                              <input
+                                id="field-escola"
+                                type="text"
+                                autoComplete="off"
+                                value={formData.escola}
+                                onChange={(e) => {
+                                  handleInputChange('escola', e.target.value);
+                                  setShowSchoolSuggestions(true);
+                                }}
+                                onFocus={() => setShowSchoolSuggestions(true)}
+                                placeholder="Escreva o nome da escola ou selecione das sugestões..."
+                                className={`${pillInputClass(Boolean(formErrors.escola))} pr-20`}
+                              />
+                              <div className="absolute right-2.5 flex items-center gap-1">
+                                {formData.escola && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleInputChange('escola', '');
+                                      setShowSchoolSuggestions(true);
+                                    }}
+                                    className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Limpar campo"
+                                    aria-label="Limpar campo da escola"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowSchoolSuggestions((prev) => !prev)}
+                                  className="p-1.5 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Ver escolas cadastradas"
+                                  aria-label="Ver lista de escolas cadastradas"
+                                >
+                                  <ChevronDown
+                                    className={`w-4 h-4 transition-transform duration-200 ${
+                                      showSchoolSuggestions ? 'rotate-180' : ''
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Dropdown com sugestões dinâmicas de escolas já cadastradas */}
+                            {showSchoolSuggestions && (
+                              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 max-h-64 overflow-y-auto p-1.5 animate-in fade-in zoom-in-95 duration-150">
+                                <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between border-b border-slate-100 mb-1">
+                                  <span>Sugestões de Escolas ({schoolSuggestions.length})</span>
+                                  {formData.escola.trim() && !isExactRegisteredSchool && (
+                                    <span className="text-amber-600 font-semibold normal-case">
+                                      Escola nova/personalizada
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Banner caso a pessoa tenha escrito uma escola não cadastrada */}
+                                {formData.escola.trim() && !isExactRegisteredSchool && (
+                                  <div className="p-2.5 mb-1.5 bg-amber-50 rounded-xl border border-amber-200 text-xs flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-amber-900 flex items-center gap-1.5 truncate">
+                                        <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                        <span className="truncate">Usar «{formData.escola}»</span>
+                                      </div>
+                                      <p className="text-[11px] text-amber-700 truncate">
+                                        Esta escola não estava na lista e será registada no documento.
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowSchoolSuggestions(false)}
+                                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                    >
+                                      Confirmar
+                                    </button>
+                                  </div>
+                                )}
+
+                                {schoolSuggestions.length === 0 ? (
+                                  <div className="p-4 text-center text-xs text-slate-500">
+                                    Nenhuma escola cadastrada coincide com «
+                                    <strong className="text-slate-800">{formData.escola}</strong>».
+                                    <div className="text-[11px] text-emerald-600 font-medium mt-1">
+                                      O nome que escreveu será utilizado diretamente na emissão da declaração.
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    {schoolSuggestions.map((schoolName) => {
+                                      const isSelected =
+                                        formData.escola.trim().toLowerCase() === schoolName.toLowerCase();
+                                      const isNewRequested =
+                                        schoolName.includes('314') ||
+                                        schoolName.toLowerCase().includes('técnico agrário') ||
+                                        schoolName.includes('27009');
+                                      return (
+                                        <button
+                                          key={schoolName}
+                                          type="button"
+                                          onClick={() => {
+                                            handleInputChange('escola', schoolName);
+                                            setShowSchoolSuggestions(false);
+                                          }}
+                                          className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                                            isSelected
+                                              ? 'bg-[#002133] text-white font-bold'
+                                              : 'hover:bg-slate-100 text-slate-800'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <School
+                                              className={`w-3.5 h-3.5 shrink-0 ${
+                                                isSelected ? 'text-amber-400' : 'text-slate-400'
+                                              }`}
+                                            />
+                                            <span className="truncate">{schoolName}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            {isNewRequested && (
+                                              <span
+                                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                  isSelected
+                                                    ? 'bg-amber-400/20 text-amber-300'
+                                                    : 'bg-emerald-100 text-emerald-800'
+                                                }`}
+                                              >
+                                                Nova Opção
+                                              </span>
+                                            )}
+                                            {isSelected && (
+                                              <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                            )}
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
                             )}
-                          </select>
+                          </div>
+
+                          {/* Dica contextual sobre a escola digitada */}
+                          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                            {isExactRegisteredSchool ? (
+                              <span className="text-emerald-700 font-medium inline-flex items-center gap-1">
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                Escola oficial cadastrada no Município de Quêssua
+                              </span>
+                            ) : formData.escola.trim() ? (
+                              <span className="text-blue-700 font-medium inline-flex items-center gap-1">
+                                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                                Escola personalizada indicada (não cadastrada previamente)
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">
+                                Digite o nome da escola ou clique na seta para ver as opções
+                              </span>
+                            )}
+                            <span className="text-slate-400">
+                              Total de opções: {allAvailableSchools.length}
+                            </span>
+                          </div>
+
                           {formErrors.escola && (
                             <p className="text-[#d92d20] text-xs mt-1 font-medium">
                               {formErrors.escola}
@@ -2004,7 +2201,9 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                         >
                           <Check className="w-4 h-4" />
                           <span>
-                            {formData.id
+                            {!isAdminOrDirector
+                              ? 'Enviar Requerimento à Administração Municipal'
+                              : formData.id
                               ? 'Salvar alterações no registo'
                               : 'Guardar na Base de Dados & Gerar Declaração'}
                           </span>
@@ -2021,14 +2220,30 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       </div>
                     </div>
                   </form>
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* ============================================================== */}
             {/* SERVICE 2: DECLARAÇÃO DE SERVIÇO (CONTA & SALÁRIO)             */}
             {/* ============================================================== */}
-            {activeTab === 'declaracao-servico' && <DeclaracaoServicoSection />}
+            {activeTab === 'declaracao-servico' && (
+              <DeclaracaoServicoSection
+                isLoggedIn={isLoggedIn}
+                currentUser={currentUser}
+              />
+            )}
+
+            {/* ============================================================== */}
+            {/* SERVICE 3: GUIA DE FÉRIAS (CADASTRO DE PESSOAL)                */}
+            {/* ============================================================== */}
+            {activeTab === 'guia-ferias' && (
+              <GuiaFeriasSection
+                isLoggedIn={isLoggedIn}
+                currentUser={currentUser}
+              />
+            )}
 
             {/* ============================================================== */}
             {/* TAB: BASE DE DADOS COMPLETA (GESTÃO & BACKUPS)                 */}

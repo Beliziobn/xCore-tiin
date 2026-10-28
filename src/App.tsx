@@ -113,8 +113,8 @@ import { NotFoundPage } from './components/pages/NotFoundPage';
 import { ThankYouPage } from './components/pages/ThankYouPage';
 import { CasesPage } from './components/pages/CasesPage';
 import { DeclaracaoEfectividadePage } from './components/pages/DeclaracaoEfectividadePage';
+import { QuickServicesPage } from './components/pages/QuickServicesPage';
 import { BackupManagerModal } from './components/modals/BackupManagerModal';
-import { QuickServicesModal } from './components/modals/QuickServicesModal';
 import { QuickRequestsManagementView } from './components/quick-services/QuickRequestsManagementView';
 
 import type { 
@@ -549,6 +549,14 @@ export default function App() {
         setCurrentView('obrigado');
       } else if (pageParam === '404' || pageParam === 'not-found') {
         setCurrentView('404');
+      } else if (
+        pageParam === 'servicos-rapidos' ||
+        pageParam === 'servicos-sem-login' ||
+        pageParam === 'servicos' ||
+        pageParam === 'servicos-cidadao' ||
+        pageParam === 'balcao-rapido'
+      ) {
+        setCurrentView('servicos-rapidos');
       }
     } catch {
       // ignore
@@ -669,6 +677,9 @@ export default function App() {
       seguranca: 'Segurança e Proteção de Dados',
       cases: 'Casos de Sucesso',
       obrigado: 'Confirmação de Solicitação',
+      'servicos-rapidos': 'Serviços Rápidos ao Cidadão (Sem Login)',
+      'servicos-sem-login': 'Serviços Rápidos ao Cidadão (Sem Login)',
+      'servicos-cidadao': 'Serviços Rápidos ao Cidadão (Sem Login)',
     };
     const pageTitle =
       currentPage === 'login'
@@ -1311,7 +1322,17 @@ export default function App() {
         currentView === 'thank-you' ||
         currentView === 'agradecimento' ||
         currentView === '404' ||
-        currentView === 'not-found';
+        currentView === 'not-found' ||
+        currentView === 'servicos-rapidos' ||
+        currentView === 'servicos-sem-login' ||
+        currentView === 'servicos-cidadao' ||
+        currentView === 'balcao-rapido' ||
+        currentView === 'pedidos-rapidos' ||
+        currentView === 'declaracao-efectividade' ||
+        currentView === 'declaracao-servico' ||
+        currentView === 'declaracao-de-servico' ||
+        currentView === 'efectividade' ||
+        currentView === 'servico';
 
       if (!isPublicView) {
         return (
@@ -1321,7 +1342,10 @@ export default function App() {
             onDirectLogin={(role) => handleDirectDemoLogin(role)}
             onOpenAbout={() => setInfoModalType('about')}
             onOpenSupport={() => setInfoModalType('support')}
-            onOpenQuickServices={() => setIsQuickServicesModalOpen(true)}
+            onOpenQuickServices={() => {
+              setCurrentView('servicos-rapidos');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         );
       }
@@ -1366,6 +1390,7 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           onLogout={handleLogout}
+          onNavigateToLogin={() => handleOpenAuth('login')}
         />
       );
     }
@@ -1571,12 +1596,11 @@ export default function App() {
       );
     }
 
-    // Quick Requests Views for Admin, Director, Teachers and Citizens
+    // Quick Requests Internal Management Views for Admin and Director
     if (
       currentView === 'admin-servicos-rapidos' ||
-      currentView === 'servicos-rapidos' ||
       currentView === 'diretor-servicos-rapidos' ||
-      currentView === 'pedidos-rapidos'
+      (currentView === 'pedidos-rapidos' && Boolean(currentUser && (currentUser.role === 'admin' || currentUser.role === 'diretor')))
     ) {
       return (
         <div className="w-full min-h-screen bg-[#f8f9fb]">
@@ -2040,12 +2064,37 @@ export default function App() {
       );
     }
 
-    // Declaração de Efectividade (Modelo Oficial em Branco)
+    // Declaração de Efectividade / Serviços SIGRE (Modelo Oficial em Branco)
     if (
       currentView === 'declaracao-efectividade' ||
+      currentView === 'servicos-sigre' ||
+      currentView === 'sigre-servicos' ||
       currentView === 'efectividade' ||
       currentView === 'mapa-efectividade'
     ) {
+      // Regra de Privacidade e Sigilo: Usuários sem sessão iniciada ou sem privilégios de Administração/Direção
+      // não têm acesso à Base de Dados dos funcionários nem à Pré-visualização ou Botões de Emissão/Download A4.
+      // Emitem o seu próprio requerimento e enviam diretamente para a Administração Municipal.
+      const isAdminOrDirector = Boolean(
+        isSessionStarted &&
+          currentUser &&
+          (currentUser.role === 'admin' || currentUser.role === 'diretor')
+      );
+
+      if (!isAdminOrDirector) {
+        return (
+          <QuickServicesPage
+            initialServiceType="DECLARACAO_EFECTIVIDADE"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToLogin={() => handleOpenAuth('login')}
+          />
+        );
+      }
+
       return (
         <DeclaracaoEfectividadePage
           onOpenGetStarted={() => handleOpenAuth('login')}
@@ -2061,12 +2110,72 @@ export default function App() {
       );
     }
 
+    // Guia de Férias (Serviços SIGRE)
+    if (
+      currentView === 'guia-ferias' ||
+      currentView === 'guia-de-ferias'
+    ) {
+      const isAdminOrDirector = Boolean(
+        isSessionStarted &&
+          currentUser &&
+          (currentUser.role === 'admin' || currentUser.role === 'diretor')
+      );
+
+      if (!isAdminOrDirector) {
+        return (
+          <QuickServicesPage
+            initialServiceType="GUIA_FERIAS"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToLogin={() => handleOpenAuth('login')}
+          />
+        );
+      }
+
+      return (
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          initialTab="guia-ferias"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+
     // Declaração de Serviço (Nova Aba Oficial em Branco)
     if (
       currentView === 'declaracao-servico' ||
       currentView === 'declaracao-de-servico' ||
       currentView === 'servico'
     ) {
+      const isAdminOrDirector = Boolean(
+        isSessionStarted &&
+          currentUser &&
+          (currentUser.role === 'admin' || currentUser.role === 'diretor')
+      );
+
+      if (!isAdminOrDirector) {
+        return (
+          <QuickServicesPage
+            initialServiceType="DECLARACAO_SERVICO"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToLogin={() => handleOpenAuth('login')}
+          />
+        );
+      }
+
       return (
         <DeclaracaoEfectividadePage
           onOpenGetStarted={() => handleOpenAuth('login')}
@@ -2281,6 +2390,28 @@ export default function App() {
           onNavigateSupport={() => setInfoModalType('support')}
           requestedPath={window.location.pathname !== '/' ? window.location.pathname : undefined}
           isLoggedIn={isSessionStarted}
+        />
+      );
+    }
+
+    // 8. Dedicated Full-Page Public Citizen Self-Service (Serviços Rápidos Sem Login)
+    if (
+      currentView === 'servicos-rapidos' ||
+      currentView === 'servicos-sem-login' ||
+      currentView === 'servicos-cidadao' ||
+      currentView === 'balcao-rapido'
+    ) {
+      return (
+        <QuickServicesPage
+          key="quick-services-page-catalog"
+          initialPageView="catalog"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToLogin={() => handleOpenAuth('login')}
+          availableSchools={adminSchools}
         />
       );
     }
@@ -2604,7 +2735,10 @@ export default function App() {
         onOpenDemoModal={() => setIsDemoModalOpen(true)}
         onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
         onOpenBackupManager={() => setIsGlobalBackupModalOpen(true)}
-        onOpenQuickServices={() => setIsQuickServicesModalOpen(true)}
+        onOpenQuickServices={() => {
+          setCurrentView('servicos-rapidos');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       {/* Main Routed View with smooth page transitions & skip-link landmark */}
@@ -2614,7 +2748,7 @@ export default function App() {
           tabIndex={-1}
           key={
             !currentUser
-              ? 'public-landing'
+              ? `public-${currentView}-${currentPage}`
               : currentPage === 'login' || currentPage === 'register'
               ? `auth-${currentPage}`
               : currentView === 'aluno-perfil'
@@ -2861,13 +2995,6 @@ export default function App() {
         isOpen={isGlobalBackupModalOpen}
         onClose={() => setIsGlobalBackupModalOpen(false)}
         currentUser={currentUser}
-      />
-
-      {/* Public Citizen Quick Services Modal (Zero Login Required) */}
-      <QuickServicesModal
-        isOpen={isQuickServicesModalOpen}
-        onClose={() => setIsQuickServicesModalOpen(false)}
-        availableSchools={adminSchools}
       />
     </div>
   );

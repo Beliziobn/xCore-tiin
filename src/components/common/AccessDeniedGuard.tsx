@@ -1,15 +1,16 @@
 import React from 'react';
-import { ShieldAlert, ArrowLeft, User, Lock, LogOut, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, User, Lock, LogOut, CheckCircle2, LogIn } from 'lucide-react';
 import type { UserAccount } from '../../types';
 import { getOwnProfileViewForUser, getViewTitle } from '../../utils/authGuard';
 
 interface AccessDeniedGuardProps {
-  currentUser: UserAccount;
+  currentUser: UserAccount | null;
   attemptedView: string;
   reason?: string;
   onNavigateToOwnProfile: () => void;
   onBackToHome: () => void;
   onLogout: () => void;
+  onNavigateToLogin?: () => void;
 }
 
 export const AccessDeniedGuard: React.FC<AccessDeniedGuardProps> = ({
@@ -19,7 +20,94 @@ export const AccessDeniedGuard: React.FC<AccessDeniedGuardProps> = ({
   onNavigateToOwnProfile,
   onBackToHome,
   onLogout,
+  onNavigateToLogin,
 }) => {
+  const attemptedTitle = getViewTitle(attemptedView);
+
+  // Unauthenticated visitor attempting to access a protected area
+  if (!currentUser) {
+    return (
+      <div
+        id="access-denied-container"
+        className="w-full min-h-[calc(100vh-160px)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50/70"
+      >
+        <div className="max-w-xl w-full bg-white rounded-3xl border border-slate-200 shadow-[0_20px_50px_rgba(0,33,51,0.08)] overflow-hidden">
+          {/* Header Alert Strip */}
+          <div className="bg-[#002133] text-white p-6 sm:p-8 text-center flex flex-col items-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-400/20 border border-amber-400/30 text-amber-400 flex items-center justify-center shadow-lg mb-4">
+              <Lock className="w-8 h-8 text-amber-400" strokeWidth={2.3} />
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-white/90 text-[11px] font-bold uppercase tracking-wider mb-2 border border-white/15">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Autenticação Necessária</span>
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Inicie Sessão para Aceder a Esta Área
+            </h2>
+
+            <p className="text-xs sm:text-sm text-white/80 mt-2 max-w-md leading-relaxed">
+              {reason ||
+                'Esta secção da plataforma Sigre é restrita e requer credenciais oficiais ativas de Diretor, Docente ou Administrador Municipal.'}
+            </p>
+          </div>
+
+          {/* Account Details Box */}
+          <div className="p-6 sm:p-8 space-y-4">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
+                <span className="font-semibold text-slate-500">Estado da Sessão:</span>
+                <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                  Nenhum utilizador conectado
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-1">
+                <span className="font-semibold text-slate-500">Página Solicitada:</span>
+                <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md">
+                  {attemptedTitle}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-relaxed text-emerald-900 font-medium">
+                Se é encarregado de educação ou cidadão e necessita de boletins ou atestados sem login, utilize o nosso <strong>Balcão de Serviços Rápidos</strong>.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              {onNavigateToLogin && (
+                <button
+                  id="btn-access-guard-login"
+                  type="button"
+                  onClick={onNavigateToLogin}
+                  className="flex-1 bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Iniciar Sessão</span>
+                </button>
+              )}
+
+              <button
+                id="btn-access-guard-home"
+                type="button"
+                onClick={onBackToHome}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Página Inicial</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const roleLabel =
     currentUser.role === 'admin'
       ? 'Administrador Central (DME)'
@@ -28,8 +116,6 @@ export const AccessDeniedGuard: React.FC<AccessDeniedGuardProps> = ({
       : currentUser.role === 'professor'
       ? 'Professor(a) Titular'
       : 'Aluno(a)';
-
-  const attemptedTitle = getViewTitle(attemptedView);
 
   return (
     <div
