@@ -212,277 +212,143 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
     return current ? current.attendanceRate.toFixed(1) : '96.5';
   }, [schools, schoolFilter]);
 
-  return (
-    <div id="admin-students-page" className="w-full min-h-screen bg-[#f7f3f3]">
-      {/* Hero Header: "Meus alunos" matching 14.png */}
-      <Hero
-        onOpenGetStarted={onOpenGetStarted}
-        isLoggedIn={isLoggedIn}
-        customTitle="Meus alunos"
-        customSubtitle=""
-      />
+  const femTotalPct =
+    totalRegisteredStudentsAllSchools > 0
+      ? Math.round((totalFemaleAllSchools / totalRegisteredStudentsAllSchools) * 100)
+      : 0;
+  const mascTotalPct =
+    totalRegisteredStudentsAllSchools > 0 ? Math.max(0, 100 - femTotalPct) : 0;
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Aviso Institucional de Competência: Director Municipal vs Director de Escola */}
-        <div className="mb-6 bg-[#0b3d5c] text-white rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <School className="w-4 h-4 text-cyan-300 shrink-0" />
-              <span className="text-xs font-black uppercase tracking-wider text-cyan-200">
-                Direcção Municipal da Educação (DME) • Consulta de Quantidades por Escola
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
-              O <strong>Director Municipal</strong> não cadastra alunos (visualiza apenas o resumo quantitativo por unidade escolar). <strong>Quem cadastra o aluno é o Director de Escola</strong>, pois no painel da escola o sistema identifica automaticamente qual instituição está a matricular o aluno.
+  return (
+    <div id="admin-students-page" className="w-full min-h-screen bg-[#FAFAFA]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        {/* Cabeçalho Minimalista */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/70 pb-5">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Efetivo Estudantil</h1>
+            <p className="text-sm text-slate-500">
+              Consulta quantitativa por unidade escolar (O cadastro individual é realizado pelo Diretor de Escola).
             </p>
           </div>
-          {onSwitchToDirectorStudents && (
-            <button
-              type="button"
-              onClick={() => onSwitchToDirectorStudents()}
-              className="shrink-0 bg-white hover:bg-cyan-50 text-[#0b3d5c] font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-xs"
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span>Aceder Painel do Director de Escola</span>
-            </button>
-          )}
+          <button
+            id="admin-btn-baixar-listas-turma"
+            type="button"
+            onClick={() => setIsTurmaPdfModalOpen(true)}
+            className="px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition self-start sm:self-auto cursor-pointer flex items-center gap-1.5"
+          >
+            <FileDown className="w-3.5 h-3.5 text-slate-500" />
+            <span>Baixar Listas de Turma (PDF)</span>
+          </button>
         </div>
 
-        {/* Resumo Básico das Quantidades de Alunos por Escola (Total, Feminino e Masculino) */}
-        <div className="mb-8 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        {/* Faixa de Dados Horizontal Consolidada (Sem subcarga de cards aninhados) */}
+        <div className="bg-white rounded-xl border border-slate-200/80 divide-y divide-slate-100">
+          <div className="p-6 grid grid-cols-2 sm:grid-cols-5 gap-6">
             <div>
-              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <UsersIcon className="w-5 h-5 text-[#f75142]" />
-                <span>Resumo Básico de Quantidades de Alunos por Escola</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Síntese quantitativa municipal por unidade escolar com distribuição por sexo (Feminino e Masculino) e situação da quota declarada no Instrumento Complementar 2026/2027.
-              </p>
+              <span className="text-xs text-slate-400">Total Matriculados</span>
+              <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+                {totalRegisteredStudentsAllSchools}
+              </div>
             </div>
-
-            {/* Totais Gerais da Rede Municipal */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 shrink-0">
-              <div className="px-3 py-2 rounded-xl bg-slate-900 text-white text-center">
-                <span className="block text-[9px] font-bold uppercase text-slate-300">Total Alunos</span>
-                <span className="text-base font-black">{totalRegisteredStudentsAllSchools}</span>
+            <div>
+              <span className="text-xs text-slate-400">Sexo Feminino</span>
+              <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+                {totalFemaleAllSchools}{' '}
+                <span className="text-xs font-normal text-slate-400">({femTotalPct}%)</span>
               </div>
-              <div className="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-rose-700">Sexo Feminino</span>
-                <span className="text-base font-black text-rose-800">{totalFemaleAllSchools}</span>
+            </div>
+            <div>
+              <span className="text-xs text-slate-400">Sexo Masculino</span>
+              <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+                {totalMaleAllSchools}{' '}
+                <span className="text-xs font-normal text-slate-400">({mascTotalPct}%)</span>
               </div>
-              <div className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-indigo-700">Sexo Masculino</span>
-                <span className="text-base font-black text-indigo-800">{totalMaleAllSchools}</span>
+            </div>
+            <div>
+              <span className="text-xs text-slate-400">Quota Declarada</span>
+              <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+                {totalDeclaredStudentsAllSchools}
               </div>
-              <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-slate-500">Quota Declarada</span>
-                <span className="text-base font-black text-slate-800">{totalDeclaredStudentsAllSchools}</span>
-              </div>
-              <div className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-amber-800">Pendentes</span>
-                <span className="text-base font-black text-amber-900">{totalPendingStudentsAllSchools}</span>
+            </div>
+            <div>
+              <span className="text-xs text-slate-400">Pendentes de Cadastro</span>
+              <div className="text-2xl font-semibold text-amber-600 mt-1 tabular-nums">
+                {totalPendingStudentsAllSchools}
               </div>
             </div>
           </div>
 
-          {schoolStudentQuotaList.length === 0 ? (
-            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
-              <School className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-800">Nenhuma escola cadastrada no sistema</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Cadastre primeiro as unidades escolares na aba &ldquo;Escolas&rdquo; para acompanhar o resumo quantitativo de alunos.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {schoolStudentQuotaList.map(({ school, quota }) => {
-                const femPct =
-                  quota.registeredCount > 0
-                    ? Math.round((quota.registeredFemaleCount / quota.registeredCount) * 100)
-                    : 0;
-                const mascPct =
-                  quota.registeredCount > 0 ? Math.max(0, 100 - femPct) : 0;
-
-                return (
-                  <div
-                    key={school.id}
-                    className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:shadow-sm transition flex flex-col justify-between gap-3.5"
+          {schoolStudentQuotaList.map(({ school, quota }) => (
+            <div
+              key={school.id}
+              className="px-6 py-3.5 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+            >
+              <span className="text-slate-600">
+                Unidade vinculada: <strong className="text-slate-900 font-medium">{school.name}</strong>{' '}
+                ({school.category} · {school.natureza || 'Pública'} · {quota.registeredCount} matriculados /{' '}
+                {quota.declaredTotal} declarados)
+              </span>
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setSchoolFilter(schoolFilter === school.name ? 'all' : school.name)}
+                  className="text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
+                >
+                  {schoolFilter === school.name ? 'Mostrar todas' : 'Filtrar escola'}
+                </button>
+                {onSwitchToDirectorStudents && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDirectorSchoolId(school.id);
+                      onSwitchToDirectorStudents(school.id, school.name);
+                    }}
+                    className="text-[#e11d48] font-medium hover:underline cursor-pointer"
                   >
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#0b3d5c] block">
-                            {school.category} • {school.natureza || 'Pública'}
-                          </span>
-                          <h4 className="text-sm sm:text-base font-black text-slate-900 leading-snug mt-0.5">
-                            {school.name}
-                          </h4>
-                        </div>
-                        <span
-                          className={`shrink-0 text-[10px] font-black px-2.5 py-1 rounded-full border ${
-                            quota.pendingCount > 0
-                              ? 'bg-amber-100 text-amber-900 border-amber-300'
-                              : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          }`}
-                        >
-                          {quota.pendingCount > 0
-                            ? `${quota.pendingCount} Pendentes de Cadastro`
-                            : 'Quota Completa'}
-                        </span>
-                      </div>
-
-                      {/* Frase de Resumo Básico exacto como pedido pelo utilizador */}
-                      <div className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
-                        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed">
-                          Na escola <strong className="text-slate-950 font-black">{school.name}</strong> tem{' '}
-                          <strong className="text-slate-950 font-black">{quota.registeredCount} alunos</strong>, dos quais{' '}
-                          <strong className="text-rose-700 font-black">
-                            {quota.registeredFemaleCount} são do sexo feminino
-                          </strong>{' '}
-                          e{' '}
-                          <strong className="text-indigo-700 font-black">
-                            {quota.registeredMaleCount} são do sexo masculino
-                          </strong>
-                          .
-                        </p>
-                      </div>
-
-                      {/* Contadores Visuais: Total | Sexo Feminino | Sexo Masculino */}
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-white rounded-xl py-2 px-2 border border-slate-200">
-                          <span className="block text-[10px] uppercase text-slate-500 font-bold">Total de Alunos</span>
-                          <span className="text-lg font-black text-slate-900">{quota.registeredCount}</span>
-                        </div>
-                        <div className="bg-rose-50/80 rounded-xl py-2 px-2 border border-rose-200">
-                          <span className="block text-[10px] uppercase text-rose-700 font-bold">Sexo Feminino</span>
-                          <span className="text-lg font-black text-rose-800">{quota.registeredFemaleCount}</span>
-                          <span className="block text-[10px] text-rose-600 font-semibold">{femPct}%</span>
-                        </div>
-                        <div className="bg-indigo-50/80 rounded-xl py-2 px-2 border border-indigo-200">
-                          <span className="block text-[10px] uppercase text-indigo-700 font-bold">Sexo Masculino</span>
-                          <span className="text-lg font-black text-indigo-800">{quota.registeredMaleCount}</span>
-                          <span className="block text-[10px] text-indigo-600 font-semibold">{mascPct}%</span>
-                        </div>
-                      </div>
-
-                      {/* Barra de Proporção Feminino vs Masculino */}
-                      <div className="space-y-1">
-                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden flex">
-                          {quota.registeredCount > 0 && (
-                            <>
-                              <div
-                                className="h-full bg-rose-500 transition-all"
-                                style={{ width: `${femPct}%` }}
-                                title={`Sexo Feminino: ${quota.registeredFemaleCount} (${femPct}%)`}
-                              />
-                              <div
-                                className="h-full bg-indigo-600 transition-all"
-                                style={{ width: `${mascPct}%` }}
-                                title={`Sexo Masculino: ${quota.registeredMaleCount} (${mascPct}%)`}
-                              />
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500">
-                          <span>Quota Declarada pela Escola: <strong>{quota.declaredTotal}</strong></span>
-                          <span>Pendentes de Cadastro: <strong className="text-amber-800">{quota.pendingCount}</strong></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/70">
-                      <button
-                        type="button"
-                        onClick={() => setSchoolFilter(schoolFilter === school.name ? 'all' : school.name)}
-                        className="text-[11px] font-bold text-slate-700 hover:text-slate-900 cursor-pointer"
-                      >
-                        {schoolFilter === school.name ? '✓ A filtrar esta escola' : 'Filtrar alunos desta escola'}
-                      </button>
-                      {onSwitchToDirectorStudents && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveDirectorSchoolId(school.id);
-                            onSwitchToDirectorStudents(school.id, school.name);
-                          }}
-                          className="text-[11px] font-bold text-[#0b3d5c] hover:underline cursor-pointer flex items-center gap-1"
-                          title="Abrir painel do Director desta Escola para cadastrar alunos"
-                        >
-                          <span>Painel do Director desta Escola</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                    Aceder ao Painel do Diretor desta Escola →
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Filter and Action Bar (Apenas Filtro e Exportação — sem botão Cadastrar) */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          {/* Left: Filter dropdowns */}
+        {/* Barra de Pesquisa e Filtros Limpa */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Filtro:</span>
-            <div className="relative">
-              <select
-                value={docFilter}
-                onChange={(e) => setDocFilter(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
-              >
-                <option value="all">Todos os Alunos</option>
-                <option value="with-docs">Com Documentos (Regular)</option>
-                <option value="without-docs">Sem Documentos (Pendente)</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                ▼
-              </div>
-            </div>
+            <select
+              value={docFilter}
+              onChange={(e) => setDocFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-slate-900 cursor-pointer"
+            >
+              <option value="all">Documentação: Todos</option>
+              <option value="with-docs">Com Documentos (Regular)</option>
+              <option value="without-docs">Sem Documentos (Pendente)</option>
+            </select>
 
-            <div className="relative">
-              <select
-                value={schoolFilter}
-                onChange={(e) => setSchoolFilter(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
-              >
-                <option value="all">Todas as Escolas</option>
-                {availableSchools.map((school) => (
-                  <option key={school} value={school}>
-                    {school}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                ▼
-              </div>
-            </div>
+            <select
+              value={schoolFilter}
+              onChange={(e) => setSchoolFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-slate-900 cursor-pointer"
+            >
+              <option value="all">Unidade: Todas as Escolas</option>
+              {availableSchools.map((school) => (
+                <option key={school} value={school}>
+                  {school}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Center: Search input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar escola ou aluno registado..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+              placeholder="Pesquisar aluno registado..."
+              className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-900"
             />
-          </div>
-
-          {/* Right: Actions (Somente Consulta / PDF — O Director Municipal não cadastra alunos) */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              id="admin-btn-baixar-listas-turma"
-              onClick={() => setIsTurmaPdfModalOpen(true)}
-              className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200/70 text-slate-800 text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-xl border border-slate-200 shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
-              title="Baixar lista de alunos por turma em PDF organizada de A a Z"
-            >
-              <FileDown className="w-4 h-4 text-[#f75142]" />
-              Baixar Listas de Turma (PDF A-Z)
-            </button>
           </div>
         </div>
 

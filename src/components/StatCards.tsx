@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { Lock, ArrowRight, Settings, Percent, Bell, RefreshCw } from 'lucide-react';
+import React from 'react';
+import { Lock, ArrowRight } from 'lucide-react';
 import type { SessionCard, SessionProfile } from '../types';
-import { StatCardItem } from './StatCardItem';
 
 interface StatCardsProps {
   session: SessionProfile;
@@ -10,54 +9,47 @@ interface StatCardsProps {
   isLoggedIn?: boolean;
   onChangeRole?: (role: 'admin' | 'diretor' | 'professor') => void;
   onRequireAuth?: (actionName: string) => void;
+  liveSummary?: {
+    schoolsCount: number;
+    directorsCount: number;
+    teachersQuotaCount: number;
+    studentsRegisteredCount: number;
+    studentsPendingCount: number;
+    turmasCount: number;
+    roomsCount: number;
+    performanceRate: number;
+    onNavigate?: (target: string) => void;
+  };
 }
 
 export const StatCards: React.FC<StatCardsProps> = ({
   session,
   onSelectCard,
-  onOpenSettings,
   isLoggedIn,
   onRequireAuth,
+  liveSummary,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'clickable' | 'stats'>('all');
-
-  const handleCardClick = (card: SessionCard) => {
-    onSelectCard(card);
-  };
-
-  const filteredCards = session.cards.filter((card) => {
-    if (filter === 'clickable') return card.isClickable !== false;
-    if (filter === 'stats') return card.isClickable === false;
-    return true;
-  });
-
-  const clickableCount = session.cards.filter((c) => c.isClickable !== false).length;
-  const nonClickableCount = session.cards.filter((c) => c.isClickable === false).length;
-
   return (
-    <section id="stats-section" className="reveal-up relative z-20 max-w-5xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 pb-20">
-      {/* Informative Banner when not logged in */}
+    <section id="stats-section" className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-8">
       {!isLoggedIn && (
-        <div 
+        <div
           onClick={() => onRequireAuth?.('Autenticação no Sistema')}
-          className="mb-8 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-800 transition-all cursor-pointer shadow-2xs"
+          className="mb-6 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-800 transition cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
               <Lock className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Sessão Não Iniciada
-              </span>
-              <p className="text-xs sm:text-sm font-semibold text-slate-800">
+              <span className="text-[11px] font-medium text-slate-400">Sessão Não Iniciada</span>
+              <p className="text-xs sm:text-sm font-medium text-slate-800">
                 Inicie sessão para desbloquear todos os dados de turmas, salas, alunos e professores.
               </p>
             </div>
           </div>
-          <button 
+          <button
             type="button"
-            className="shrink-0 bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 hover:bg-black transition-colors cursor-pointer"
+            className="shrink-0 bg-slate-900 text-white text-xs font-medium px-3.5 py-2 rounded-lg flex items-center gap-1.5 hover:bg-slate-800 transition cursor-pointer"
           >
             <span>Iniciar Sessão</span>
             <ArrowRight className="w-3.5 h-3.5 text-white" />
@@ -65,85 +57,123 @@ export const StatCards: React.FC<StatCardsProps> = ({
         </div>
       )}
 
-      {/* Card Classification Filter Chips & Settings Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setFilter('all')}
-            className={`filter-chip ${filter === 'all' ? 'is-active' : ''}`}
-          >
-            Todos ({session.cards.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter('clickable')}
-            className={`filter-chip ${filter === 'clickable' ? 'is-active' : ''}`}
-          >
-            Módulos Clicáveis ({clickableCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter('stats')}
-            className={`filter-chip ${filter === 'stats' ? 'is-active' : ''}`}
-          >
-            Estatísticas ({nonClickableCount})
-          </button>
-        </div>
-
-        {/* Applied Settings Indicators & Direct Settings Trigger Button */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {session.settings?.autoSync && (
-            <span
-              title="Sincronização em tempo real ativa nas configurações"
-              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
-            >
-              Sincronização Ativa
-            </span>
-          )}
-          {session.settings?.showPercentages && (
-            <span
-              title="Exibição de percentuais ativa nas configurações"
-              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
-            >
-              Métricas em %
-            </span>
-          )}
-          {session.settings?.emailAlerts && (
-            <span
-              title="Alertas críticos ativos nas configurações"
-              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
-            >
-              Alertas Ativos
-            </span>
-          )}
-          {onOpenSettings && (
+      {/* Faixa de Métricas Contínua (Substitui 6 cards pesados) */}
+      {liveSummary ? (
+        <div className="bg-white rounded-xl border border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+          <div className="p-5">
+            <span className="text-xs text-slate-400 font-medium">Escolas Ativas</span>
+            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+              {liveSummary.schoolsCount}
+            </div>
             <button
-              id="statcards-open-settings-btn"
               type="button"
-              onClick={onOpenSettings}
-              className="btn--secondary inline-flex items-center gap-1.5"
-              title="Abrir Configurações da Sessão"
+              onClick={() => liveSummary.onNavigate?.('admin-escolas')}
+              className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-2 inline-block cursor-pointer transition-colors"
             >
-              <Settings className="w-3.5 h-3.5 text-[#52606d]" />
-              <span>Configurações</span>
+              Inspecionar →
             </button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Harmonized Cards Grid: 1 Featured Anchor Card + Clean Surface Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 max-w-5xl mx-auto items-stretch">
-        {filteredCards.map((card, index) => (
-          <StatCardItem
-            key={card.id}
-            card={card}
-            featured={index === 0}
-            onSelect={handleCardClick}
-            showPercentages={session.settings?.showPercentages !== false}
-          />
-        ))}
-      </div>
+          <div className="p-5">
+            <span className="text-xs text-slate-400 font-medium">Diretores</span>
+            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+              {liveSummary.directorsCount}
+            </div>
+            <button
+              type="button"
+              onClick={() => liveSummary.onNavigate?.('admin-directores')}
+              className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-2 inline-block cursor-pointer transition-colors"
+            >
+              Homologados →
+            </button>
+          </div>
+
+          <div className="p-5">
+            <span className="text-xs text-slate-400 font-medium">Professores (Quota)</span>
+            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+              {liveSummary.teachersQuotaCount}
+            </div>
+            <button
+              type="button"
+              onClick={() => liveSummary.onNavigate?.('admin-professores')}
+              className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-2 inline-block cursor-pointer transition-colors"
+            >
+              Ver quadro →
+            </button>
+          </div>
+
+          <div className="p-5">
+            <span className="text-xs text-slate-400 font-medium">Alunos Matriculados</span>
+            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+              {liveSummary.studentsRegisteredCount}{' '}
+              {liveSummary.studentsPendingCount > 0 && (
+                <span className="text-xs font-normal text-amber-600">
+                  / {liveSummary.studentsPendingCount} pend.
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => liveSummary.onNavigate?.('admin-alunos')}
+              className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-2 inline-block cursor-pointer transition-colors"
+            >
+              Consultar →
+            </button>
+          </div>
+
+          <div className="p-5">
+            <span className="text-xs text-slate-400 font-medium">Turmas Formadas</span>
+            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+              {liveSummary.turmasCount}
+            </div>
+            <span className="text-[11px] text-slate-400 mt-2 block">
+              {liveSummary.roomsCount} salas físicas
+            </span>
+          </div>
+
+          <div className="p-5">
+            <span className="text-xs text-slate-400 font-medium">Aproveitamento</span>
+            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+              {liveSummary.performanceRate}%
+            </div>
+            <span className="text-[11px] text-slate-400 mt-2 block">Ano 2026/2027</span>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`bg-white rounded-xl border border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 ${
+            session.cards.length >= 6
+              ? 'lg:grid-cols-6'
+              : session.cards.length === 5
+              ? 'lg:grid-cols-5'
+              : 'lg:grid-cols-4'
+          } divide-y sm:divide-y-0 sm:divide-x divide-slate-100`}
+        >
+          {session.cards.map((card) => (
+            <div key={card.id} className="p-5 flex flex-col justify-between">
+              <div>
+                <span className="text-xs text-slate-400 font-medium">{card.title}</span>
+                <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
+                  {card.value}
+                </div>
+              </div>
+              {card.isClickable !== false ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectCard(card)}
+                  className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-2 inline-block text-left cursor-pointer transition-colors"
+                >
+                  {card.actionText || 'Inspecionar'} →
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-400 mt-2 block truncate">
+                  {card.subtitle || 'Ano 2026/2027'}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 };

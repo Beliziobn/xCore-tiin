@@ -798,21 +798,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <div className="flex items-center gap-2">
               <button
-                id="navbar-public-quick-services-btn"
-                type="button"
-                onClick={() => onSelectPage('servicos-rapidos')}
-                className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold tracking-wide bg-amber-400/20 hover:bg-amber-400/30 text-[#002133] border border-amber-500/40 transition-all cursor-pointer shadow-xs active:scale-95 mr-1"
-                title="Serviços Rápidos Sem Login: Boletim, Declaração e Guia"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
-                <span className="hidden sm:inline">Serviços Rápidos</span>
-                <span className="sm:hidden">Serviços</span>
-                <span className="text-[9px] uppercase font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full border border-emerald-200">
-                  Sem login
-                </span>
-              </button>
-
-              <button
                 id="navbar-entrar-btn"
                 type="button"
                 onClick={handleLoginClick}

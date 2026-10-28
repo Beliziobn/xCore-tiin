@@ -400,41 +400,41 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
             {/* Right Column: Informações da Rede Central e Seleção */}
             <div className="lg:col-span-5 flex flex-col justify-between space-y-5 lg:pl-6 lg:border-l lg:border-slate-100">
               <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fef2f1] border border-[#fee4e2] text-xs font-bold text-[#f75142] mb-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#f75142] mb-1.5">
                   <MapPin className="w-3.5 h-3.5" />
                   <span>{selectedMunicipality === 'Todas as Escolas' ? 'Toda a Rede Central' : `Zona de ${selectedMunicipality}`}</span>
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
                   {displayValues.name}
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                  {displayValues.subtitle} • {displayValues.location}
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  {displayValues.subtitle} · {displayValues.location}
                 </p>
               </div>
 
-              {/* Indicadores Principais de Escolas e Directores */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-                <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200/60">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+              {/* Indicadores Principais de Escolas e Directores (sem caixas aninhadas) */}
+              <div className="grid grid-cols-2 divide-x divide-slate-100 py-4 border-y border-slate-100">
+                <div className="pr-4">
+                  <span className="text-xs font-medium text-slate-500 block mb-1">
                     Nº Escolas
                   </span>
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 font-display block leading-none">
+                  <span className="text-3xl font-bold text-slate-900 tabular-nums block leading-none">
                     {displayValues.schoolsCount}
                   </span>
-                  <span className="text-[11px] text-slate-500 mt-1.5 font-medium block">
-                    Unidades Ativas
+                  <span className="text-xs text-slate-400 mt-1.5 block">
+                    Unidades activas
                   </span>
                 </div>
 
-                <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200/60">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                <div className="pl-4">
+                  <span className="text-xs font-medium text-slate-500 block mb-1">
                     Nº Directores
                   </span>
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 font-display block leading-none">
+                  <span className="text-3xl font-bold text-slate-900 tabular-nums block leading-none">
                     {displayValues.directorsCount}
                   </span>
-                  <span className="text-[11px] text-slate-500 mt-1.5 font-medium block truncate" title={activeSchool ? 'Director Titular' : 'Directores Homologados'}>
-                    {activeSchool ? 'Director Titular' : 'Directores Homologados'}
+                  <span className="text-xs text-slate-400 mt-1.5 block truncate" title={activeSchool ? 'Director Titular' : 'Directores Homologados'}>
+                    {activeSchool ? 'Director titular' : 'Directores homologados'}
                   </span>
                 </div>
               </div>
@@ -573,28 +573,29 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
         </div>
 
-        {/* 3. Censo Documental: Superfície Plana com Barra de Progresso Sólida (Masakula v2.0) */}
-        <div id="admin-documentation-census" className="reveal-up bg-white rounded-2xl border border-[#e8e8ea] p-5 sm:p-6 mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-[#e8e8ea]">
+        {/* 3. Censo Documental: Superfície Plana com Barra de Progresso Sólida */}
+        <div id="admin-documentation-census" className="reveal-up bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-sm sm:text-base font-bold text-[#002133] tracking-tight">
+                <h4 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
                   Censo Documental & Regularização
                 </h4>
-                <span className="text-[11px] font-medium badge--neutral px-2 py-0.5 rounded-md">
-                  Registo Civil
+                <span className="text-xs text-slate-400 font-medium">
+                  · Registo Civil
                 </span>
               </div>
-              <p className="text-xs text-[#52606d] mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Auditoria de Certidões, Assentos e Bilhetes de Identidade dos estudantes
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-[#52606d] numeric">
-                Total: <strong className="text-[#002133]">{docsStats.total.toLocaleString('pt-AO')} alunos</strong>
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500 tabular-nums">
+              <span>
+                Total: <strong className="text-slate-900">{docsStats.total.toLocaleString('pt-AO')} alunos</strong>
               </span>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full badge--success numeric">
+              <span className="text-slate-300">·</span>
+              <span className="font-semibold text-emerald-700">
                 {docsStats.rate}% Regularizados
               </span>
             </div>
@@ -658,15 +659,14 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
         <div id="admin-schools-explorer" className="mt-8 pt-6 border-t border-slate-200/60">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <div>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <SchoolIcon className="w-5 h-5 text-[#f75142]" />
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
                 <span>Catálogo de Escolas</span>
-                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
-                  {processedSchools.length} {processedSchools.length === 1 ? 'escola' : 'escolas'}
+                <span className="text-sm font-medium text-slate-400 tabular-nums">
+                  · {processedSchools.length} {processedSchools.length === 1 ? 'escola' : 'escolas'}
                 </span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {selectedMunicipality === 'Todas as Escolas' ? 'Toda a Rede Central' : `Zona de ${selectedMunicipality}`} • Clique para inspecionar indicadores
+                {selectedMunicipality === 'Todas as Escolas' ? 'Toda a Rede Central' : `Zona de ${selectedMunicipality}`} · Clique para inspecionar indicadores
               </p>
             </div>
 
@@ -772,19 +772,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 const isEspecial = regData.oferta?.ensinoEspecial?.activo;
                 const isComplexo = regData.situacao?.regimeComplexoEscolar;
 
-                const getNatureColor = (nat: string) => {
-                  switch (nat) {
-                    case 'Pública':
-                      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                    case 'Público-Privada':
-                      return 'bg-blue-50 text-blue-700 border-blue-200';
-                    case 'Privada':
-                      return 'bg-purple-50 text-purple-700 border-purple-200';
-                    default:
-                      return 'bg-slate-50 text-slate-700 border-slate-200';
-                  }
-                };
-
                 return (
                   <div
                     key={school.id}
@@ -794,40 +781,42 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                     }}
                     className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                       isSelected
-                        ? 'bg-[#fef2f1]/80 border-[#f75142] ring-2 ring-[#f75142]/20 shadow-md'
-                        : 'bg-white hover:bg-slate-50/70 border-slate-200/90 hover:border-slate-300 shadow-2xs hover:shadow-xs'
+                        ? 'bg-[#fef2f1]/60 border-[#f75142]'
+                        : 'bg-white hover:bg-slate-50/60 border-slate-200/80 hover:border-slate-300'
                     }`}
                   >
                     <div>
-                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="flex items-center justify-between gap-2 text-xs text-slate-500 mb-3">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${getNatureColor(regData.natureza)}`}>
+                          <span className="font-medium text-slate-700">
                             {regData.natureza}
                           </span>
                           {isEspecial && (
-                            <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded-md">
-                              Especial
-                            </span>
+                            <>
+                              <span className="text-slate-300">·</span>
+                              <span className="text-rose-700 font-medium">Especial</span>
+                            </>
                           )}
                           {isComplexo && (
-                            <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md">
-                              Complexo
-                            </span>
+                            <>
+                              <span className="text-slate-300">·</span>
+                              <span className="text-slate-600">Complexo</span>
+                            </>
                           )}
                         </div>
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
-                          {school.performanceRate}% Desempenho
+                        <span className="font-semibold text-emerald-700 tabular-nums">
+                          {school.performanceRate}% aproveitamento
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 mt-3">
+                      <div className="flex items-center gap-3">
                         {school.logoSvg ? (
                           <div 
-                            className="w-10 h-10 shrink-0 rounded-xl p-0.5 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shadow-2xs"
+                            className="w-10 h-10 shrink-0 rounded-xl p-0.5 bg-slate-50 border border-slate-200/80 flex items-center justify-center overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: school.logoSvg }}
                           />
                         ) : (
-                          <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                          <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
                             <SchoolIcon className="w-5 h-5 text-slate-400" />
                           </div>
                         )}
@@ -836,7 +825,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                             {school.name}
                           </h4>
                           {regData.codigoSIGE && (
-                            <span className="text-[10px] font-mono text-slate-400 font-semibold">
+                            <span className="text-[11px] font-mono text-slate-400">
                               SIGE: {regData.codigoSIGE}
                             </span>
                           )}
@@ -846,60 +835,32 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                       <div className="mt-3 space-y-1 text-xs text-slate-600">
                         <div className="flex items-center gap-1.5">
                           <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">Director: <strong>{school.directorName}</strong></span>
+                          <span className="truncate">Director: <strong className="font-semibold text-slate-800">{school.directorName}</strong></span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">{school.location}</span>
+                          <span className="truncate text-slate-500">{school.location}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-3">
                       {(() => {
                         const q = getSchoolTeacherQuotaStatus(school);
                         const sq = getSchoolStudentQuotaStatus(school);
                         return (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-slate-500 font-semibold text-[11px]">
-                              <span title="Docentes Cadastrados na Planilha / Quota Declarada">
-                                <strong className="text-slate-800">{q.registeredCount}</strong>/{q.declaredTotal} Docentes
-                              </span>
-                              <span>•</span>
-                              <span>{school.turmasCount} Turmas</span>
-                              <span>•</span>
-                              <span title="Alunos Cadastrados na Planilha / Quota Declarada">
-                                <strong className="text-slate-800">{sq.registeredCount}</strong>/{sq.declaredTotal} Alunos
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 bg-amber-50/70 border border-amber-200/80 rounded-lg px-2.5 py-1 text-[10px]">
-                              <span className="font-bold text-amber-900">
-                                Docentes SIGE: <strong>{q.registeredCount}</strong>/{q.declaredTotal}
-                              </span>
-                              <span
-                                className={`font-black px-1.5 py-0.5 rounded ${
-                                  q.pendingCount > 0
-                                    ? 'bg-amber-200/80 text-amber-950'
-                                    : 'bg-emerald-100 text-emerald-800'
-                                }`}
-                              >
-                                {q.pendingCount > 0 ? `${q.pendingCount} Pend.` : '0 Pend.'}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 bg-cyan-50/70 border border-cyan-200/80 rounded-lg px-2.5 py-1 text-[10px]">
-                              <span className="font-bold text-cyan-950">
-                                Alunos: <strong>{sq.registeredCount}</strong>/{sq.declaredTotal} (F: <strong className="text-rose-700">{sq.registeredFemaleCount}</strong> | M: <strong className="text-indigo-700">{sq.registeredMaleCount}</strong>)
-                              </span>
-                              <span
-                                className={`font-black px-1.5 py-0.5 rounded ${
-                                  sq.pendingCount > 0
-                                    ? 'bg-amber-200/80 text-amber-950'
-                                    : 'bg-emerald-100 text-emerald-800'
-                                }`}
-                              >
-                                {sq.pendingCount > 0 ? `${sq.pendingCount} Pend.` : '0 Pend.'}
-                              </span>
-                            </div>
+                          <div className="flex items-center justify-between text-slate-500 text-xs tabular-nums">
+                            <span title="Docentes Cadastrados / Quota Declarada">
+                              <strong className="text-slate-900 font-semibold">{q.registeredCount}</strong>/{q.declaredTotal} Docentes
+                            </span>
+                            <span className="text-slate-300">·</span>
+                            <span>
+                              <strong className="text-slate-900 font-semibold">{school.turmasCount}</strong> Turmas
+                            </span>
+                            <span className="text-slate-300">·</span>
+                            <span title="Alunos Cadastrados / Quota Declarada">
+                              <strong className="text-slate-900 font-semibold">{sq.registeredCount}</strong>/{sq.declaredTotal} Alunos
+                            </span>
                           </div>
                         );
                       })()}
@@ -958,19 +919,6 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 const isEspecial = regData.oferta?.ensinoEspecial?.activo;
                 const isComplexo = regData.situacao?.regimeComplexoEscolar;
 
-                const getNatureColor = (nat: string) => {
-                  switch (nat) {
-                    case 'Pública':
-                      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                    case 'Público-Privada':
-                      return 'bg-blue-50 text-blue-700 border-blue-200';
-                    case 'Privada':
-                      return 'bg-purple-50 text-purple-700 border-purple-200';
-                    default:
-                      return 'bg-slate-50 text-slate-700 border-slate-200';
-                  }
-                };
-
                 return (
                   <div
                     key={school.id}
@@ -980,7 +928,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                     }}
                     className={`p-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-[#fef2f1]/80 ring-1 ring-inset ring-[#f75142]'
+                        ? 'bg-[#fef2f1]/60 ring-1 ring-inset ring-[#f75142]'
                         : 'hover:bg-slate-50/70'
                     }`}
                   >
@@ -988,11 +936,11 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                     <div className="flex items-center gap-3.5 min-w-0 md:w-5/12">
                       {school.logoSvg ? (
                         <div 
-                          className="w-10 h-10 shrink-0 rounded-xl p-0.5 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shadow-2xs"
+                          className="w-10 h-10 shrink-0 rounded-xl p-0.5 bg-slate-50 border border-slate-200/80 flex items-center justify-center overflow-hidden"
                           dangerouslySetInnerHTML={{ __html: school.logoSvg }}
                         />
                       ) : (
-                        <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                        <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
                           <SchoolIcon className="w-5 h-5 text-slate-400" />
                         </div>
                       )}
@@ -1001,27 +949,27 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                           <h4 className="text-sm font-bold text-slate-900 truncate" title={school.name}>
                             {school.name}
                           </h4>
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${getNatureColor(regData.natureza)}`}>
-                            {regData.natureza}
+                          <span className="text-xs text-slate-500">
+                            · {regData.natureza}
                           </span>
                           {isEspecial && (
-                            <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1 py-0.5 rounded">
-                              Especial
+                            <span className="text-xs text-rose-700 font-medium">
+                              · Especial
                             </span>
                           )}
                           {isComplexo && (
-                            <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1 py-0.5 rounded">
-                              Complexo
+                            <span className="text-xs text-slate-500">
+                              · Complexo
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium mt-0.5">
-                          <span>Director: <strong className="text-slate-700">{school.directorName}</strong></span>
-                          <span>•</span>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                          <span>Director: <strong className="text-slate-700 font-semibold">{school.directorName}</strong></span>
+                          <span>·</span>
                           <span className="truncate">{school.location}</span>
                           {regData.codigoSIGE && (
                             <>
-                              <span>•</span>
+                              <span>·</span>
                               <span className="font-mono text-slate-400">SIGE: {regData.codigoSIGE}</span>
                             </>
                           )}

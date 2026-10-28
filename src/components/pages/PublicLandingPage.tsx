@@ -85,11 +85,6 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </span>
           </h1>
 
-          {/* Subtitle */}
-          <p className="text-slate-600 text-base sm:text-lg md:text-xl font-normal text-center max-w-3xl mx-auto mt-6 sm:mt-7 leading-relaxed text-balance">
-            Automatize a burocracia acadêmica, elimine o retrabalho em boletins e acompanhe a evolução de cada estudante com 100% de conformidade com a BNCC e o Censo Escolar.
-          </p>
-
           {/* Primary Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 mt-9 sm:mt-10 w-full max-w-md sm:max-w-none">
             {/* Começa agora */}
