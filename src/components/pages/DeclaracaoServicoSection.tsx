@@ -14,6 +14,10 @@ import {
   Eye,
   Landmark,
   ShieldCheck,
+  Database,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import {
@@ -90,26 +94,26 @@ function getTodayIso(): string {
 
 function getInitialServicoFormState(): DeclaracaoServicoFormState {
   return {
-    tratamento: '',
+    tratamento: 'Senhor',
     nome: '',
     nascimento: '',
-    naturalidade: '',
-    provNat: '',
+    naturalidade: 'Malanje',
+    provNat: 'Malanje',
     pai: '',
     mae: '',
     bi: '',
     biData: '',
-    profissao: '',
-    grau: '',
-    categoria: 'P.E.P.E.S do ',
+    profissao: 'Professor do Ensino Primário',
+    grau: '11º Grau',
+    categoria: 'P.E.P.E.S do 11º',
     agente: '',
     municipio: 'Quêssua',
-    escola: '',
-    banco: '',
+    escola: 'Complexo Escolar Católico n.º 166 MJE São Pedro – Quêssua',
+    banco: 'Banco Sol',
     bancoOutro: '',
     conta: '',
     salario: '',
-    finalidade: '',
+    finalidade: 'à regularização da conta bancária',
     provEmissao: 'Malanje',
     municipioAdm: 'Quêssua',
     direccao: 'Direcção Municipal de Educação',
@@ -134,6 +138,8 @@ export const DeclaracaoServicoSection: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [recordToDelete, setRecordToDelete] = useState<DeclaracaoServicoRecord | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isDbCollapsed, setIsDbCollapsed] = useState(false);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(true);
 
   const todayISO = useMemo(() => getTodayIso(), []);
 
@@ -178,6 +184,54 @@ export const DeclaracaoServicoSection: React.FC = () => {
     [salarioNumero]
   );
 
+  // Live preview record derived from current formData (or submittedRecord if explicitly viewing one)
+  const livePreviewRecord: DeclaracaoServicoRecord = useMemo(() => {
+    if (submittedRecord) return submittedRecord;
+    const salKz = parseKz(formData.salario);
+    const ext = salKz > 0 ? extensoKz(salKz) : 'valor por extenso';
+    const bancoFinal =
+      formData.banco === 'Outro'
+        ? formData.bancoOutro.trim() || 'Banco Comercial'
+        : formData.banco.trim() || 'Banco Comercial';
+
+    return {
+      id: formData.id || 'preview-live',
+      ref: formData.ref || 'PRE-VISUALIZAÇÃO',
+      criadoEm: formData.criadoEm || todayISO,
+      tratamento: (formData.tratamento as 'Senhor' | 'Senhora') || 'Senhor',
+      nome: formData.nome.trim() || '[Nome Completo do Funcionário]',
+      nascimento: formData.nascimento.trim() || '1988-05-12',
+      naturalidade: formData.naturalidade.trim() || 'Malanje',
+      provNat: formData.provNat.trim() || 'Malanje',
+      pai: formData.pai.trim() || '[Nome do Pai]',
+      mae: formData.mae.trim() || '[Nome da Mãe]',
+      bi: formData.bi.trim().toUpperCase() || '[000000000AA000]',
+      biData: formData.biData.trim() || todayISO,
+      profissao: formData.profissao.trim() || 'Professor do Ensino Primário',
+      grau: formData.grau.trim() || '11º Grau',
+      categoria: formData.categoria.trim() || 'P.E.P.E.S do 11º',
+      agente: formData.agente.trim() || '[Nº Agente]',
+      municipio: formData.municipio.trim() || 'Quêssua',
+      escola:
+        formData.escola.trim() ||
+        'Complexo Escolar Católico n.º 166 MJE São Pedro – Quêssua',
+      banco: formData.banco.trim() || 'Banco Sol',
+      bancoOutro: formData.bancoOutro.trim(),
+      bancoNome: bancoFinal,
+      conta: formData.conta.trim() || '[0000-000000-000]',
+      salario: salKz > 0 ? fmtKz(salKz) : '0,00',
+      salarioKz: salKz,
+      extenso: ext,
+      finalidade: formData.finalidade.trim() || 'à regularização da conta bancária',
+      provEmissao: formData.provEmissao.trim() || 'Malanje',
+      municipioAdm: formData.municipioAdm.trim() || 'Quêssua',
+      direccao: formData.direccao.trim() || 'Direcção Municipal de Educação',
+      localEmissao: formData.localEmissao.trim() || 'Quêssua',
+      dataEmissao: formData.dataEmissao.trim() || todayISO,
+      director: formData.director.trim() || 'Belizio Miguel dos Santos António',
+    };
+  }, [formData, submittedRecord, todayISO]);
+
   // Real-time duplicate check in Declaração de Serviço database
   const duplicateWarning = useMemo(() => {
     if (!formData.bi && !formData.agente) return null;
@@ -185,7 +239,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
     return dup.isDuplicate ? dup : null;
   }, [formData.bi, formData.agente, formData.id, records]);
 
-  // Field validation matching Cadastro_de_Pessoal_6faeaf90.html
+  // Field validation
   const validateSingleField = (
     name: keyof DeclaracaoServicoFormState,
     val: string,
@@ -271,72 +325,14 @@ export const DeclaracaoServicoSection: React.FC = () => {
     }
   };
 
-  // Section progress calculation for sticky left rail (I to VII)
-  const sectionProgress = useMemo(() => {
-    const s1Fields: (keyof DeclaracaoServicoFormState)[] = [
-      'tratamento',
-      'nome',
-      'nascimento',
-      'naturalidade',
-      'provNat',
-    ];
-    const s2Fields: (keyof DeclaracaoServicoFormState)[] = ['mae'];
-    const s3Fields: (keyof DeclaracaoServicoFormState)[] = ['bi', 'biData'];
-    const s4Fields: (keyof DeclaracaoServicoFormState)[] = [
-      'profissao',
-      'grau',
-      'categoria',
-      'agente',
-      'municipio',
-      'escola',
-    ];
-    const s5Fields: (keyof DeclaracaoServicoFormState)[] =
-      formData.banco === 'Outro'
-        ? ['banco', 'bancoOutro', 'conta', 'salario']
-        : ['banco', 'conta', 'salario'];
-    const s6Fields: (keyof DeclaracaoServicoFormState)[] = ['finalidade'];
-
-    const countFilled = (fields: (keyof DeclaracaoServicoFormState)[]) => {
-      const filled = fields.filter((k) => {
-        const val = String(formData[k] || '').trim();
-        if (k === 'categoria' && val.toUpperCase() === 'P.E.P.E.S DO') return false;
-        return val !== '';
-      }).length;
-      return {
-        filled,
-        total: fields.length,
-        done: fields.length > 0 && filled === fields.length,
-      };
-    };
-
-    const s1 = countFilled(s1Fields);
-    const s2 = countFilled(s2Fields);
-    const s3 = countFilled(s3Fields);
-    const s4 = countFilled(s4Fields);
-    const s5 = countFilled(s5Fields);
-    const s6 = countFilled(s6Fields);
-
-    const totalReq = s1.total + s2.total + s3.total + s4.total + s5.total + s6.total;
-    const filledReq = s1.filled + s2.filled + s3.filled + s4.filled + s5.filled + s6.filled;
-    const percent = totalReq > 0 ? Math.round((filledReq / totalReq) * 100) : 0;
-
-    return {
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      totalReq,
-      filledReq,
-      percent,
-    };
-  }, [formData]);
-
   const handleFieldChange = (field: keyof DeclaracaoServicoFormState, rawValue: string) => {
     let value = rawValue;
     if (field === 'bi') {
       value = rawValue.toUpperCase().replace(/\s/g, '');
+    }
+
+    if (submittedRecord) {
+      setSubmittedRecord(null);
     }
 
     setFormData((prev) => {
@@ -369,6 +365,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
   };
 
   const handleSelectChip = (text: string) => {
+    if (submittedRecord) setSubmittedRecord(null);
     setFormData((prev) => ({ ...prev, finalidade: text }));
     setErrors((prev) => ({ ...prev, finalidade: '' }));
   };
@@ -380,6 +377,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
     setFormErrorBanner(null);
     setSubmittedRecord(null);
     setCopyNote(null);
+    showToast('Formulário de Declaração de Serviço limpo.');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -421,7 +419,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
     setErrors(newErrors);
 
     if (firstInvalidField) {
-      setFormErrorBanner('Há campos por corrigir. Confira as mensagens a vermelho.');
+      setFormErrorBanner('Há campos obrigatórios por corrigir. Confira as mensagens assinaladas.');
       const el = document.getElementById(`f-servico-${firstInvalidField}`);
       if (el) el.focus();
       return;
@@ -475,6 +473,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
 
     reloadRecords();
     setSubmittedRecord(saveRes.record);
+    setIsPreviewExpanded(true);
     setCopyNote(null);
     showToast(
       formData.id
@@ -483,84 +482,9 @@ export const DeclaracaoServicoSection: React.FC = () => {
     );
 
     setTimeout(() => {
-      const resEl = document.getElementById('servico-result-panel');
+      const resEl = document.getElementById('servico-live-preview-panel');
       if (resEl) resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
-  };
-
-  // Build plain text lines matching declaracao(r) in Cadastro_de_Pessoal_6faeaf90.html
-  const buildDeclarationLines = (r: DeclaracaoServicoRecord) => {
-    const f = r.tratamento === 'Senhora';
-    const lines: { c: 'ph' | 'pt' | 'pb' | 'pl' | 'ps'; t: string }[] = [];
-
-    lines.push({ c: 'ph', t: 'República de Angola' });
-    if (r.provEmissao) lines.push({ c: 'ph', t: `Governo Provincial de ${r.provEmissao}` });
-    if (r.municipioAdm) lines.push({ c: 'ph', t: `Administração Municipal de ${r.municipioAdm}` });
-    if (r.direccao) lines.push({ c: 'ph', t: r.direccao });
-    lines.push({ c: 'pt', t: 'DECLARAÇÃO DE SERVIÇO' });
-
-    const fil = `${f ? 'filha' : 'filho'} de ${r.pai ? `${r.pai} e de ${r.mae}` : r.mae}`;
-    const corpo =
-      `Para os devidos efeitos achados convenientes, declara-se que ${f ? 'a senhora ' : 'o senhor '}${r.nome}` +
-      `, ${fil}, natural de ${r.naturalidade}, Província de ${r.provNat}` +
-      `, ${f ? 'nascida' : 'nascido'} aos ${fmtDateDeclaracaoServico(r.nascimento)}` +
-      `, ${f ? 'portadora' : 'portador'} do BI nº ${r.bi}, emitido aos ${fmtDateDeclaracaoServico(r.biData)}` +
-      `, ${r.profissao} do ${r.grau}, ${f ? 'colocada' : 'colocado'} no Município de ${r.municipio}` +
-      `, local de trabalho: ${r.escola}, com a categoria de ${r.categoria}, Agente nº ${r.agente}` +
-      `, é cliente do ${r.bancoNome}, titular da conta bancária nº ${r.conta}` +
-      `, auferindo o salário líquido de ${fmtKz(r.salarioKz)} Kz (${r.extenso}).`;
-
-    lines.push({ c: 'pb', t: corpo });
-    lines.push({
-      c: 'pb',
-      t: `Observação: A presente declaração destina-se ${r.finalidade.replace(/\.$/, '')}.`,
-    });
-    lines.push({
-      c: 'pb',
-      t: 'Por ser verdade e me ter sido pedido, mandei passar a presente declaração, que vai por mim assinada e autenticada com carimbo a óleo em uso nesta Direcção.',
-    });
-
-    const local = [r.direccao, r.localEmissao].filter(Boolean).join(', ');
-    if (local || r.dataEmissao) {
-      lines.push({
-        c: 'pl',
-        t: `${local ? `${local} ` : ''}${r.dataEmissao ? `aos ${fmtDateDeclaracaoServico(r.dataEmissao)}.` : ''}`,
-      });
-    }
-    lines.push({ c: 'ps', t: 'O Director Municipal' });
-    if (r.director) lines.push({ c: 'pl', t: r.director });
-
-    return lines;
-  };
-
-  const handleCopyPlainText = (r: DeclaracaoServicoRecord) => {
-    const txt = buildDeclarationLines(r)
-      .map((l) => l.t)
-      .join('\n\n');
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard
-        .writeText(txt)
-        .then(() => setCopyNote('Texto copiado para a área de transferência.'))
-        .catch(() => setCopyNote('Não foi possível copiar automaticamente.'));
-    } else {
-      setCopyNote('Copie o texto diretamente da folha abaixo.');
-    }
-  };
-
-  const handleDownloadTxt = (r: DeclaracaoServicoRecord) => {
-    const txt = buildDeclarationLines(r)
-      .map((l) => l.t)
-      .join('\n\n');
-    const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `declaracao-${r.ref}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setCopyNote('Ficheiro .txt descarregado com sucesso.');
   };
 
   const handleExportCsv = () => {
@@ -652,8 +576,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
     setSubmittedRecord(null);
     setErrors({});
     setFormErrorBanner(null);
-    window.scrollTo({ top: 180, behavior: 'smooth' });
-    showToast(`A editar registo de ${r.nome} (${r.ref}).`);
+    showToast(`Registo de ${r.nome} (${r.ref}) carregado para edição e pré-visualização.`);
   };
 
   const filteredRecords = useMemo(() => {
@@ -667,1001 +590,330 @@ export const DeclaracaoServicoSection: React.FC = () => {
     );
   }, [records, searchQuery]);
 
-  const scrollToSection = (secId: string) => {
-    const el = document.getElementById(secId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const pillInputClass = (hasError?: boolean) =>
+    `w-full h-11 px-4 rounded-full border bg-white text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all ${
+      hasError
+        ? 'border-[#d92d20] bg-red-50/20 focus:border-[#d92d20] focus:ring-2 focus:ring-[#d92d20]/15'
+        : 'border-slate-300 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10'
+    }`;
 
   return (
-    <div id="declaracao-servico-module" className="w-full space-y-8 animate-in fade-in duration-150">
+    <div id="declaracao-servico-module" className="w-full space-y-6 animate-in fade-in duration-150">
       {/* Toast Feedback */}
       {toastMsg && (
-        <div className="no-print fixed top-20 right-6 z-50 bg-[#101C2B] text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
+        <div className="no-print fixed top-20 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* Top Module Distinction Header */}
-      <div className="no-print bg-white border border-[#D3DADF] rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-        <div className="flex items-center gap-3">
-          <span
-            className="w-6 h-6 shrink-0 rounded-xs"
-            style={{ background: 'linear-gradient(135deg, #A8231B 50%, #101C2B 50%)' }}
-            aria-hidden="true"
-          />
+      {/* ================================================================= */}
+      {/* EXEMPLAR HEADER: Circular Icon + Title + Subtitle + Hairline      */}
+      {/* ================================================================= */}
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-full bg-[#f2f4f7] border border-slate-200/80 flex items-center justify-center text-slate-800 shrink-0">
+            <Landmark className="w-5 h-5" />
+          </div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-xs uppercase tracking-[0.14em] text-[#566475]">
-                República de Angola • Módulo Exclusivo
-              </span>
-              <span className="text-[11px] bg-amber-100 text-amber-900 font-bold px-2.5 py-0.5 rounded-full">
-                Declaração de Serviço (Conta & Salário)
-              </span>
-            </div>
-            <p className="text-xs text-[#566475] mt-0.5">
-              Base de dados e formulário dedicados exclusivamente à emissão de <strong>Declaração de Serviço Bancária / Salarial</strong> (independente da Declaração de Efectividade).
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Declaração de Serviço
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500">
+              Dados bancários, salário líquido em Kwanzas (Kz) e emissão oficial A4
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {submittedRecord && (
-            <button
-              type="button"
-              onClick={() => setSubmittedRecord(null)}
-              className="px-3.5 py-2 rounded-lg text-xs font-bold border border-[#101C2B] text-[#101C2B] hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              ← Voltar ao Formulário
-            </button>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              const adminEl = document.getElementById('servico-admin-list');
-              if (adminEl) adminEl.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#101C2B] text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5"
+            onClick={handleResetForm}
+            className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Landmark className="w-3.5 h-3.5 text-amber-400" />
-            <span>Registos Recebidos ({records.length})</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Novo Registo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadDeclaracaoServicoPdf(livePreviewRecord)}
+            className="h-10 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>Baixar PDF</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => printSinglePageA4Clean('declaracao-servico-a4-sheet')}
+            className="h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Imprimir A4</span>
           </button>
         </div>
       </div>
 
-      {/* Main Shell: Left Sticky Index Rail + Right Form / Result */}
-      {!submittedRecord ? (
-        <div className="no-print grid grid-cols-1 lg:grid-cols-[290px_minmax(0,1fr)] gap-8 lg:gap-12 items-start">
-          {/* Left Sticky Section Index Rail */}
-          <aside className="min-w-0 lg:sticky lg:top-20 bg-white lg:bg-transparent p-5 lg:p-0 rounded-xl border border-[#D3DADF] lg:border-0">
-            <h1 className="font-black text-3xl sm:text-4xl text-[#101C2B] tracking-tight leading-[1.02] mb-3">
-              Cadastro de Pessoal
-            </h1>
-            <p className="text-sm text-[#566475] mb-6 leading-relaxed">
-              Preencha os dados uma vez. Eles servem para emitir a Declaração de Serviço.
-            </p>
+      {/* ================================================================= */}
+      {/* ENCIMA 1: BASE DE DADOS DA DECLARAÇÃO DE SERVIÇO                  */}
+      {/* ================================================================= */}
+      <section
+        id="servico-admin-list"
+        className="no-print bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+              <Database className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                Base de Dados — Declaração de Serviço ({records.length})
+              </h2>
+              <p className="text-xs text-slate-500">
+                Selecione qualquer funcionário cadastrado para carregar ou imprimir a declaração
+              </p>
+            </div>
+          </div>
 
-            <ol className="border-t border-[#D3DADF] list-none m-0 p-0">
-              {[
-                {
-                  id: 's1',
-                  rn: 'I',
-                  title: 'Identificação',
-                  stat: `${sectionProgress.s1.done ? '✓ ' : ''}${sectionProgress.s1.filled}/${sectionProgress.s1.total}`,
-                  done: sectionProgress.s1.done,
-                },
-                {
-                  id: 's2',
-                  rn: 'II',
-                  title: 'Filiação',
-                  stat: `${sectionProgress.s2.done ? '✓ ' : ''}${sectionProgress.s2.filled}/${sectionProgress.s2.total}`,
-                  done: sectionProgress.s2.done,
-                },
-                {
-                  id: 's3',
-                  rn: 'III',
-                  title: 'Bilhete de Identidade',
-                  stat: `${sectionProgress.s3.done ? '✓ ' : ''}${sectionProgress.s3.filled}/${sectionProgress.s3.total}`,
-                  done: sectionProgress.s3.done,
-                },
-                {
-                  id: 's4',
-                  rn: 'IV',
-                  title: 'Situação profissional',
-                  stat: `${sectionProgress.s4.done ? '✓ ' : ''}${sectionProgress.s4.filled}/${sectionProgress.s4.total}`,
-                  done: sectionProgress.s4.done,
-                },
-                {
-                  id: 's5',
-                  rn: 'V',
-                  title: 'Conta e salário',
-                  stat: `${sectionProgress.s5.done ? '✓ ' : ''}${sectionProgress.s5.filled}/${sectionProgress.s5.total}`,
-                  done: sectionProgress.s5.done,
-                },
-                {
-                  id: 's6',
-                  rn: 'VI',
-                  title: 'Finalidade',
-                  stat: `${sectionProgress.s6.done ? '✓ ' : ''}${sectionProgress.s6.filled}/${sectionProgress.s6.total}`,
-                  done: sectionProgress.s6.done,
-                },
-                {
-                  id: 's7',
-                  rn: 'VII',
-                  title: 'Dados da emissão',
-                  stat: 'opcional',
-                  done: false,
-                },
-              ].map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => scrollToSection(`sec-servico-${item.id}`)}
-                    className="w-full grid grid-cols-[34px_1fr_auto] items-baseline gap-1 py-2.5 px-1 border-b border-[#D3DADF] text-left text-sm text-[#101C2B] hover:bg-white/60 transition-colors cursor-pointer group"
-                  >
-                    <span className="font-mono text-xs text-[#566475] tracking-wider">
-                      {item.rn}
-                    </span>
-                    <span className="group-hover:underline font-medium">{item.title}</span>
-                    <span
-                      className={`font-mono text-xs tabular-nums ${
-                        item.done ? 'text-[#1D7048] font-bold' : 'text-[#566475]'
-                      }`}
-                    >
-                      {item.stat}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-
-            <p className="font-mono text-xs text-[#566475] mt-4 tabular-nums" aria-live="polite">
-              {sectionProgress.filledReq} de {sectionProgress.totalReq} campos obrigatórios
-            </p>
-            <div className="h-1.5 bg-[#D3DADF] mt-2 rounded-full overflow-hidden max-w-[300px]">
-              <div
-                className="h-full bg-[#1D7048] transition-all duration-300"
-                style={{ width: `${sectionProgress.percent}%` }}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Procurar nome, BI ou agente..."
+                aria-label="Procurar registos"
+                className="w-full h-9 pl-9 pr-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-900 outline-none focus:border-slate-900"
               />
             </div>
 
-            {formData.id && (
-              <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-1.5">
-                <p className="font-bold">Modo de Edição Ativo ({formData.ref})</p>
-                <button
-                  type="button"
-                  onClick={handleResetForm}
-                  className="underline font-semibold text-amber-950 cursor-pointer"
-                >
-                  Cancelar edição e limpar
-                </button>
-              </div>
-            )}
-          </aside>
-
-          {/* Right Form */}
-          <div className="min-w-0 space-y-6">
-            {duplicateWarning && duplicateWarning.duplicateRecord && (
-              <div
-                role="alert"
-                className="bg-amber-50 border-2 border-amber-500 rounded-xl p-4 flex items-start gap-3 text-amber-950 shadow-xs"
+            {records.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                className="h-9 px-3.5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="text-xs sm:text-sm space-y-1 flex-1">
-                  <p className="font-bold">
-                    Registo já existente na Declaração de Serviço ({duplicateWarning.duplicateRecord.ref})
-                  </p>
-                  <p>
-                    Já consta <strong>{duplicateWarning.duplicateRecord.nome}</strong> com o mesmo{' '}
-                    {duplicateWarning.reason === 'bi' ? 'número de BI' : 'número de Agente'}.
-                  </p>
-                  <div className="pt-1 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSubmittedRecord(duplicateWarning.duplicateRecord!)}
-                      className="px-3 py-1 bg-[#101C2B] text-white rounded-md text-xs font-semibold cursor-pointer"
-                    >
-                      Ver Declaração Existente
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleEditRecord(duplicateWarning.duplicateRecord!)}
-                      className="px-3 py-1 bg-white border border-amber-600 text-amber-900 rounded-md text-xs font-semibold cursor-pointer"
-                    >
-                      Editar Registo
-                    </button>
-                  </div>
-                </div>
-              </div>
+                <Download className="w-3.5 h-3.5" />
+                <span>Exportar CSV</span>
+              </button>
             )}
 
-            <form onSubmit={handleSubmit} noValidate className="grid gap-7">
-              {/* SECTION I: Identificação pessoal */}
-              <section
-                id="sec-servico-s1"
-                className="bg-white border border-[#D3DADF] rounded-lg p-6 scroll-mt-20"
-              >
-                <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 mb-5">
-                  <span className="font-mono text-sm pt-1 text-[#A8231B] font-semibold">I</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-[#101C2B] leading-tight">
-                      Identificação pessoal
-                    </h2>
-                    <p className="text-sm text-[#566475] mt-1">
-                      Escreva como consta no Bilhete de Identidade.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-tratamento" className="text-[13px] font-semibold text-[#101C2B]">
-                      Tratamento<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <select
-                      id="f-servico-tratamento"
-                      value={formData.tratamento}
-                      onChange={(e) => handleFieldChange('tratamento', e.target.value)}
-                      onBlur={() => handleFieldBlur('tratamento')}
-                      aria-invalid={Boolean(errors.tratamento)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.tratamento ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    >
-                      <option value="">Escolha</option>
-                      <option value="Senhor">Senhor</option>
-                      <option value="Senhora">Senhora</option>
-                    </select>
-                    {errors.tratamento && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.tratamento}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-3">
-                    <label htmlFor="f-servico-nome" className="text-[13px] font-semibold text-[#101C2B]">
-                      Nome completo<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-nome"
-                      type="text"
-                      value={formData.nome}
-                      onChange={(e) => handleFieldChange('nome', e.target.value)}
-                      onBlur={() => handleFieldBlur('nome')}
-                      placeholder="Ex.: Maria Teresa Domingos"
-                      aria-invalid={Boolean(errors.nome)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.nome ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.nome && <p className="text-[13px] text-[#B3261E] m-0">{errors.nome}</p>}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-nascimento" className="text-[13px] font-semibold text-[#101C2B]">
-                      Data de nascimento<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-nascimento"
-                      type="date"
-                      max={todayISO}
-                      value={formData.nascimento}
-                      onChange={(e) => handleFieldChange('nascimento', e.target.value)}
-                      onBlur={() => handleFieldBlur('nascimento')}
-                      aria-invalid={Boolean(errors.nascimento)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.nascimento ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.nascimento && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.nascimento}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-naturalidade" className="text-[13px] font-semibold text-[#101C2B]">
-                      Natural de (município)<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-naturalidade"
-                      type="text"
-                      value={formData.naturalidade}
-                      onChange={(e) => handleFieldChange('naturalidade', e.target.value)}
-                      onBlur={() => handleFieldBlur('naturalidade')}
-                      placeholder="Ex.: Cacuso"
-                      aria-invalid={Boolean(errors.naturalidade)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.naturalidade ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.naturalidade && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.naturalidade}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-provNat" className="text-[13px] font-semibold text-[#101C2B]">
-                      Província de naturalidade<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <select
-                      id="f-servico-provNat"
-                      value={formData.provNat}
-                      onChange={(e) => handleFieldChange('provNat', e.target.value)}
-                      onBlur={() => handleFieldBlur('provNat')}
-                      aria-invalid={Boolean(errors.provNat)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.provNat ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    >
-                      <option value="">Escolha</option>
-                      {ANGOLA_PROVINCIAS_SERVICO.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.provNat && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.provNat}</p>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              {/* SECTION II: Filiação */}
-              <section
-                id="sec-servico-s2"
-                className="bg-white border border-[#D3DADF] rounded-lg p-6 scroll-mt-20"
-              >
-                <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 mb-5">
-                  <span className="font-mono text-sm pt-1 text-[#A8231B] font-semibold">II</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-[#101C2B] leading-tight">Filiação</h2>
-                    <p className="text-sm text-[#566475] mt-1">
-                      Nomes dos pais, como constam no registo.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-pai" className="text-[13px] font-semibold text-[#101C2B]">
-                      Nome do pai
-                    </label>
-                    <input
-                      id="f-servico-pai"
-                      type="text"
-                      value={formData.pai}
-                      onChange={(e) => handleFieldChange('pai', e.target.value)}
-                      placeholder="Ex.: Domingos Manuel"
-                      className="min-h-[44px] px-3 py-2.5 rounded-md border border-[#D3DADF] focus:border-[#1B5FAA] bg-white text-base text-[#101C2B] outline-none transition-colors"
-                    />
-                    <p className="text-[12.5px] text-[#566475] m-0">
-                      Pode ficar em branco se não constar.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-mae" className="text-[13px] font-semibold text-[#101C2B]">
-                      Nome da mãe<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-mae"
-                      type="text"
-                      value={formData.mae}
-                      onChange={(e) => handleFieldChange('mae', e.target.value)}
-                      onBlur={() => handleFieldBlur('mae')}
-                      placeholder="Ex.: Ana Paula Gomes"
-                      aria-invalid={Boolean(errors.mae)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.mae ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.mae && <p className="text-[13px] text-[#B3261E] m-0">{errors.mae}</p>}
-                  </div>
-                </div>
-              </section>
-
-              {/* SECTION III: Bilhete de Identidade */}
-              <section
-                id="sec-servico-s3"
-                className="bg-white border border-[#D3DADF] rounded-lg p-6 scroll-mt-20"
-              >
-                <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 mb-5">
-                  <span className="font-mono text-sm pt-1 text-[#A8231B] font-semibold">III</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-[#101C2B] leading-tight">
-                      Bilhete de Identidade
-                    </h2>
-                    <p className="text-sm text-[#566475] mt-1">
-                      O número tem 14 caracteres: 9 números, 2 letras e 3 números.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-bi" className="text-[13px] font-semibold text-[#101C2B]">
-                      BI nº<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-bi"
-                      type="text"
-                      maxLength={14}
-                      value={formData.bi}
-                      onChange={(e) => handleFieldChange('bi', e.target.value)}
-                      onBlur={() => handleFieldBlur('bi')}
-                      placeholder="000000000AA000"
-                      aria-invalid={Boolean(errors.bi)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white font-mono text-[15px] tracking-wider text-[#101C2B] outline-none transition-colors ${
-                        errors.bi ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.bi && <p className="text-[13px] text-[#B3261E] m-0">{errors.bi}</p>}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-biData" className="text-[13px] font-semibold text-[#101C2B]">
-                      Data de emissão<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-biData"
-                      type="date"
-                      max={todayISO}
-                      value={formData.biData}
-                      onChange={(e) => handleFieldChange('biData', e.target.value)}
-                      onBlur={() => handleFieldBlur('biData')}
-                      aria-invalid={Boolean(errors.biData)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.biData ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.biData && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.biData}</p>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              {/* SECTION IV: Situação profissional */}
-              <section
-                id="sec-servico-s4"
-                className="bg-white border border-[#D3DADF] rounded-lg p-6 scroll-mt-20"
-              >
-                <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 mb-5">
-                  <span className="font-mono text-sm pt-1 text-[#A8231B] font-semibold">IV</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-[#101C2B] leading-tight">
-                      Situação profissional
-                    </h2>
-                    <p className="text-sm text-[#566475] mt-1">
-                      Dados do cargo e do local onde está colocado.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <label htmlFor="f-servico-profissao" className="text-[13px] font-semibold text-[#101C2B]">
-                      Profissão<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <select
-                      id="f-servico-profissao"
-                      value={formData.profissao}
-                      onChange={(e) => handleFieldChange('profissao', e.target.value)}
-                      onBlur={() => handleFieldBlur('profissao')}
-                      aria-invalid={Boolean(errors.profissao)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.profissao ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    >
-                      <option value="">Escolha</option>
-                      <option value="Professor do Ensino Primário">Professor do Ensino Primário</option>
-                      <option value="Professor do Ensino Secundário">Professor do Ensino Secundário</option>
-                      <option value="Professor do Ensino Primário e Secundário">
-                        Professor do Ensino Primário e Secundário
-                      </option>
-                      {formData.profissao &&
-                        ![
-                          'Professor do Ensino Primário',
-                          'Professor do Ensino Secundário',
-                          'Professor do Ensino Primário e Secundário',
-                        ].includes(formData.profissao) && (
-                          <option value={formData.profissao}>{formData.profissao}</option>
-                        )}
-                    </select>
-                    {errors.profissao && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.profissao}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-grau" className="text-[13px] font-semibold text-[#101C2B]">
-                      Grau<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-grau"
-                      type="text"
-                      value={formData.grau}
-                      onChange={(e) => handleFieldChange('grau', e.target.value)}
-                      onBlur={() => handleFieldBlur('grau')}
-                      placeholder="Ex.: 12º Grau"
-                      aria-invalid={Boolean(errors.grau)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.grau ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    <p className="text-[12.5px] text-[#566475] m-0">
-                      A declaração lê: profissão do grau indicado.
-                    </p>
-                    {errors.grau && <p className="text-[13px] text-[#B3261E] m-0">{errors.grau}</p>}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-categoria" className="text-[13px] font-semibold text-[#101C2B]">
-                      Categoria<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-categoria"
-                      type="text"
-                      value={formData.categoria}
-                      onChange={(e) => handleFieldChange('categoria', e.target.value)}
-                      onBlur={() => handleFieldBlur('categoria')}
-                      placeholder="Ex.: P.E.P.E.S do 12º"
-                      aria-invalid={Boolean(errors.categoria)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.categoria ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.categoria && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.categoria}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-agente" className="text-[13px] font-semibold text-[#101C2B]">
-                      Agente nº<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-agente"
-                      type="text"
-                      inputMode="numeric"
-                      value={formData.agente}
-                      onChange={(e) => handleFieldChange('agente', e.target.value)}
-                      onBlur={() => handleFieldBlur('agente')}
-                      placeholder="00000000"
-                      aria-invalid={Boolean(errors.agente)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white font-mono text-[15px] tracking-wider text-[#101C2B] outline-none transition-colors ${
-                        errors.agente ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.agente && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.agente}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-municipio" className="text-[13px] font-semibold text-[#101C2B]">
-                      Município de colocação<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-municipio"
-                      type="text"
-                      value={formData.municipio}
-                      onChange={(e) => handleFieldChange('municipio', e.target.value)}
-                      onBlur={() => handleFieldBlur('municipio')}
-                      placeholder="Ex.: Quêssua"
-                      aria-invalid={Boolean(errors.municipio)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.municipio ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.municipio && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.municipio}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <label htmlFor="f-servico-escola" className="text-[13px] font-semibold text-[#101C2B]">
-                      Escola ou local de trabalho<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-escola"
-                      type="text"
-                      value={formData.escola}
-                      onChange={(e) => handleFieldChange('escola', e.target.value)}
-                      onBlur={() => handleFieldBlur('escola')}
-                      placeholder="Ex.: Escola Primária n.º 000 – Nome do bairro – Município"
-                      aria-invalid={Boolean(errors.escola)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.escola ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.escola && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.escola}</p>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              {/* SECTION V: Conta bancária e salário */}
-              <section
-                id="sec-servico-s5"
-                className="bg-white border border-[#D3DADF] rounded-lg p-6 scroll-mt-20"
-              >
-                <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 mb-5">
-                  <span className="font-mono text-sm pt-1 text-[#A8231B] font-semibold">V</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-[#101C2B] leading-tight">
-                      Conta bancária e salário
-                    </h2>
-                    <p className="text-sm text-[#566475] mt-1">Valores em kwanzas (Kz).</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-banco" className="text-[13px] font-semibold text-[#101C2B]">
-                      Banco<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <select
-                      id="f-servico-banco"
-                      value={formData.banco}
-                      onChange={(e) => handleFieldChange('banco', e.target.value)}
-                      onBlur={() => handleFieldBlur('banco')}
-                      aria-invalid={Boolean(errors.banco)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                        errors.banco ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    >
-                      <option value="">Escolha</option>
-                      {ANGOLA_BANCOS_SERVICO.map((b) => (
-                        <option key={b} value={b}>
-                          {b}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.banco && <p className="text-[13px] text-[#B3261E] m-0">{errors.banco}</p>}
-                  </div>
-
-                  {formData.banco === 'Outro' && (
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="f-servico-bancoOutro" className="text-[13px] font-semibold text-[#101C2B]">
-                        Nome do banco<span className="text-[#A8231B] ml-1">*</span>
-                      </label>
-                      <input
-                        id="f-servico-bancoOutro"
-                        type="text"
-                        value={formData.bancoOutro}
-                        onChange={(e) => handleFieldChange('bancoOutro', e.target.value)}
-                        onBlur={() => handleFieldBlur('bancoOutro')}
-                        placeholder="Indique o nome do banco"
-                        aria-invalid={Boolean(errors.bancoOutro)}
-                        className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors ${
-                          errors.bancoOutro ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                        }`}
-                      />
-                      {errors.bancoOutro && (
-                        <p className="text-[13px] text-[#B3261E] m-0">{errors.bancoOutro}</p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-conta" className="text-[13px] font-semibold text-[#101C2B]">
-                      Conta bancária nº<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <input
-                      id="f-servico-conta"
-                      type="text"
-                      value={formData.conta}
-                      onChange={(e) => handleFieldChange('conta', e.target.value)}
-                      onBlur={() => handleFieldBlur('conta')}
-                      placeholder="0000-X00000-000"
-                      aria-invalid={Boolean(errors.conta)}
-                      className={`min-h-[44px] px-3 py-2.5 rounded-md border bg-white font-mono text-[15px] tracking-wider text-[#101C2B] outline-none transition-colors ${
-                        errors.conta ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                      }`}
-                    />
-                    {errors.conta && <p className="text-[13px] text-[#B3261E] m-0">{errors.conta}</p>}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-salario" className="text-[13px] font-semibold text-[#101C2B]">
-                      Salário líquido<span className="text-[#A8231B] ml-1">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="f-servico-salario"
-                        type="text"
-                        inputMode="decimal"
-                        value={formData.salario}
-                        onChange={(e) => handleFieldChange('salario', e.target.value)}
-                        onBlur={() => handleFieldBlur('salario')}
-                        placeholder="0,00"
-                        aria-invalid={Boolean(errors.salario)}
-                        className={`w-full min-h-[44px] pl-3 pr-12 py-2.5 rounded-md border bg-white text-right tabular-nums text-base text-[#101C2B] outline-none transition-colors ${
-                          errors.salario ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                        }`}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[13px] text-[#566475] pointer-events-none">
-                        Kz
-                      </span>
-                    </div>
-                    <p className="text-[13px] text-[#566475] m-0 min-h-[1.4em]">
-                      {salarioExtenso ? `Por extenso: ${salarioExtenso}` : ''}
-                    </p>
-                    {errors.salario && (
-                      <p className="text-[13px] text-[#B3261E] m-0">{errors.salario}</p>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              {/* SECTION VI: Finalidade */}
-              <section
-                id="sec-servico-s6"
-                className="bg-white border border-[#D3DADF] rounded-lg p-6 scroll-mt-20"
-              >
-                <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 mb-5">
-                  <span className="font-mono text-sm pt-1 text-[#A8231B] font-semibold">VI</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-[#101C2B] leading-tight">Finalidade</h2>
-                    <p className="text-sm text-[#566475] mt-1">
-                      A observação que aparece no fim da declaração.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="f-servico-finalidade" className="text-[13px] font-semibold text-[#101C2B]">
-                    A presente declaração destina-se<span className="text-[#A8231B] ml-1">*</span>
-                  </label>
-                  <textarea
-                    id="f-servico-finalidade"
-                    rows={3}
-                    value={formData.finalidade}
-                    onChange={(e) => handleFieldChange('finalidade', e.target.value)}
-                    onBlur={() => handleFieldBlur('finalidade')}
-                    placeholder="à regularização da conta"
-                    aria-invalid={Boolean(errors.finalidade)}
-                    className={`min-h-[84px] px-3 py-2.5 rounded-md border bg-white text-base text-[#101C2B] outline-none transition-colors resize-y ${
-                      errors.finalidade ? 'border-[#B3261E]' : 'border-[#D3DADF] focus:border-[#1B5FAA]'
-                    }`}
-                  />
-                  <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Sugestões de finalidade">
-                    {[
-                      { label: 'Regularização da conta', fill: 'à regularização da conta' },
-                      { label: 'Abertura de conta', fill: 'à abertura de conta bancária' },
-                      { label: 'Pedido de crédito', fill: 'ao pedido de crédito bancário' },
-                    ].map((chip) => (
-                      <button
-                        key={chip.fill}
-                        type="button"
-                        onClick={() => handleSelectChip(chip.fill)}
-                        className="text-[13px] bg-transparent text-[#101C2B] border border-[#D3DADF] hover:border-[#101C2B] rounded-full px-3.5 py-1.5 min-h-[36px] transition-colors cursor-pointer"
-                      >
-                        {chip.label}
-                      </button>
-                    ))}
-                  </div>
-                  {errors.finalidade && (
-                    <p className="text-[13px] text-[#B3261E] m-0">{errors.finalidade}</p>
-                  )}
-                </div>
-              </section>
-
-              {/* SECTION VII: Dados da emissão */}
-              <section
-                id="sec-servico-s7"
-                className="bg-white border border-[#D3DADF] rounded-lg p-6 scroll-mt-20"
-              >
-                <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 mb-5">
-                  <span className="font-mono text-sm pt-1 text-[#A8231B] font-semibold">VII</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-[#101C2B] leading-tight">
-                      Dados da emissão
-                    </h2>
-                    <p className="text-sm text-[#566475] mt-1">
-                      Preenchimento da Direcção. Pode ficar em branco no cadastro.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-provEmissao" className="text-[13px] font-semibold text-[#101C2B]">
-                      Governo Provincial de
-                    </label>
-                    <select
-                      id="f-servico-provEmissao"
-                      value={formData.provEmissao}
-                      onChange={(e) => handleFieldChange('provEmissao', e.target.value)}
-                      className="min-h-[44px] px-3 py-2.5 rounded-md border border-[#D3DADF] focus:border-[#1B5FAA] bg-white text-base text-[#101C2B] outline-none transition-colors"
-                    >
-                      <option value="">Escolha</option>
-                      {ANGOLA_PROVINCIAS_SERVICO.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-municipioAdm" className="text-[13px] font-semibold text-[#101C2B]">
-                      Administração Municipal de
-                    </label>
-                    <input
-                      id="f-servico-municipioAdm"
-                      type="text"
-                      value={formData.municipioAdm}
-                      onChange={(e) => handleFieldChange('municipioAdm', e.target.value)}
-                      placeholder="Ex.: Quêssua"
-                      className="min-h-[44px] px-3 py-2.5 rounded-md border border-[#D3DADF] focus:border-[#1B5FAA] bg-white text-base text-[#101C2B] outline-none transition-colors"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <label htmlFor="f-servico-direccao" className="text-[13px] font-semibold text-[#101C2B]">
-                      Direcção
-                    </label>
-                    <input
-                      id="f-servico-direccao"
-                      type="text"
-                      value={formData.direccao}
-                      onChange={(e) => handleFieldChange('direccao', e.target.value)}
-                      placeholder="Ex.: Direcção Municipal de Educação"
-                      className="min-h-[44px] px-3 py-2.5 rounded-md border border-[#D3DADF] focus:border-[#1B5FAA] bg-white text-base text-[#101C2B] outline-none transition-colors"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-localEmissao" className="text-[13px] font-semibold text-[#101C2B]">
-                      Local de emissão
-                    </label>
-                    <input
-                      id="f-servico-localEmissao"
-                      type="text"
-                      value={formData.localEmissao}
-                      onChange={(e) => handleFieldChange('localEmissao', e.target.value)}
-                      placeholder="Ex.: Quêssua"
-                      className="min-h-[44px] px-3 py-2.5 rounded-md border border-[#D3DADF] focus:border-[#1B5FAA] bg-white text-base text-[#101C2B] outline-none transition-colors"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="f-servico-dataEmissao" className="text-[13px] font-semibold text-[#101C2B]">
-                      Data de emissão da declaração
-                    </label>
-                    <input
-                      id="f-servico-dataEmissao"
-                      type="date"
-                      value={formData.dataEmissao}
-                      onChange={(e) => handleFieldChange('dataEmissao', e.target.value)}
-                      className="min-h-[44px] px-3 py-2.5 rounded-md border border-[#D3DADF] focus:border-[#1B5FAA] bg-white text-base text-[#101C2B] outline-none transition-colors"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <label htmlFor="f-servico-director" className="text-[13px] font-semibold text-[#101C2B]">
-                      Nome do Director Municipal
-                    </label>
-                    <input
-                      id="f-servico-director"
-                      type="text"
-                      value={formData.director}
-                      onChange={(e) => handleFieldChange('director', e.target.value)}
-                      placeholder="Nome de quem assina"
-                      className="min-h-[44px] px-3 py-2.5 rounded-md border border-[#D3DADF] focus:border-[#1B5FAA] bg-white text-base text-[#101C2B] outline-none transition-colors"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {/* Submit Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <p className="text-sm text-[#566475] max-w-[46ch] m-0">
-                  Confira os dados. Depois de enviar, o texto da declaração aparece para conferência.
-                </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleResetForm}
-                    className="font-semibold text-[15px] rounded-md px-5 py-3 min-h-[46px] border border-[#101C2B] bg-transparent text-[#101C2B] hover:bg-[#D3DADF] transition-colors cursor-pointer"
-                  >
-                    Limpar
-                  </button>
-                  <button
-                    type="submit"
-                    className="font-semibold text-[15px] rounded-md px-5 py-3 min-h-[46px] border border-[#A8231B] bg-[#A8231B] text-white hover:brightness-110 transition-all cursor-pointer"
-                  >
-                    {formData.id ? 'Guardar alterações' : 'Enviar cadastro'}
-                  </button>
-                </div>
-              </div>
-
-              {formErrorBanner && (
-                <p role="alert" className="text-[#B3261E] font-semibold text-sm m-0">
-                  {formErrorBanner}
-                </p>
-              )}
-            </form>
+            <button
+              type="button"
+              onClick={() => setIsDbCollapsed((prev) => !prev)}
+              className="h-9 px-3 rounded-full bg-[#f2f4f7] hover:bg-slate-200/70 text-xs font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>{isDbCollapsed ? 'Mostrar Tabela' : 'Recolher'}</span>
+              {isDbCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            </button>
           </div>
         </div>
-      ) : (
-        /* ============================================================== */
-        /* RESULTADO / CONFERÊNCIA DA DECLARAÇÃO DE SERVIÇO               */
-        /* ============================================================== */
-        <section
-          id="servico-result-panel"
-          aria-live="polite"
-          className="space-y-6 animate-in fade-in duration-150"
-        >
-          <div className="no-print bg-white border border-[#D3DADF] rounded-lg p-6 space-y-4">
-            <div className="text-sm font-semibold px-3.5 py-2.5 rounded-md border border-[#1D7048] text-[#1D7048] bg-emerald-50/50 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 shrink-0" />
-              <span>Cadastro guardado. Anote a referência abaixo.</span>
+
+        {!isDbCollapsed && (
+          <div className="overflow-x-auto max-h-[260px] overflow-y-auto border border-slate-200 rounded-2xl">
+            <table className="w-full border-collapse text-xs min-w-[780px]">
+              <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
+                <tr>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Ref.
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Nome Completo
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    B.I.
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Nº Agente
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Banco & Conta
+                  </th>
+                  <th className="text-right px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Salário (Kz)
+                  </th>
+                  <th className="text-right px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                      Nenhum registo encontrado na Base de Dados de Declaração de Serviço.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRecords.map((r) => (
+                    <tr
+                      key={r.id}
+                      className={`hover:bg-slate-50/90 transition-colors ${
+                        formData.id === r.id || submittedRecord?.id === r.id ? 'bg-slate-100/80' : ''
+                      }`}
+                    >
+                      <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap font-semibold text-slate-900">
+                        {r.ref}
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-900">
+                        {r.nome}
+                      </td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap text-slate-700">
+                        {r.bi}
+                      </td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap text-slate-700">
+                        {r.agente}
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap text-slate-700">
+                        <span className="font-medium">{r.bancoNome}</span> •{' '}
+                        <span className="font-mono text-[11px] text-slate-500">{r.conta}</span>
+                      </td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap text-right font-semibold text-slate-900 tabular-nums">
+                        {typeof r.salarioKz === 'number' ? fmtKz(r.salarioKz) : r.salario}
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleEditRecord(r);
+                              setIsPreviewExpanded(true);
+                            }}
+                            className="px-2.5 py-1 rounded-full bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer inline-flex items-center gap-1"
+                            title="Carregar nos campos e pré-visualizar documento"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Carregar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadDeclaracaoServicoPdf(r)}
+                            className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1"
+                            title="Baixar PDF (1 Página A4)"
+                          >
+                            <FileDown className="w-3 h-3" />
+                            <span>PDF</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditRecord(r)}
+                            className="p-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                            title="Editar cadastro"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRecordToDelete(r)}
+                            className="p-1.5 rounded-full border border-red-200 text-[#d92d20] hover:bg-red-50 cursor-pointer"
+                            title="Eliminar registo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* ================================================================= */}
+      {/* ENCIMA 2: PRÉ-VISUALIZAÇÃO DO DOCUMENTO SENDO PREENCHIDO (A4)     */}
+      {/* ================================================================= */}
+      <section
+        id="servico-live-preview-panel"
+        aria-live="polite"
+        className="bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 print:border-0 print:p-0 print:shadow-none"
+      >
+        <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+              <FileText className="w-4 h-4" />
             </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-[#101C2B] m-0">Cadastro recebido</h2>
-                <p className="text-sm text-[#566475] mt-1">
-                  Referência{' '}
-                  <b className="font-mono font-medium text-[#101C2B] text-base tracking-wider">
-                    {submittedRecord.ref}
-                  </b>
-                </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Pré-visualização em Tempo Real — Declaração de Serviço
+                </h2>
+                <span className="text-xs text-slate-500">
+                  · {livePreviewRecord.nome}
+                </span>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => downloadDeclaracaoServicoPdf(submittedRecord)}
-                  className="inline-flex items-center gap-2 font-semibold text-sm rounded-md px-4 py-2.5 min-h-[44px] bg-[#1D7048] text-white hover:brightness-110 transition-all cursor-pointer shadow-xs"
-                >
-                  <FileDown className="w-4 h-4" />
-                  <span>Baixar Declaração (PDF)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => printSinglePageA4Clean('declaracao-servico-a4-sheet')}
-                  className="inline-flex items-center gap-2 font-semibold text-sm rounded-md px-4 py-2.5 min-h-[44px] bg-[#A8231B] text-white hover:brightness-110 transition-all cursor-pointer shadow-xs"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>Imprimir (1 Página A4)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleEditRecord(submittedRecord)}
-                  className="inline-flex items-center gap-2 font-semibold text-sm rounded-md px-4 py-2.5 min-h-[44px] border border-[#D3DADF] text-[#101C2B] hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  <Edit className="w-4 h-4" />
-                  <span>Editar</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleResetForm}
-                  className="inline-flex items-center gap-2 font-semibold text-sm rounded-md px-4 py-2.5 min-h-[44px] border border-[#101C2B] text-[#101C2B] hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Novo cadastro</span>
-                </button>
-              </div>
+              <p className="text-xs text-slate-500">
+                O documento A4 abaixo é preenchido automaticamente enquanto digita no formulário ou seleciona da base de dados
+              </p>
             </div>
-
-            {copyNote && <p className="text-xs font-semibold text-[#1D7048] m-0">{copyNote}</p>}
           </div>
 
-          {/* Official A4 Sheet Preview */}
-          <div className="flex justify-center w-full print:block print:m-0 print:p-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center bg-[#f2f4f7] p-1 rounded-full border border-slate-200">
+              <button
+                type="button"
+                onClick={() => handleFieldChange('tratamento', 'Senhor')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  livePreviewRecord.tratamento !== 'Senhora'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Senhor
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFieldChange('tratamento', 'Senhora')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  livePreviewRecord.tratamento === 'Senhora'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Senhora
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => downloadDeclaracaoServicoPdf(livePreviewRecord)}
+              className="h-9 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Baixar PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => printSinglePageA4Clean('declaracao-servico-a4-sheet')}
+              className="h-9 px-3.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir A4</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsPreviewExpanded((prev) => !prev)}
+              className="h-9 px-3 rounded-full bg-[#f2f4f7] hover:bg-slate-200/70 text-xs font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>{isPreviewExpanded ? 'Ocultar Folha' : 'Expandir Folha'}</span>
+              {isPreviewExpanded ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {isPreviewExpanded && (
+          <div className="flex justify-center w-full bg-[#f8f9fa] p-3 sm:p-6 rounded-2xl border border-slate-200/70 print:bg-white print:block print:m-0 print:p-0 print:border-0">
             <div
               id="declaracao-servico-a4-sheet"
-              className="bg-[#FBFBF8] print:bg-white w-full max-w-[210mm] p-8 sm:p-12 md:px-[20mm] md:py-[15mm] border border-[#D3DADF] print:border-0 shadow-sm print:shadow-none text-black mx-auto"
+              className="bg-white w-full max-w-[210mm] p-6 sm:p-10 md:px-[20mm] md:py-[14mm] border border-slate-200/90 print:border-0 shadow-xs print:shadow-none text-black mx-auto"
               style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
             >
               <div style={{ lineHeight: 1.5 }}>
@@ -1674,18 +926,18 @@ export const DeclaracaoServicoSection: React.FC = () => {
                     />
                   </div>
                   <p className="a4-republic-title">REPÚBLICA DE ANGOLA</p>
-                  {submittedRecord.provEmissao && (
+                  {livePreviewRecord.provEmissao && (
                     <p className="a4-inst-line">
-                      GOVERNO PROVINCIAL DE {submittedRecord.provEmissao.toUpperCase()}
+                      GOVERNO PROVINCIAL DE {livePreviewRecord.provEmissao.toUpperCase()}
                     </p>
                   )}
-                  {submittedRecord.municipioAdm && (
+                  {livePreviewRecord.municipioAdm && (
                     <p className="a4-inst-line">
-                      ADMINISTRAÇÃO MUNICIPAL DE {submittedRecord.municipioAdm.toUpperCase()}
+                      ADMINISTRAÇÃO MUNICIPAL DE {livePreviewRecord.municipioAdm.toUpperCase()}
                     </p>
                   )}
-                  {submittedRecord.direccao && (
-                    <p className="a4-inst-line">{submittedRecord.direccao.toUpperCase()}</p>
+                  {livePreviewRecord.direccao && (
+                    <p className="a4-inst-line">{livePreviewRecord.direccao.toUpperCase()}</p>
                   )}
                 </div>
 
@@ -1694,13 +946,13 @@ export const DeclaracaoServicoSection: React.FC = () => {
                 </div>
 
                 {(() => {
-                  const f = submittedRecord.tratamento === 'Senhora';
+                  const f = livePreviewRecord.tratamento === 'Senhora';
                   const fil = `${f ? 'filha' : 'filho'} de ${
-                    submittedRecord.pai && submittedRecord.pai.trim()
-                      ? `${submittedRecord.pai.trim()} e de ${submittedRecord.mae}`
-                      : submittedRecord.mae
+                    livePreviewRecord.pai && livePreviewRecord.pai.trim()
+                      ? `${livePreviewRecord.pai.trim()} e de ${livePreviewRecord.mae}`
+                      : livePreviewRecord.mae
                   }`;
-                  const local = [submittedRecord.direccao, submittedRecord.localEmissao]
+                  const local = [livePreviewRecord.direccao, livePreviewRecord.localEmissao]
                     .filter(Boolean)
                     .join(', ');
 
@@ -1710,31 +962,31 @@ export const DeclaracaoServicoSection: React.FC = () => {
                         <p style={{ lineHeight: 1.5 }}>
                           Para os devidos efeitos achados convenientes, declara-se que{' '}
                           {f ? 'a senhora ' : 'o senhor '}
-                          <strong>{submittedRecord.nome}</strong>, {fil}, natural de{' '}
-                          {submittedRecord.naturalidade}, Província de {submittedRecord.provNat},{' '}
+                          <strong>{livePreviewRecord.nome}</strong>, {fil}, natural de{' '}
+                          {livePreviewRecord.naturalidade}, Província de {livePreviewRecord.provNat},{' '}
                           {f ? 'nascida' : 'nascido'} aos{' '}
-                          {fmtDateDeclaracaoServico(submittedRecord.nascimento)},{' '}
+                          {fmtDateDeclaracaoServico(livePreviewRecord.nascimento)},{' '}
                           {f ? 'portadora' : 'portador'} do BI nº{' '}
-                          <strong>{submittedRecord.bi}</strong>, emitido aos{' '}
-                          {fmtDateDeclaracaoServico(submittedRecord.biData)},{' '}
-                          {submittedRecord.profissao} do {submittedRecord.grau},{' '}
+                          <strong>{livePreviewRecord.bi}</strong>, emitido aos{' '}
+                          {fmtDateDeclaracaoServico(livePreviewRecord.biData)},{' '}
+                          {livePreviewRecord.profissao} do {livePreviewRecord.grau},{' '}
                           {f ? 'colocada' : 'colocado'} no Município de{' '}
-                          {submittedRecord.municipio}, local de trabalho:{' '}
-                          <strong>{submittedRecord.escola}</strong>, com a categoria de{' '}
-                          {submittedRecord.categoria}, Agente nº{' '}
-                          <strong>{submittedRecord.agente}</strong>, é cliente do{' '}
-                          <strong>{submittedRecord.bancoNome}</strong>, titular da conta bancária
-                          nº <strong>{submittedRecord.conta}</strong>, auferindo o salário líquido
+                          {livePreviewRecord.municipio}, local de trabalho:{' '}
+                          <strong>{livePreviewRecord.escola}</strong>, com a categoria de{' '}
+                          {livePreviewRecord.categoria}, Agente nº{' '}
+                          <strong>{livePreviewRecord.agente}</strong>, é cliente do{' '}
+                          <strong>{livePreviewRecord.bancoNome}</strong>, titular da conta bancária
+                          nº <strong>{livePreviewRecord.conta}</strong>, auferindo o salário líquido
                           de{' '}
                           <strong>
-                            {fmtKz(submittedRecord.salarioKz)} Kz ({submittedRecord.extenso})
+                            {fmtKz(livePreviewRecord.salarioKz)} Kz ({livePreviewRecord.extenso})
                           </strong>
                           .
                         </p>
 
                         <p style={{ lineHeight: 1.5 }}>
                           <strong>Observação:</strong> A presente declaração destina-se{' '}
-                          {submittedRecord.finalidade.replace(/\.$/, '')}.
+                          {livePreviewRecord.finalidade.replace(/\.$/, '')}.
                         </p>
 
                         <p style={{ lineHeight: 1.5 }}>
@@ -1745,12 +997,12 @@ export const DeclaracaoServicoSection: React.FC = () => {
                       </div>
 
                       <div className="a4-footer-block">
-                        {(local || submittedRecord.dataEmissao) && (
+                        {(local || livePreviewRecord.dataEmissao) && (
                           <div className="a4-date-line" style={{ textAlign: 'center' }}>
                             <span>
                               {local ? `${local} ` : ''}
-                              {submittedRecord.dataEmissao
-                                ? `aos ${fmtDateDeclaracaoServico(submittedRecord.dataEmissao)}.`
+                              {livePreviewRecord.dataEmissao
+                                ? `aos ${fmtDateDeclaracaoServico(livePreviewRecord.dataEmissao)}.`
                                 : ''}
                             </span>
                           </div>
@@ -1760,8 +1012,8 @@ export const DeclaracaoServicoSection: React.FC = () => {
                           <div className="a4-sig-container">
                             <p className="a4-sig-role">O Director Municipal</p>
                             <div className="a4-sig-line"></div>
-                            {submittedRecord.director && (
-                              <p className="a4-sig-name">{submittedRecord.director}</p>
+                            {livePreviewRecord.director && (
+                              <p className="a4-sig-name">{livePreviewRecord.director}</p>
                             )}
                           </div>
                         </div>
@@ -1772,178 +1024,622 @@ export const DeclaracaoServicoSection: React.FC = () => {
               </div>
             </div>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
-      {/* ============================================================== */}
-      {/* REGISTOS RECEBIDOS (EXCLUSIVOS DA DECLARAÇÃO DE SERVIÇO)       */}
-      {/* ============================================================== */}
-      <section
-        id="servico-admin-list"
-        className="no-print mt-10 bg-white border border-[#D3DADF] rounded-lg p-6 space-y-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-[#101C2B] m-0 mr-auto">
-            Registos recebidos (Declaração de Serviço)
-          </h2>
-
-          <div className="relative w-full sm:w-68">
-            <Search className="w-4 h-4 text-[#566475] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Procurar nome, BI ou agente"
-              aria-label="Procurar registos"
-              className="w-full min-h-[40px] pl-9 pr-3 py-1.5 rounded-md border border-[#D3DADF] bg-white text-sm text-[#101C2B] outline-none focus:border-[#1B5FAA]"
-            />
+      {/* ================================================================= */}
+      {/* FORMULÁRIO NO ESTILO DO EXEMPLAR (Pills + Divisores Horizontais)  */}
+      {/* ================================================================= */}
+      <div className="no-print bg-white rounded-[24px] border border-slate-200 p-6 sm:p-8 shadow-xs space-y-7">
+        {/* Duplicate Alert */}
+        {duplicateWarning && duplicateWarning.duplicateRecord && (
+          <div
+            role="alert"
+            className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3 text-amber-950"
+          >
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs sm:text-sm space-y-1 flex-1">
+              <p className="font-bold">
+                Registo já existente na Declaração de Serviço ({duplicateWarning.duplicateRecord.ref})
+              </p>
+              <p>
+                Já consta <strong>{duplicateWarning.duplicateRecord.nome}</strong> com o mesmo{' '}
+                {duplicateWarning.reason === 'bi' ? 'número de BI' : 'número de Agente'}.
+              </p>
+              <div className="pt-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleEditRecord(duplicateWarning.duplicateRecord!)}
+                  className="px-3.5 py-1.5 bg-slate-900 text-white rounded-full text-xs font-semibold cursor-pointer"
+                >
+                  Carregar Registo Existente
+                </button>
+              </div>
+            </div>
           </div>
+        )}
 
-          {records.length > 0 && (
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 font-semibold text-sm rounded-md px-4 py-2 min-h-[40px] border border-[#101C2B] text-[#101C2B] hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>Exportar CSV</span>
-            </button>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-xs text-slate-600 m-0">
+            <span className="text-[#d92d20] font-bold">*</span> Campo obrigatório
+          </p>
+          {formData.id && (
+            <span className="text-xs font-semibold text-amber-800">
+              A editar registo {formData.ref}
+            </span>
           )}
         </div>
 
-        {records.length > 0 && (
-          <p className="text-[12.5px] text-[#566475] m-0">
-            {filteredRecords.length} de {records.length} registos
-          </p>
-        )}
+        <form onSubmit={handleSubmit} noValidate className="space-y-7">
+          {/* SECÇÃO 1: Identificação do funcionário */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                Identificação pessoal e filiação
+              </h3>
+              <div className="h-px bg-slate-200 flex-1" />
+            </div>
 
-        <div className="overflow-x-auto border border-[#D3DADF] rounded-md">
-          <table className="w-full border-collapse text-sm min-w-[820px]">
-            <thead>
-              <tr className="bg-slate-50/70">
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Ref.
-                </th>
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Nome
-                </th>
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  BI
-                </th>
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Agente
-                </th>
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Município
-                </th>
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Banco
-                </th>
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Salário (Kz)
-                </th>
-                <th className="text-left px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Data
-                </th>
-                <th className="text-right px-3 py-2.5 border-b border-[#D3DADF] font-mono font-medium text-[11.5px] uppercase tracking-wider text-[#566475]">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRecords.map((r) => (
-                <tr key={r.id} className="border-b border-[#D3DADF] last:border-b-0 hover:bg-slate-50/80">
-                  <td className="px-3 py-2.5 font-mono text-[13px] whitespace-nowrap font-semibold text-[#101C2B]">
-                    {r.ref}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap font-medium text-[#101C2B]">
-                    {r.nome}
-                  </td>
-                  <td className="px-3 py-2.5 font-mono text-[13px] whitespace-nowrap">
-                    {r.bi}
-                  </td>
-                  <td className="px-3 py-2.5 font-mono text-[13px] whitespace-nowrap">
-                    {r.agente}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{r.municipio}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{r.bancoNome}</td>
-                  <td className="px-3 py-2.5 font-mono text-[13px] whitespace-nowrap font-semibold">
-                    {typeof r.salarioKz === 'number' ? fmtKz(r.salarioKz) : r.salario}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-xs text-[#566475]">
-                    {(r.criadoEm || '').slice(0, 10)}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-right">
-                    <div className="inline-flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSubmittedRecord(r);
-                          window.scrollTo({ top: 150, behavior: 'smooth' });
-                        }}
-                        className="px-2.5 py-1 rounded bg-[#101C2B] text-white text-xs font-semibold hover:bg-slate-800 cursor-pointer inline-flex items-center gap-1"
-                        title="Ver Declaração de Serviço"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Ver</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => downloadDeclaracaoServicoPdf(r)}
-                        className="px-2.5 py-1 rounded bg-[#1D7048] text-white text-xs font-semibold hover:brightness-110 cursor-pointer inline-flex items-center gap-1"
-                        title="Baixar PDF (1 Página A4)"
-                      >
-                        <FileDown className="w-3.5 h-3.5" />
-                        <span>PDF</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleEditRecord(r)}
-                        className="p-1.5 rounded border border-[#D3DADF] text-[#101C2B] hover:bg-slate-100 cursor-pointer"
-                        title="Editar cadastro"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRecordToDelete(r)}
-                        className="p-1.5 rounded border border-red-200 text-[#B3261E] hover:bg-red-50 cursor-pointer"
-                        title="Eliminar registo"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+              <div>
+                <label htmlFor="f-servico-nome" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Nome completo <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-nome"
+                  type="text"
+                  value={formData.nome}
+                  onChange={(e) => handleFieldChange('nome', e.target.value)}
+                  onBlur={() => handleFieldBlur('nome')}
+                  placeholder="Ex.: Maria Teresa Domingos"
+                  className={pillInputClass(Boolean(errors.nome))}
+                />
+                {errors.nome && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.nome}</p>}
+              </div>
 
-        {records.length === 0 && (
-          <p className="text-sm text-[#566475] m-0">
-            Ainda não há registos na Declaração de Serviço. Quando alguém enviar o cadastro, ele aparece aqui.
-          </p>
-        )}
-      </section>
+              <div>
+                <label htmlFor="f-servico-tratamento" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Tratamento oficial <span className="text-[#d92d20]">*</span>
+                </label>
+                <select
+                  id="f-servico-tratamento"
+                  value={formData.tratamento}
+                  onChange={(e) => handleFieldChange('tratamento', e.target.value)}
+                  onBlur={() => handleFieldBlur('tratamento')}
+                  className={pillInputClass(Boolean(errors.tratamento))}
+                >
+                  <option value="">Escolha</option>
+                  <option value="Senhor">Senhor (Masculino)</option>
+                  <option value="Senhora">Senhora (Feminino)</option>
+                </select>
+                {errors.tratamento && (
+                  <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.tratamento}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-pai" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Nome do pai
+                </label>
+                <input
+                  id="f-servico-pai"
+                  type="text"
+                  value={formData.pai}
+                  onChange={(e) => handleFieldChange('pai', e.target.value)}
+                  placeholder="Ex.: Domingos Manuel"
+                  className={pillInputClass(false)}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-mae" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Nome da mãe <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-mae"
+                  type="text"
+                  value={formData.mae}
+                  onChange={(e) => handleFieldChange('mae', e.target.value)}
+                  onBlur={() => handleFieldBlur('mae')}
+                  placeholder="Ex.: Ana Paula Gomes"
+                  className={pillInputClass(Boolean(errors.mae))}
+                />
+                {errors.mae && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.mae}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-nascimento" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Data de nascimento <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-nascimento"
+                  type="date"
+                  max={todayISO}
+                  value={formData.nascimento}
+                  onChange={(e) => handleFieldChange('nascimento', e.target.value)}
+                  onBlur={() => handleFieldBlur('nascimento')}
+                  className={pillInputClass(Boolean(errors.nascimento))}
+                />
+                {errors.nascimento && (
+                  <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.nascimento}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="f-servico-naturalidade" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                    Natural de (município) <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-servico-naturalidade"
+                    type="text"
+                    value={formData.naturalidade}
+                    onChange={(e) => handleFieldChange('naturalidade', e.target.value)}
+                    onBlur={() => handleFieldBlur('naturalidade')}
+                    placeholder="Ex.: Cacuso"
+                    className={pillInputClass(Boolean(errors.naturalidade))}
+                  />
+                  {errors.naturalidade && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.naturalidade}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="f-servico-provNat" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                    Província <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <select
+                    id="f-servico-provNat"
+                    value={formData.provNat}
+                    onChange={(e) => handleFieldChange('provNat', e.target.value)}
+                    onBlur={() => handleFieldBlur('provNat')}
+                    className={pillInputClass(Boolean(errors.provNat))}
+                  >
+                    <option value="">Escolha</option>
+                    {ANGOLA_PROVINCIAS_SERVICO.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.provNat && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.provNat}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECÇÃO 2: Bilhete de Identidade e Enquadramento */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                Bilhete de Identidade e situação profissional
+              </h3>
+              <div className="h-px bg-slate-200 flex-1" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+              <div>
+                <label htmlFor="f-servico-bi" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Número do Bilhete de Identidade (BI) <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-bi"
+                  type="text"
+                  maxLength={14}
+                  value={formData.bi}
+                  onChange={(e) => handleFieldChange('bi', e.target.value)}
+                  onBlur={() => handleFieldBlur('bi')}
+                  placeholder="Ex.: 005417082ME010"
+                  className={`${pillInputClass(Boolean(errors.bi))} font-mono uppercase`}
+                />
+                {errors.bi && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.bi}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-biData" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Data de emissão do BI <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-biData"
+                  type="date"
+                  max={todayISO}
+                  value={formData.biData}
+                  onChange={(e) => handleFieldChange('biData', e.target.value)}
+                  onBlur={() => handleFieldBlur('biData')}
+                  className={pillInputClass(Boolean(errors.biData))}
+                />
+                {errors.biData && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.biData}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-profissao" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Profissão / Carreira docente <span className="text-[#d92d20]">*</span>
+                </label>
+                <select
+                  id="f-servico-profissao"
+                  value={formData.profissao}
+                  onChange={(e) => handleFieldChange('profissao', e.target.value)}
+                  onBlur={() => handleFieldBlur('profissao')}
+                  className={pillInputClass(Boolean(errors.profissao))}
+                >
+                  <option value="">Escolha</option>
+                  <option value="Professor do Ensino Primário">Professor do Ensino Primário</option>
+                  <option value="Professor do Ensino Secundário">Professor do Ensino Secundário</option>
+                  <option value="Professor do Ensino Primário e Secundário">
+                    Professor do Ensino Primário e Secundário
+                  </option>
+                  {formData.profissao &&
+                    ![
+                      'Professor do Ensino Primário',
+                      'Professor do Ensino Secundário',
+                      'Professor do Ensino Primário e Secundário',
+                    ].includes(formData.profissao) && (
+                      <option value={formData.profissao}>{formData.profissao}</option>
+                    )}
+                </select>
+                {errors.profissao && (
+                  <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.profissao}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="f-servico-grau" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                    Grau <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-servico-grau"
+                    type="text"
+                    value={formData.grau}
+                    onChange={(e) => handleFieldChange('grau', e.target.value)}
+                    onBlur={() => handleFieldBlur('grau')}
+                    placeholder="Ex.: 12º Grau"
+                    className={pillInputClass(Boolean(errors.grau))}
+                  />
+                  {errors.grau && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.grau}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="f-servico-categoria" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                    Categoria <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-servico-categoria"
+                    type="text"
+                    value={formData.categoria}
+                    onChange={(e) => handleFieldChange('categoria', e.target.value)}
+                    onBlur={() => handleFieldBlur('categoria')}
+                    placeholder="Ex.: P.E.P.E.S do 12º"
+                    className={pillInputClass(Boolean(errors.categoria))}
+                  />
+                  {errors.categoria && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.categoria}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-agente" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Número de Agente <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-agente"
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.agente}
+                  onChange={(e) => handleFieldChange('agente', e.target.value)}
+                  onBlur={() => handleFieldBlur('agente')}
+                  placeholder="Ex.: 54170829"
+                  className={`${pillInputClass(Boolean(errors.agente))} font-mono`}
+                />
+                {errors.agente && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.agente}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-municipio" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Município de colocação <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-municipio"
+                  type="text"
+                  value={formData.municipio}
+                  onChange={(e) => handleFieldChange('municipio', e.target.value)}
+                  onBlur={() => handleFieldBlur('municipio')}
+                  placeholder="Ex.: Quêssua"
+                  className={pillInputClass(Boolean(errors.municipio))}
+                />
+                {errors.municipio && (
+                  <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.municipio}</p>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label htmlFor="f-servico-escola" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Escola ou local de trabalho <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-escola"
+                  type="text"
+                  value={formData.escola}
+                  onChange={(e) => handleFieldChange('escola', e.target.value)}
+                  onBlur={() => handleFieldBlur('escola')}
+                  placeholder="Ex.: Complexo Escolar Católico n.º 166 MJE São Pedro – Quêssua"
+                  className={pillInputClass(Boolean(errors.escola))}
+                />
+                {errors.escola && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.escola}</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* SECÇÃO 3: Conta bancária e salário (Exemplar Fiscal & Faturação) */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                Conta bancária e salário líquido
+              </h3>
+              <div className="h-px bg-slate-200 flex-1" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+              <div>
+                <label htmlFor="f-servico-banco" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Instituição bancária <span className="text-[#d92d20]">*</span>
+                </label>
+                <select
+                  id="f-servico-banco"
+                  value={formData.banco}
+                  onChange={(e) => handleFieldChange('banco', e.target.value)}
+                  onBlur={() => handleFieldBlur('banco')}
+                  className={pillInputClass(Boolean(errors.banco))}
+                >
+                  <option value="">Escolha</option>
+                  {ANGOLA_BANCOS_SERVICO.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+                {errors.banco && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.banco}</p>}
+              </div>
+
+              {formData.banco === 'Outro' ? (
+                <div>
+                  <label htmlFor="f-servico-bancoOutro" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                    Nome do banco <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-servico-bancoOutro"
+                    type="text"
+                    value={formData.bancoOutro}
+                    onChange={(e) => handleFieldChange('bancoOutro', e.target.value)}
+                    onBlur={() => handleFieldBlur('bancoOutro')}
+                    placeholder="Indique o nome do banco"
+                    className={pillInputClass(Boolean(errors.bancoOutro))}
+                  />
+                  {errors.bancoOutro && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.bancoOutro}</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="f-servico-conta" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                    Número da conta bancária <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-servico-conta"
+                    type="text"
+                    value={formData.conta}
+                    onChange={(e) => handleFieldChange('conta', e.target.value)}
+                    onBlur={() => handleFieldBlur('conta')}
+                    placeholder="Ex.: 0000-X00000-000"
+                    className={`${pillInputClass(Boolean(errors.conta))} font-mono`}
+                  />
+                  {errors.conta && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.conta}</p>}
+                </div>
+              )}
+
+              {formData.banco === 'Outro' && (
+                <div>
+                  <label htmlFor="f-servico-conta" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                    Número da conta bancária <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-servico-conta"
+                    type="text"
+                    value={formData.conta}
+                    onChange={(e) => handleFieldChange('conta', e.target.value)}
+                    onBlur={() => handleFieldBlur('conta')}
+                    placeholder="Ex.: 0000-X00000-000"
+                    className={`${pillInputClass(Boolean(errors.conta))} font-mono`}
+                  />
+                  {errors.conta && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.conta}</p>}
+                </div>
+              )}
+
+              {/* Read-only Currency pill matching the exemplar's "Moeda de faturação -> Kwanza (Kz)" */}
+              <div>
+                <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Moeda oficial de vencimento
+                </label>
+                <div className="w-full h-11 px-4 rounded-full bg-[#f2f4f7] text-sm text-slate-800 font-medium flex items-center">
+                  Kwanza (Kz){salarioExtenso ? ` — ${salarioExtenso}` : ''}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  O sistema usa Kz como moeda oficial e converte automaticamente o valor por extenso.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-salario" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Salário líquido mensal (Kz) <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-salario"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.salario}
+                  onChange={(e) => handleFieldChange('salario', e.target.value)}
+                  onBlur={() => handleFieldBlur('salario')}
+                  placeholder="Ex.: 185.400,00"
+                  className={`${pillInputClass(Boolean(errors.salario))} font-mono tabular-nums`}
+                />
+                {errors.salario && (
+                  <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.salario}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SECÇÃO 4: Finalidade e Entidade Emissora */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                Finalidade e entidade emissora
+              </h3>
+              <div className="h-px bg-slate-200 flex-1" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+              <div className="md:col-span-2">
+                <label htmlFor="f-servico-finalidade" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Finalidade da declaração (A presente declaração destina-se...) <span className="text-[#d92d20]">*</span>
+                </label>
+                <input
+                  id="f-servico-finalidade"
+                  type="text"
+                  value={formData.finalidade}
+                  onChange={(e) => handleFieldChange('finalidade', e.target.value)}
+                  onBlur={() => handleFieldBlur('finalidade')}
+                  placeholder="Ex.: à regularização da conta bancária"
+                  className={pillInputClass(Boolean(errors.finalidade))}
+                />
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {[
+                    { label: 'Regularização da conta', fill: 'à regularização da conta bancária' },
+                    { label: 'Abertura de conta', fill: 'à abertura de conta bancária' },
+                    { label: 'Pedido de crédito', fill: 'ao pedido de crédito bancário' },
+                  ].map((chip) => (
+                    <button
+                      key={chip.fill}
+                      type="button"
+                      onClick={() => handleSelectChip(chip.fill)}
+                      className="text-xs bg-[#f2f4f7] hover:bg-slate-200/80 text-slate-800 font-medium rounded-full px-3.5 py-1.5 transition-colors cursor-pointer"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+                {errors.finalidade && (
+                  <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.finalidade}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-direccao" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Direcção emissora
+                </label>
+                <input
+                  id="f-servico-direccao"
+                  type="text"
+                  value={formData.direccao}
+                  onChange={(e) => handleFieldChange('direccao', e.target.value)}
+                  placeholder="Ex.: Direcção Municipal de Educação"
+                  className={pillInputClass(false)}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-director" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Nome do Director Municipal
+                </label>
+                <input
+                  id="f-servico-director"
+                  type="text"
+                  value={formData.director}
+                  onChange={(e) => handleFieldChange('director', e.target.value)}
+                  placeholder="Nome de quem assina"
+                  className={pillInputClass(false)}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-localEmissao" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Local de emissão
+                </label>
+                <input
+                  id="f-servico-localEmissao"
+                  type="text"
+                  value={formData.localEmissao}
+                  onChange={(e) => handleFieldChange('localEmissao', e.target.value)}
+                  placeholder="Ex.: Quêssua"
+                  className={pillInputClass(false)}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="f-servico-dataEmissao" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
+                  Data de emissão
+                </label>
+                <input
+                  id="f-servico-dataEmissao"
+                  type="date"
+                  value={formData.dataEmissao}
+                  onChange={(e) => handleFieldChange('dataEmissao', e.target.value)}
+                  className={pillInputClass(false)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {formErrorBanner && (
+            <p role="alert" className="text-[#d92d20] font-semibold text-xs sm:text-sm m-0">
+              {formErrorBanner}
+            </p>
+          )}
+
+          {/* Submit Footer */}
+          <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                className="h-11 px-7 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs"
+              >
+                <Check className="w-4 h-4" />
+                <span>{formData.id ? 'Guardar alterações no registo' : 'Guardar na Base de Dados & Gerar Declaração'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetForm}
+                className="h-11 px-5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors cursor-pointer flex items-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4 text-slate-500" />
+                <span>Limpar campos</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
 
       {/* Delete Confirmation Modal */}
       {recordToDelete && (
         <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
-            <h3 className="text-lg font-bold text-[#101C2B]">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <h3 className="text-lg font-bold text-slate-900">
               Eliminar Registo de Declaração de Serviço?
             </h3>
-            <p className="text-sm text-[#566475]">
+            <p className="text-sm text-slate-600">
               Tem a certeza que deseja eliminar o cadastro de{' '}
-              <strong className="text-[#101C2B]">{recordToDelete.nome}</strong> (Ref.{' '}
+              <strong className="text-slate-900">{recordToDelete.nome}</strong> (Ref.{' '}
               <span className="font-mono">{recordToDelete.ref}</span>)?
             </p>
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setRecordToDelete(null)}
-                className="flex-1 h-10 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold cursor-pointer"
+                className="flex-1 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold cursor-pointer"
               >
                 Cancelar
               </button>
@@ -1958,7 +1654,7 @@ export const DeclaracaoServicoSection: React.FC = () => {
                   reloadRecords();
                   showToast('Registo eliminado da Declaração de Serviço.');
                 }}
-                className="flex-1 h-10 rounded-lg bg-[#B3261E] hover:brightness-110 text-white text-sm font-semibold cursor-pointer"
+                className="flex-1 h-10 rounded-full bg-[#d92d20] hover:brightness-110 text-white text-sm font-semibold cursor-pointer"
               >
                 Eliminar
               </button>
