@@ -237,7 +237,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     }
 
     const alreadyInList = dmeStaff.some((m) => m.role === newStaffRole);
-    if (alreadyInList || occupiedDmeCargos.has(newStaffRole)) {
+    if (alreadyInList || Boolean(occupiedDmeCargos[newStaffRole]?.occupied)) {
       setStaffModalError(
         `O cargo "${getRoleTitle(newStaffRole)}" já se encontra ocupado na Direcção Municipal. Escolha outro cargo disponível.`
       );
@@ -1000,19 +1000,19 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
                 >
                   <option value="chefe_reparticao">
                     Chefe de Repartição / Ensino Geral{' '}
-                    {occupiedDmeCargos.has('chefe_reparticao') ? '(Já Ocupado)' : ''}
+                    {occupiedDmeCargos['chefe_reparticao']?.occupied ? '(Já Ocupado)' : ''}
                   </option>
                   <option value="inspetor_escolar">
                     Inspector(a) Escolar Municipal{' '}
-                    {occupiedDmeCargos.has('inspetor_escolar') ? '(Já Ocupado)' : ''}
+                    {occupiedDmeCargos['inspetor_escolar']?.occupied ? '(Já Ocupado)' : ''}
                   </option>
                   <option value="tecnico_estatistica">
                     Técnico(a) de Planeamento & Estatística{' '}
-                    {occupiedDmeCargos.has('tecnico_estatistica') ? '(Já Ocupado)' : ''}
+                    {occupiedDmeCargos['tecnico_estatistica']?.occupied ? '(Já Ocupado)' : ''}
                   </option>
                   <option value="tecnico_recursos_humanos">
                     Técnico(a) de Recursos Humanos / Secretaria{' '}
-                    {occupiedDmeCargos.has('tecnico_recursos_humanos') ? '(Já Ocupado)' : ''}
+                    {occupiedDmeCargos['tecnico_recursos_humanos']?.occupied ? '(Já Ocupado)' : ''}
                   </option>
                   <option value="diretor_municipal" disabled>
                     Director(a) Municipal da Educação (Ocupado — dmedoquessua@gmail.com)

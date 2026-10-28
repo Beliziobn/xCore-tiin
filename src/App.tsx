@@ -1903,7 +1903,7 @@ export default function App() {
                 id: newStudent.id,
                 name: newStudent.name,
                 nomeCompleto: newStudent.name,
-                genero: newStudent.genero === 'Masculino' ? 'M' : 'F',
+                genero: (newStudent.genero as string) === 'Masculino' || newStudent.genero === 'M' ? 'M' : 'F',
                 dataNascimento: newStudent.dataNascimento || '2016-05-10',
                 idade: newStudent.idade || 10,
                 tipoDocumento: (newStudent.tipoDocumento as any) || (hasDocs ? 'BI' : 'sem Documento'),

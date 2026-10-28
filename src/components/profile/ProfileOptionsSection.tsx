@@ -55,7 +55,7 @@ interface ProfileOptionsSectionProps {
 }
 
 export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
-  user = { name: '', email: '' },
+  user = { name: '', email: '' } as UserProfileData,
   onUpdateUser,
   onBack,
   title = 'Perfil',

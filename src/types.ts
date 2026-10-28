@@ -93,6 +93,7 @@ export interface UserAccount {
   scope?: 'escola' | 'administracao';
   schoolRole?: SchoolStaffRole;
   adminRole?: AdminStaffRole;
+  adminStaffRole?: AdminStaffRole;
   cargoTitle?: string;
   schoolName?: string;
   schoolId?: string;
@@ -100,6 +101,10 @@ export interface UserAccount {
   titlePrefix?: string;
   greeting?: string;
   avatar?: string;
+  avatarUrl?: string;
+  birthDate?: string;
+  gender?: string;
+  address?: string;
   rememberMe?: boolean;
   accountValidated?: boolean;
   emailVerified?: boolean;
@@ -565,6 +570,7 @@ export interface AdminSchool {
   location: string;
   studentsWithDocs: number;
   studentsWithoutDocs: number;
+  studentsCount?: number;
   declaredStudentsCount?: number;
   performanceRate: number; // e.g. 79
   attendanceRate: number; // e.g. 96.2
@@ -573,6 +579,7 @@ export interface AdminSchool {
   codigoSIGE?: string;
   phone: string;
   email: string;
+  foundedYear?: number | string;
   logoSvg?: string;
   registrationData?: SchoolRegistrationData;
 }

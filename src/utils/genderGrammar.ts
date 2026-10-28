@@ -193,8 +193,10 @@ export function isFemaleFirstName(fullName?: string): boolean {
 export function resolveIsFeminino(
   nome?: string,
   tratamento?: 'Senhor' | 'Senhora' | string,
-  manualOverride?: boolean
+  manualOverride?: boolean | 'Senhor' | 'Senhora' | string | null
 ): boolean {
+  if (manualOverride === 'Senhora') return true;
+  if (manualOverride === 'Senhor') return false;
   if (tratamento === 'Senhora') return true;
   if (manualOverride && tratamento === 'Senhor') return false;
   if (isFemaleFirstName(nome)) return true;

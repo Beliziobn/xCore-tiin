@@ -597,7 +597,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       if (appNames[0]) gFirst = appNames[0];
       if (appNames.length > 1) gLast = appNames.slice(1).join(' ');
     } else if (existingFirestoreUser) {
-      resolvedRole = existingFirestoreUser.role;
+      resolvedRole =
+        existingFirestoreUser.role === 'admin' || existingFirestoreUser.role === 'professor'
+          ? existingFirestoreUser.role
+          : 'diretor';
       resolvedScope = existingFirestoreUser.scope || resolvedScope;
       resolvedSchoolRole = existingFirestoreUser.schoolRole;
       resolvedAdminRole = existingFirestoreUser.adminRole;

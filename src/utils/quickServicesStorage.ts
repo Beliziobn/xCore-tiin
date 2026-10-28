@@ -100,9 +100,11 @@ export async function submitQuickServiceRequest(payload: {
   requesterPhone: string;
   requesterEmail?: string;
   requesterRoleTitle?: string;
+  targetRole?: 'DIRECTOR' | 'ADMIN';
   targetSchoolId?: string;
   targetSchoolName?: string;
   targetDirectorEmail?: string;
+  targetAdminEmail?: string;
   details: QuickServiceRequest['details'];
 }): Promise<{ success: boolean; request?: QuickServiceRequest; protocol?: string; message?: string; error?: string }> {
   try {

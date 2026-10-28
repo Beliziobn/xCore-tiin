@@ -902,6 +902,8 @@ export function checkDuplicateRegistration(
 export function findRegisteredAccountByEmail(email: string): {
   exists: boolean;
   isMasterAdmin?: boolean;
+  expectedVerifier?: string;
+  fullName?: string;
   app?: PendingApplication;
   dmeStaff?: any;
   director?: any;
@@ -911,14 +913,23 @@ export function findRegisteredAccountByEmail(email: string): {
   if (!normEmail) return { exists: false };
 
   if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
-    return { exists: true, isMasterAdmin: true };
+    return {
+      exists: true,
+      isMasterAdmin: true,
+      fullName: 'Dr. Belízio Miguel dos Santos António',
+    };
   }
 
   // 1. Check applications (pending, approved, or rejected)
   const apps = getPendingApplications();
   const matchedApp = apps.find((a) => a.email && a.email.trim().toLowerCase() === normEmail);
   if (matchedApp) {
-    return { exists: true, app: matchedApp };
+    return {
+      exists: true,
+      app: matchedApp,
+      expectedVerifier: matchedApp.passwordVerifier,
+      fullName: matchedApp.fullName,
+    };
   }
 
   // 2. Check DME Staff list
