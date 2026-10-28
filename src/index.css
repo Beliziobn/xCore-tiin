@@ -1,4 +1,44 @@
 @import "tailwindcss";
+@import "react-day-picker/style.css";
+
+:root {
+  --coral-light: #ff6a4a;
+  --coral-base: #f2593c;
+  --coral-deep: #c93f26;
+  --navy: #0e1b2c;
+  --navy-soft: rgba(14, 27, 44, 0.72);
+  --cream: #fafafa;
+  --header-height: 84px;
+  --header-height-compact: 64px;
+
+  /* Masakula v2.0 + Sigre Angola Engineering Design Tokens */
+  --canvas: #fafafa;
+  --surface: #ffffff;
+  --surface-subtle: #f4f4f6;
+  --ink: #002133;
+  --line: #e8e8ea;
+  --line-strong: #d1d1d6;
+  --track: #ececee;
+
+  --text-primary: #002133;
+  --text-secondary: #52606d;
+  --text-on-dark: #ffffff;
+  --text-secondary-on-dark: #9fb3c8;
+
+  --accent: #f75142;
+
+  --success-soft: #e7f6f0;
+  --success-text: #0b7a54;
+  --warning-soft: #fdf1e0;
+  --warning-text: #a34a08;
+  --danger-soft: #fde8ed;
+  --danger-text: #c8002f;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 9999px;
+}
 
 @theme {
   /* Type system — professional pairing */
@@ -6,23 +46,24 @@
   --font-display: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
   --font-chau: 'Chau Philomene One', sans-serif;
 
-  /* Brand color system — one primary, one accent, disciplined neutrals */
-  --color-brand: #4f67ff;
-  --color-brand-600: #4056ea;
-  --color-brand-700: #3547cf;
-  --color-brand-50: #eef1ff;
-  --color-brand-100: #dfe4ff;
+  /* Brand color system — updated to #f75142 */
+  --color-brand: #f75142;
+  --color-brand-600: #e04436;
+  --color-brand-700: #c9372a;
+  --color-brand-50: #fef2f1;
+  --color-brand-100: #fee4e2;
 
-  /* Accent lives inside the brand hue — a lighter periwinkle, used sparingly for tonal depth only */
-  --color-accent: #6d84ff;
-  --color-accent-600: #4f67ff;
-  --color-accent-50: #eef1ff;
+  /* Accent lives inside the brand hue */
+  --color-accent: #f86f63;
+  --color-accent-600: #f75142;
+  --color-accent-50: #fef2f1;
 
-  --color-ink: #0b1020;
-  --color-ink-soft: #475569;
+  --color-ink: #002133;
+  --color-ink-soft: #334e68;
+  --color-black: #002133;
 
-  /* Global page surface — soft off-white to avoid harsh pure white */
-  --color-background: #f7f3f3;
+  /* Global page surface — 95% neutral canvas (#fafafa) per Masakula v2.0 */
+  --color-background: #fafafa;
 
   --radius: 0.875rem;
 }
@@ -32,18 +73,36 @@
   body,
   #root {
     font-family: var(--font-sans);
-    color: var(--color-ink);
-    background-color: var(--color-background);
+    color: #002133;
+    background-color: var(--canvas, #fafafa);
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
+  html.dark,
+  html.dark body,
+  html.dark #root {
+    background-color: #090d16;
+    color: #f1f5f9;
+  }
+
   /* Display font for headings — restrained, modern, technical */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
+    color: #002133;
+    text-wrap: balance;
+  }
+
+  html.dark h1,
+  html.dark h2,
+  html.dark h3,
+  html.dark h4,
+  html.dark h5,
+  html.dark h6 {
+    color: #f8fafc;
   }
 
   /* Body copy and controls use the humanist sans for legibility */
@@ -52,10 +111,92 @@
     font-family: var(--font-sans);
   }
 
+  /* Tabular numerals for vertical alignment in tables, metrics, and grades (Prompt Mestre v4 Seção 16 & 18.3) */
+  td, th, .tabular-nums, .stat-number, .metric-card .value, .grades-table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ensure typography uses brand primary contrast #002133 in light theme without breaking dark surfaces (WCAG 1.4.3) */
+  html:not(.dark) .text-black,
+  html:not(.dark) .text-slate-950,
+  html:not(.dark) .text-slate-900,
+  html:not(.dark) .text-gray-950,
+  html:not(.dark) .text-gray-900 {
+    color: #002133;
+  }
+
+  /* WCAG 2.2 AA 2.4.7 Focus Visible & 2.4.11 Focus Not Obscured */
+  :focus-visible {
+    outline: 2px solid var(--color-brand, #f75142);
+    outline-offset: 2px;
+    scroll-margin-top: calc(var(--header-height, 84px) + 16px);
+  }
+
+  /* Skip to main content link (WCAG 2.4.1 Bypass Blocks) */
+  .skip-to-content-link {
+    position: fixed;
+    top: -100px;
+    left: 16px;
+    z-index: 9999;
+    background-color: #002133;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    padding: 0.625rem 1rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px rgba(0, 33, 51, 0.35);
+    transition: top 0.15s ease;
+    text-decoration: none;
+  }
+
+  .skip-to-content-link:focus,
+  .skip-to-content-link:focus-visible {
+    top: 12px;
+    outline: 2px solid #f75142;
+    outline-offset: 2px;
+  }
+
   ::selection {
     background-color: var(--color-brand);
     color: #ffffff;
   }
+
+  /* Proteção contra Extração e Download de Imagens (SSD) */
+  img, picture, svg.protected-asset {
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Estilo Global de Ícones Lucide (Composables.com / Lucide Specification: 24x24, 2px stroke, round caps & joins) */
+  svg.lucide,
+  .lucide-composable-icon {
+    stroke-width: 2px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    shape-rendering: geometricPrecision;
+    flex-shrink: 0;
+  }
+}
+
+/* Composables.com Lucide Icon Tile Container */
+.composable-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Optional utilities kept for explicit use */
@@ -82,3 +223,973 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-brand);
 }
+
+/* ---------- Header & Section Shader ---------- */
+/* Shader mounts into this layer. It fills the section and sits
+   behind the content. If WebGPU/the shader module fails to
+   load, this div keeps the plain coral background from the section
+   visible underneath it, so the section still looks intentional. */
+.header-shader {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.header-shader canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* ---------- Smooth scroll (Lenis) housekeeping ---------- */
+/* Recommended by Lenis: while it's driving the scroll, native
+   scroll-behavior must stay off or the two fight each other. */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+html.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+html.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* ---------- Header compact on scroll ---------- */
+.site-header {
+  transition: height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.35s ease;
+}
+
+.site-header.is-scrolled {
+  box-shadow: 0 8px 24px rgba(14, 27, 44, 0.18);
+}
+
+/* ---------- Scroll reveal ---------- */
+.reveal-up {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0s);
+  will-change: opacity, transform;
+}
+
+.reveal-up.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .nav-link, .cta-button, .site-header {
+    transition: none;
+  }
+  .reveal-up {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---------- Hero & Sections ---------- */
+
+.hero {
+  padding: clamp(3rem, 8vw, 6rem) 0 clamp(2rem, 5vw, 3.5rem);
+  text-align: center;
+}
+
+.hero h1,
+.hero-heading {
+  font-family: 'Manrope', 'Inter', sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(2.5rem, 7vw, 4.5rem) !important;
+  letter-spacing: -0.02em !important;
+  color: var(--navy) !important;
+  margin: 0 !important;
+}
+
+.hero-subtitle {
+  margin: 0.75rem 0 0 !important;
+  font-size: clamp(1.05rem, 2vw, 1.3rem) !important;
+  color: rgba(14, 27, 44, 0.55) !important;
+}
+
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+}
+
+/* ---------- Modern Card Logic (Concentric Nested Radius & Soft Shadow) ----------
+   Formula: Inner Radius (32px) = Outer Radius (48px) - Padding (16px)
+   Drop Shadow: X: 0, Y: 20px, Blur: 40px, Spread: 0, Color: rgba(0, 0, 0, 0.08)
+   Letter-spacing: -2% (-0.02em)
+*/
+.stat-card,
+.ui-modern-card {
+  flex: 1 1 180px;
+  background: #ffffff;
+  border-radius: 48px;
+  padding: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  will-change: transform;
+}
+
+.stat-card:hover,
+.ui-modern-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.13);
+}
+
+.stat-card:active,
+.ui-modern-card:active {
+  transform: translateY(-2px) scale(0.99);
+}
+
+.ui-modern-card-inner {
+  border-radius: 32px; /* 48px outer - 16px padding = 32px inner */
+}
+
+.ui-modern-card h1,
+.ui-modern-card h2,
+.ui-modern-card h3,
+.ui-modern-card h4 {
+  letter-spacing: -0.02em; /* -2% letter spacing */
+}
+
+.stat-number {
+  display: block;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--navy);
+}
+
+.stat-label {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: rgba(14, 27, 44, 0.55);
+}
+
+.feature-block {
+  padding: clamp(3rem, 7vw, 5rem) 0;
+  border-top: 1px solid rgba(14, 27, 44, 0.08);
+  max-width: 640px;
+}
+
+.feature-block--alt {
+  margin-left: auto;
+  text-align: right;
+}
+
+.feature-block h2 {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 1.75rem;
+  color: var(--navy);
+  margin: 0 0 0.75rem;
+}
+
+.feature-block p {
+  margin: 0;
+  color: rgba(14, 27, 44, 0.65);
+  line-height: 1.6;
+}
+
+/* ---------- Letter hover effect ---------- */
+/* .hover-text elements have their text split into one <span> per
+   character. In place of folding/compressing, the characters become
+   thicker and bolder on hover, preserving the original text color. */
+
+.hover-text {
+  display: inline-block;
+  cursor: default;
+}
+
+.hover-char {
+  display: inline-block;
+  transform-origin: center;
+  color: inherit;
+  -webkit-text-stroke: 0px currentColor;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              -webkit-text-stroke 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              text-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              font-weight 0.3s ease;
+  transition-delay: calc(var(--i, 0) * 16ms);
+}
+
+/* O texto fica mais grosso e negrito, mantendo a cor original */
+.hover-text:hover .hover-char,
+.hover-text:focus-visible .hover-char {
+  font-weight: 900 !important;
+  -webkit-text-stroke: 1.5px currentColor;
+  text-shadow: 0 0 0.8px currentColor;
+  transform: scale(1.04);
+}
+
+/* Letra individual em foco/hover ganha destaque extra */
+.hover-char:hover {
+  -webkit-text-stroke: 2px currentColor;
+  transform: scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hover-char {
+    transition: none;
+    transition-delay: 0s;
+  }
+  .hover-text:hover .hover-char,
+  .hover-text:focus-visible .hover-char,
+  .hover-char:hover {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Student Profile Design System - Sigre
+   ========================================================================== */
+
+:root {
+  --coral: #ff5148;
+  --coral-soft: #fff1ef;
+  --navy: #06283a;
+  --text: #18364a;
+  --muted: #7c8fa3;
+  --surface: #ffffff;
+  --background: #f8f6f5;
+  --border: #e1e8ef;
+  --success: #07966b;
+}
+
+.student-card {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  border: 1px solid #e3e9ef;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(10, 35, 51, 0.08);
+}
+
+.student-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: #ff5148;
+}
+
+.student-card .avatar {
+  width: 72px;
+  height: 72px;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background: #fff1ef;
+  box-shadow: 0 8px 18px rgba(255, 81, 72, 0.18);
+}
+
+.student-card .name {
+  margin-top: 14px;
+  color: #06283a;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.student-card .status-pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e6faf2;
+  color: #087a58;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.enrollment-card {
+  padding: 26px;
+  border: 1px solid #e1e8ef;
+  border-radius: 22px;
+  background: #ffffff;
+}
+
+.enrollment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px 32px;
+  margin-top: 22px;
+}
+
+.enrollment-item .label {
+  color: #7c8fa3;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.enrollment-item .value {
+  margin-top: 6px;
+  color: #06283a;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.enrollment-item .caption {
+  margin-top: 4px;
+  color: #5c7285;
+  font-size: 12px;
+}
+
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.metric-card {
+  padding: 18px 20px;
+  border: 1px solid #e6edf2;
+  border-radius: 18px;
+  background: #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card.highlight {
+  border-color: #ffd2cf;
+  background: #fff8f7;
+}
+
+.metric-card .label {
+  color: #7c8fa3;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metric-card .value {
+  margin-top: 8px;
+  color: #06283a;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.metric-card.highlight .value {
+  color: #ff5148;
+}
+
+.biographic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.biographic-item {
+  min-height: 120px;
+  padding: 20px 24px;
+  border-top: 1px solid #e6edf2;
+}
+
+.biographic-item:nth-child(odd) {
+  border-right: 1px solid #e6edf2;
+}
+
+.grades-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.grades-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5ecf2;
+  background: #f7fafc;
+  color: #51687d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.grades-table tbody tr {
+  border-top: 1px solid #edf2f6;
+  transition: background-color 0.18s ease;
+}
+
+.grades-table tbody tr.is-selected {
+  border-left: 4px solid #ff5148;
+  background: #fff8f7;
+}
+
+@media (max-width: 900px) {
+  .enrollment-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .summary-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .biographic-grid {
+    grid-template-columns: 1fr;
+  }
+  .biographic-item:nth-child(odd) {
+    border-right: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .enrollment-grid {
+    grid-template-columns: 1fr;
+  }
+  .summary-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Google Sign-In Material Button Styling */
+.gsi-material-button {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -webkit-appearance: none;
+  background-color: WHITE;
+  background-image: none;
+  border: 1px solid #747775;
+  -webkit-border-radius: 20px;
+  border-radius: 20px;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  color: #1f1f1f;
+  cursor: pointer;
+  font-family: 'Roboto', 'Plus Jakarta Sans', arial, sans-serif;
+  font-size: 14px;
+  height: 44px;
+  letter-spacing: 0.25px;
+  overflow: hidden;
+  padding: 0 12px;
+  position: relative;
+  text-align: center;
+  -webkit-transition: background-color .218s, border-color .218s, box-shadow .218s;
+  transition: background-color .218s, border-color .218s, box-shadow .218s;
+  vertical-align: middle;
+  white-space: nowrap;
+  width: auto;
+  max-width: 400px;
+  min-width: min-content;
+}
+
+.gsi-material-button:focus-visible {
+  outline: 2px solid #f75142;
+  outline-offset: 2px;
+}
+
+.gsi-material-button .gsi-material-button-icon {
+  height: 20px;
+  margin-right: 12px;
+  min-width: 20px;
+  width: 20px;
+}
+
+.gsi-material-button .gsi-material-button-content-wrapper {
+  -webkit-align-items: center;
+  align-items: center;
+  display: flex;
+  -webkit-flex-direction: row;
+  flex-direction: row;
+  -webkit-flex-wrap: nowrap;
+  flex-wrap: nowrap;
+  height: 100%;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+}
+
+.gsi-material-button .gsi-material-button-contents {
+  -webkit-flex-grow: 1;
+  flex-grow: 1;
+  font-family: 'Roboto', 'Plus Jakarta Sans', arial, sans-serif;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+.gsi-material-button .gsi-material-button-state {
+  -webkit-transition: opacity .218s;
+  transition: opacity .218s;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.gsi-material-button:disabled {
+  cursor: default;
+  background-color: #ffffff61;
+  border-color: #1f1f1f1f;
+}
+
+.gsi-material-button:disabled .gsi-material-button-contents {
+  opacity: 38%;
+}
+
+.gsi-material-button:disabled .gsi-material-button-icon {
+  opacity: 38%;
+}
+
+.gsi-material-button:not(:disabled):active .gsi-material-button-state, 
+.gsi-material-button:not(:disabled):focus .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 12%;
+}
+
+.gsi-material-button:not(:disabled):hover {
+  -webkit-box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+}
+
+.gsi-material-button:not(:disabled):hover .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 8%;
+}
+
+/* ---------- Profile Modal Card (School Team Profile) ---------- */
+.profile-modal {
+  width: 100%;
+  max-width: 380px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 32px 28px 28px;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.12);
+  position: relative;
+  text-align: center;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Botão fechar */
+.profile-modal .close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #F3F4F6;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-modal .close-btn:hover {
+  background: #E5E7EB;
+  color: #111827;
+}
+
+/* Avatar */
+.profile-modal .avatar-wrapper {
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.profile-modal .avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Nome */
+.profile-modal .name {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.profile-modal .verified {
+  flex-shrink: 0;
+}
+
+.profile-modal .role {
+  font-size: 0.9rem;
+  color: #6B7280;
+  margin: 0 0 16px;
+}
+
+/* Badges */
+.profile-modal .badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.profile-modal .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 999px;
+}
+
+.profile-modal .badge.school {
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.profile-modal .badge.subject {
+  background: #F0FDF4;
+  color: #15803D;
+}
+
+/* Stats (estilo da imagem 2) */
+.profile-modal .stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #F9FAFB;
+  border-radius: 16px;
+  padding: 14px 12px;
+  margin-bottom: 20px;
+}
+
+.profile-modal .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 70px;
+}
+
+.profile-modal .stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.profile-modal .stat-label {
+  font-size: 0.7rem;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+.profile-modal .stat-divider {
+  width: 1px;
+  height: 28px;
+  background: #E5E7EB;
+}
+
+/* Descrição */
+.profile-modal .description {
+  font-size: 0.875rem;
+  color: #4B5563;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+/* Contactos */
+.profile-modal .contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.profile-modal .contact-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #374151;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.profile-modal .contact-item:hover {
+  color: #111827;
+}
+
+/* CTA */
+.profile-modal .cta-btn {
+  width: 100%;
+  background: #111827;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-modal .cta-btn:hover {
+  background: #1F2937;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Masakula v2.0 — Atomic Engineering & Subtraction Rules (Sigre Angola)
+   ========================================================================== */
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #e8e8ea);
+  border-radius: var(--r-lg, 14px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.kpi:hover {
+  border-color: var(--line-strong, #d1d1d6);
+}
+
+.kpi--featured {
+  background: var(--ink, #002133);
+  border-color: var(--ink, #002133);
+  color: var(--text-on-dark, #ffffff);
+}
+
+.kpi--featured .kpi__label,
+.kpi--featured .kpi__meta {
+  color: var(--text-secondary-on-dark, #9fb3c8);
+}
+
+.btn--primary {
+  background: var(--ink, #002133);
+  color: var(--text-on-dark, #ffffff);
+  border: 1px solid var(--ink, #002133);
+  border-radius: var(--r-md, 10px);
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.btn--primary:hover {
+  opacity: 0.92;
+}
+
+.btn--secondary {
+  background: var(--surface, #ffffff);
+  color: var(--text-primary, #002133);
+  border: 1px solid var(--line-strong, #d1d1d6);
+  border-radius: var(--r-md, 10px);
+  padding: 9px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn--secondary:hover {
+  background: var(--surface-subtle, #f4f4f6);
+}
+
+.btn--tertiary {
+  background: transparent;
+  color: var(--text-secondary, #52606d);
+  border: none;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn--tertiary:hover {
+  color: var(--text-primary, #002133);
+}
+
+.filter-chip {
+  padding: 7px 14px;
+  border-radius: var(--r-pill, 9999px);
+  border: 1px solid var(--line, #e8e8ea);
+  background: var(--surface, #ffffff);
+  color: var(--text-secondary, #52606d);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  border-color: var(--line-strong, #d1d1d6);
+  color: var(--text-primary, #002133);
+}
+
+.filter-chip.is-active {
+  background: var(--ink, #002133);
+  border-color: var(--ink, #002133);
+  color: var(--text-on-dark, #ffffff);
+  font-weight: 600;
+}
+
+.badge--neutral {
+  background: var(--surface-subtle, #f4f4f6);
+  color: var(--text-secondary, #52606d);
+}
+.badge--success {
+  background: var(--success-soft, #e7f6f0);
+  color: var(--success-text, #0b7a54);
+}
+.badge--warning {
+  background: var(--warning-soft, #fdf1e0);
+  color: var(--warning-text, #a34a08);
+}
+.badge--danger {
+  background: var(--danger-soft, #fde8ed);
+  color: var(--danger-text, #c8002f);
+}
+
+/* Official A4 Document Typography: 100% Times New Roman on all elements (including spans, headings, strong, date line) */
+#oficial-a4-sheet,
+#oficial-a4-sheet *,
+#official-modal-print-sheet,
+#official-modal-print-sheet * {
+  font-family: 'Times New Roman', Times, serif !important;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0mm !important;
+  }
+
+  html,
+  body {
+    display: block !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    width: 210mm !important;
+    height: 296mm !important;
+    max-height: 296mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
+
+  #root,
+  #root > div,
+  #main-content,
+  #declaracao-efectividade-page,
+  #declaracao-efectividade-page > main,
+  #declaracao-efectividade-page > main > div,
+  #declaracao-efectividade-page > main > div > div {
+    display: block !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: 296mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    zoom: 1 !important;
+    overflow: hidden !important;
+  }
+
+  #siteHeader,
+  #ucore-hero-section,
+  #ucore-cloud-footer,
+  #btn-floating-support-chat,
+  #system-toast-notification,
+  #page-tabs-bar,
+  .skip-to-content-link,
+  .no-print,
+  header,
+  footer,
+  nav {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #oficial-a4-sheet,
+  #official-modal-print-sheet {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    height: 296mm !important;
+    max-height: 296mm !important;
+    margin: 0 auto !important;
+    padding: 15mm 20mm !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+}
+
+
+

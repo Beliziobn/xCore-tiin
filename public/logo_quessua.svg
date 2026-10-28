@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 260" width="740" height="260" fill="#000000">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&amp;display=swap');
+      .quessua-sans-heavy {
+        font-family: 'Montserrat', 'Arial Black', 'Helvetica Neue', system-ui, -apple-system, sans-serif;
+        font-weight: 900;
+      }
+      .quessua-serif-title {
+        font-family: 'Playfair Display', 'Times New Roman', 'Baskerville', 'Georgia', serif;
+        font-weight: 800;
+      }
+    </style>
+  </defs>
+
+  <g>
+    <!-- Anel principal do Q (Raio externo ~94, Raio interno ~52) -->
+    <path
+      d="M 148,22 A 94,94 0 1,0 148,210 A 94,94 0 1,0 148,22 Z M 148,66 A 52,52 0 1,1 148,170 A 52,52 0 1,1 148,66 Z"
+      fill-rule="evenodd"
+    />
+
+    <!-- Haste / Cauda diagonal grossa do Q no quadrante inferior direito -->
+    <polygon
+      points="180,166 264,236 238,260 154,190"
+    />
+
+    <!-- Bandeira / Flâmula ondulante atravessando o corpo e o vão do 'Q' -->
+    <path
+      d="M 34,156 
+         C 48,132 74,122 102,126 
+         C 132,130 154,148 184,142 
+         C 202,138 214,128 220,118 
+         L 220,154 
+         C 204,168 182,176 156,172 
+         C 128,168 106,152 80,156 
+         C 58,159 44,175 36,192 
+         Z"
+    />
+
+    <!-- Dobra inferior da fita / flâmula ondulante -->
+    <path
+      d="M 34,156 
+         C 46,168 52,185 48,200 
+         C 38,194 30,175 34,156 
+         Z"
+    />
+
+    <!-- Palavra 'uêssua' (Ultra Bold Display Grotesque) -->
+    <text
+      x="264"
+      y="142"
+      class="quessua-sans-heavy"
+      font-size="98"
+      letter-spacing="-2.5px"
+    >
+      uêssua
+    </text>
+
+    <!-- Subtítulo Institucional: 'Administração Municipal' -->
+    <text
+      x="320"
+      y="188"
+      class="quessua-serif-title"
+      font-size="35"
+      letter-spacing="0.4px"
+    >
+      Administração
+    </text>
+    <text
+      x="348"
+      y="230"
+      class="quessua-serif-title"
+      font-size="37"
+      letter-spacing="0.4px"
+    >
+      Municipal
+    </text>
+  </g>
+</svg>

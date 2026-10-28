@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, CheckCircle, ArrowRight, Shield } from 'lucide-react';
+import { X, CheckCircle, ArrowRight } from 'lucide-react';
 import type { EducationalModule } from '../types';
+import { ComposablesLucideIcon } from './common/ComposablesLucideIcon';
 
 interface ModuleDetailModalProps {
   module: EducationalModule | null;
@@ -26,16 +27,28 @@ export const ModuleDetailModal: React.FC<ModuleDetailModalProps> = ({
             onClick={onClose}
             className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-200/50 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" strokeWidth={2} />
           </button>
 
-          <span className="text-[9px] uppercase font-black tracking-[0.25em] bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full text-[#3B82F6] inline-block mb-2">
-            {module.subtitle}
-          </span>
-          <h3 className="text-2xl font-black uppercase tracking-tight text-slate-950">{module.title}</h3>
-          <p className="text-xs uppercase tracking-[0.1em] text-slate-500 mt-1">
-            Módulo Integrado da Central uCore
-          </p>
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-[#002133] shrink-0">
+              <ComposablesLucideIcon
+                name={module.icon}
+                titleFallback={module.title}
+                size={24}
+                strokeWidth={2}
+              />
+            </div>
+            <div>
+              <span className="text-[9px] uppercase font-black tracking-[0.25em] bg-[#fef2f1] border border-[#f75142]/30 px-2.5 py-1 rounded-full text-[#f75142] inline-block mb-1.5">
+                {module.subtitle}
+              </span>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-[#002133]">{module.title}</h3>
+              <p className="text-xs uppercase tracking-[0.1em] text-slate-500 mt-1">
+                Módulo Integrado da Central Sigre
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -51,7 +64,7 @@ export const ModuleDetailModal: React.FC<ModuleDetailModalProps> = ({
             <div className="space-y-2">
               {module.features.map((feat, idx) => (
                 <div key={idx} className="flex items-start gap-2.5 text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-                  <CheckCircle className="w-4 h-4 text-[#3B82F6] shrink-0 mt-0.5" />
+                  <CheckCircle className="w-4 h-4 text-[#f75142] shrink-0 mt-0.5" />
                   <span>{feat}</span>
                 </div>
               ))}
@@ -69,10 +82,10 @@ export const ModuleDetailModal: React.FC<ModuleDetailModalProps> = ({
             {isLoggedIn ? (
               <button
                 onClick={onClose}
-                className="bg-[#5067fc] hover:bg-[#4359eb] text-white text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2.5 rounded-full transition-all shadow-sm flex items-center gap-2 cursor-pointer active:scale-95"
+                className="bg-[#f75142] hover:bg-[#e04436] text-[#002133] text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2.5 rounded-full transition-all shadow-sm flex items-center gap-2 cursor-pointer active:scale-95"
               >
                 <span>Módulo Integrado</span>
-                <CheckCircle className="w-3.5 h-3.5" />
+                <CheckCircle className="w-3.5 h-3.5 text-[#002133]" />
               </button>
             ) : (
               <button
@@ -80,7 +93,7 @@ export const ModuleDetailModal: React.FC<ModuleDetailModalProps> = ({
                   onClose();
                   onOpenGetStarted();
                 }}
-                className="bg-slate-950 hover:bg-[#3B82F6] text-white text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2.5 rounded-full transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
+                className="bg-[#002133] hover:bg-[#f75142] hover:text-[#002133] text-white text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2.5 rounded-full transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
               >
                 <span>Acessar Módulo</span>
                 <ArrowRight className="w-3.5 h-3.5" />

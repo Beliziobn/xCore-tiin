@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Filter, Home, Layers, Calendar, Users, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorRoomsData as initialRooms } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import type { DirectorRoom } from '../../../types';
+import { StatCardItem } from '../../StatCardItem';
+import { saveRoomToFirestore } from '../../../utils/firestoreSync';
 
 interface DirectorRoomsPageProps {
   onOpenGetStarted: () => void;
@@ -14,12 +16,37 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
 }) => {
-  const [rooms, setRooms] = useState<DirectorRoom[]>(initialRooms);
-  const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[2]?.id || 'room-3'); // default Sala 03
+  const [rooms, setRooms] = useState<DirectorRoom[]>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_director_rooms');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return initialRooms;
+  });
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('ucore_director_rooms');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setRooms(parsed);
+        }
+      } catch {}
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    return () => window.removeEventListener('sigre-data-synced', handleSync);
+  }, []);
 
   // Filtered rooms
   const filteredRooms = useMemo(() => {
@@ -36,25 +63,72 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
   }, [rooms, searchQuery, typeFilter]);
 
   const currentRoom =
-    rooms.find((r) => r.id === selectedRoomId) || filteredRooms[0] || rooms[0];
+    rooms.find((r) => r.id === selectedRoomId) || filteredRooms[0] || rooms[0] || null;
 
   const handleCreateSuccess = (newRoom: any) => {
-    const formatted: DirectorRoom = {
-      id: newRoom.id,
-      roomNumber: newRoom.name.startsWith('Sala') ? newRoom.name : `Sala ${newRoom.name}`,
-      name: `Sala de Aula ${newRoom.gradeClass}`,
-      turmasCount: 2,
-      turmas: [`${newRoom.gradeClass} ${newRoom.turma}`],
-      period: newRoom.period === 'Tarde' ? 'Tarde' : 'Manhã / Tarde',
-      classes: [newRoom.gradeClass],
-      teachers: ['Prof. Regente Alocado'],
-      capacity: newRoom.studentCount || 45,
-      currentStudents: 42,
-      status: 'Ativa',
-      type: newRoom.type || 'Regular',
-    };
-    setRooms((prev) => [formatted, ...prev]);
-    setSelectedRoomId(formatted.id);
+    const resolvedRoomNum =
+      newRoom.room ||
+      (newRoom.name?.startsWith('Sala') ? newRoom.name : `Sala ${newRoom.name || '01'}`);
+    const turmaLabel = newRoom.turma
+      ? `${newRoom.gradeClass || ''} — ${newRoom.turma} (${newRoom.period || 'Manhã'})`.trim()
+      : '';
+
+    setRooms((prev) => {
+      const existingIdx = prev.findIndex(
+        (r) => r.roomNumber.trim().toLowerCase() === resolvedRoomNum.trim().toLowerCase()
+      );
+      let next: DirectorRoom[];
+      if (existingIdx >= 0) {
+        const existing = prev[existingIdx];
+        const nextTurmas = turmaLabel && !existing.turmas.includes(turmaLabel)
+          ? [...existing.turmas, turmaLabel]
+          : existing.turmas;
+        const nextClasses =
+          newRoom.gradeClass && !existing.classes.includes(newRoom.gradeClass)
+            ? [...existing.classes, newRoom.gradeClass]
+            : existing.classes;
+        const updatedRoom: DirectorRoom = {
+          ...existing,
+          name: newRoom.name || existing.name,
+          turmas: nextTurmas,
+          turmasCount: nextTurmas.length,
+          classes: nextClasses,
+          capacity: newRoom.studentCount || existing.capacity || 45,
+          type: newRoom.type || existing.type,
+        };
+        next = [...prev];
+        next[existingIdx] = updatedRoom;
+        setSelectedRoomId(updatedRoom.id);
+      } else {
+        const formatted: DirectorRoom = {
+          id: newRoom.id || `room-${Date.now()}`,
+          roomNumber: resolvedRoomNum,
+          name: newRoom.name || `Sala de Aula ${newRoom.gradeClass || ''}`.trim(),
+          turmasCount: turmaLabel ? 1 : 0,
+          turmas: turmaLabel ? [turmaLabel] : [],
+          period: newRoom.period === 'Tarde' ? 'Tarde' : newRoom.period === 'Noite' ? 'Noite' : 'Manhã / Tarde',
+          classes: newRoom.gradeClass ? [newRoom.gradeClass] : [],
+          teachers: [],
+          capacity: newRoom.studentCount || 45,
+          currentStudents: 0,
+          status: 'Ativa',
+          type: newRoom.type || 'Regular',
+        };
+        next = [formatted, ...prev];
+        setSelectedRoomId(formatted.id);
+        saveRoomToFirestore(formatted).catch(() => {});
+      }
+      if (existingIdx >= 0 && next[existingIdx]) {
+        saveRoomToFirestore(next[existingIdx]).catch(() => {});
+      }
+      try {
+        localStorage.setItem('ucore_director_rooms', JSON.stringify(next));
+        localStorage.setItem('sigre_director_rooms', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   return (
@@ -77,7 +151,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
               onClick={() => setFilterDropdownOpen((prev) => !prev)}
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
             >
-              <Filter className="w-3.5 h-3.5 text-[#5067fc]" />
+              <Filter className="w-3.5 h-3.5 text-[#f75142]" />
               <span>
                 Filtro: {typeFilter === 'all' ? 'Salas' : typeFilter}
               </span>
@@ -93,7 +167,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
                   }}
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
                 >
-                  Todas as Salas (11)
+                  Todas as Salas ({rooms.length})
                 </button>
                 <button
                   onClick={() => {
@@ -143,7 +217,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
               placeholder="Pesquisar por número da sala, classe, turno ou professor..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#5067fc] focus:ring-2 focus:ring-[#5067fc]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
             />
           </div>
 
@@ -151,7 +225,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
           <button
             id="btn-cadastrar-sala"
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+            className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Cadastrar</span>
@@ -169,7 +243,7 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
               onClick={() => setSelectedRoomId(r.id)}
               className={`text-xs px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
                 currentRoom?.id === r.id
-                  ? 'bg-[#5067fc] text-white shadow-xs'
+                  ? 'bg-[#f75142] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -179,144 +253,132 @@ export const DirectorRoomsPage: React.FC<DirectorRoomsPageProps> = ({
           ))}
         </div>
 
-        {/* Main 5 Cards Grid with Cyan Badges matching 15.png */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
-          {/* Card 1: [Nº Salas] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº Salas
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Espaço Físico</span>
-                <h4 className="text-3xl sm:text-4xl font-black mt-2">{currentRoom?.roomNumber || 'Sala 03'}</h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>Total de {rooms.length} Salas Ativas na Escola</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: [Nº Turmas] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº Turmas
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Turmas na Sala</span>
-                <h4 className="text-3xl sm:text-4xl font-black mt-2">
-                  {currentRoom?.turmasCount || 2} Turmas
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>16 Turmas distribuídas no total</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: [Periodo] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Periodo
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Funcionamento</span>
-                <h4 className="text-xl sm:text-2xl font-black mt-2 leading-tight">
-                  {currentRoom?.period || 'Manhã / Tarde'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-[11px] text-white/90">
-                <span>07h30 às 12h00 e 12h30 às 17h30</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: [Classes] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Classes
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Níveis Atendidos</span>
-                <h4 className="text-xl sm:text-2xl font-black mt-2">
-                  {currentRoom?.classes.join(', ') || '4ª Classe'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-xs text-white/90">
-                <span>Capacidade: {currentRoom?.capacity || 46} alunos</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 5: [Nome dos Professores] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nome dos Professores
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-sm min-h-[170px]">
-              <div>
-                <span className="text-xs uppercase font-bold text-white/80 tracking-wider">Corpo Docente Alocado</span>
-                <h4 className="text-sm sm:text-base font-bold mt-2 leading-snug">
-                  {currentRoom?.teachers.join(', ') || 'Prof. Santar Goes'}
-                </h4>
-              </div>
-              <div className="pt-3 border-t border-white/20 text-[11px] text-white/90">
-                <span>Supervisão do Diretor Fert Horlan</span>
-              </div>
-            </div>
-          </div>
+        {/* Metric Cards featuring harmonious equal-height cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-8 items-stretch">
+          <StatCardItem
+            id="dr-card-salas"
+            size="sm"
+            card={{
+              id: 'salas',
+              title: currentRoom?.roomNumber || 'Salas',
+              value: String(rooms.length),
+              isClickable: false,
+              subtitle: 'Total de Salas Ativas',
+            }}
+          />
+          <StatCardItem
+            id="dr-card-turmas"
+            size="sm"
+            card={{
+              id: 'turmas',
+              title: 'Nº Turmas',
+              value: String(currentRoom?.turmasCount || 0),
+              isClickable: false,
+              subtitle: `${currentRoom?.turmasCount || 0} Turmas distribuídas`,
+            }}
+          />
+          <StatCardItem
+            id="dr-card-capacidade"
+            size="sm"
+            card={{
+              id: 'capacidade',
+              title: 'Capacidade',
+              value: String(currentRoom?.capacity || 0),
+              isClickable: true,
+              actionText: 'Ver mais',
+              subtitle: 'Lotação máxima sala',
+            }}
+            onSelect={() => {
+              document.getElementById('room-specs-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+          <StatCardItem
+            id="dr-card-periodo"
+            size="sm"
+            card={{
+              id: 'periodo',
+              title: 'Periodo',
+              value: currentRoom ? currentRoom.period?.split(' ')[0] || '---' : '---',
+              isClickable: false,
+              subtitle: currentRoom?.period || 'Aguardando salas',
+            }}
+          />
+          <StatCardItem
+            id="dr-card-professores"
+            size="sm"
+            card={{
+              id: 'professores',
+              title: 'Professores',
+              value: String(currentRoom?.teachers?.length || 0),
+              isClickable: false,
+              subtitle: currentRoom?.teachers?.[0] || 'Nenhum docente alocado',
+            }}
+          />
         </div>
 
         {/* Detailed Room Specifications Panel */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#5067fc]">
-                Ficha Técnica da Sala
-              </span>
-              <h3 className="text-xl font-black text-slate-900 mt-0.5">
-                {currentRoom?.roomNumber} • {currentRoom?.name}
-              </h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold">
-                {currentRoom?.status || 'Ativa'}
-              </span>
-              <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-bold">
-                {currentRoom?.type}
-              </span>
-            </div>
-          </div>
+        <div id="room-specs-section" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
+          {currentRoom ? (
+            <>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-[0.2em] text-[#f75142]">
+                    Ficha Técnica da Sala
+                  </span>
+                  <h3 className="text-xl font-black text-slate-900 mt-0.5">
+                    {currentRoom.roomNumber} • {currentRoom.name}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold">
+                    {currentRoom.status || 'Ativa'}
+                  </span>
+                  <span className="text-xs bg-[#fef2f1] text-[#e04436] border border-[#fee4e2] px-3 py-1 rounded-full font-bold">
+                    {currentRoom.type}
+                  </span>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-5 text-xs text-slate-600">
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Turmas Atendidas</span>
-              <ul className="space-y-1 font-semibold text-slate-800">
-                {currentRoom?.turmas.map((t, idx) => (
-                  <li key={idx} className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#5067fc]" />
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Ocupação & Carteiras</span>
-              <p className="font-semibold text-slate-800">
-                {currentRoom?.currentStudents} alunos frequentes de {currentRoom?.capacity} lugares disponíveis (
-                {Math.round(((currentRoom?.currentStudents || 42) / (currentRoom?.capacity || 46)) * 100)}% de ocupação).
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-5 text-xs text-slate-600">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Turmas Atendidas</span>
+                  {currentRoom.turmas?.length > 0 ? (
+                    <ul className="space-y-1 font-semibold text-slate-800">
+                      {currentRoom.turmas.map((t, idx) => (
+                        <li key={idx} className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#f75142]" />
+                          <span>{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-slate-400 italic">Nenhuma turma atribuída</p>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Ocupação & Carteiras</span>
+                  <p className="font-semibold text-slate-800">
+                    {currentRoom.currentStudents} alunos frequentes de {currentRoom.capacity} lugares disponíveis (
+                    {currentRoom.capacity > 0 ? Math.round((currentRoom.currentStudents / currentRoom.capacity) * 100) : 0}% de ocupação).
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Equipamentos & Recursos</span>
+                  <p className="font-semibold text-slate-800">
+                    Quadro branco magnético, iluminação natural LED, ventilação cruzada, armários pedagógicos e ponto de rede Sigre.
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <Home className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <p className="font-bold text-slate-700 text-sm">Nenhuma sala cadastrada</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Ainda não existem salas de aula adicionadas. Clique em "Cadastrar Sala" acima para iniciar o lançamento.
               </p>
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Equipamentos & Recursos</span>
-              <p className="font-semibold text-slate-800">
-                Quadro branco magnético, iluminação natural LED, ventilação cruzada, armários pedagógicos e ponto de rede uCore.
-              </p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

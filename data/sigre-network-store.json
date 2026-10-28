@@ -1,0 +1,125 @@
+{
+  "schools": [],
+  "directors": [
+    {
+      "id": "usr_1790893847062",
+      "name": "Só da Educação",
+      "schoolName": "Só Ciência da Educação",
+      "phone": "47895668855533",
+      "email": "socienciadaeduca2018@gmail.com",
+      "appointmentYear": 2026,
+      "status": "Ativo",
+      "performanceRating": 95,
+      "teachersCount": 18,
+      "studentsCount": 450,
+      "location": "Quêssua, Malanje",
+      "registrationData": {
+        "id": "dir-dossier-usr_1790893847062",
+        "nomeCompleto": "Só da Educação",
+        "biNif": "33347799986",
+        "sexo": "Feminino",
+        "dataNascimento": "1970-01-01",
+        "idade": 56,
+        "faixaEtaria": "mais de 39 anos",
+        "telefone": "47895668855533",
+        "emailPessoal": "socienciadaeduca2018@gmail.com",
+        "emailInstitucional": "scinciadaeducao@ucore.edu.ao",
+        "morada": "Bairro Central de Quêssua, Zona A",
+        "provinciaResidencia": "Malanje",
+        "municipioResidencia": "Quêssua",
+        "escolaId": "sch-1790810466749",
+        "nomeEscola": "Só Ciência da Educação",
+        "codigoEscola": "ESC-QSS-001",
+        "naturezaEscola": "Público-Privada",
+        "provinciaEscola": "Malanje",
+        "municipioEscola": "Quêssua",
+        "niveisEscolaOferece": [
+          "Classe de Iniciação",
+          "Ensino Primário (1.ª a 6.ª)",
+          "Iº Ciclo do Ensino Secundário Geral"
+        ],
+        "cargo": "Director(a)",
+        "dataNomeacao": "2026-10-01",
+        "regime": "Efectivo",
+        "dedicacao": "Acumula com leccionação",
+        "anosExperienciaDirector": 7,
+        "anosServicoEducacao": 6,
+        "situacaoMandato": "Atual / Em Exercício",
+        "temFormacaoPedagogica": true,
+        "temMagisterioCompleto": true,
+        "temImneCompleto": true,
+        "temOutraFormacaoPedagogica": false,
+        "classificacaoPedagogica": "Com magistério e com IMNE completo",
+        "nivelAcademico": "Licenciado",
+        "temFormacaoAdministracaoGestao": true,
+        "temFormacaoLiderancaSupervisao": true,
+        "outrasFormacoesGestao": "Supervisão Pedagógica, Gestão Orçamental Escolar e Liderança Educativa (MED Angola)",
+        "anoUltimaFormacaoGestao": 2024,
+        "foiDirectorOutrasEscolas": false,
+        "possuiValidacaoHabilitacoesCargo": true,
+        "documentosAnexos": [
+          {
+            "id": "doc-homologacao-0",
+            "nome": "Despacho_Nomeacao_Oficial_2019.pdf",
+            "tamanho": "1.4 MB",
+            "tipo": "nomeacao",
+            "data": "2019-02-01"
+          },
+          {
+            "id": "doc-diploma-0",
+            "nome": "Certificado_Habilitacoes_Pedagogicas.pdf",
+            "tamanho": "2.8 MB",
+            "tipo": "diploma",
+            "data": "2016-11-20"
+          }
+        ],
+        "observacoes": "Director(a) com excelente assiduidade institucional e forte liderança comunitária junto à comissão de pais de Só Ciência da Educação.",
+        "professoresSobDirecao": 18,
+        "alunosSobDirecao": 2,
+        "desafiosGestao": [
+          "Infra-estruturas e número insuficiente de salas",
+          "Alunos sem certidão de nascimento / BI (registo civil)",
+          "Necessidade de formação pedagógica contínua dos docentes"
+        ],
+        "disponibilidadeFormacaoContinua": "Total",
+        "directoresAnteriores": [
+          {
+            "id": "prev-0-1",
+            "nomeCompleto": "Prof. Bernardo Kassanje Vunge",
+            "cargo": "Director(a)",
+            "periodoInicio": "2015",
+            "periodoFim": "2019",
+            "motivoSaida": "Transferência para Gabinete Provincial de Educação",
+            "observacoes": "Transição pacífica de pastas e inventário patrimonial homologado."
+          }
+        ],
+        "historicoAlteracoes": [
+          {
+            "id": "audit-1790894345160",
+            "data": "2026-10-01T22:39:05.160Z",
+            "autor": "Director Municipal da Educação",
+            "acao": "Homologação",
+            "detalhes": "Homologação ministerial/municipal pelo Administrador com conferência presencial de documentos em mãos. Despacho de Homologação nº 437/DME/2026. Nível: Licenciado, 6 anos de serviço, Regime: Efectivo."
+          },
+          {
+            "id": "log-init-0",
+            "data": "2019-02-01T08:30:00Z",
+            "autor": "Gabinete Municipal de Educação de Quêssua",
+            "acao": "Homologação",
+            "detalhes": "Homologação formal do mandato directivo na Só Ciência da Educação."
+          }
+        ],
+        "criadoEm": "2019-02-01T08:30:00Z",
+        "atualizadoEm": "2026-10-01T22:39:05.159Z",
+        "nivelAcademicoOutro": ""
+      },
+      "approvedAt": "01/10/2026, 23:39:05"
+    }
+  ],
+  "teachers": [],
+  "students": [],
+  "applications": [],
+  "efectividade": [],
+  "quickRequests": [],
+  "updatedAt": "2026-10-25T14:44:43.782Z"
+}

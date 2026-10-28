@@ -1,0 +1,75 @@
+# ==============================================================================
+# robots.txt - Central uCore (Plataforma Integrada de Gestão Educacional em Angola)
+# ==============================================================================
+# Configuração oficial de rastreamento e indexação para motores de busca.
+# Protege dados confidenciais de alunos, docentes e áreas de gestão escolar.
+
+User-agent: *
+# Páginas Públicas Institucionais Permitidas
+Allow: /
+Allow: /index.html
+Allow: /public/
+Allow: /assets/
+Allow: /?page=sobre
+Allow: /?page=cases
+Allow: /?page=faq
+Allow: /?page=mapas
+Allow: /?page=rotas
+Allow: /?page=reunioes
+Allow: /?page=termos
+Allow: /?page=privacidade
+Allow: /?page=seguranca
+Allow: /?page=obrigado
+Allow: /sobre
+Allow: /cases
+Allow: /faq
+Allow: /mapas
+Allow: /rotas
+Allow: /reunioes
+Allow: /termos
+Allow: /privacidade
+Allow: /seguranca
+Allow: /obrigado
+
+# Bloqueio de Áreas Restritas, Dados Pessoais e API
+Disallow: /api/
+Disallow: /admin
+Disallow: /diretor
+Disallow: /professor
+Disallow: /aluno
+Disallow: /secretaria
+Disallow: /portal-privado
+Disallow: /*?view=admin*
+Disallow: /*?view=director*
+Disallow: /*?view=teacher*
+Disallow: /*?view=student*
+Disallow: /*?view=approvals*
+Disallow: /*?view=attendance*
+
+# Bloqueio de Ficheiros de Dados e Planilhas Brutas
+Disallow: /*.xlsx$
+Disallow: /*.xls$
+Disallow: /*.csv$
+Disallow: /*.json$
+
+# Googlebot Diretrizes Específicas
+User-agent: Googlebot
+Allow: /
+Allow: /assets/
+Disallow: /api/
+Disallow: /*?view=*
+
+# Bingbot Diretrizes Específicas
+User-agent: Bingbot
+Allow: /
+Allow: /assets/
+Disallow: /api/
+Disallow: /*?view=*
+
+# Taxa de rastreio recomendada
+Crawl-delay: 5
+
+# Sitemaps Oficiais
+Sitemap: https://ais-pre-je74l3gqxasv5iudwsbmo6-172471451356.europe-west2.run.app/sitemap.xml
+Sitemap: https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/sitemap.xml
+

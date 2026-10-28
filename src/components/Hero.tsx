@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Box, GraduationCap } from 'lucide-react';
 import heroImg from '../assets/images/hero_creative_desk.png';
+import { SectionShader } from './SectionShader';
+
+export interface BreadcrumbItem {
+  label: string;
+  onClick?: () => void;
+}
 
 interface HeroProps {
   onOpenGetStarted: () => void;
@@ -8,6 +14,9 @@ interface HeroProps {
   isLoggedIn?: boolean;
   customTitle?: string;
   customSubtitle?: string;
+  breadcrumbs?: BreadcrumbItem[];
+  badge?: string;
+  compact?: boolean | 'ultra';
 }
 
 const SERVICE_TAGS = [
@@ -21,6 +30,9 @@ export const Hero: React.FC<HeroProps> = ({
   isLoggedIn,
   customTitle,
   customSubtitle,
+  breadcrumbs,
+  badge,
+  compact,
 }) => {
   const [scrollY, setScrollY] = useState(0);
 
@@ -40,16 +52,25 @@ export const Hero: React.FC<HeroProps> = ({
   }, []);
 
   /* ---------------------------------------------------------------------
-   * Inner-page banner (blue). Kept for every page that passes customTitle.
+   * Inner-page banner (coral). Kept for every page that passes customTitle.
    * ------------------------------------------------------------------- */
   if (customTitle) {
     return (
       <section
         id="ucore-hero-section"
-        className="relative w-full bg-gradient-to-br from-[#4f67ff] via-[#4a60fb] to-[#3547cf] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(79,103,255,0.55)] pt-10 sm:pt-14 pb-12 sm:pb-16 px-4 sm:px-8 lg:px-16 overflow-hidden"
+        className={`relative w-full bg-gradient-to-br from-[#f75142] via-[#e54536] to-[#c9372a] rounded-b-[28px] shadow-[0_24px_60px_-20px_rgba(247,81,66,0.45)] px-4 sm:px-8 lg:px-16 overflow-hidden ${
+          compact === 'ultra'
+            ? 'pt-3.5 sm:pt-4 pb-4 sm:pb-5 min-h-[115px] sm:min-h-[125px]'
+            : compact
+            ? 'pt-5 sm:pt-6 pb-7 sm:pb-9 min-h-[155px]'
+            : 'pt-8 sm:pt-12 pb-10 sm:pb-14'
+        }`}
       >
+        <SectionShader variant="coral" />
         <div
-          className="absolute inset-0 opacity-[0.07] pointer-events-none"
+          className={`absolute inset-0 pointer-events-none z-[1] ${
+            compact === 'ultra' ? 'opacity-[0.02]' : compact ? 'opacity-[0.03]' : 'opacity-[0.07]'
+          }`}
           style={{
             backgroundImage:
               'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
@@ -57,11 +78,46 @@ export const Hero: React.FC<HeroProps> = ({
           }}
         />
         <div className="max-w-6xl mx-auto relative z-10 text-white">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]">
+          {/* Breadcrumb Trail & Optional Role Badge */}
+          {(badge || (breadcrumbs && breadcrumbs.length > 0)) && (
+            <div className={`flex flex-wrap items-center gap-2.5 ${compact ? 'mb-2' : 'mb-3'}`}>
+              {badge && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-white text-[11px] font-black uppercase tracking-wider">
+                  {badge}
+                </span>
+              )}
+              {breadcrumbs && breadcrumbs.length > 0 && (
+                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-semibold text-white/80 flex-wrap">
+                  {breadcrumbs.map((crumb, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <span className="opacity-50">/</span>}
+                      {crumb.onClick ? (
+                        <button
+                          type="button"
+                          onClick={crumb.onClick}
+                          className="hover:text-white transition-colors cursor-pointer hover:underline text-white/85"
+                        >
+                          {crumb.label}
+                        </button>
+                      ) : (
+                        <span className="text-white font-bold">{crumb.label}</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </nav>
+              )}
+            </div>
+          )}
+
+          <h1 className={`font-black tracking-tight leading-[1.1] ${
+            compact ? 'text-2xl sm:text-3xl lg:text-3xl' : 'text-3xl sm:text-4xl lg:text-5xl'
+          }`}>
             {customTitle}
           </h1>
           {customSubtitle && (
-            <p className="mt-4 text-sm sm:text-base font-medium text-white/85 leading-relaxed max-w-xl">
+            <p className={`font-medium text-white/90 leading-relaxed max-w-2xl ${
+              compact ? 'mt-1.5 text-xs sm:text-sm' : 'mt-3 text-sm sm:text-base'
+            }`}>
               {customSubtitle}
             </p>
           )}
@@ -71,41 +127,88 @@ export const Hero: React.FC<HeroProps> = ({
   }
 
   /* ---------------------------------------------------------------------
-   * Homepage hero (white) — matches the uCore reference composition.
+   * Homepage hero (white) — matches the Sigre reference composition.
    * ------------------------------------------------------------------- */
   const floatSlow = Math.min(28, scrollY * 0.06);
 
   return (
     <section
-      id="ucore-hero-section"
+      id="sigre-hero-section"
       className="relative w-full bg-background overflow-hidden px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-16 sm:pb-20"
     >
-      <div className="max-w-5xl mx-auto flex flex-col items-center">
+      <SectionShader variant="subtle" className="opacity-70" />
+      <div className="max-w-5xl mx-auto flex flex-col items-center relative z-10">
         {/* Heading */}
-        <div className="text-center">
+        <div className="text-center reveal-up">
           {greeting ? (
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-slate-950 leading-[1.02] text-balance">
-              {greeting}
+            <h1
+              className="hero-heading font-extrabold tracking-[-0.02em] leading-[1.05] text-balance"
+              style={{
+                fontFamily: "'Manrope', 'Inter', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(2.5rem, 7vw, 4.5rem)',
+                letterSpacing: '-0.02em',
+                color: 'var(--navy)',
+                margin: 0,
+              }}
+            >
+              <span className="hover-text">
+                {greeting.split('').map((char, index) => (
+                  <span
+                    key={index}
+                    className="hover-char"
+                    style={{ '--i': index } as React.CSSProperties}
+                  >
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                ))}
+              </span>
             </h1>
           ) : (
-            <h1 className="text-5xl sm:text-7xl lg:text-[5.5rem] font-black tracking-tighter text-slate-950 leading-[0.98] text-balance">
-              Central uCore
+            <h1
+              className="hero-heading font-extrabold tracking-[-0.02em] leading-[1.05] text-balance"
+              style={{
+                fontFamily: "'Manrope', 'Inter', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(2.5rem, 7vw, 4.5rem)',
+                letterSpacing: '-0.02em',
+                color: 'var(--navy)',
+                margin: 0,
+              }}
+            >
+              <span className="hover-text">
+                {'Sigre'.split('').map((char, index) => (
+                  <span
+                    key={index}
+                    className="hover-char"
+                    style={{ '--i': index } as React.CSSProperties}
+                  >
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                ))}
+              </span>
             </h1>
           )}
-          <p className="mt-5 sm:mt-6 text-lg sm:text-2xl font-medium text-slate-500 leading-relaxed text-pretty">
+          <p
+            className="hero-subtitle text-pretty"
+            style={{
+              margin: '0.75rem 0 0',
+              fontSize: 'clamp(1.05rem, 2vw, 1.3rem)',
+              color: 'rgba(14, 27, 44, 0.55)',
+            }}
+          >
             Uma gestão e organização melhor da educação
           </p>
         </div>
 
-        {/* Single-image collage — the photo forms one irregular silhouette
-            that contours around the info cards (same plane, no overlap). */}
-        <div className="mt-10 sm:mt-14 w-full max-w-4xl">
+        {/* Hero Image Showcase with White Contour and Attached Centered Stat Cards */}
+        <div className="mt-12 sm:mt-16 w-full max-w-4xl px-4 sm:px-8 reveal-up" data-reveal-delay="0.15">
           <div
-            className="relative w-full aspect-[96/60] transition-transform duration-100 ease-out"
+            className="relative w-full transition-transform duration-100 ease-out"
             style={{ transform: `translateY(${floatSlow * 0.25}px)` }}
           >
-            {/* ---- One continuous photo, clipped to a rounded rectangle ---- */}
-            <div className="absolute inset-0 overflow-hidden rounded-[6%] shadow-[0_40px_90px_-40px_rgba(15,23,42,0.45)]">
+            {/* ---- Central photo with prominent white contour / border ---- */}
+            <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-[24px] sm:rounded-[36px] overflow-hidden border-4 sm:border-8 border-white shadow-[0_30px_70px_-20px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/5 bg-slate-100">
               <img
                 src={heroImg}
                 alt="Profissional da educação a organizar documentos numa secretária de trabalho"
@@ -114,74 +217,47 @@ export const Hero: React.FC<HeroProps> = ({
               />
             </div>
 
-            {/* ---- Background-colored "erasers" carve the silhouette so the
-                    photo genuinely recedes around each card (thin white gap) ---- */}
-            {/* top-left carve */}
-            <div
-              className="absolute bg-background"
-              style={{ left: '-1%', top: '-1%', width: '32%', height: '41%', borderRadius: '7%' }}
-            />
-            {/* right-edge notch carve */}
-            <div
-              className="absolute bg-background"
-              style={{ left: '88%', top: '30%', width: '16%', height: '27%', borderRadius: '32%' }}
-            />
-            {/* bottom-left carve */}
-            <div
-              className="absolute bg-background"
-              style={{ left: '-2%', top: '63.5%', width: '20.5%', height: '30%', borderRadius: '11%' }}
-            />
-            {/* bottom-right recess carve (scoop for the tags card) */}
-            <div
-              className="absolute bg-background"
-              style={{ left: '58%', top: '72%', width: '46%', height: '21%', borderRadius: '18%' }}
-            />
+            {/* ---- Attached Stat Cards with Centered Content ---- */}
 
-            {/* ---- Info cards sit inside the carved negative space ---- */}
-            {/* Black stat card — top-left */}
+            {/* Dark Navy Stat Card — Top-Left */}
             <div
-              className="absolute z-10 flex flex-col justify-between rounded-[9%] bg-slate-950 p-3 sm:p-5 shadow-[0_20px_45px_-26px_rgba(15,23,42,0.5)]"
-              style={{ left: '1.5%', top: '1.5%', width: '28%', height: '35.5%' }}
+              className="absolute z-20 -top-4 sm:-top-7 -left-2 sm:-left-6 bg-[#002133] text-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-[0_20px_45px_-12px_rgba(0,33,51,0.6)] flex flex-col items-center justify-center text-center min-w-[100px] sm:min-w-[140px] border border-white/10"
             >
-              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-white/10 flex items-center justify-center">
-                <Box className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" strokeWidth={2.5} />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/10 flex items-center justify-center mb-2 mx-auto">
+                <Box className="w-4 h-4 sm:w-5 sm:h-5 text-white" strokeWidth={2.5} />
               </div>
-              <div>
-                <div className="text-xl sm:text-4xl font-black text-white leading-none tracking-tight">
-                  +2.5k
-                </div>
-                <div className="mt-1 text-[8px] sm:text-xs font-medium text-white/55">
-                  Alunos ativos
-                </div>
+              <div className="text-xl sm:text-3xl font-black text-white leading-none tracking-tight text-center">
+                +2.5k
+              </div>
+              <div className="mt-1 text-[10px] sm:text-xs font-medium text-white/60 text-center">
+                Alunos ativos
               </div>
             </div>
 
-            {/* White stat card — bottom-left */}
+            {/* White Stat Card — Bottom-Left */}
             <div
-              className="absolute z-10 flex flex-col justify-center rounded-[16%] bg-background border border-slate-200/80 p-2.5 sm:p-4 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.32)]"
-              style={{ left: '1.5%', top: '64.5%', width: '17.5%', height: '27%' }}
+              className="absolute z-20 -bottom-4 sm:-bottom-7 -left-2 sm:-left-6 bg-white text-[#002133] rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-[0_20px_40px_-15px_rgba(15,23,42,0.22)] border border-slate-100 flex flex-col items-center justify-center text-center min-w-[100px] sm:min-w-[130px]"
             >
-              <GraduationCap className="w-4 h-4 sm:w-6 sm:h-6 text-[#4f67ff] mb-1" strokeWidth={2.25} />
-              <div className="text-base sm:text-2xl font-black text-slate-950 leading-none tracking-tight">
+              <GraduationCap className="w-5 h-5 sm:w-7 sm:h-7 text-[#f75142] mb-1.5 mx-auto" strokeWidth={2.25} />
+              <div className="text-xl sm:text-3xl font-black text-[#002133] leading-none tracking-tight text-center">
                 98%
               </div>
-              <div className="mt-0.5 text-[7px] sm:text-[11px] font-medium text-slate-500">
+              <div className="mt-1 text-[10px] sm:text-xs font-medium text-slate-500 text-center">
                 Satisfação
               </div>
             </div>
 
-            {/* Service tags card — bottom-right */}
+            {/* Service Tags Card — Bottom-Right */}
             <div
-              className="absolute z-10 rounded-[10%] bg-background border border-slate-200/80 shadow-[0_16px_40px_-24px_rgba(15,23,42,0.3)] p-3 sm:p-4"
-              style={{ left: '60%', top: '75%', width: '42%' }}
+              className="absolute z-20 -bottom-5 sm:-bottom-8 -right-2 sm:-right-6 bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-[0_20px_40px_-15px_rgba(15,23,42,0.22)] p-3 sm:p-5 flex flex-col items-center justify-center text-center max-w-[210px] sm:max-w-xs"
             >
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
                 {SERVICE_TAGS.map((row, i) => (
-                  <div key={i} className="flex flex-wrap gap-1.5 sm:gap-2">
+                  <div key={i} className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
                     {row.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center rounded-full bg-slate-50 border border-slate-200 px-2 sm:px-3.5 py-0.5 sm:py-1.5 text-[9px] sm:text-sm font-semibold text-slate-700 shadow-sm"
+                        className="inline-flex items-center rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
                       >
                         {tag}
                       </span>
@@ -198,7 +274,7 @@ export const Hero: React.FC<HeroProps> = ({
           <button
             id="hero-comecar-btn"
             onClick={onOpenGetStarted}
-            className="mt-10 sm:mt-14 bg-[#4f67ff] hover:bg-[#3547cf] text-white font-bold text-base sm:text-lg px-10 sm:px-14 py-3.5 sm:py-4 rounded-2xl transition-all duration-300 cursor-pointer shadow-[0_16px_36px_-12px_rgba(79,103,255,0.9)] hover:shadow-[0_20px_44px_-12px_rgba(79,103,255,1)] active:scale-[0.98]"
+            className="mt-10 sm:mt-14 bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black text-base sm:text-lg px-10 sm:px-14 py-3.5 sm:py-4 rounded-2xl transition-all duration-300 cursor-pointer shadow-[0_16px_36px_-12px_rgba(247,81,66,0.6)] hover:shadow-[0_20px_44px_-12px_rgba(247,81,66,0.8)] active:scale-[0.98]"
           >
             Começar
           </button>

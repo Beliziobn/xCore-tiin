@@ -1,27 +1,200 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Plus, Filter, CheckCircle, AlertCircle, FileCheck, FileX, ChevronDown, ShieldCheck } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Search,
+  Plus,
+  Filter,
+  CheckCircle,
+  AlertCircle,
+  FileCheck,
+  FileX,
+  ChevronDown,
+  GraduationCap,
+  FileText,
+  Edit3,
+  FileDown,
+  Trash2,
+  Clock,
+  School,
+  Users
+} from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorStudentsData as initialStudents } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
-import type { DirectorStudent, AdminStudent } from '../../../types';
+import { TurmaStudentListPdfModal } from '../../modals/TurmaStudentListPdfModal';
+import type { DirectorStudent, AdminStudent, AdminSchool, StudentRegistrationData, UserAccount } from '../../../types';
+import { StatCardItem } from '../../StatCardItem';
+import { SchoolAnnouncementsBanner } from '../../announcements/SchoolAnnouncementsBanner';
+import { getDemandStatus } from '../../../utils/announcementStorage';
+import { StudentAnalyticalMatrixModal } from '../../modals/StudentAnalyticalMatrixModal';
+import { StudentDetailModal } from '../../modals/StudentDetailModal';
+import { StudentRegistrationModal } from '../../modals/StudentRegistrationModal';
+import {
+  getStoredStudents,
+  saveStudent,
+  deleteStudent,
+  getRegisteredSchoolsFromStorage,
+  getSchoolStudentQuotaStatus,
+  getActiveDirectorSchool,
+  setActiveDirectorSchoolId,
+} from '../../../utils/studentStorage';
 
 interface DirectorStudentsPageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
   onAddStudentGlobal?: (student: AdminStudent) => void;
+  schools?: AdminSchool[];
+  currentUser?: UserAccount | null;
 }
 
 export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
   onAddStudentGlobal,
+  schools: propSchools,
+  currentUser,
 }) => {
-  const [students, setStudents] = useState<DirectorStudent[]>(initialStudents);
+  const [students, setStudents] = useState<DirectorStudent[]>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_director_students');
+      return saved ? JSON.parse(saved) : initialStudents;
+    } catch {
+      return initialStudents;
+    }
+  });
   const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || 'std-1');
   const [searchQuery, setSearchQuery] = useState('');
   const [docFilter, setDocFilter] = useState<'all' | 'with-docs' | 'without-docs'>('all');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTurmaPdfModalOpen, setIsTurmaPdfModalOpen] = useState(false);
+  const [turmaPdfClass, setTurmaPdfClass] = useState('4ª Classe');
+  const [turmaPdfTurma, setTurmaPdfTurma] = useState('Turma A');
+
+  // New detailed modals state
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<StudentRegistrationData | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('ucore_director_students');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setStudents(parsed);
+        }
+      } catch {}
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    return () => window.removeEventListener('sigre-data-synced', handleSync);
+  }, []);
+
+  const handleConfirmDeleteDirectorStudent = () => {
+    if (!studentToDelete) return;
+    deleteStudent(studentToDelete.id, studentToDelete.name);
+    setStudents((prev) => {
+      const next = prev.filter((s) => s.id !== studentToDelete.id && s.name !== studentToDelete.name);
+      try {
+        localStorage.setItem('ucore_director_students', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setStudentToDelete(null);
+  };
+
+  const detailedStudents = useMemo(() => getStoredStudents(), [isModalOpen, isEditModalOpen, students]);
+
+  const availableSchools = useMemo(() => {
+    return propSchools && propSchools.length > 0 ? propSchools : getRegisteredSchoolsFromStorage();
+  }, [propSchools, isModalOpen, isEditModalOpen]);
+
+  const [selectedDirectorSchoolId, setSelectedDirectorSchoolId] = useState<string>(() => {
+    const initial = getActiveDirectorSchool(propSchools, currentUser?.schoolName);
+    return initial?.id || '';
+  });
+
+  const activeDirectorSchool = useMemo(() => {
+    if (selectedDirectorSchoolId) {
+      const found = availableSchools.find((s) => s.id === selectedDirectorSchoolId);
+      if (found) return found;
+    }
+    return getActiveDirectorSchool(availableSchools, currentUser?.schoolName);
+  }, [availableSchools, selectedDirectorSchoolId, currentUser?.schoolName]);
+
+  const directorSchoolQuota = useMemo(() => {
+    if (!activeDirectorSchool) {
+      const declared = 0;
+      const registered = detailedStudents.length;
+      const femaleCount = detailedStudents.filter((s) => s.genero === 'F').length;
+      const maleCount = Math.max(0, registered - femaleCount);
+      const pending = Math.max(0, declared - registered);
+      return {
+        schoolName: currentUser?.schoolName || 'Unidade Escolar da Direção',
+        declaredTotal: declared,
+        registeredCount: registered,
+        registeredFemaleCount: femaleCount,
+        registeredMaleCount: maleCount,
+        pendingCount: pending,
+        progressPercent: declared > 0 ? Math.min(100, Math.round((registered / declared) * 100)) : 0,
+      };
+    }
+    const q = getSchoolStudentQuotaStatus(activeDirectorSchool, detailedStudents);
+    return {
+      ...q,
+      schoolName: activeDirectorSchool.name,
+    };
+  }, [activeDirectorSchool, detailedStudents, students, currentUser?.schoolName]);
+
+  const getRegistrationDataFromDirectorStudent = (st: DirectorStudent): StudentRegistrationData => {
+    const matching = detailedStudents.find((d) => d.id === st.id || d.name === st.name);
+    if (matching) return matching;
+
+    return {
+      id: st.id,
+      name: st.name,
+      nomeCompleto: st.name,
+      genero: 'F',
+      dataNascimento: st.dataNascimento || '2016-05-10',
+      idade: st.idade || 9,
+      faixaEtariaCalculada: `${st.idade || 9} anos`,
+      tipoDocumento: (st.documentType as any) || (st.hasDocuments ? 'BI' : 'sem Documento'),
+      numeroDocumento: st.numeroDocumento,
+      naturezaEscola: 'Pública',
+      tipoEscolaModalidade: 'primario_regular',
+      tipoEscolaNome: 'D. Ensino Primário Regular',
+      classeEtapaModulo: st.gradeClass || '4.ª Classe',
+      classe: st.gradeClass || '4ª Classe',
+      turma: st.turma || 'Turma A',
+      periodo: 'Manhã',
+      turno: 'Manhã',
+      sala: st.room || 'Sala 03',
+      escola: directorSchoolQuota.schoolName || '',
+      condicaoMatricula: st.condicaoMatricula || 'primeira_vez',
+      alunoRepetente: st.condicaoMatricula === 'repetente',
+      encarregado: st.guardianName || 'Encarregado Institucional',
+      telefone: '+244 923 000 000',
+      endereco: st.location || 'Zona Escolar de Quêssua',
+      provincia: 'Malanje',
+      municipio: 'Quêssua',
+    };
+  };
+
+  const consolidatedStudentsForMatrix = useMemo(() => {
+    const map = new Map<string, StudentRegistrationData>();
+    detailedStudents.forEach((ds) => map.set(ds.id || ds.name, ds));
+    students.forEach((st) => {
+      const reg = getRegistrationDataFromDirectorStudent(st);
+      if (!map.has(st.id) && !map.has(st.name)) {
+        map.set(st.id, reg);
+      }
+    });
+    return Array.from(map.values());
+  }, [detailedStudents, students]);
+
+  // Check demand status for matriculas
+  const demandStatus = useMemo(() => getDemandStatus('matriculas'), []);
 
   // Filtered list
   const filteredStudents = useMemo(() => {
@@ -73,11 +246,36 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
     setStudents((prev) => [formatted, ...prev]);
     setSelectedStudentId(formatted.id);
 
+    // Ensure full unified persistence across localStorage and Firestore
+    saveStudent({
+      id: formatted.id,
+      name: formatted.name,
+      nomeCompleto: newStudent.nomeCompleto || formatted.name,
+      genero: newStudent.genero === 'M' ? 'M' : 'F',
+      dataNascimento: formatted.dataNascimento || '2016-05-10',
+      idade: formatted.idade || 10,
+      tipoDocumento: (formatted.documentType as any) || (hasDocs ? 'BI' : 'sem Documento'),
+      numeroDocumento: formatted.numeroDocumento,
+      naturezaEscola: newStudent.naturezaEscola || 'Pública',
+      tipoEscolaModalidade: newStudent.tipoEscolaModalidade || 'primario_regular',
+      classeEtapaModulo: newStudent.classeEtapaModulo || formatted.gradeClass,
+      classe: formatted.gradeClass,
+      turma: formatted.turma,
+      sala: formatted.room,
+      escola: newStudent.escola || directorSchoolQuota.schoolName || '',
+      schoolId: newStudent.schoolId || activeDirectorSchool?.id,
+      condicaoMatricula: (formatted.condicaoMatricula as any) || 'primeira_vez',
+      alunoRepetente: formatted.condicaoMatricula === 'repetente',
+      encarregado: formatted.guardianName,
+      telefone: newStudent.telefone || '+244 923 000 000',
+      endereco: formatted.location,
+    });
+
     if (onAddStudentGlobal) {
       const adminFormatted: AdminStudent = {
         id: formatted.id,
         name: formatted.name,
-        gender: 'F',
+        gender: newStudent.genero === 'M' ? 'M' : 'F',
         gradeClass: formatted.gradeClass,
         room: formatted.room,
         turma: formatted.turma || 'Turma A',
@@ -93,7 +291,10 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
         foto: formatted.foto,
         anexoDocumentoNome: formatted.anexoDocumentoNome,
         performanceScore: formatted.performanceScore,
-        schoolName: 'Escola Modelo Central',
+        schoolName: newStudent.escola || directorSchoolQuota.schoolName || '',
+        schoolId: newStudent.schoolId,
+        schoolType: newStudent.naturezaEscola || 'Pública',
+        registrationData: newStudent,
       };
       onAddStudentGlobal(adminFormatted);
     }
@@ -111,38 +312,92 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Institutional Authority Card */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-blue-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5067fc] text-white flex items-center justify-center shrink-0 shadow-xs">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-black text-slate-900 block text-xs sm:text-sm">
-                Competência da Direção Escolar: Matrícula e Validação de Documentos
-              </span>
-              <p className="text-slate-600 text-[11px] sm:text-xs mt-0.5">
-                A matrícula e conferência de BI ou Cédula de Nascimento dos estudantes é realizada exclusivamente pelo Diretor e sua secretaria, garantindo a integridade dos registros oficiais da rede.
+        {/* Google-style Demand Announcement Banner for Matriculas */}
+        <SchoolAnnouncementsBanner filterType="matriculas" className="mb-6" />
+
+        {/* Controlo de Quota e Identificação Automática da Escola do Director */}
+        <div className="mb-6 bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <School className="w-4 h-4 text-[#0b3d5c]" />
+                <h3 className="text-xs sm:text-sm font-black text-slate-900">
+                  Direção Escolar Activa: {directorSchoolQuota.schoolName}
+                </h3>
+                <span className="text-[10px] font-bold bg-cyan-50 text-[#0b3d5c] border border-cyan-200 px-2.5 py-0.5 rounded-full">
+                  Vínculo Automático no Cadastro
+                </span>
+                <span
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                    directorSchoolQuota.pendingCount > 0
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  }`}
+                >
+                  {directorSchoolQuota.pendingCount > 0
+                    ? `${directorSchoolQuota.pendingCount} Pendentes`
+                    : 'Quota Concluída'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600">
+                Na escola <strong className="text-slate-900">{directorSchoolQuota.schoolName}</strong> tem{' '}
+                <strong className="text-slate-900">{directorSchoolQuota.registeredCount}</strong> alunos cadastrados, dos quais{' '}
+                <strong className="text-rose-700">{directorSchoolQuota.registeredFemaleCount} são do sexo feminino</strong> e{' '}
+                <strong className="text-indigo-700">{directorSchoolQuota.registeredMaleCount} são do sexo masculino</strong>. Ao cadastrar um novo aluno, o sistema vincula-o automaticamente a esta escola.
               </p>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {availableSchools.length > 1 && (
+                <select
+                  value={activeDirectorSchool?.id || ''}
+                  onChange={(e) => {
+                    setSelectedDirectorSchoolId(e.target.value);
+                    setActiveDirectorSchoolId(e.target.value);
+                  }}
+                  className="text-xs font-bold bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0b3d5c] cursor-pointer"
+                  title="Alternar escola da Direção Escolar"
+                >
+                  {availableSchools.map((sc) => (
+                    <option key={sc.id} value={sc.id}>
+                      Escola: {sc.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-slate-500">Declarados</span>
+                <span className="text-sm font-black text-slate-900">{directorSchoolQuota.declaredTotal}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-emerald-700">Cadastrados</span>
+                <span className="text-sm font-black text-emerald-800">{directorSchoolQuota.registeredCount}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-rose-700">Feminino</span>
+                <span className="text-sm font-black text-rose-800">{directorSchoolQuota.registeredFemaleCount}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-indigo-700">Masculino</span>
+                <span className="text-sm font-black text-indigo-800">{directorSchoolQuota.registeredMaleCount}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-amber-800">Pendentes</span>
+                <span className="text-sm font-black text-amber-900">{directorSchoolQuota.pendingCount}</span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="whitespace-nowrap px-4 py-2 bg-[#5067fc] hover:bg-[#4359eb] text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
-          >
-            Matricular Novo Aluno
-          </button>
         </div>
 
         {/* Filter Bar matching 13.png: Filtro: Alunos v, Search, Cadastrar button */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="reveal-up flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
           {/* Left: Filtro Dropdown */}
           <div className="relative">
             <button
               onClick={() => setFilterDropdownOpen((prev) => !prev)}
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
             >
-              <Filter className="w-3.5 h-3.5 text-[#5067fc]" />
+              <Filter className="w-3.5 h-3.5 text-[#f75142]" />
               <span>
                 Filtro: {docFilter === 'all' ? 'Alunos' : docFilter === 'with-docs' ? 'Com Documentos' : 'Sem Documentos'}
               </span>
@@ -158,7 +413,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
                   }}
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700"
                 >
-                  Todos os Alunos (478)
+                  Todos os Alunos ({students.length})
                 </button>
                 <button
                   onClick={() => {
@@ -168,7 +423,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700 flex items-center justify-between"
                 >
                   <span>Com Documentos</span>
-                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full font-bold">432</span>
+                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full font-bold">{students.filter((s) => s.hasDocuments).length}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -178,7 +433,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
                   className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 text-slate-700 flex items-center justify-between"
                 >
                   <span>Sem Documentos</span>
-                  <span className="text-[10px] text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full font-bold">46</span>
+                  <span className="text-[10px] text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full font-bold">{students.filter((s) => !s.hasDocuments).length}</span>
                 </button>
               </div>
             )}
@@ -192,247 +447,356 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
               placeholder="Pesquisar aluno por nome, classe, encarregado ou sala..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#5067fc] focus:ring-2 focus:ring-[#5067fc]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/20 outline-none text-xs text-slate-800 placeholder:text-slate-400 transition-all bg-white"
             />
           </div>
 
-          {/* Right: Cadastrar Button */}
-          <button
-            id="btn-cadastrar-aluno"
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Cadastrar</span>
-          </button>
-        </div>
-
-        {/* Quick Student Selector Chips */}
-        <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
-            Ficha de Aluno:
-          </span>
-          {filteredStudents.map((s) => (
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
             <button
-              key={s.id}
-              onClick={() => setSelectedStudentId(s.id)}
-              className={`text-xs px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                currentStudent?.id === s.id
-                  ? 'bg-[#5067fc] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              id="btn-baixar-listas-turma-director"
+              onClick={() => setIsTurmaPdfModalOpen(true)}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer border border-slate-200 flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs active:scale-95 whitespace-nowrap"
+              title="Baixar listas de alunos por turma em PDF organizadas de A a Z"
             >
-              <span>{s.name.split(' ')[0]} {s.name.split(' ')[1] || ''}</span>
-              <span className={`w-2 h-2 rounded-full ${s.hasDocuments ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              <FileDown className="w-4 h-4 text-[#f75142]" />
+              <span>Baixar Listas por Turma (PDF A-Z)</span>
             </button>
-          ))}
-        </div>
 
-        {/* First Row: 7 Cards with Cyan Badges matching 13.png */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
-          {/* Card 1: [Nome] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Nome
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <div className="flex items-center gap-2 mb-1">
-                {currentStudent?.foto && (
-                  <img src={currentStudent.foto} alt={currentStudent.name} className="w-8 h-8 rounded-full object-cover border border-white/30 shrink-0" />
-                )}
-                <h5 className="font-bold text-sm leading-snug break-words">
-                  {currentStudent?.name || 'Albertina Kassoma'}
-                </h5>
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {currentStudent?.idade && (
-                  <span className="text-[9px] bg-white/20 px-1.5 py-0.2 rounded font-bold">
-                    {currentStudent.idade} anos
-                  </span>
-                )}
-                {currentStudent?.condicaoMatricula && (
-                  <span className="text-[9px] bg-white/20 px-1.5 py-0.2 rounded font-bold">
-                    {currentStudent.condicaoMatricula === 'repetente' ? 'Repetente' : '1ª Vez'}
-                  </span>
-                )}
-                <span className="text-[9px] text-white/80">
-                  {currentStudent?.documentType || 'Matrícula Regular'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: [Classe] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Classe
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-black text-base sm:text-lg">
-                {currentStudent?.gradeClass || '4ª Classe'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-0.5">Ciclo Primário</span>
-            </div>
-          </div>
-
-          {/* Card 3: [Sala] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Sala
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-black text-base sm:text-lg">
-                {currentStudent?.room || 'Sala 03'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-0.5">Bloco B</span>
-            </div>
-          </div>
-
-          {/* Card 4: [Turma] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Turma
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-black text-base sm:text-lg">
-                {currentStudent?.turma || 'Turma A'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-0.5">Turno Manhã</span>
-            </div>
-          </div>
-
-          {/* Card 5: [Nome dos Professores] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Nome dos Professores
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-bold text-xs sm:text-sm leading-tight">
-                {currentStudent?.teacherName || 'Santar Goes'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-1">Professor Regente</span>
-            </div>
-          </div>
-
-          {/* Card 6: [Nome dos Encarregados] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Nome dos Encarregados
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-bold text-xs leading-tight">
-                {currentStudent?.guardianName || 'Manuel Kassoma'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-1">Contato Autorizado</span>
-            </div>
-          </div>
-
-          {/* Card 7: [Localização] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md mb-2 shadow-2xs">
-              Localização
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-4 flex-1 flex flex-col justify-center shadow-sm min-h-[110px]">
-              <h5 className="font-bold text-xs leading-tight">
-                {currentStudent?.location || 'Bairro Modelo - Rua 12'}
-              </h5>
-              <span className="text-[10px] text-white/80 mt-1">Área de Cobertura</span>
-            </div>
+            <button
+              id="btn-cadastrar-aluno"
+              onClick={() => setIsModalOpen(true)}
+              className="bg-[#f75142] hover:bg-[#e04436] text-white font-black text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cadastrar</span>
+            </button>
           </div>
         </div>
 
-        {/* Second Row: 4 Cards with Cyan Badges matching 13.png */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Card 1: [Nº alunos com Documentos] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº alunos com Documentos
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <FileCheck className="w-7 h-7 text-emerald-300" />
-                <span className="text-xs bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold">
-                  90.4% Regularizados
-                </span>
+        {/* Informações do Aluno - Sem cards pesados, mantendo organização e máxima legibilidade */}
+        <div className="reveal-up bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 mb-8 shadow-xs">
+          {/* Header com dados do aluno e seletor rápido */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-5 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#fef2f1] text-[#f75142] border border-[#fee4e2] flex items-center justify-center font-bold">
+                <GraduationCap className="w-4 h-4" />
               </div>
-              <div className="mt-4">
-                <div className="text-4xl sm:text-5xl font-black">432</div>
-                <p className="text-xs text-white/80 mt-1">
-                  Alunos com BI ou Cédula de Nascimento válidos na secretaria
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  Ficha do Aluno Selecionado
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Dados cadastrais, alocação escolar e situação documental
                 </p>
               </div>
             </div>
-          </div>
 
-          {/* Card 2: [Nº alunos sem Documentos] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Nº alunos sem Documentos
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <FileX className="w-7 h-7 text-rose-300" />
-                <span className="text-xs bg-rose-400/20 text-rose-200 border border-rose-400/30 px-2 py-0.5 rounded-full font-bold">
-                  9.6% Pendentes
+            {currentStudent && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsDetailModalOpen(true)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#f75142]" />
+                  <span>Ficha Individual (4 Seções)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingStudent(getRegistrationDataFromDirectorStudent(currentStudent));
+                    setIsEditModalOpen(true);
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-200 cursor-pointer transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Editar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudentToDelete({ id: currentStudent.id, name: currentStudent.name })}
+                  className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-rose-200 cursor-pointer transition-colors"
+                  title="Apagar cadastro deste aluno"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Apagar</span>
+                </button>
+                <span
+                  className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                    currentStudent?.hasDocuments
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}
+                >
+                  {currentStudent?.hasDocuments ? 'Documentação Regular' : 'Pendente de Documentos'}
                 </span>
               </div>
-              <div className="mt-4">
-                <div className="text-4xl sm:text-5xl font-black">46</div>
-                <p className="text-xs text-white/80 mt-1">
-                  Em processo de registo civil com apoio do gabinete social
-                </p>
-              </div>
+            )}
+          </div>
+
+          {!currentStudent ? (
+            <div className="py-10 text-center text-slate-500">
+              <GraduationCap className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-700">Nenhum aluno cadastrado no sistema</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Clique em &quot;Cadastrar&quot; acima para adicionar o primeiro registo discente.
+              </p>
             </div>
+          ) : (
+            <>
+              {/* Quick Student Selector Chips */}
+              <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
+                  Alternar Aluno:
+                </span>
+                {filteredStudents.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedStudentId(s.id)}
+                    className={`text-xs px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      currentStudent?.id === s.id
+                        ? 'bg-[#f75142] text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>
+                      {s.name.split(' ')[0]} {s.name.split(' ')[1] || ''}
+                    </span>
+                    <span className={`w-2 h-2 rounded-full ${s.hasDocuments ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                  </button>
+                ))}
+              </div>
+
+              {/* Grid de Informações: 7 colunas organizadas sem cartões pesados */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-y-4 gap-x-6 pt-4 border-t border-slate-100">
+                {/* 1. Nome */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Nome
+                  </span>
+                  <div className="flex items-center gap-2 mb-1">
+                    {currentStudent.foto && (
+                      <img
+                        src={currentStudent.foto}
+                        alt={currentStudent.name}
+                        className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                      />
+                    )}
+                    <span className="text-sm font-bold text-slate-900 leading-snug break-words">
+                      {currentStudent.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    {currentStudent.idade && (
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold">
+                        {currentStudent.idade} anos
+                      </span>
+                    )}
+                    {currentStudent.condicaoMatricula && (
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold">
+                        {currentStudent.condicaoMatricula === 'repetente' ? 'Repetente' : '1ª Vez'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Classe */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Classe
+                  </span>
+                  <span className="text-sm font-black text-slate-900">
+                    {currentStudent.gradeClass || '---'}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Ciclo Primário
+                  </span>
+                </div>
+
+                {/* 3. Sala */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Sala
+                  </span>
+                  <span className="text-sm font-black text-slate-900">
+                    {currentStudent.room || '---'}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Bloco B
+                  </span>
+                </div>
+
+                {/* 4. Turma */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Turma
+                  </span>
+                  <span className="text-sm font-black text-slate-900">
+                    {currentStudent.turma || '---'}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Turno Manhã
+                  </span>
+                </div>
+
+                {/* 5. Nome dos Professores */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Nome dos Professores
+                  </span>
+                  <span className="text-sm font-bold text-slate-900 leading-tight">
+                    {currentStudent.teacherName || '---'}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Professor Regente
+                  </span>
+                </div>
+
+                {/* 6. Nome dos Encarregados */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Nome dos Encarregados
+                  </span>
+                  <span className="text-sm font-bold text-slate-900 leading-tight">
+                    {currentStudent.guardianName || '---'}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    {currentStudent.guardianPhone || 'Contato Autorizado'}
+                  </span>
+                </div>
+
+                {/* 7. Localização */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Localização
+                  </span>
+                  <span className="text-sm font-bold text-slate-900 leading-tight">
+                    {currentStudent.location || '---'}
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Área de Cobertura
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Second Row: Métricas e Indicadores da Unidade - Layout Limpo e Organizado */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Métricas Consolidadas da Turma & Regularização
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                Situação documental, aproveitamento médio e frequência escolar dos discentes
+              </p>
+            </div>
+            <span className="text-[10px] font-semibold bg-slate-50 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200/70">
+              Ano Lectivo 2026 / 2027
+            </span>
           </div>
 
-          {/* Card 3: [Desempenho do aluno] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Desempenho do aluno
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">
-                  Nota do Aluno Selecionado
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
+            {/* 1. Alunos com Documentos */}
+            <div
+              className="flex flex-col justify-between cursor-pointer group"
+              onClick={() => {
+                setDocFilter('with-docs');
+                document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block group-hover:text-[#f75142] transition-colors">
+                  Alunos com Documentos
                 </span>
-                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                  Escala 0 a 10
-                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight group-hover:text-[#f75142] transition-colors">
+                    {students.filter((s) => s.hasDocuments).length}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {students.length > 0 ? `${Math.round((students.filter((s) => s.hasDocuments).length / students.length) * 100)}% da rede` : '0% da rede'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Regularizados com certidão ou B.I.</p>
               </div>
               <div className="mt-3">
-                <div className="text-4xl sm:text-5xl font-black flex items-baseline gap-1">
-                  <span>{currentStudent?.performanceScore || 8.9}</span>
-                  <span className="text-base text-white/70 font-semibold">/ 10</span>
-                </div>
-                <p className="text-xs text-white/80 mt-2">
-                  Aproveitamento Muito Bom • Acima da média geral escolar (7.8)
-                </p>
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Documentação Homologada
+                </span>
               </div>
             </div>
-          </div>
 
-          {/* Card 4: [Presença dos alunos] */}
-          <div className="flex flex-col">
-            <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-              Presença dos alunos
-            </span>
-            <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">
-                  Frequência Trimestral
+            {/* 2. Alunos sem Documentos */}
+            <div
+              className="flex flex-col justify-between cursor-pointer group"
+              onClick={() => {
+                setDocFilter('without-docs');
+                document.getElementById('director-students-table')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block group-hover:text-[#f75142] transition-colors">
+                  Alunos sem Documentos
                 </span>
-                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                  {currentStudent?.presenceRate || 98.2}%
-                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight group-hover:text-[#f75142] transition-colors">
+                    {students.filter((s) => !s.hasDocuments).length}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {students.length > 0 ? `${Math.round((students.filter((s) => !s.hasDocuments).length / students.length) * 100)}% pendentes` : '0% pendentes'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Pendentes de certidão ou registo civil</p>
               </div>
               <div className="mt-3">
-                <div className="text-4xl sm:text-5xl font-black">96.2%</div>
-                <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden mt-3">
-                  <div className="bg-emerald-300 h-full rounded-full" style={{ width: '96.2%' }} />
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  Processo em Apoio
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Desempenho Geral */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                  Desempenho Geral
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {currentStudent ? String(currentStudent.performanceScore || '0.0') : '0.0'}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">/ 10 valores</span>
                 </div>
-                <p className="text-[11px] text-white/80 mt-2">
-                  Assiduidade geral excelente em todos os turnos escolares
-                </p>
+                <p className="text-[11px] text-slate-500 mt-1">Aproveitamento médio curricular</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  {currentStudent ? 'Bom Rendimento' : 'Sem Registos'}
+                </span>
+              </div>
+            </div>
+
+            {/* 4. Presença dos Alunos */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
+                  Presença dos Alunos
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {currentStudent ? `${currentStudent.presenceRate || 0}%` : '0%'}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">assiduidade</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Frequência geral nas salas de aula</p>
+              </div>
+              <div className="mt-3">
+                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Assiduidade Coletiva
+                </span>
               </div>
             </div>
           </div>
@@ -445,6 +809,96 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
         onClose={() => setIsModalOpen(false)}
         entityType="alunos"
         onSuccess={handleCreateSuccess}
+        schoolName={directorSchoolQuota.schoolName}
+      />
+
+      {/* Analytical Matrix Modal */}
+      <StudentAnalyticalMatrixModal
+        isOpen={isMatrixModalOpen}
+        onClose={() => setIsMatrixModalOpen(false)}
+        students={consolidatedStudentsForMatrix}
+      />
+
+      {/* Modal de Confirmação para Apagar 1 Aluno */}
+      {studentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">Apagar Cadastro do Aluno</h3>
+                <p className="text-xs text-slate-500">Esta ação remove o registo do sistema e atualiza as estatísticas da escola.</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200">
+              Tem a certeza que deseja apagar o cadastro de <strong className="text-slate-900">{studentToDelete.name}</strong>?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setStudentToDelete(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteDirectorStudent}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sim, Apagar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Student Detail Modal */}
+      <StudentDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        student={currentStudent ? getRegistrationDataFromDirectorStudent(currentStudent) : null}
+        onEdit={(st) => {
+          setEditingStudent(st);
+          setIsEditModalOpen(true);
+        }}
+        onDelete={(st) => {
+          deleteStudent(st.id, st.nomeCompleto || st.name);
+          setStudents((prev) => {
+            const next = prev.filter((s) => s.id !== st.id && s.name !== (st.nomeCompleto || st.name));
+            try {
+              localStorage.setItem('ucore_director_students', JSON.stringify(next));
+            } catch {}
+            return next;
+          });
+        }}
+      />
+
+      {/* Student Edit Modal */}
+      <StudentRegistrationModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+        }}
+        initialData={editingStudent}
+        onSuccess={(updated) => {
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+        }}
+        schoolName={directorSchoolQuota.schoolName || ''}
+      />
+
+      {/* Turma Student List PDF Modal (A-Z) */}
+      <TurmaStudentListPdfModal
+        isOpen={isTurmaPdfModalOpen}
+        onClose={() => setIsTurmaPdfModalOpen(false)}
+        initialClass={turmaPdfClass}
+        initialTurma={turmaPdfTurma}
+        schoolName={directorSchoolQuota.schoolName || 'Unidade Escolar Municipal'}
       />
     </div>
   );

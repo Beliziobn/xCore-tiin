@@ -1,0 +1,454 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sige.med.gov.ao/schemas/sige-2024-2025.json",
+  "title": "SIGE 2024/2025 - Schema Oficial de Dados Agregados (MED / GEPE)",
+  "description": "Especificação normativa e contratual de dados estatísticos agregados para o Instrumento Oficial Complementar Anual do SIGE (2024/2025). O documento define exactamente 18 chaves de topo alinhadas ao motor de preenchimento, cobrindo as 9 folhas oficiais e garantindo total ausência de dados nominais/identificáveis.",
+  "type": "object",
+  "additionalProperties": false,
+  "documentation": {
+    "versao": "2.0.0",
+    "ano_lectivo": "2024/2025",
+    "ministerio": "República de Angola - Ministério da Educação (MED)",
+    "gabinete": "Gabinete de Estudos, Planeamento e Estatística (GEPE)",
+    "folhas_oficiais": [
+      { "numero": 1, "nome": "CAPA", "chave": "meta", "descricao": "Identificação geográfica e institucional (Província, Município, Data de entrega)." },
+      { "numero": 2, "nome": "1 – Matriculados", "chaves": ["pre_escolar", "iniciacao", "primario_regular", "praeer", "eja_primario", "sec1_geral", "sec1_tecnico", "sec1_eja", "sec2_geral", "sec2_tecnico", "sec2_formacao"], "descricao": "Contagem agregada de alunos matriculados por Nível x Natureza x Classe x Idade x Gênero (MF/F)." },
+      { "numero": 3, "nome": "2 – Pessoal Docente", "chave": "docentes", "descricao": "Quadro docente agregado por qualificação pedagógica, regime e gênero." },
+      { "numero": 4, "nome": "3 – Infraestruturas", "chave": "infraestruturas", "descricao": "Edifícios escolares e salas de aula (definitivas e provisórias) por tipologia e natureza." },
+      { "numero": 5, "nome": "4 – Aproveitamento", "chave": "aproveitamento", "descricao": "Balanço pedagógico estrito com residual zero: Matriculados = Aprovados + Reprovados + Desistidos." },
+      { "numero": 6, "nome": "5 – Repetentes", "chave": "repetentes", "descricao": "Retenção escolar agregada por classe e idade (idade mínima de 6 anos no Primário Regular)." },
+      { "numero": 7, "nome": "6 – NEE", "chave": "nee", "descricao": "Alunos com Necessidades Educativas Especiais por tipologia funcional e gênero." },
+      { "numero": 8, "nome": "7 – Pessoal Não Docente", "chave": "nao_docente", "descricao": "Corpo administrativo, técnico e auxiliar agregado por cargo e gênero." },
+      { "numero": 9, "nome": "Quadro Geral de Turmas", "chave": "infraestruturas.turmas", "descricao": "Distribuição de turmas por período de funcionamento (Manhã, Tarde, Noite)." }
+    ],
+    "campos_proibidos": [
+      { "tipo": 1, "campo": "nomes_pessoais", "descricao": "Nomes próprios de alunos, docentes individuais, pais ou encarregados. (NOTA: O Nome e Código da ESCOLA são institucionais, permitidos e fundamentais para saber a que escola pertencem os dados)." },
+      { "tipo": 2, "campo": "emails", "descricao": "Endereços de correio electrónico pessoais de utilizadores." },
+      { "tipo": 3, "campo": "bi", "descricao": "Números de Bilhete de Identidade (BI), Cédula ou Passaporte." },
+      { "tipo": 4, "campo": "nif", "descricao": "Número de Identificação Fiscal pessoal." },
+      { "tipo": 5, "campo": "n_processo", "descricao": "Números de processo escolar individual ou de matrícula de estudante." },
+      { "tipo": 6, "campo": "encarregados", "descricao": "Nomes, dados de filiação (pai/mãe) ou contactos de encarregados de educação." },
+      { "tipo": 7, "campo": "directores", "descricao": "Nomes próprios ou dados directos de diretores escolares." },
+      { "tipo": 8, "campo": "moradas", "descricao": "Moradas residenciais, bairros, ruas ou coordenadas privadas de indivíduos." },
+      { "tipo": 9, "campo": "telefones", "descricao": "Números de telefone ou telemóvel pessoais." },
+      { "tipo": 10, "campo": "data_nascimento", "descricao": "Datas de nascimento individuais exatas (só são aceites faixas etárias agregadas)." },
+      { "tipo": 11, "campo": "senhas", "descricao": "Senhas, hashes, credenciais de autenticação ou tokens." }
+    ],
+    "regras_embutidas": [
+      "Feminino (F) <= Total (MF) em todas as células numéricas de gênero.",
+      "Todos os valores devem ser números inteiros maiores ou iguais a zero (>= 0).",
+      "Matriculados = Aprovados + Reprovados + Desistidos em Aproveitamento (Residual = 0).",
+      "Separação obrigatória entre Ensino Regular, PRAEER e Educação de Jovens e Adultos (EJA).",
+      "Idade mínima no Primário Regular de Repetentes é de 6 anos (coluna de 5 anos inexistente).",
+      "Total e absoluta proibição de dados pessoais, identificadores civis e números de processo."
+    ]
+  },
+  "required": [
+    "meta",
+    "pre_escolar",
+    "iniciacao",
+    "primario_regular",
+    "praeer",
+    "eja_primario",
+    "sec1_geral",
+    "sec1_tecnico",
+    "sec1_eja",
+    "sec2_geral",
+    "sec2_tecnico",
+    "sec2_formacao",
+    "repetentes",
+    "nee",
+    "aproveitamento",
+    "docentes",
+    "infraestruturas",
+    "nao_docente"
+  ],
+  "definitions": {
+    "genderPair": {
+      "type": "object",
+      "description": "Par quantitativo de gênero. Regra estrita: F <= MF e valores >= 0.",
+      "required": ["MF", "F"],
+      "additionalProperties": false,
+      "properties": {
+        "MF": { "type": "integer", "minimum": 0, "description": "Total (Masculino + Feminino)" },
+        "F": { "type": "integer", "minimum": 0, "description": "Subtotal Feminino (F <= MF)" }
+      }
+    },
+    "aproveitamentoEntry": {
+      "type": "object",
+      "description": "Componentes de aproveitamento escolar. Regra: Matriculados = Aprovados + Reprovados + Desistidos.",
+      "required": ["matriculados", "aprovados", "reprovados", "desistidos"],
+      "additionalProperties": false,
+      "properties": {
+        "matriculados": { "$ref": "#/definitions/genderPair" },
+        "aprovados": { "$ref": "#/definitions/genderPair" },
+        "reprovados": { "$ref": "#/definitions/genderPair" },
+        "desistidos": { "$ref": "#/definitions/genderPair" }
+      }
+    }
+  },
+  "properties": {
+    "meta": {
+      "type": "object",
+      "title": "1. Metadados Oficiais da CAPA e Identificação da Escola",
+      "description": "Folha SIGE: CAPA e Cabeçalho Institucional. Identificação geográfica (Província, Município, Comuna) e da Instituição Escolar (Nome da Escola e Código SIGE) para saber a que unidade pertencem os dados estatísticos.",
+      "required": ["provincia", "municipio", "data_entrega"],
+      "properties": {
+        "provincia": { "type": "string", "description": "Nome da Província (ex: MALANJE, LUANDA)" },
+        "municipio": { "type": "string", "description": "Nome do Município (ex: MALANJE - QUÊSSUA)" },
+        "comuna": { "type": "string", "description": "Comuna ou Distrito Urbano onde a escola se localiza" },
+        "escola": { "type": "string", "description": "Nome ou Designação Oficial da Escola (ex: Complexo Escolar nº 5024 - Rainha Ginga). Permite identificar com exatidão a que escola pertencem os dados agregados." },
+        "codigo_sige": { "type": "string", "description": "Código identificador oficial da Escola no SIGE (ex: SIGE-MAL-QUE-0042)" },
+        "data_entrega": { "type": "string", "description": "Data oficial de entrega do relatório estatístico" }
+      },
+      "_exemplo": {
+        "provincia": "MALANJE",
+        "municipio": "MALANJE - QUÊSSUA",
+        "comuna": "QUÊSSUA",
+        "escola": "Complexo Escolar nº 5024 - Rainha Ginga",
+        "codigo_sige": "SIGE-MAL-QUE-0042",
+        "data_entrega": "23 de Setembro de 2025"
+      }
+    },
+    "pre_escolar": {
+      "type": "object",
+      "title": "2. Ensino Pré-Escolar (Creche e Jardim de Infância)",
+      "description": "Folha SIGE: 1 – Matriculados. Dados agregados por subsistema pré-escolar.",
+      "properties": {
+        "creche": { "type": "object" },
+        "jardim1": { "type": "object" },
+        "jardim2": { "type": "object" }
+      },
+      "_exemplo": {
+        "creche": {
+          "PÚBLICA": {
+            "3 Meses aos 3 anos": { "MF": 25, "F": 15 },
+            "3 Anos": { "MF": 30, "F": 18 }
+          },
+          "PRIVADA": {
+            "3 Meses aos 3 anos": { "MF": 18, "F": 10 }
+          }
+        },
+        "jardim1": {
+          "PÚBLICA": {
+            "3 Anos": { "MF": 40, "F": 22 },
+            "4 Anos": { "MF": 45, "F": 25 }
+          }
+        }
+      }
+    },
+    "iniciacao": {
+      "type": "object",
+      "title": "3. Classe de Iniciação",
+      "description": "Folha SIGE: 1 – Matriculados. Contagem por idade e natureza de ensino.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "5 Anos": { "MF": 65, "F": 35 },
+          "6 Anos": { "MF": 80, "F": 42 }
+        },
+        "PRIVADA": {
+          "5 Anos": { "MF": 30, "F": 16 }
+        }
+      }
+    },
+    "primario_regular": {
+      "type": "object",
+      "title": "4. Ensino Primário Regular",
+      "description": "Folha SIGE: 1 – Matriculados. 1ª à 6ª Classe do Ensino Primário Regular.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "1ª Classe": {
+            "6 Anos": { "MF": 90, "F": 48 },
+            "7 Anos": { "MF": 40, "F": 20 }
+          },
+          "2ª Classe": {
+            "7 Anos": { "MF": 85, "F": 45 }
+          },
+          "6ª Classe": {
+            "11 Anos": { "MF": 70, "F": 38 }
+          }
+        },
+        "PRIVADA": {
+          "1ª Classe": {
+            "6 Anos": { "MF": 45, "F": 24 }
+          }
+        }
+      }
+    },
+    "praeer": {
+      "type": "object",
+      "title": "5. PRAEER (Aceleração Escolar)",
+      "description": "Folha SIGE: 1 – Matriculados. Programa de Aceleração Escolar por Etapas.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "Etapa 1": { "9 Anos": { "MF": 28, "F": 14 } },
+          "Etapa 2": { "11 Anos": { "MF": 32, "F": 16 } }
+        }
+      }
+    },
+    "eja_primario": {
+      "type": "object",
+      "title": "6. Educação de Jovens e Adultos (Primário)",
+      "description": "Folha SIGE: 1 – Matriculados. EJA Primário por Módulos.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "Módulo 1": { "Mais de 13 Anos": { "MF": 35, "F": 18 } },
+          "Módulo 2": { "Mais de 13 Anos": { "MF": 30, "F": 15 } }
+        }
+      }
+    },
+    "sec1_geral": {
+      "type": "object",
+      "title": "7. Ensino Secundário I Ciclo Geral",
+      "description": "Folha SIGE: 1 – Matriculados. 7ª, 8ª e 9ª Classes do I Ciclo Geral.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "7ª Classe": { "12 Anos": { "MF": 80, "F": 42 } },
+          "8ª Classe": { "13 Anos": { "MF": 75, "F": 39 } }
+        }
+      }
+    },
+    "sec1_tecnico": {
+      "type": "object",
+      "title": "8. Ensino Secundário I Ciclo Técnico",
+      "description": "Folha SIGE: 1 – Matriculados. I Ciclo Secundário Técnico.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "7ª Classe": { "12 Anos": { "MF": 50, "F": 22 } }
+        }
+      }
+    },
+    "sec1_eja": {
+      "type": "object",
+      "title": "9. Ensino Secundário I Ciclo EJA",
+      "description": "Folha SIGE: 1 – Matriculados. EJA I Ciclo por Anos de formação.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "1º Ano": { "Mais de 18 Anos": { "MF": 40, "F": 20 } }
+        }
+      }
+    },
+    "sec2_geral": {
+      "type": "object",
+      "title": "10. Ensino Secundário II Ciclo Geral",
+      "description": "Folha SIGE: 1 – Matriculados. 10ª, 11ª, 12ª e 13ª Classes do II Ciclo Geral.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "10ª Classe": { "15 Anos": { "MF": 60, "F": 32 } },
+          "11ª Classe": { "16 Anos": { "MF": 55, "F": 28 } }
+        }
+      }
+    },
+    "sec2_tecnico": {
+      "type": "object",
+      "title": "11. Ensino Secundário II Ciclo Técnico",
+      "description": "Folha SIGE: 1 – Matriculados. Ensino Técnico-Profissional do II Ciclo.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "10ª Classe": { "15 Anos": { "MF": 70, "F": 30 } }
+        }
+      }
+    },
+    "sec2_formacao": {
+      "type": "object",
+      "title": "12. Formação de Professores (II Ciclo)",
+      "description": "Folha SIGE: 1 – Matriculados. Escolas de Magistério e Formação Docente.",
+      "properties": {
+        "PÚBLICA": { "type": "object" },
+        "PRIVADA": { "type": "object" }
+      },
+      "_exemplo": {
+        "PÚBLICA": {
+          "10ª Classe": { "15 Anos": { "MF": 45, "F": 28 } }
+        }
+      }
+    },
+    "repetentes": {
+      "type": "object",
+      "title": "13. Alunos Repetentes",
+      "description": "Folha SIGE: 5 – Repetentes. Retenção escolar por classe e idade (mínimo 6 anos no Primário).",
+      "properties": {
+        "iniciacao": { "type": "object" },
+        "primario_regular": { "type": "object" },
+        "sec1_geral": { "type": "object" }
+      },
+      "_exemplo": {
+        "iniciacao": {
+          "PÚBLICA": {
+            "6a": { "MF": 12, "F": 5 }
+          }
+        },
+        "primario_regular": {
+          "PÚBLICA": {
+            "1ª Classe": { "6a": { "MF": 15, "F": 7 } }
+          }
+        }
+      }
+    },
+    "nee": {
+      "type": "object",
+      "title": "14. Alunos com Necessidades Educativas Especiais (NEE)",
+      "description": "Folha SIGE: 6 – NEE. Alunos com deficiência e necessidades educativas especiais.",
+      "properties": {
+        "iniciacao": { "type": "object" },
+        "primario": { "type": "object" },
+        "visuais": { "$ref": "#/definitions/genderPair" },
+        "auditivas": { "$ref": "#/definitions/genderPair" },
+        "fisico_motoras": { "$ref": "#/definitions/genderPair" },
+        "intelectuais": { "$ref": "#/definitions/genderPair" },
+        "autismo": { "$ref": "#/definitions/genderPair" },
+        "outras": { "$ref": "#/definitions/genderPair" }
+      },
+      "_exemplo": {
+        "iniciacao": {
+          "Iniciação": {
+            "PÚBLICA": {
+              "Visual": { "MF": 3, "F": 1 },
+              "Auditiva": { "MF": 2, "F": 1 }
+            }
+          }
+        },
+        "primario": {
+          "1ª Classe": {
+            "PÚBLICA": {
+              "Visual": { "MF": 5, "F": 2 },
+              "Outras": { "MF": 3, "F": 1 }
+            }
+          }
+        }
+      }
+    },
+    "aproveitamento": {
+      "type": "object",
+      "title": "15. Rendimento e Aproveitamento Escolar",
+      "description": "Folha SIGE: 4 – Aproveitamento. Regra de consistência: Matriculados = Aprovados + Reprovados + Desistidos.",
+      "properties": {
+        "iniciacao": { "type": "object" },
+        "primario": { "type": "object" }
+      },
+      "_exemplo": {
+        "iniciacao": {
+          "PÚBLICA": {
+            "matriculados": { "MF": 100, "F": 52 },
+            "aprovados": { "MF": 85, "F": 45 },
+            "reprovados": { "MF": 10, "F": 5 },
+            "desistidos": { "MF": 5, "F": 2 }
+          }
+        },
+        "primario": {
+          "1ª Classe": {
+            "PÚBLICA": {
+              "matriculados": { "MF": 130, "F": 68 },
+              "aprovados": { "MF": 110, "F": 60 },
+              "reprovados": { "MF": 15, "F": 6 },
+              "desistidos": { "MF": 5, "F": 2 }
+            }
+          }
+        }
+      }
+    },
+    "docentes": {
+      "type": "object",
+      "title": "16. Pessoal Docente",
+      "description": "Folha SIGE: 2 – Pessoal Docente. Quadro de professores agregados por nível e qualificação.",
+      "properties": {
+        "pre_escolar": { "type": "object" },
+        "primario": { "type": "object" },
+        "secundario1": { "type": "object" },
+        "secundario2": { "type": "object" }
+      },
+      "_exemplo": {
+        "pre_escolar": {
+          "PÚBLICA": {
+            "educadores_creche": { "MF": 5, "F": 5 },
+            "educadores_jardim": { "MF": 12, "F": 11 }
+          }
+        },
+        "primario": {
+          "PÚBLICA": {
+            "Com Magistério e Com IMNE Completo": {
+              "ate_6a": { "MF": 30, "F": 18 }
+            }
+          }
+        }
+      }
+    },
+    "infraestruturas": {
+      "type": "object",
+      "title": "17. Infraestruturas Escolares",
+      "description": "Folha SIGE: 3 – Infraestruturas. Edifícios e salas de aula (definitivas e provisórias).",
+      "properties": {
+        "escolas": { "type": "object" },
+        "salas": { "type": "object" },
+        "turmas": { "type": "object" }
+      },
+      "_exemplo": {
+        "escolas": {
+          "Pública": { "primarias": 45, "colegios": 8, "liceus": 3 },
+          "Privada": { "primarias": 10, "colegios": 5, "liceus": 2 }
+        },
+        "salas": {
+          "Definitivas": { "Pública": { "primarias": 180 } },
+          "Provisórias": { "Pública": { "primarias": 20 } }
+        }
+      }
+    },
+    "nao_docente": {
+      "type": "object",
+      "title": "18. Pessoal Não Docente",
+      "description": "Folha SIGE: 7 – Pessoal Não Docente. Pessoal administrativo, técnico e auxiliar.",
+      "properties": {
+        "pre_escolar": { "type": "object" },
+        "administrativo": { "type": "object" }
+      },
+      "_exemplo": {
+        "pre_escolar": {
+          "educadores": { "PÚBLICA": { "MF": 8, "F": 7 } },
+          "limpeza": { "PÚBLICA": { "MF": 4, "F": 3 } }
+        },
+        "administrativo": {
+          "Pública": {
+            "Secretárias (os)": { "primarias": { "MF": 15, "F": 12 } },
+            "Guardas": { "primarias": { "MF": 20, "F": 2 } }
+          }
+        }
+      }
+    }
+  }
+}

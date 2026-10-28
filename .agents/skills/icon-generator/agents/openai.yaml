@@ -1,0 +1,4 @@
+interface:
+  display_name: "Icon Generator"
+  short_description: "Generate Android and iOS app icon sets"
+  default_prompt: "Use $icon-generator to turn a source image into Android and iOS app icons."

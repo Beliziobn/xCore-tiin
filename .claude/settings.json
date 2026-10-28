@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allowShellCommands": [
+      "npm test",
+      "npm run lint",
+      "npm run build",
+      "git status",
+      "git diff"
+    ],
+    "denyShellCommands": [
+      "rm -rf /",
+      "drop database",
+      "git push --force"
+    ]
+  },
+  "hooks": {
+    "onSessionStart": [
+      "claude-mem sync",
+      "task-observer init"
+    ],
+    "onSessionEnd": [
+      "claude-mem flush",
+      "task-observer flush"
+    ],
+    "beforeCommit": [
+      "npm run lint",
+      "npm test"
+    ]
+  },
+  "mcpServers": {
+    "claude-mem": {
+      "command": "npx",
+      "args": ["-y", "claude-mem", "--workspace", "./.claude/memories"],
+      "env": {
+        "MEMORY_STORE": "local-sqlite",
+        "SYNC_MODE": "continuous"
+      }
+    },
+    "omniroute": {
+      "command": "npx",
+      "args": ["-y", "omniroute", "--config", "./omniroute.config.json"],
+      "env": {
+        "OMNIROUTE_PORT": "4000",
+        "ROUTING_STRATEGY": "headroom-based"
+      }
+    }
+  }
+}

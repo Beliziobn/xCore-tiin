@@ -24,7 +24,6 @@ import {
   FileText, 
   FileSpreadsheet, 
   File as FileGeneric, 
-  ArrowLeftRight, 
   Volume2, 
   VolumeX,
   Eye,
@@ -53,6 +52,7 @@ interface SupportChatModalProps {
       url: string;
     }
   ) => void;
+  onStartCall?: (roomId: string, title: string, isVideo: boolean) => void;
 }
 
 // Gentle Web Audio synthesizers for iconic Messenger sounds
@@ -102,25 +102,24 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
   channels,
   messages,
   onSendMessage,
+  onStartCall,
 }) => {
   // 1. DETERMINE CURRENT USER'S SCHOOL (SCHOOL ISOLATION)
   // The user can ONLY see people from their school. No interaction with other schools.
   const userSchoolName = 
     currentUser?.schoolName || 
-    (activeRole === 'diretor' ? 'Escola Modelo Central' :
-     activeRole === 'professor' ? 'Escola Modelo Central' :
-     'Escola Modelo Central');
+    'Unidade Escolar Municipal';
 
-  const normalizedUserSchool = (userSchoolName || 'Escola Modelo Central').toLowerCase().trim();
+  const normalizedUserSchool = (userSchoolName || 'Unidade Escolar Municipal').toLowerCase().trim();
 
   // Filter channels strictly for the user's school with safe fallback
   const schoolChannels = (channels || [])
     .map((c) => ({
       ...c,
-      schoolName: c.schoolName || 'Escola Modelo Central',
+      schoolName: c.schoolName || 'Unidade Escolar Municipal',
     }))
     .filter((c) => {
-      const channelSchool = (c.schoolName || 'Escola Modelo Central').toLowerCase().trim();
+      const channelSchool = (c.schoolName || 'Unidade Escolar Municipal').toLowerCase().trim();
       return channelSchool === normalizedUserSchool;
     });
 
@@ -416,7 +415,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               <a
                 href={previewModalImage}
                 download="imagem-ucore.png"
-                className="px-4 py-2 bg-[#0084FF] hover:bg-[#0073e6] text-white text-xs font-bold rounded-full flex items-center gap-2 shadow-md cursor-pointer transition-all"
+                className="px-4 py-2 bg-[#f75142] hover:bg-[#e04436] text-white text-xs font-bold rounded-full flex items-center gap-2 shadow-md cursor-pointer transition-all"
               >
                 <Download className="w-4 h-4" /> Baixar Imagem Original
               </a>
@@ -433,12 +432,12 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
 
       {/* Drag & Drop Visual Indicator */}
       {isDraggingFile && (
-        <div className="absolute inset-4 z-60 rounded-3xl border-4 border-dashed border-[#0084FF] bg-blue-500/20 backdrop-blur-xs flex flex-col items-center justify-center text-white pointer-events-none animate-in zoom-in-95">
-          <div className="w-16 h-16 rounded-full bg-[#0084FF] flex items-center justify-center shadow-lg mb-3">
+        <div className="absolute inset-4 z-60 rounded-3xl border-4 border-dashed border-[#f75142] bg-[#f75142]/20 backdrop-blur-xs flex flex-col items-center justify-center text-white pointer-events-none animate-in zoom-in-95">
+          <div className="w-16 h-16 rounded-full bg-[#f75142] flex items-center justify-center shadow-lg mb-3">
             <Paperclip className="w-8 h-8 text-white" />
           </div>
           <h3 className="text-xl font-black text-white">Solte o arquivo ou imagem aqui</h3>
-          <p className="text-sm text-blue-100 mt-1">Importação direta em tempo real para o chat escolar</p>
+          <p className="text-sm text-[#fee4e2] mt-1">Importação direta em tempo real para o chat escolar</p>
         </div>
       )}
 
@@ -451,60 +450,14 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
             : 'w-full h-full sm:w-[92vw] sm:max-w-5xl sm:h-[86vh] sm:max-h-[800px] sm:rounded-[24px]'
         }`}
       >
-        {/* TOP MESSENGER BAR WITH SCHOOL LOCK */}
+        {/* TOP MESSENGER BAR */}
         <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xs select-none">
-          {/* Brand + School Security Indicator */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0084FF] via-[#0099FF] to-[#00C6FF] flex items-center justify-center shadow-xs text-white">
+          {/* Brand */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#f75142] via-[#f86f63] to-[#f86f63] flex items-center justify-center shadow-xs text-white">
               <MessageSquare className="w-4 h-4 fill-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-900 tracking-tight">uCore Messenger</span>
-                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  <Lock className="w-3 h-3 text-emerald-600" />
-                  Isolamento: {userSchoolName}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Tempo Real Ativo
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-slate-600">Apenas membros da tua escola têm acesso</span>
-              </p>
-            </div>
-          </div>
-
-          {/* SENDER SWITCHER (Allows testing real-time interaction between real users of this school) */}
-          <div className="hidden lg:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-2.5 py-1 rounded-full text-xs">
-            <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-              <ArrowLeftRight className="w-3 h-3 text-[#0084FF]" />
-              Remetente:
-            </span>
-            <select
-              value={currentSenderName}
-              onChange={(e) => {
-                const selectedName = e.target.value;
-                setCurrentSenderName(selectedName);
-                const member = schoolMembers.find((m) => m.name === selectedName);
-                if ((member?.role || '').toLowerCase().includes('diretor')) {
-                  setCurrentSenderRole('diretor');
-                } else {
-                  setCurrentSenderRole('professor');
-                }
-                // When switching sender, unlock waiting state so the new sender can answer!
-                setIsWaitingForReply(false);
-              }}
-              className="bg-white border border-slate-300 rounded-md px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0084FF]"
-            >
-              {schoolMembers.map((m) => (
-                <option key={m.id} value={m.name}>
-                  {m.name} ({m.role})
-                </option>
-              ))}
-            </select>
+            <span className="text-sm font-bold text-slate-900">Mensagens</span>
           </div>
 
           {/* Window Actions */}
@@ -514,7 +467,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
               title={soundEnabled ? 'Silenciar sons' : 'Ativar sons do Messenger'}
             >
-              {soundEnabled ? <Volume2 className="w-4 h-4 text-[#0084FF]" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
+              {soundEnabled ? <Volume2 className="w-4 h-4 text-[#f75142]" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
             </button>
             <button
               onClick={() => setIsExpanded((prev) => !prev)}
@@ -542,7 +495,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
             <div className="p-3.5 pb-2">
               <div className="flex items-center justify-between mb-2.5">
                 <h2 className="text-lg font-black text-slate-900 tracking-tight">Bate-papos da Escola</h2>
-                <span className="text-[10px] font-bold bg-[#E7F3FF] text-[#0084FF] px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold bg-[#fef2f1] text-[#f75142] px-2 py-0.5 rounded-full">
                   {schoolChannels.length} canais
                 </span>
               </div>
@@ -555,7 +508,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                   placeholder={`Pesquisar em ${userSchoolName}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-[#F0F2F5] hover:bg-[#E4E6EB] focus:bg-white border border-transparent focus:border-slate-300 rounded-full text-xs text-slate-800 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0084FF]/25 transition-all"
+                  className="w-full pl-9 pr-3 py-2 bg-[#F0F2F5] hover:bg-[#E4E6EB] focus:bg-white border border-transparent focus:border-slate-300 rounded-full text-xs text-slate-800 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#f75142]/25 transition-all"
                 />
               </div>
             </div>
@@ -583,7 +536,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                     <div className="relative">
                       <div className={`w-11 h-11 rounded-full flex items-center justify-center text-xs font-black transition-all ${
                         isCurrent 
-                          ? 'ring-2 ring-[#0084FF] ring-offset-2 bg-gradient-to-tr from-[#0084FF] to-[#00C6FF] text-white' 
+                          ? 'ring-2 ring-[#f75142] ring-offset-2 bg-gradient-to-tr from-[#f75142] to-[#f86f63] text-white' 
                           : 'bg-[#F0F2F5] text-slate-700 group-hover:bg-[#E4E6EB]'
                       }`}>
                         {initials}
@@ -593,7 +546,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                       )}
                     </div>
                     <span className={`text-[10px] max-w-[54px] truncate text-center ${
-                      isCurrent ? 'font-bold text-[#0084FF]' : 'text-slate-600'
+                      isCurrent ? 'font-bold text-[#f75142]' : 'text-slate-600'
                     }`}>
                       {m.name.split(' ')[0]}
                     </span>
@@ -616,14 +569,14 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                     }}
                     className={`w-full p-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-3 text-left ${
                       isSelected
-                        ? 'bg-[#E7F3FF] text-[#0084FF]'
+                        ? 'bg-[#fef2f1] text-[#f75142]'
                         : 'hover:bg-[#F0F2F5] text-slate-800'
                     }`}
                   >
                     <div className="relative shrink-0">
                       <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black shadow-2xs ${
                         isSelected 
-                          ? 'bg-gradient-to-tr from-[#0084FF] to-[#00B2FE] text-white' 
+                          ? 'bg-gradient-to-tr from-[#f75142] to-[#f86f63] text-white' 
                           : 'bg-[#E4E6EB] text-slate-700'
                       }`}>
                         {channel.iconType === 'shield' && <ShieldCheck className="w-5 h-5" />}
@@ -635,7 +588,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold truncate ${isSelected ? 'text-[#0084FF]' : 'text-slate-900'}`}>
+                        <span className={`text-xs font-bold truncate ${isSelected ? 'text-[#f75142]' : 'text-slate-900'}`}>
                           {channel.name}
                         </span>
                         <span className="text-[10px] text-slate-400 shrink-0 ml-1">
@@ -644,7 +597,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                       </div>
 
                       <p className={`text-[11px] truncate mt-0.5 ${
-                        isSelected ? 'text-[#0084FF]/90 font-medium' : 'text-slate-500'
+                        isSelected ? 'text-[#f75142]/90 font-medium' : 'text-slate-500'
                       }`}>
                         {channel.lastMessageSnippet || channel.description}
                       </p>
@@ -652,12 +605,6 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                   </button>
                 );
               })}
-            </div>
-
-            {/* Strict Isolation Notice */}
-            <div className="p-3 border-t border-slate-100 bg-[#F9FAFB] text-[11px] text-slate-500 flex items-center gap-2">
-              <Lock className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Rede Fechada: É impossível interagir com usuários de outras escolas.</span>
             </div>
           </div>
 
@@ -668,7 +615,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
             <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between bg-white shrink-0 shadow-2xs">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative">
-                  <div className="w-10 h-10 rounded-full bg-[#0084FF] flex items-center justify-center text-xs font-black text-white shadow-xs">
+                  <div className="w-10 h-10 rounded-full bg-[#f75142] flex items-center justify-center text-xs font-black text-white shadow-xs">
                     <School className="w-5 h-5" />
                   </div>
                   <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#31A24C] border-2 border-white" />
@@ -689,25 +636,47 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-1 text-[#0084FF]">
+              <div className="flex items-center gap-1 text-[#f75142]">
                 <button
-                  onClick={() => setActiveCallType('audio')}
+                  type="button"
+                  onClick={() => {
+                    if (onStartCall) {
+                      onStartCall(
+                        `call-${activeChannel.id}`,
+                        `Chamada de Voz • ${activeChannel.name}`,
+                        false
+                      );
+                    } else {
+                      setActiveCallType('audio');
+                    }
+                  }}
                   className="p-2 hover:bg-[#F0F2F5] rounded-full transition-colors cursor-pointer"
-                  title="Chamada de voz da escola"
+                  title="Iniciar chamada de voz funcional em tempo real"
                 >
                   <Phone className="w-5 h-5 fill-current" />
                 </button>
                 <button
-                  onClick={() => setActiveCallType('video')}
+                  type="button"
+                  onClick={() => {
+                    if (onStartCall) {
+                      onStartCall(
+                        `call-${activeChannel.id}`,
+                        `Chamada de Vídeo • ${activeChannel.name}`,
+                        true
+                      );
+                    } else {
+                      setActiveCallType('video');
+                    }
+                  }}
                   className="p-2 hover:bg-[#F0F2F5] rounded-full transition-colors cursor-pointer"
-                  title="Chamada de vídeo da escola"
+                  title="Iniciar chamada de vídeo funcional em tempo real"
                 >
                   <Video className="w-5 h-5 fill-current" />
                 </button>
                 <button
                   onClick={() => setShowDetailsSidebar((prev) => !prev)}
                   className={`p-2 rounded-full transition-colors cursor-pointer ${
-                    showDetailsSidebar ? 'bg-[#E7F3FF] text-[#0084FF]' : 'hover:bg-[#F0F2F5] text-[#0084FF]'
+                    showDetailsSidebar ? 'bg-[#fef2f1] text-[#f75142]' : 'hover:bg-[#F0F2F5] text-[#f75142]'
                   }`}
                   title="Detalhes do canal escolar"
                 >
@@ -716,28 +685,48 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               </div>
             </div>
 
-            {/* Audio/Video Call Mock */}
+            {/* Audio/Video Active Call Strip */}
             {activeCallType && (
-              <div className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-3 px-4 flex items-center justify-between gap-3 animate-in slide-in-from-top-3">
+              <div className="bg-gradient-to-r from-[#002133] to-[#0a354f] text-white p-3 px-4 flex items-center justify-between gap-3 animate-in slide-in-from-top-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center animate-pulse">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-pulse border border-emerald-500/30">
                     {activeCallType === 'audio' ? <Phone className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold">
-                      {activeCallType === 'audio' ? 'Chamada de Voz da Escola' : 'Chamada de Vídeo Escolar'}
+                    <h4 className="text-xs font-bold flex items-center gap-2">
+                      <span>{activeCallType === 'audio' ? 'Chamada de Voz em Tempo Real' : 'Chamada de Vídeo ao Vivo'}</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                     </h4>
-                    <p className="text-[11px] text-blue-200">
-                      Conectando aos docentes de {userSchoolName}...
+                    <p className="text-[11px] text-[#fee4e2]">
+                      Transmissão WebRTC ativa com docentes de {userSchoolName}...
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setActiveCallType(null)}
-                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold cursor-pointer transition-all"
-                >
-                  Desligar
-                </button>
+                <div className="flex items-center gap-2">
+                  {onStartCall && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onStartCall(
+                          `call-${activeChannel.id}`,
+                          `Chamada de ${activeCallType === 'video' ? 'Vídeo' : 'Voz'} • ${activeChannel.name}`,
+                          activeCallType === 'video'
+                        );
+                        setActiveCallType(null);
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-bold cursor-pointer transition-all shadow-xs"
+                    >
+                      Ecrã Zoom
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveCallType(null)}
+                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold cursor-pointer transition-all"
+                  >
+                    Desligar
+                  </button>
+                </div>
               </div>
             )}
 
@@ -746,7 +735,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               
               {/* Channel Security Intro */}
               <div className="text-center py-5 border-b border-slate-100 mb-3">
-                <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-tr from-[#0084FF] to-[#00C6FF] flex items-center justify-center text-white shadow-sm mb-2">
+                <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-tr from-[#f75142] to-[#f86f63] flex items-center justify-center text-white shadow-sm mb-2">
                   <School className="w-7 h-7" />
                 </div>
                 <h3 className="text-base font-black text-slate-900">{activeChannel.name}</h3>
@@ -793,7 +782,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                           <div
                             className={`px-4 py-2.5 text-[14px] leading-relaxed select-text shadow-2xs transition-all ${
                               isMine
-                                ? 'bg-[#0084FF] text-white rounded-[18px] rounded-br-[4px]'
+                                ? 'bg-[#f75142] text-white rounded-[18px] rounded-br-[4px]'
                                 : 'bg-[#F0F2F5] text-[#050505] rounded-[18px] rounded-bl-[4px]'
                             }`}
                           >
@@ -827,7 +816,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                                   : 'bg-white border-slate-200 text-slate-800'
                               }`}>
                                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                  msg.attachmentType === 'pdf' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-[#0084FF]'
+                                  msg.attachmentType === 'pdf' ? 'bg-red-100 text-red-600' : 'bg-[#fee4e2] text-[#f75142]'
                                 }`}>
                                   {msg.attachmentType === 'pdf' ? (
                                     <FileText className="w-5 h-5" />
@@ -840,7 +829,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                                   <span className="text-xs font-bold truncate block">
                                     {msg.attachmentName || 'Documento Oficial'}
                                   </span>
-                                  <span className={`text-[10px] ${isMine ? 'text-blue-100' : 'text-slate-400'}`}>
+                                  <span className={`text-[10px] ${isMine ? 'text-[#fee4e2]' : 'text-slate-400'}`}>
                                     {msg.attachmentSize || 'Arquivo'}
                                   </span>
                                 </div>
@@ -886,7 +875,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
 
                       {/* Delivery Status below my message */}
                       {isMine && msg.id === lastSentMessageId && isWaitingForReply && (
-                        <div className="flex items-center gap-1 mt-1 text-[11px] text-[#0084FF] font-semibold pr-1">
+                        <div className="flex items-center gap-1 mt-1 text-[11px] text-[#f75142] font-semibold pr-1">
                           <Clock className="w-3 h-3 animate-spin" />
                           Enviado em tempo real • Aguardando resposta do destinatário...
                         </div>
@@ -899,7 +888,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               {/* Real-time remote typing indicator from other connected users */}
               {remoteTyping && (
                 <div className="flex items-end gap-2 text-slate-600 pt-1 animate-in fade-in duration-200">
-                  <div className="w-7 h-7 rounded-full bg-[#0084FF] text-white flex items-center justify-center text-[10px] font-black shrink-0 mb-0.5">
+                  <div className="w-7 h-7 rounded-full bg-[#f75142] text-white flex items-center justify-center text-[10px] font-black shrink-0 mb-0.5">
                     {remoteTyping.senderName.charAt(0)}
                   </div>
                   
@@ -920,9 +909,9 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
 
             {/* WAITING LOCK BANNER (Strict waiting requirement until someone answers) */}
             {isWaitingForReply && (
-              <div className="px-4 py-2 bg-blue-50 border-t border-b border-blue-200 flex items-center justify-between gap-3 text-xs text-blue-900 animate-in fade-in duration-200">
+              <div className="px-4 py-2 bg-[#fef2f1] border-t border-b border-[#fee4e2] flex items-center justify-between gap-3 text-xs text-[#002133] animate-in fade-in duration-200">
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-[#0084FF] text-white flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-[#f75142] text-white flex items-center justify-center shrink-0">
                     <Clock className="w-3 h-3 animate-spin" />
                   </div>
                   <span>
@@ -932,7 +921,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                 {/* Immediate unlock button for convenience if testing solo */}
                 <button
                   onClick={() => setIsWaitingForReply(false)}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-100 border border-blue-300 text-[#0084FF] text-[11px] font-bold rounded-lg cursor-pointer transition-colors shrink-0 shadow-2xs"
+                  className="px-2.5 py-1 bg-white hover:bg-[#fee4e2] border border-[#f75142]/30 text-[#f75142] text-[11px] font-bold rounded-lg cursor-pointer transition-colors shrink-0 shadow-2xs"
                   title="Desbloquear para enviar nova mensagem"
                 >
                   Liberar Envio
@@ -951,7 +940,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                       className="w-10 h-10 rounded-lg object-cover border border-slate-300 shrink-0"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 text-[#0084FF] flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-[#fee4e2] text-[#f75142] flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
                   )}
@@ -985,7 +974,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                 className="flex items-center gap-2"
               >
                 {/* Attachment buttons for real Documents and Images */}
-                <div className="flex items-center gap-1 text-[#0084FF]">
+                <div className="flex items-center gap-1 text-[#f75142]">
                   <button
                     type="button"
                     disabled={isWaitingForReply}
@@ -1023,7 +1012,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                     className={`w-full pl-4 pr-10 py-2.5 rounded-full text-xs sm:text-sm text-slate-900 transition-all ${
                       isWaitingForReply
                         ? 'bg-slate-100 text-slate-400 placeholder-slate-400 border border-slate-200 cursor-not-allowed'
-                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] focus:bg-white border border-transparent focus:border-slate-300 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0084FF]/25'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] focus:bg-white border border-transparent focus:border-slate-300 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#f75142]/25'
                     }`}
                   />
 
@@ -1032,7 +1021,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                     type="button"
                     disabled={isWaitingForReply}
                     onClick={() => setShowEmojiPicker((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0084FF] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#f75142] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     title="Escolher emoji"
                   >
                     <Smile className="w-4 h-4" />
@@ -1063,7 +1052,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                   <button
                     type="submit"
                     disabled={isWaitingForReply}
-                    className="w-10 h-10 rounded-full bg-[#0084FF] hover:bg-[#0073e6] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs"
+                    className="w-10 h-10 rounded-full bg-[#f75142] hover:bg-[#e04436] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs"
                     title="Enviar mensagem em tempo real"
                   >
                     <Send className="w-4 h-4 fill-white" />
@@ -1073,25 +1062,13 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                     type="button"
                     disabled={isWaitingForReply}
                     onClick={() => handleSend('👍')}
-                    className="w-10 h-10 rounded-full text-[#0084FF] hover:bg-[#F0F2F5] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-all cursor-pointer shrink-0"
+                    className="w-10 h-10 rounded-full text-[#f75142] hover:bg-[#F0F2F5] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-all cursor-pointer shrink-0"
                     title="Enviar polegar para cima"
                   >
                     <ThumbsUp className="w-5 h-5 fill-current" />
                   </button>
                 )}
               </form>
-
-              {/* Status Hint */}
-              <div className="flex items-center justify-between mt-1.5 px-2 text-[10px] text-slate-400">
-                <span>
-                  {isWaitingForReply ? (
-                    <strong className="text-[#0084FF]">Envio bloqueado temporariamente até a resposta chegar.</strong>
-                  ) : (
-                    <>Envio direto em tempo real (Arraste arquivos ou clique no clipe para importar).</>
-                  )}
-                </span>
-                <span>{userSchoolName}</span>
-              </div>
             </div>
           </div>
 
@@ -1109,7 +1086,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               </div>
 
               <div className="p-4 text-center border-b border-slate-100">
-                <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-tr from-[#0084FF] to-[#00C6FF] flex items-center justify-center text-xl font-black text-white shadow-sm mb-2.5">
+                <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-tr from-[#f75142] to-[#f86f63] flex items-center justify-center text-xl font-black text-white shadow-sm mb-2.5">
                   <School className="w-8 h-8" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-900">{userSchoolName}</h4>

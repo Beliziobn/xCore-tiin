@@ -1,6 +1,7 @@
 import React from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, ArrowUpRight } from 'lucide-react';
 import type { EducationalModule } from '../types';
+import { ComposablesLucideIcon } from './common/ComposablesLucideIcon';
 
 interface CyanCardsSectionProps {
   onSelectModule: (module: EducationalModule) => void;
@@ -95,49 +96,74 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
   };
 
   return (
-    <section id="cyan-modules-section" className="w-full pt-16 pb-24 px-4 sm:px-8 max-w-6xl mx-auto">
+    <section id="cyan-modules-section" className="reveal-up w-full pt-16 pb-24 px-4 sm:px-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-10 pb-6 border-b border-slate-200">
-        <span className="text-xs font-semibold tracking-[0.14em] uppercase text-[#4f67ff]">
-          Módulos
+        <span className="text-xs font-bold tracking-wider uppercase text-slate-500">
+          Módulos Integrados
         </span>
         <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance">
           Tudo o que a sua escola precisa
         </h2>
-        <p className="text-sm text-slate-500 mt-3 max-w-xl leading-relaxed">
+        <p className="text-sm text-slate-500 mt-2 max-w-xl leading-relaxed">
           Sistemas unificados para gestão integrada de secretarias, corpo docente e comunidade escolar.
         </p>
       </div>
 
-      {/* Grid of Cards Fiel ao Modelo */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+      {/* Grid of Cards with New Card Logic: 48px Outer Radius, 16px Padding, 32px Inner, 0 20px 40px Drop Shadow */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 items-stretch">
         {modulesData.map((module, idx) => (
           <div
             key={module.id}
             id={`cyan-card-${module.id}`}
             onClick={() => handleModuleClick(module)}
-            className="h-72 sm:h-80 bg-white hover:border-[#4f67ff]/40 rounded-2xl shadow-[0_1px_2px_rgba(11,16,32,0.04)] hover:shadow-[0_20px_40px_-16px_rgba(79,103,255,0.35)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between p-6 group border border-slate-200 relative"
+            data-reveal-delay={(idx * 0.08).toFixed(2)}
+            className="reveal-up min-h-[340px] h-full bg-white hover:border-slate-300/80 rounded-[48px] shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:shadow-[0_25px_50px_rgba(0,0,0,0.13)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col justify-between p-4 group border border-slate-100/90 relative select-none"
           >
-            <div className="flex items-start justify-between">
-              <div className="w-11 h-11 rounded-xl bg-[#eef1ff] group-hover:bg-[#4f67ff] flex items-center justify-center text-[#4f67ff] group-hover:text-white font-display font-bold text-sm transition-colors duration-300">
-                {String(idx + 1).padStart(2, '0')}
-              </div>
-              {!isLoggedIn && (
-                <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                  <Lock className="w-3.5 h-3.5" />
-                </div>
-              )}
-            </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-slate-400 mb-1.5">
-                {module.subtitle}
-              </p>
-              <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-snug">
-                {module.title}
-              </h4>
-              <p className="text-sm text-slate-500 mt-2 leading-relaxed line-clamp-3">
-                {module.description}
-              </p>
+              {/* Nested Radius Rule: Outer 48px - Padding 16px = Inner 32px */}
+              <div className="w-full bg-slate-50/90 group-hover:bg-slate-100/90 rounded-[32px] p-4 mb-4 border border-slate-100 flex items-center justify-between transition-colors duration-200">
+                <div className="w-11 h-11 rounded-2xl bg-white group-hover:bg-[#002133] border border-slate-200/80 group-hover:border-[#002133] flex items-center justify-center text-[#002133] group-hover:text-white transition-all duration-200 shadow-2xs">
+                  <ComposablesLucideIcon
+                    name={module.icon}
+                    titleFallback={module.title}
+                    size={20}
+                    strokeWidth={2}
+                  />
+                </div>
+                {!isLoggedIn ? (
+                  <div className="w-8 h-8 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 shadow-2xs" title="Requer início de sessão">
+                    <Lock className="w-3.5 h-3.5" strokeWidth={2} />
+                  </div>
+                ) : (
+                  <span className="text-[10px] uppercase tracking-[-0.01em] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                    {module.status}
+                  </span>
+                )}
+              </div>
+
+              <div className="px-2">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">
+                  {module.subtitle}
+                </p>
+                <h3 
+                  style={{ letterSpacing: '-0.02em' }}
+                  className="font-black text-base text-[#002133] tracking-[-0.02em] leading-snug group-hover:text-[#f75142] transition-colors"
+                >
+                  {module.title}
+                </h3>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed line-clamp-3">
+                  {module.description}
+                </p>
+              </div>
+            </div>
+
+            {/* Bottom Action Pill Button */}
+            <div className="pt-3 px-1 mt-3">
+              <div className="w-full bg-slate-100 group-hover:bg-[#002133] text-slate-700 group-hover:text-white rounded-full py-2.5 px-4 text-xs font-bold flex items-center justify-between transition-all duration-300 shadow-2xs">
+                <span className="tracking-[-0.01em]">Aceder módulo</span>
+                <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </div>
             </div>
           </div>
         ))}
@@ -145,3 +171,4 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
     </section>
   );
 };
+

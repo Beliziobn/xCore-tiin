@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, ShieldCheck, Mail, MapPin, Phone, Info, User, CheckCircle, LogOut, MessageSquare } from 'lucide-react';
 import type { UserAccount } from '../types';
+import { ProfilePhotoUploader } from './ProfilePhotoUploader';
 
 export type InfoModalType = 'about' | 'terms' | 'support' | 'profile' | null;
 
@@ -21,6 +22,14 @@ export const InfoModal: React.FC<InfoModalProps> = ({
   onOpenGetStarted,
   onOpenChat,
 }) => {
+  const [userAvatar, setUserAvatar] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('ucore_user_avatar');
+    } catch {
+      return null;
+    }
+  });
+
   if (!type) return null;
 
   return (
@@ -36,16 +45,16 @@ export const InfoModal: React.FC<InfoModalProps> = ({
           </button>
 
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[9px] uppercase font-black tracking-[0.25em] text-[#3B82F6]">
-              Central uCore
+            <span className="text-[9px] uppercase font-black tracking-[0.25em] text-[#f75142]">
+              Sigre
             </span>
           </div>
 
-          <h3 className="text-2xl font-black uppercase tracking-tight text-slate-950">
-            {type === 'about' && 'Sobre a Central uCore'}
+          <h3 className="text-2xl font-black uppercase tracking-tight text-[#002133]">
+            {type === 'about' && 'Sobre o Sigre'}
             {type === 'terms' && 'Termos e Políticas de Privacidade'}
             {type === 'support' && 'Suporte & Contato'}
-            {type === 'profile' && 'Meu Perfil uCore'}
+            {type === 'profile' && 'Meu Perfil no Sigre'}
           </h3>
         </div>
 
@@ -54,27 +63,27 @@ export const InfoModal: React.FC<InfoModalProps> = ({
           {type === 'about' && (
             <>
               <p>
-                A <strong className="text-slate-950">Central uCore</strong> nasceu com o propósito de transformar a gestão educacional em redes públicas e privadas de ensino em todo o país.
+                O <strong className="text-[#002133]">Sigre (Sistema Integrado de Gestão Escolar)</strong> nasceu com o propósito de transformar a gestão educacional em redes públicas e privadas de ensino em todo o país.
               </p>
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-xs text-slate-700">
-                <p className="font-bold mb-1 text-[#3B82F6] uppercase tracking-wider text-[11px]">
+              <div className="bg-[#fef2f1] border border-[#f75142]/20 rounded-2xl p-4 text-xs text-slate-700">
+                <p className="font-black mb-1 text-[#f75142] uppercase tracking-wider text-[11px]">
                   "Priorizamos a melhor organização da Educação"
                 </p>
                 Acreditamos que professores que gastam menos tempo com burocracias manuais têm mais tempo para inspirar e educar seus alunos.
               </div>
-              <h4 className="font-black text-slate-950 text-xs uppercase tracking-[0.15em]">Nossos Pilares:</h4>
+              <h4 className="font-black text-[#002133] text-xs uppercase tracking-[0.15em]">Nossos Pilares:</h4>
               <ul className="space-y-2 text-xs">
                 <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#3B82F6] shrink-0" />
-                  <span><strong className="text-slate-950">Simplicidade Operacional:</strong> Interfaces limpas e objetivas.</span>
+                  <CheckCircle className="w-4 h-4 text-[#f75142] shrink-0" />
+                  <span><strong className="text-[#002133]">Simplicidade Operacional:</strong> Interfaces limpas e objetivas.</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#3B82F6] shrink-0" />
-                  <span><strong className="text-slate-950">Transparência Pedagógica:</strong> Acesso direto para pais e alunos.</span>
+                  <CheckCircle className="w-4 h-4 text-[#f75142] shrink-0" />
+                  <span><strong className="text-[#002133]">Transparência Pedagógica:</strong> Acesso direto para pais e alunos.</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#3B82F6] shrink-0" />
-                  <span><strong className="text-slate-950">Segurança de Dados:</strong> Em conformidade com a LGPD e padrões do MEC.</span>
+                  <CheckCircle className="w-4 h-4 text-[#f75142] shrink-0" />
+                  <span><strong className="text-[#002133]">Segurança de Dados:</strong> Em conformidade com a LGPD e padrões do MEC.</span>
                 </li>
               </ul>
             </>
@@ -83,25 +92,25 @@ export const InfoModal: React.FC<InfoModalProps> = ({
           {type === 'terms' && (
             <>
               <p>
-                A Central uCore preza pela total transparência e proteção rigorosa de dados de estudantes, docentes e equipes gestoras.
+                O Sigre preza pela total transparência e proteção rigorosa de dados de estudantes, docentes e equipes gestoras.
               </p>
               <div className="space-y-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <h5 className="font-black text-slate-950 text-xs uppercase tracking-wider">1. Privacidade dos Estudantes</h5>
+                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">1. Privacidade dos Estudantes</h5>
                   <p className="text-slate-600 mt-1">
                     Dados pessoais de menores são tratados exclusivamente para finalidades pedagógicas e de escrituração escolar legal, sem compartilhamento comercial de qualquer natureza.
                   </p>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <h5 className="font-black text-slate-950 text-xs uppercase tracking-wider">2. Conformidade LGPD</h5>
+                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">2. Proteção e Segurança de Dados</h5>
                   <p className="text-slate-600 mt-1">
                     Criptografia de ponta a ponta para diários de classe, históricos escolares e relatórios socioeducacionais.
                   </p>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <h5 className="font-black text-slate-950 text-xs uppercase tracking-wider">3. Responsabilidade das Instituições</h5>
+                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">3. Responsabilidade das Instituições</h5>
                   <p className="text-slate-600 mt-1">
-                    Cada instituição escolar conectada à uCore mantém autonomia de controle de acesso de suas respectivas turmas e matrículas.
+                    Cada instituição escolar conectada ao Sigre mantém autonomia de controle de acesso de suas respectivas turmas e matrículas.
                   </p>
                 </div>
               </div>
@@ -115,26 +124,26 @@ export const InfoModal: React.FC<InfoModalProps> = ({
               </p>
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-                  <Mail className="w-5 h-5 text-[#3B82F6]" />
+                  <Mail className="w-5 h-5 text-[#f75142]" />
                   <div>
                     <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">E-mail de Suporte</span>
-                    <span className="text-xs font-black text-slate-950">suporte@ucore.educacao.br</span>
+                    <span className="text-xs font-black text-[#002133]">suporte@sigre.edu.ao</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-                  <Phone className="w-5 h-5 text-[#3B82F6]" />
+                  <Phone className="w-5 h-5 text-[#f75142]" />
                   <div>
                     <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Central Telefônica / WhatsApp</span>
-                    <span className="text-xs font-black text-slate-950">0800 459 2026</span>
+                    <span className="text-xs font-black text-[#002133]">0800 459 2026</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-                  <MapPin className="w-5 h-5 text-[#3B82F6]" />
+                  <MapPin className="w-5 h-5 text-[#f75142]" />
                   <div>
                     <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Atendimento</span>
-                    <span className="text-xs font-black text-slate-950">Segunda a Sexta, das 07:00 às 19:00</span>
+                    <span className="text-xs font-black text-[#002133]">Segunda a Sexta, das 07:00 às 19:00</span>
                   </div>
                 </div>
 
@@ -145,9 +154,9 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                         onClose();
                         onOpenChat();
                       }}
-                      className="w-full py-3 px-4 bg-gradient-to-r from-[#5067fc] to-[#4f67ff] hover:from-[#4359eb] hover:to-[#1fb3cd] text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-3 px-4 bg-[#f75142] hover:bg-[#e04436] text-[#002133] rounded-2xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <MessageSquare className="w-4 h-4" />
+                      <MessageSquare className="w-4 h-4 text-[#002133]" />
                       Abrir Chat de Suporte & Ajuda em Tempo Real
                     </button>
                   </div>
@@ -161,11 +170,25 @@ export const InfoModal: React.FC<InfoModalProps> = ({
               {currentUser ? (
                 <>
                   <div className="flex items-center gap-3.5 p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
-                    <div className="w-12 h-12 rounded-full bg-[#5067fc] text-white flex items-center justify-center font-black text-base tracking-wider uppercase shadow-sm">
-                      {currentUser.firstName.charAt(0)}
-                    </div>
+                    <ProfilePhotoUploader
+                      id="user-modal-photo-uploader"
+                      photo={userAvatar}
+                      onPhotoChange={(newPhoto) => {
+                        setUserAvatar(newPhoto);
+                        try {
+                          if (newPhoto) localStorage.setItem('ucore_user_avatar', newPhoto);
+                          else localStorage.removeItem('ucore_user_avatar');
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      fallbackInitials={currentUser.firstName.charAt(0)}
+                      shape="circle"
+                      badgePosition="bottom-right"
+                      className="w-12 h-12 rounded-full bg-[#002133] text-white flex items-center justify-center font-black text-base tracking-wider uppercase shadow-sm"
+                    />
                     <div className="flex-1">
-                      <h4 className="font-bold text-slate-950 text-sm tracking-wide">
+                      <h4 className="font-bold text-[#002133] text-sm tracking-wide">
                         {currentUser.firstName} {currentUser.lastName}
                       </h4>
                       <p className="text-xs text-slate-600">{currentUser.email}</p>
@@ -178,7 +201,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between py-2 border-b border-slate-100">
                       <span className="text-slate-400 uppercase tracking-wider">Unidade Vinculada:</span>
-                      <span className="font-bold text-slate-950">Escola Modelo Central uCore</span>
+                      <span className="font-bold text-slate-950">Escola Central Sigre</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-slate-100">
                       <span className="text-slate-400 uppercase tracking-wider">Ano Letivo:</span>
@@ -220,7 +243,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                         onClose();
                         onOpenGetStarted();
                       }}
-                      className="mt-2 inline-flex items-center gap-2 bg-[#5067fc] hover:bg-[#4359eb] text-white font-bold text-xs uppercase tracking-wider px-6 py-2.5 rounded-full shadow transition-all cursor-pointer"
+                      className="mt-2 inline-flex items-center gap-2 bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black text-xs uppercase tracking-wider px-6 py-2.5 rounded-full shadow transition-all cursor-pointer"
                     >
                       Começar / Entrar
                     </button>

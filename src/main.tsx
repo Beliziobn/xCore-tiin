@@ -1,10 +1,13 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { ClientProtectionProvider } from './components/security/ClientProtectionProvider.tsx';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ClientProtectionProvider>
+      <App />
+    </ClientProtectionProvider>
   </StrictMode>,
 );

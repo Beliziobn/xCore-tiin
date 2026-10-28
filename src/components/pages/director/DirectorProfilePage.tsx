@@ -1,19 +1,82 @@
-import React, { useState } from 'react';
-import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Users, Phone, Building, Clock, ShieldCheck, Mail, MapPin, Edit3, CheckCircle2, School, GraduationCap, Settings, Lock } from 'lucide-react';
 import { Hero } from '../../Hero';
+import { ProfilePhotoUploader } from '../../ProfilePhotoUploader';
+import { ProfileOptionsSection, UserProfileData } from '../../profile/ProfileOptionsSection';
+import { AccessDeniedGuard } from '../../common/AccessDeniedGuard';
 import { directorProfileData as initialProfile } from '../../../data/directorData';
-import type { DirectorProfileInfo } from '../../../types';
+import type { DirectorProfileInfo, UserAccount } from '../../../types';
 
 interface DirectorProfilePageProps {
   onOpenGetStarted: () => void;
   isLoggedIn?: boolean;
+  currentUser?: UserAccount | null;
+  onOpenSettings?: () => void;
+  onNavigateToOwnProfile?: () => void;
+  onBackToHome?: () => void;
+  onLogout?: () => void;
+  focusZone?: boolean;
+  settingsTrigger?: number;
 }
+
+const STORAGE_KEY_DIRECTOR = 'ucore_director_profile';
 
 export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
   onOpenGetStarted,
   isLoggedIn,
+  currentUser,
+  onOpenSettings,
+  onNavigateToOwnProfile,
+  onBackToHome,
+  onLogout,
+  focusZone,
+  settingsTrigger,
 }) => {
-  const [profile, setProfile] = useState<DirectorProfileInfo>(initialProfile);
+  // 1. Strict Security Guard: User can NEVER enter or modify someone else's profile
+  if (currentUser && currentUser.role !== 'diretor') {
+    return (
+      <AccessDeniedGuard
+        currentUser={currentUser}
+        attemptedView="diretor-perfil"
+        reason={`A sua conta (${currentUser.firstName} • ${currentUser.role.toUpperCase()}) não tem permissão para aceder ao Perfil da Direção Escolar. Cada utilizador tem acesso estrito e exclusivo apenas ao seu próprio perfil.`}
+        onNavigateToOwnProfile={onNavigateToOwnProfile || (() => {})}
+        onBackToHome={onBackToHome || (() => {})}
+        onLogout={onLogout || (() => {})}
+      />
+    );
+  }
+
+  useEffect(() => {
+    if (focusZone || settingsTrigger) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('zona-dados-senha');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [focusZone, settingsTrigger]);
+
+  const userStorageKey = currentUser?.id
+    ? `${STORAGE_KEY_DIRECTOR}_${currentUser.id}`
+    : STORAGE_KEY_DIRECTOR;
+
+  const [profile, setProfile] = useState<DirectorProfileInfo>(() => {
+    try {
+      const saved = localStorage.getItem(userStorageKey);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return {
+      ...initialProfile,
+      name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : initialProfile.name,
+      email: currentUser?.email || initialProfile.email,
+      schoolName: currentUser?.schoolName || initialProfile.schoolName,
+      avatar: currentUser?.avatarUrl || initialProfile.avatar,
+    };
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(profile.name);
   const [editPhone, setEditPhone] = useState(profile.phone);
@@ -21,13 +84,49 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    setProfile((prev) => ({
-      ...prev,
-      name: editName.trim() || prev.name,
-      phone: editPhone.trim() || prev.phone,
-      email: editEmail.trim() || prev.email,
-    }));
+    const updated = {
+      ...profile,
+      name: editName.trim() || profile.name,
+      phone: editPhone.trim() || profile.phone,
+      email: editEmail.trim() || profile.email,
+    };
+    setProfile(updated);
+    try {
+      localStorage.setItem(userStorageKey, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
     setIsEditing(false);
+  };
+
+  const handlePhotoChange = (newPhoto: string | null) => {
+    const updated = {
+      ...profile,
+      avatar: newPhoto || undefined,
+    };
+    setProfile(updated);
+    try {
+      localStorage.setItem(userStorageKey, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdateDirectorUser = (updated: Partial<UserProfileData>) => {
+    const next = {
+      ...profile,
+      name: updated.name || profile.name,
+      email: updated.email || profile.email,
+      phone: updated.phone || profile.phone,
+      avatar: updated.avatar !== undefined ? (updated.avatar || undefined) : profile.avatar,
+      schoolName: updated.schoolName || profile.schoolName,
+    };
+    setProfile(next);
+    try {
+      localStorage.setItem(userStorageKey, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -45,10 +144,18 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch mb-8">
           {/* Left Column: Profile Card with circular User badge matching 19.png */}
           <div className="lg:col-span-4 flex flex-col">
-            <div className="relative bg-[#5067fc] text-white rounded-3xl pt-14 pb-10 px-6 text-center shadow-[0_15px_35px_rgba(80,103,252,0.25)] flex flex-col items-center justify-center flex-1">
-              {/* White Circular Badge with User Icon */}
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md border-2 border-white">
-                <Users className="w-8 h-8 text-[#5067fc]" strokeWidth={2.2} />
+            <div className="relative bg-[#f75142] text-white rounded-3xl pt-14 pb-10 px-6 text-center shadow-[0_15px_35px_rgba(247,81,66,0.25)] flex flex-col items-center justify-center flex-1">
+              {/* White Circular Badge with User Icon & Photo Upload (Click / Drag-and-Drop) */}
+              <div className="absolute -top-7 left-1/2 -translate-x-1/2">
+                <ProfilePhotoUploader
+                  id="director-photo-uploader"
+                  photo={profile.avatar}
+                  onPhotoChange={handlePhotoChange}
+                  fallbackIcon={<Users className="w-8 h-8 text-[#f75142]" strokeWidth={2.2} />}
+                  shape="circle"
+                  badgePosition="bottom-right"
+                  className="w-16 h-16 bg-white text-[#f75142] rounded-full shadow-md border-2 border-white flex items-center justify-center"
+                />
               </div>
 
               {/* Title & Director Name */}
@@ -70,144 +177,244 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-white/70">Status:</span>
                   <span className="bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    Ativo no uCore
+                    Ativo no Sigre
                   </span>
                 </div>
               </div>
 
-              {/* Edit button */}
-              <button
-                onClick={() => setIsEditing(true)}
-                className="mt-6 inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer border border-white/20"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Atualizar Dados</span>
-              </button>
+              {/* Action buttons */}
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer border border-white/20"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Atualizar Dados</span>
+                </button>
+                {onOpenSettings && (
+                  <button
+                    onClick={onOpenSettings}
+                    className="inline-flex items-center gap-1.5 bg-white text-[#002133] hover:bg-slate-100 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-[#f75142]" />
+                    <span>Configurações</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Right Column: Top row with 6 Cyan-badged cards + Bottom row with 2 Cyan-badged cards matching 19.png */}
+          {/* Right Column: Informações da Unidade Escolar & Métricas Principais (Sem cards pesados, mantendo organização e máxima legibilidade) */}
           <div className="lg:col-span-8 flex flex-col justify-between gap-6">
-            {/* Top Row: 6 Cards with Cyan Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-              {/* Card 1: [Nome da Escola] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
-                  Nome da Escola
+            {/* Informações da Unidade Escolar - 6 colunas organizadas */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#fef2f1] text-[#f75142] border border-[#fee4e2] flex items-center justify-center font-bold">
+                    <School className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                      Informações da Unidade Escolar
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Dados estruturais e capacidade da instituição
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Unidade Central Sigre
                 </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
-                  <h5 className="font-bold text-xs sm:text-sm leading-tight">
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-4 gap-x-4">
+                {/* 1. Nome da Escola */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Nome da Escola
+                  </span>
+                  <span className="text-sm font-bold text-slate-900 leading-snug break-words">
                     {profile.schoolName}
-                  </h5>
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Rede Pública
+                  </span>
                 </div>
-              </div>
 
-              {/* Card 2: [Periodos] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
-                  Periodos
-                </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
-                  <h5 className="font-bold text-xs sm:text-sm leading-tight">
+                {/* 2. Períodos */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Períodos
+                  </span>
+                  <span className="text-sm font-black text-slate-900 leading-snug">
                     {profile.periods}
-                  </h5>
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Regular / Diurno
+                  </span>
                 </div>
-              </div>
 
-              {/* Card 3: [Classes] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
-                  Classes
-                </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
-                  <h5 className="font-bold text-xs sm:text-sm leading-tight">
+                {/* 3. Classes */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Classes
+                  </span>
+                  <span className="text-sm font-black text-slate-900 leading-snug">
                     {profile.classesCount}
-                  </h5>
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    1ª à 9ª Classe
+                  </span>
                 </div>
-              </div>
 
-              {/* Card 4: [Salas] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
-                  Salas
-                </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
-                  <h5 className="font-bold text-xs sm:text-sm leading-tight">
+                {/* 4. Salas */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Salas
+                  </span>
+                  <span className="text-sm font-black text-slate-900 leading-snug">
                     {profile.roomsCount}
-                  </h5>
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Salas Ativas
+                  </span>
                 </div>
-              </div>
 
-              {/* Card 5: [Telefone] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
-                  Telefone
-                </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
-                  <h5 className="font-bold text-[11px] sm:text-xs leading-tight">
+                {/* 5. Telefone */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Telefone
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
                     {profile.phone}
-                  </h5>
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Linha Direta
+                  </span>
                 </div>
-              </div>
 
-              {/* Card 6: [Turmas] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 shadow-2xs">
-                  Turmas
-                </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-3.5 flex-1 flex flex-col justify-center shadow-sm min-h-[90px]">
-                  <h5 className="font-bold text-xs sm:text-sm leading-tight">
+                {/* 6. Turmas */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                    Turmas
+                  </span>
+                  <span className="text-sm font-black text-slate-900 leading-snug">
                     {profile.turmasCount}
-                  </h5>
+                  </span>
+                  <span className="text-xs text-slate-500 mt-0.5">
+                    Turmas Formadas
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Bottom Row: 2 Cards with Cyan Badges matching 19.png */}
+            {/* Bottom Row: 2 Métricas Principais (Alunos & Professores) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Card 7: [Nº de alunos] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-                  Nº de alunos
-                </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[140px]">
-                  <div className="text-xs uppercase font-bold text-white/80">Corpo Discente Matriculado</div>
-                  <div className="text-3xl sm:text-4xl font-black mt-2">
+              {/* Métrica 1: Nº de alunos */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between min-h-[140px]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[#fef2f1] text-[#f75142] flex items-center justify-center">
+                      <GraduationCap className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Nº de Alunos
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    Corpo Discente
+                  </span>
+                </div>
+
+                <div className="my-2">
+                  <div className="text-3xl sm:text-4xl font-black text-slate-900">
                     {profile.studentsCount}
                   </div>
-                  <span className="text-xs text-white/80 mt-1">Distribuídos da 1ª à 9ª Classe</span>
+                  <p className="text-xs text-slate-500 mt-1 font-medium">
+                    Alunos matriculados e regularizados na rede
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Abrangência</span>
+                  <span className="font-semibold text-slate-600">1ª à 9ª Classe</span>
                 </div>
               </div>
 
-              {/* Card 8: [Nº de Professores] */}
-              <div className="flex flex-col">
-                <span className="inline-block self-start bg-[#4f67ff] text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md mb-2 shadow-2xs">
-                  Nº de Professores
-                </span>
-                <div className="bg-[#5067fc] text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[140px]">
-                  <div className="text-xs uppercase font-bold text-white/80">Quadro Docente Ativo</div>
-                  <div className="text-3xl sm:text-4xl font-black mt-2">
+              {/* Métrica 2: Nº de Professores */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between min-h-[140px]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[#fef2f1] text-[#f75142] flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Nº de Professores
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    Quadro Docente
+                  </span>
+                </div>
+
+                <div className="my-2">
+                  <div className="text-3xl sm:text-4xl font-black text-slate-900">
                     {profile.teachersCount}
                   </div>
-                  <span className="text-xs text-white/80 mt-1">Especialistas e Regentes de Classe</span>
+                  <p className="text-xs text-slate-500 mt-1 font-medium">
+                    Docentes ativos em regime letivo integral
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Estatuto</span>
+                  <span className="font-semibold text-slate-600">Especialistas & Regentes</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Profile Options and Settings matching screenshot (Account, Preferences, Security) */}
+        <div id="zona-dados-senha" className="my-8 scroll-mt-24">
+          <div className="mb-4">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#f75142] block">
+              Configurações da Conta & Segurança
+            </span>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
+              Zona de Alteração de Dados & Palavra-passe
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Atualize as informações cadastrais do diretor, contactos e credenciais de acesso seguro.
+            </p>
+          </div>
+          <ProfileOptionsSection
+            user={{
+              name: profile.name,
+              email: profile.email,
+              phone: profile.phone,
+              roleTitle: 'Diretor Geral • Gestão Escolar',
+              avatar: profile.avatar,
+              schoolName: profile.schoolName,
+              biNumber: '007294102LA048',
+              address: 'Complexo Escolar Central, Maianga, Luanda',
+            }}
+            onUpdateUser={handleUpdateDirectorUser}
+          />
+        </div>
+
         {/* Institutional Mission & Governance Note */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#5067fc]/10 text-[#5067fc] flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-[#f75142]/10 text-[#f75142] flex items-center justify-center shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
               <h4 className="text-sm font-black text-slate-900">
-                Diretoria de Ensino • Central uCore
+                Diretoria de Ensino • Central Sigre
               </h4>
               <p className="text-xs text-slate-500">
-                "Priorizamos a melhor organização da Educação" • Unidade Modelo Central
+                "Priorizamos a melhor organização da Educação" • Direcção Municipal do Quéssua
               </p>
             </div>
           </div>
@@ -229,7 +436,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-[#5067fc] outline-none text-slate-900 bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-[#f75142] outline-none text-slate-900 bg-white"
                 />
               </div>
               <div>
@@ -238,7 +445,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                   type="text"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-[#5067fc] outline-none text-slate-900 bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-[#f75142] outline-none text-slate-900 bg-white"
                 />
               </div>
               <div>
@@ -247,7 +454,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-[#5067fc] outline-none text-slate-900 bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-[#f75142] outline-none text-slate-900 bg-white"
                 />
               </div>
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -260,7 +467,7 @@ export const DirectorProfilePage: React.FC<DirectorProfilePageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-full bg-[#4f67ff] hover:bg-[#3547cf] text-white font-black uppercase tracking-wider"
+                  className="px-5 py-2 rounded-full bg-[#e04436] hover:bg-[#c9372a] text-white font-black uppercase tracking-wider"
                 >
                   Salvar
                 </button>

@@ -1,918 +1,1976 @@
-import React, { useState, useId, useRef, useEffect } from 'react';
-import { 
-  X, 
-  Upload, 
-  Camera, 
-  FileText, 
-  CheckCircle2, 
-  AlertCircle, 
-  Calendar, 
-  User, 
-  Users, 
-  ShieldCheck, 
-  GraduationCap, 
-  Phone, 
-  MapPin, 
-  FileUp, 
-  Sparkles, 
-  RefreshCw,
+import React, { useState, useId, useRef, useEffect, useMemo } from 'react';
+import {
+  X,
+  Check,
+  Building,
+  Layers,
+  HeartHandshake,
   Clock,
-  Trash2,
-  FileCheck
+  Camera,
+  FileUp,
+  AlertCircle,
+  Zap,
 } from 'lucide-react';
-import type { StudentDocumentType, StudentRegistrationData } from '../../types';
+import type {
+  StudentDocumentType,
+  StudentRegistrationData,
+  StudentModalidadeKey,
+  StudentNaturezaEscola,
+  StudentTipoDeficiencia,
+  AdminSchool,
+} from '../../types';
+import {
+  STUDENT_MODALITIES_CATALOG,
+  DISABILITY_TYPES_OPTIONS,
+  calculateStudentAgeAndFaixa,
+  calculateSuggestedClassForAgeAndModality,
+  saveStudent,
+  getRegisteredSchoolsFromStorage,
+  getSuggestedModalityForSchool,
+  getSchoolStudentQuotaStatus,
+} from '../../utils/studentStorage';
+import {
+  incrementTurmaOccupancy,
+  STANDARD_ROOMS,
+  STANDARD_TURMAS,
+} from '../../data/classesConfig';
+import {
+  getSchoolRegistrationData,
+  getOfferedLevelsBadges,
+  syncSchoolsFromServer,
+} from '../../utils/schoolStorage';
+import { BoletimMatriculaModal } from './BoletimMatriculaModal';
+import {
+  validateAngolaBI,
+  validateAngolaPhone,
+  validateFullName,
+  validateBirthDate,
+} from '../../utils/formConstraints';
+import { AuditLogger } from '../../services/auditLogger';
+import { SearchIndexer } from '../../utils/searchIndexer';
+import { DualValidationService } from '../../services/dualValidationService';
+import { RollbackManager } from '../../services/rollbackManager';
 
 interface StudentRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (studentData: StudentRegistrationData) => void;
+  initialData?: StudentRegistrationData | null;
   defaultGradeClass?: string;
   defaultTurma?: string;
   defaultRoom?: string;
   defaultPeriod?: string;
   schoolName?: string;
+  schools?: AdminSchool[];
 }
 
 export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  initialData,
   defaultGradeClass = '4ª Classe',
   defaultTurma = 'Turma A',
   defaultRoom = 'Sala 03',
   defaultPeriod = 'Manhã',
-  schoolName = 'Escola Modelo Central',
+  schoolName = '',
+  schools: propSchools,
 }) => {
   const photoInputId = useId();
   const docInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
 
-  // Form states
-  const [name, setName] = useState('');
-  const [genero, setGenero] = useState<'F' | 'M'>('F');
-  const [dataNascimento, setDataNascimento] = useState('');
-  const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
-
-  // Document states
-  const [tipoDocumento, setTipoDocumento] = useState<StudentDocumentType>('BI');
-  const [numeroDocumento, setNumeroDocumento] = useState('');
-  const [anexoDocumento, setAnexoDocumento] = useState<string | undefined>(undefined);
-  const [anexoDocumentoNome, setAnexoDocumentoNome] = useState<string | undefined>(undefined);
-
-  // Academic states
-  const [classe, setClasse] = useState(defaultGradeClass);
-  const [turma, setTurma] = useState(defaultTurma);
-  const [periodo, setPeriodo] = useState(defaultPeriod);
-  const [sala, setSala] = useState(defaultRoom);
-  const [condicaoMatricula, setCondicaoMatricula] = useState<'primeira_vez' | 'repetente'>('primeira_vez');
-
-  // Photo
-  const [foto, setFoto] = useState<string | undefined>(undefined);
-
-  // Parents and Guardian
-  const [nomePai, setNomePai] = useState('');
-  const [nomeMae, setNomeMae] = useState('');
-  const [encarregado, setEncarregado] = useState('');
-  const [parentescoEncarregado, setParentescoEncarregado] = useState('Mãe');
-  const [telefone, setTelefone] = useState('');
-  const [telefoneAlternativo, setTelefoneAlternativo] = useState('');
-  const [endereco, setEndereco] = useState('');
-  const [observacoes, setObservacoes] = useState('');
-
-  // UI States
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorNotice, setErrorNotice] = useState<string | null>(null);
-  const [successNotice, setSuccessNotice] = useState(false);
-  const [activeTab, setActiveTab] = useState<'geral' | 'documentos' | 'academico' | 'familia'>('geral');
-
-  // Calculate age automatically whenever birth date changes
+  // Escolas cadastradas no sistema (prop + localStorage + backend)
+  const [schoolRefreshTick, setSchoolRefreshTick] = useState(0);
   useEffect(() => {
-    if (!dataNascimento) {
-      setCalculatedAge(null);
-      return;
+    if (isOpen) {
+      syncSchoolsFromServer()
+        .then(() => setSchoolRefreshTick((t) => t + 1))
+        .catch(() => {});
     }
-    const birth = new Date(dataNascimento);
-    if (isNaN(birth.getTime())) {
-      setCalculatedAge(null);
-      return;
+    const handleSync = () => setSchoolRefreshTick((t) => t + 1);
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [isOpen]);
+
+  const registeredSchools = useMemo(() => {
+    const fromStorage = getRegisteredSchoolsFromStorage();
+    const combined = [...(propSchools || []), ...fromStorage];
+    const uniqueMap = new Map<string, AdminSchool>();
+    combined.forEach((sc) => {
+      if (sc && sc.name) {
+        uniqueMap.set(sc.name.trim().toLowerCase(), sc);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [propSchools, isOpen, schoolRefreshTick]);
+
+  // Active Wizard Step: 1=Identificação, 2=Natureza & Modalidade, 3=Classe & Faixa Etária, 4=Família & Documentos
+  const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
+
+  // Exibir Boletim de Matrícula imediatamente após cadastrar
+  const [registeredStudentForBoletim, setRegisteredStudentForBoletim] = useState<StudentRegistrationData | null>(null);
+  const prevIsOpenRef = useRef(isOpen);
+
+  // Smart Autofill state
+  const [isAutofillMinimized, setIsAutofillMinimized] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState<'admin' | 'guardian' | 'demo_student'>('admin');
+
+  // 1. Identificação do Aluno
+  const [nomeCompleto, setNomeCompleto] = useState(initialData?.nomeCompleto || initialData?.name || '');
+  const [tipoDocumento, setTipoDocumento] = useState<StudentDocumentType>(initialData?.tipoDocumento || 'BI');
+  const [numeroDocumento, setNumeroDocumento] = useState(initialData?.numeroDocumento || '');
+  const [genero, setGenero] = useState<'M' | 'F' | 'Outro'>(initialData?.genero || 'F');
+  const [dataNascimento, setDataNascimento] = useState(initialData?.dataNascimento || '2016-04-15');
+  const [encarregado, setEncarregado] = useState(initialData?.encarregado || '');
+  const [parentescoEncarregado, setParentescoEncarregado] = useState(initialData?.parentescoEncarregado || 'Mãe');
+  const [telefone, setTelefone] = useState(initialData?.telefone || '+244 923 000 000');
+  const [telefoneAlternativo, setTelefoneAlternativo] = useState(initialData?.telefoneAlternativo || '');
+  const [endereco, setEndereco] = useState(initialData?.endereco || 'Bairro Modelo - Quéssua');
+  const [provincia, setProvincia] = useState(initialData?.provincia || 'Malanje');
+  const [municipio, setMunicipio] = useState(initialData?.municipio || 'Quéssua');
+
+  // 2. Natureza & Modalidade da Escola
+  const [nomeEscola, setNomeEscola] = useState(
+    initialData?.escola || (registeredSchools[0]?.name ?? schoolName)
+  );
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | undefined>(
+    initialData?.schoolId || registeredSchools[0]?.id
+  );
+  const [isCustomSchoolInput, setIsCustomSchoolInput] = useState(false);
+  const [tipoEscolaModalidade, setTipoEscolaModalidade] = useState<StudentModalidadeKey>(
+    initialData?.tipoEscolaModalidade || getSuggestedModalityForSchool(registeredSchools[0])
+  );
+  const [naturezaEscola, setNaturezaEscola] = useState<StudentNaturezaEscola>(
+    initialData?.naturezaEscola || (registeredSchools[0]?.natureza as StudentNaturezaEscola) || 'Pública'
+  );
+
+  const selectedSchoolObj = useMemo(() => {
+    return registeredSchools.find(
+      (sc) =>
+        (selectedSchoolId && sc.id === selectedSchoolId) ||
+        sc.name.trim().toLowerCase() === nomeEscola.trim().toLowerCase()
+    );
+  }, [registeredSchools, selectedSchoolId, nomeEscola]);
+
+  const selectedSchoolStudentQuota = useMemo(() => {
+    if (!selectedSchoolObj) return null;
+    return getSchoolStudentQuotaStatus(selectedSchoolObj);
+  }, [selectedSchoolObj, isOpen, nomeEscola]);
+
+  const handleSelectSchoolFromSystem = (school: AdminSchool) => {
+    setIsCustomSchoolInput(false);
+    setNomeEscola(school.name);
+    setSelectedSchoolId(school.id);
+    if (school.natureza) {
+      setNaturezaEscola(school.natureza as StudentNaturezaEscola);
     }
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
+    if (school.registrationData?.endereco?.provincia) {
+      setProvincia(school.registrationData.endereco.provincia);
     }
-    setCalculatedAge(Math.max(0, age));
-  }, [dataNascimento]);
+    if (school.registrationData?.endereco?.municipio) {
+      setMunicipio(school.registrationData.endereco.municipio);
+    }
+    const suggestedMod = getSuggestedModalityForSchool(school);
+    setTipoEscolaModalidade(suggestedMod);
+  };
+
+  useEffect(() => {
+    if (!prevIsOpenRef.current && isOpen) {
+      setRegisteredStudentForBoletim(null);
+      if (!initialData && registeredSchools.length > 0) {
+        const matched =
+          registeredSchools.find((s) => s.name.trim().toLowerCase() === schoolName.trim().toLowerCase()) ||
+          registeredSchools[0];
+        if (matched) {
+          handleSelectSchoolFromSystem(matched);
+        }
+      }
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialData, registeredSchools, schoolName]);
+
+  // 3. Classe / Etapa / Módulo e Idade específica
+  const selectedModalityConfig = useMemo(() => {
+    return (
+      STUDENT_MODALITIES_CATALOG.find((m) => m.key === tipoEscolaModalidade) ||
+      STUDENT_MODALITIES_CATALOG[3]
+    );
+  }, [tipoEscolaModalidade]);
+
+  // Dynamic Age & Normative Class calculation
+  const calculatedAgeData = useMemo(() => {
+    return calculateStudentAgeAndFaixa(dataNascimento, tipoEscolaModalidade);
+  }, [dataNascimento, tipoEscolaModalidade]);
+
+  const [classeEtapaModulo, setClasseEtapaModulo] = useState<string>(() => {
+    return (
+      initialData?.classeEtapaModulo ||
+      calculateStudentAgeAndFaixa(initialData?.dataNascimento || '2016-04-15', initialData?.tipoEscolaModalidade || 'primario_regular').suggestedClass ||
+      selectedModalityConfig.etapasOuClasses[0] ||
+      '1.ª Classe'
+    );
+  });
+
+  const [idadeEspecificaNivel, setIdadeEspecificaNivel] = useState<string>(() => {
+    return initialData?.idadeEspecificaNivel || calculatedAgeData.suggestedFaixa || selectedModalityConfig.agePresets[0] || '10 anos';
+  });
+
+  // State for confirming the automatically calculated class vs choosing an adequate class manually
+  const [isClassConfirmPromptOpen, setIsClassConfirmPromptOpen] = useState<boolean>(false);
+  const [isManualClassSelectionMode, setIsManualClassSelectionMode] = useState<boolean>(false);
+  const [hasConfirmedClassForYear, setHasConfirmedClassForYear] = useState<boolean>(Boolean(initialData));
+
+  // Selected Disabilities for Special Education (or mainstream with inclusive needs)
+  const [selectedDisabilities, setSelectedDisabilities] = useState<StudentTipoDeficiencia[]>(
+    initialData?.tiposDeficiencia || initialData?.deficienciasInclusivas || []
+  );
+
+  // 4. Dados Complementares & Documentos
+  const [alunoRepetente, setAlunoRepetente] = useState<boolean>(
+    initialData?.alunoRepetente || initialData?.condicaoMatricula === 'repetente' || false
+  );
+  const [temNecessidadesEspeciais, setTemNecessidadesEspeciais] = useState<boolean>(
+    initialData?.temNecessidadesEspeciais || selectedModalityConfig.isSpecialEducation || false
+  );
+  const [turno, setTurno] = useState<'Manhã' | 'Tarde' | 'Noite' | 'Integral'>(
+    initialData?.turno || (initialData?.periodo as any) || 'Manhã'
+  );
+  const [turma, setTurma] = useState<string>(initialData?.turma || defaultTurma);
+  const [sala, setSala] = useState<string>(initialData?.sala || defaultRoom);
+  const [transferido, setTransferido] = useState<boolean>(initialData?.transferido || false);
+  const [escolaOrigem, setEscolaOrigem] = useState<string>(initialData?.escolaOrigem || '');
+  const [observacoes, setObservacoes] = useState<string>(initialData?.observacoes || '');
+
+  // Attachments & Photos
+  const [foto, setFoto] = useState<string | undefined>(initialData?.foto);
+  const [anexoDocumento, setAnexoDocumento] = useState<string | undefined>(initialData?.anexoDocumento);
+  const [anexoDocumentoNome, setAnexoDocumentoNome] = useState<string | undefined>(initialData?.anexoDocumentoNome);
+
+  // Validation & Error
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Synchronize classeEtapaModulo and idadeEspecificaNivel when birthDate or modality changes
+  useEffect(() => {
+    if (!initialData && !isManualClassSelectionMode) {
+      const autoClass = calculatedAgeData.suggestedClass;
+      if (autoClass && selectedModalityConfig.etapasOuClasses.includes(autoClass)) {
+        setClasseEtapaModulo(autoClass);
+      } else {
+        setClasseEtapaModulo(selectedModalityConfig.etapasOuClasses[0] || '');
+      }
+    } else if (!selectedModalityConfig.etapasOuClasses.includes(classeEtapaModulo)) {
+      setClasseEtapaModulo(calculatedAgeData.suggestedClass || selectedModalityConfig.etapasOuClasses[0] || '');
+    }
+
+    // Update age preset default
+    if (calculatedAgeData.suggestedFaixa && selectedModalityConfig.agePresets.includes(calculatedAgeData.suggestedFaixa)) {
+      setIdadeEspecificaNivel(calculatedAgeData.suggestedFaixa);
+    } else {
+      setIdadeEspecificaNivel(selectedModalityConfig.agePresets[0] || `${calculatedAgeData.age} anos`);
+    }
+
+    // Special education modalities are strictly "Pública"
+    if (selectedModalityConfig.isSpecialEducation) {
+      setNaturezaEscola('Pública');
+      setTemNecessidadesEspeciais(true);
+    }
+  }, [tipoEscolaModalidade, selectedModalityConfig, calculatedAgeData.suggestedFaixa, calculatedAgeData.suggestedClass]);
+
+  // Sync initialData when provided
+  useEffect(() => {
+    if (initialData) {
+      setNomeCompleto(initialData.nomeCompleto || initialData.name || '');
+      setTipoDocumento(initialData.tipoDocumento || 'BI');
+      setNumeroDocumento(initialData.numeroDocumento || '');
+      setGenero(initialData.genero || 'F');
+      setDataNascimento(initialData.dataNascimento || '2016-04-15');
+      setEncarregado(initialData.encarregado || '');
+      setParentescoEncarregado(initialData.parentescoEncarregado || 'Mãe');
+      setTelefone(initialData.telefone || '');
+      setTelefoneAlternativo(initialData.telefoneAlternativo || '');
+      setEndereco(initialData.endereco || '');
+      setProvincia(initialData.provincia || 'Malanje');
+      setMunicipio(initialData.municipio || 'Quéssua');
+      if (initialData.escola) setNomeEscola(initialData.escola);
+      if (initialData.tipoEscolaModalidade) setTipoEscolaModalidade(initialData.tipoEscolaModalidade);
+      if (initialData.naturezaEscola) setNaturezaEscola(initialData.naturezaEscola);
+      if (initialData.classeEtapaModulo) setClasseEtapaModulo(initialData.classeEtapaModulo);
+      if (initialData.idadeEspecificaNivel) setIdadeEspecificaNivel(initialData.idadeEspecificaNivel);
+      if (initialData.tiposDeficiencia) setSelectedDisabilities(initialData.tiposDeficiencia);
+      setAlunoRepetente(initialData.alunoRepetente || initialData.condicaoMatricula === 'repetente' || false);
+      setTemNecessidadesEspeciais(initialData.temNecessidadesEspeciais || false);
+      setTurma(initialData.turma || defaultTurma);
+      setSala(initialData.sala || defaultRoom);
+      setTurno(initialData.turno || (initialData.periodo as any) || 'Manhã');
+      setTransferido(initialData.transferido || false);
+      setEscolaOrigem(initialData.escolaOrigem || '');
+      setObservacoes(initialData.observacoes || '');
+      setFoto(initialData.foto);
+      setAnexoDocumento(initialData.anexoDocumento);
+      setAnexoDocumentoNome(initialData.anexoDocumentoNome);
+    }
+  }, [initialData, defaultTurma, defaultRoom]);
 
   if (!isOpen) return null;
 
-  // Handle Photo upload
+  // Disability toggle
+  const handleToggleDisability = (d: StudentTipoDeficiencia) => {
+    if (selectedDisabilities.includes(d)) {
+      setSelectedDisabilities(selectedDisabilities.filter((item) => item !== d));
+    } else {
+      setSelectedDisabilities([...selectedDisabilities, d]);
+    }
+  };
+
+  // Photo handlers
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrorNotice('A foto deve ter no máximo 5MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setFoto(reader.result as string);
-        setErrorNotice(null);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMessage('A fotografia não pode exceder 2MB.');
+      return;
     }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFoto(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
-  // Handle Document upload
+  // Document attachment handler
   const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setErrorNotice('O documento deve ter no máximo 10MB.');
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('O documento anexo não pode exceder 5MB.');
+      return;
+    }
+    setAnexoDocumentoNome(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAnexoDocumento(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleApplySmartAutofill = () => {
+    if (selectedProfileId === 'admin') {
+      setEncarregado('Dr. Fred Silva');
+      setParentescoEncarregado('Pai');
+      setTelefone('+244 923 110 001');
+      setTelefoneAlternativo('+244 931 220 002');
+      setEndereco('Bairro Modelo - Quéssua');
+      setProvincia('Malanje');
+      setMunicipio('Quéssua');
+      setErrorMessage(null);
+    } else if (selectedProfileId === 'guardian') {
+      setEncarregado('Maria António Quessua');
+      setParentescoEncarregado('Mãe');
+      setTelefone('+244 923 000 000');
+      setTelefoneAlternativo('+244 931 000 000');
+      setEndereco('Bairro Modelo - Quéssua');
+      setProvincia('Malanje');
+      setMunicipio('Quéssua');
+      setErrorMessage(null);
+    } else if (selectedProfileId === 'demo_student') {
+      setNomeCompleto('Teresa Domingos Manuel');
+      setNumeroDocumento('008942125ME041');
+      setTipoDocumento('BI');
+      setGenero('F');
+      setDataNascimento('2016-04-15');
+      setEncarregado('Maria António Quessua');
+      setParentescoEncarregado('Mãe');
+      setTelefone('+244 923 000 000');
+      setTelefoneAlternativo('+244 931 000 000');
+      setEndereco('Bairro Modelo - Quéssua');
+      setProvincia('Malanje');
+      setMunicipio('Quéssua');
+      setNomeEscola(registeredSchools[0]?.name || schoolName || '');
+      setTipoEscolaModalidade('primario_regular');
+      setNaturezaEscola('Pública');
+      setClasseEtapaModulo('1.ª Classe');
+      setIdadeEspecificaNivel('10 anos');
+      setTurma('Turma A');
+      setSala('Sala 03');
+      setTurno('Manhã');
+      setAlunoRepetente(false);
+      setTransferido(false);
+      setErrorMessage(null);
+    }
+  };
+
+  const handleNextStep = () => {
+    setErrorMessage(null);
+    if (activeTab === 1) {
+      if (!nomeCompleto.trim()) {
+        setErrorMessage('Por favor informe o Nome Completo do Aluno.');
         return;
       }
-      setAnexoDocumentoNome(file.name);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAnexoDocumento(reader.result as string);
-        setErrorNotice(null);
-      };
-      reader.readAsDataURL(file);
+      if (!dataNascimento) {
+        setErrorMessage('A Data de Nascimento é obrigatória.');
+        return;
+      }
+      if (!encarregado.trim()) {
+        setErrorMessage('Por favor informe o Nome do Encarregado de Educação.');
+        return;
+      }
+      setActiveTab(2);
+    } else if (activeTab === 2) {
+      if (!nomeEscola.trim()) {
+        setErrorMessage('Por favor informe o Nome da Escola onde o Aluno está Matriculado.');
+        return;
+      }
+      if (!hasConfirmedClassForYear) {
+        setIsClassConfirmPromptOpen(true);
+        return;
+      }
+      setActiveTab(3);
+    } else if (activeTab === 3) {
+      if (!classeEtapaModulo) {
+        setErrorMessage('Selecione a Classe, Etapa ou Módulo.');
+        return;
+      }
+      if (selectedModalityConfig.isSpecialEducation && selectedDisabilities.length === 0) {
+        setErrorMessage('Para Ensino Especial, seleccione pelo menos um Tipo de Deficiência.');
+        return;
+      }
+      setActiveTab(4);
     }
   };
 
-  const handleRemovePhoto = () => {
-    setFoto(undefined);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleConfirmCalculatedClassAndAdvance = () => {
+    setErrorMessage(null);
+    setHasConfirmedClassForYear(true);
+    setIsManualClassSelectionMode(false);
+    setIsClassConfirmPromptOpen(false);
+    if (selectedModalityConfig.isSpecialEducation && selectedDisabilities.length === 0) {
+      setActiveTab(3);
+    } else {
+      setActiveTab(4);
+    }
   };
 
-  const handleRemoveDoc = () => {
-    setAnexoDocumento(undefined);
-    setAnexoDocumentoNome(undefined);
-    if (docInputRef.current) docInputRef.current.value = '';
+  const handleRejectCalculatedClassAndChooseAdequate = () => {
+    setErrorMessage(null);
+    setHasConfirmedClassForYear(false);
+    setIsManualClassSelectionMode(true);
+    setIsClassConfirmPromptOpen(false);
+    setActiveTab(3);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Submit Handler
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorNotice(null);
+    setErrorMessage(null);
 
-    // Validation
-    if (!name.trim()) {
-      setErrorNotice('Por favor, informe o nome completo do aluno.');
-      setActiveTab('geral');
+    // Validação Dual Simultânea (Frontend + Backend)
+    const dualVal = await DualValidationService.validateStudent({
+      nomeCompleto,
+      biOuCedula: numeroDocumento,
+      tipoDocumento,
+      dataNascimento,
+      nomeEscola,
+    });
+    if (!dualVal.isValid) {
+      setErrorMessage(dualVal.errors.join(' | '));
+      setActiveTab(1);
       return;
     }
-    if (!dataNascimento) {
-      setErrorNotice('Por favor, selecione a data de nascimento do aluno.');
-      setActiveTab('geral');
+
+    const nameValidation = validateFullName(nomeCompleto);
+    if (!nameValidation.isValid) {
+      setErrorMessage(nameValidation.error || 'Nome inválido.');
+      setActiveTab(1);
       return;
     }
-    if (tipoDocumento !== 'sem Documento' && !numeroDocumento.trim()) {
-      setErrorNotice(`Por favor, digite o número do documento (${tipoDocumento}).`);
-      setActiveTab('documentos');
+
+    const birthValidation = validateBirthDate(dataNascimento);
+    if (!birthValidation.isValid) {
+      setErrorMessage(birthValidation.error || 'Data de nascimento inválida.');
+      setActiveTab(1);
       return;
     }
+
+    if (tipoDocumento === 'BI') {
+      const biValidation = validateAngolaBI(numeroDocumento);
+      if (!biValidation.isValid) {
+        setErrorMessage(biValidation.error || 'Bilhete de Identidade inválido.');
+        setActiveTab(1);
+        return;
+      }
+    }
+
+    if (telefone) {
+      const phoneValidation = validateAngolaPhone(telefone, false);
+      if (!phoneValidation.isValid) {
+        setErrorMessage(phoneValidation.error || 'Número de telefone inválido.');
+        setActiveTab(1);
+        return;
+      }
+    }
+
+    if (!naturezaEscola) {
+      setErrorMessage('A Natureza da Escola é obrigatória.');
+      setActiveTab(2);
+      return;
+    }
+
+    if (!tipoEscolaModalidade) {
+      setErrorMessage('O Tipo de Escola / Modalidade é obrigatório.');
+      setActiveTab(2);
+      return;
+    }
+
+    if (!classeEtapaModulo) {
+      setErrorMessage('A Classe / Etapa / Módulo é obrigatória.');
+      setActiveTab(3);
+      return;
+    }
+
+    if (selectedModalityConfig.isSpecialEducation && selectedDisabilities.length === 0) {
+      setErrorMessage('Para Ensino Especial, seleccione pelo menos um Tipo de Deficiência.');
+      setActiveTab(3);
+      return;
+    }
+
     if (!encarregado.trim()) {
-      setErrorNotice('Por favor, indique o nome do encarregado de educação.');
-      setActiveTab('familia');
-      return;
-    }
-    if (!telefone.trim()) {
-      setErrorNotice('Por favor, indique um telefone de contato do encarregado.');
-      setActiveTab('familia');
+      setErrorMessage('Por favor informe o Nome do Encarregado de Educação.');
+      setActiveTab(1);
       return;
     }
 
-    setIsSubmitting(true);
-
-    const studentPayload: StudentRegistrationData = {
-      id: `aluno-${Date.now()}`,
-      name: name.trim(),
+    const payload: StudentRegistrationData = {
+      id: initialData?.id || `std-${Date.now()}`,
+      name: nomeCompleto.trim(),
+      nomeCompleto: nomeCompleto.trim(),
       genero,
       dataNascimento,
-      idade: calculatedAge ?? 9,
+      idade: calculatedAgeData.age,
+      faixaEtariaCalculada: calculatedAgeData.suggestedFaixa,
       tipoDocumento,
-      numeroDocumento: tipoDocumento !== 'sem Documento' ? numeroDocumento.trim() : undefined,
-      anexoDocumento: tipoDocumento !== 'sem Documento' ? anexoDocumento : undefined,
-      anexoDocumentoNome: tipoDocumento !== 'sem Documento' ? anexoDocumentoNome : undefined,
-      classe,
-      turma,
-      periodo,
-      sala,
-      condicaoMatricula,
+      numeroDocumento: tipoDocumento === 'sem Documento' ? 'Sem documento' : numeroDocumento.trim(),
+      anexoDocumento,
+      anexoDocumentoNome,
       foto,
-      nomePai: nomePai.trim() || undefined,
-      nomeMae: nomeMae.trim() || undefined,
+      naturezaEscola,
+      tipoEscolaModalidade,
+      tipoEscolaNome: selectedModalityConfig.label,
+      classeEtapaModulo,
+      idadeEspecificaNivel: idadeEspecificaNivel || calculatedAgeData.suggestedFaixa,
+      isEnsinoEspecial: selectedModalityConfig.isSpecialEducation,
+      tiposDeficiencia: selectedDisabilities,
+      classe: classeEtapaModulo,
+      turma,
+      periodo: turno,
+      turno,
+      sala,
+      escola: nomeEscola.trim(),
+      schoolId: selectedSchoolObj?.id || selectedSchoolId,
+      categoriaEscola: selectedSchoolObj?.category || selectedModalityConfig.categoryName,
+      condicaoMatricula: alunoRepetente ? 'repetente' : 'primeira_vez',
+      alunoRepetente,
+      temNecessidadesEspeciais: temNecessidadesEspeciais || selectedModalityConfig.isSpecialEducation,
+      deficienciasInclusivas: selectedDisabilities,
+      transferido,
+      escolaOrigem: transferido ? escolaOrigem.trim() : undefined,
       encarregado: encarregado.trim(),
       parentescoEncarregado,
       telefone: telefone.trim(),
-      telefoneAlternativo: telefoneAlternativo.trim() || undefined,
-      endereco: endereco.trim() || undefined,
-      observacoes: observacoes.trim() || undefined,
-      escola: schoolName,
+      telefoneAlternativo: telefoneAlternativo.trim(),
+      endereco: endereco.trim(),
+      provincia: provincia.trim(),
+      municipio: municipio.trim(),
+      observacoes: observacoes.trim(),
+      dataCadastro: initialData?.dataCadastro || new Date().toISOString().substring(0, 10),
+      codigoMatricula:
+        initialData?.codigoMatricula ||
+        `MAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
     };
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSuccessNotice(true);
+    const searchTokens = SearchIndexer.generateSearchTokens([
+      payload.nomeCompleto,
+      payload.name,
+      payload.numeroDocumento,
+      payload.escola,
+      payload.turma,
+      payload.classe,
+    ]);
 
-      setTimeout(() => {
-        onSuccess(studentPayload);
-        onClose();
-        setSuccessNotice(false);
-      }, 750);
-    }, 400);
+    const studentWithIndex = {
+      ...payload,
+      searchTokens,
+    };
+
+    const saved = saveStudent(studentWithIndex);
+    incrementTurmaOccupancy(classeEtapaModulo, turma);
+
+    // Rollback Snapshot Transaction
+    RollbackManager.recordTransaction({
+      entityType: 'student',
+      entityId: saved.id,
+      action: initialData ? 'UPDATE' : 'CREATE',
+      description: `${initialData ? 'Atualização cadastral' : 'Matrícula'} do estudante ${saved.nomeCompleto || saved.name} (${saved.classe || ''} - ${saved.turma || ''})`,
+      authorId: 'admin-current',
+      authorName: 'Administrador Escolar',
+      authorRole: 'admin',
+      previousState: initialData || null,
+      newState: saved,
+    });
+
+    // SSD Audit Trail
+    AuditLogger.log({
+      action: initialData ? 'STUDENT_UPDATE' : 'STUDENT_CREATE',
+      severity: 'INFO',
+      targetId: saved.id,
+      targetType: 'Estudante',
+      schoolId: saved.escola,
+      details: `${initialData ? 'Atualização' : 'Matrícula'} do estudante ${saved.nomeCompleto || saved.name} na turma ${saved.turma} (${saved.classe || ''}) - Escola: ${saved.escola || ''}.`,
+    });
+
+    onSuccess(saved);
+    setRegisteredStudentForBoletim(saved);
   };
 
+  if (registeredStudentForBoletim) {
+    return (
+      <BoletimMatriculaModal
+        isOpen={true}
+        onClose={() => {
+          setRegisteredStudentForBoletim(null);
+          onClose();
+        }}
+        student={registeredStudentForBoletim}
+        isJustRegistered={true}
+      />
+    );
+  }
+
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/65 backdrop-blur-xs animate-in fade-in duration-200">
-      <div 
-        className="bg-white text-slate-900 rounded-3xl max-w-2xl w-full shadow-[0_24px_70px_rgba(0,0,0,0.22)] border border-slate-200 overflow-hidden relative max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div
+        className="flex flex-col h-full max-h-[90vh] w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header matching uCore visual branding */}
-        <div className="bg-[#5067fc] p-5 sm:p-6 relative shrink-0 text-white shadow-sm">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white rounded-full hover:bg-white/15 transition-colors cursor-pointer"
-            title="Fechar"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-white/20">
-            <GraduationCap className="w-3.5 h-3.5 text-[#4f67ff]" />
-            Secretaria & Matrículas • uCore
+        {/* ==================== HEADER ==================== */}
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shrink-0">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3z" />
+                </svg>
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {initialData ? 'Atualizar Matrícula do Aluno' : 'Candidatura & Matrícula de Aluno'}
+                  </h2>
+                  {nomeEscola && (
+                    <span className="text-xs font-bold bg-[#0b3d5c] text-white px-2.5 py-0.5 rounded-full">
+                      Escola: {nomeEscola}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-500 mt-0.5 max-w-xl">
+                  O sistema identifica automaticamente a unidade escolar do Director ({nomeEscola || 'Direção Escolar'}) e vincula este aluno à respectiva escola.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              title="Fechar formulário"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
-            <span>Matrícula de Novo Aluno</span>
-          </h3>
-          <p className="text-xs text-blue-100 font-medium mt-1">
-            {schoolName} • Registro individual, documentação legal e perfil pedagógico
-          </p>
+          {/* STEPPER */}
+          <div className="mt-5 flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+            {/* Passo 1 */}
+            <button
+              type="button"
+              onClick={() => setActiveTab(1)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 1
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 1 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                1
+              </span>
+              <span className="hidden sm:inline">Identificação</span>
+            </button>
 
-          {/* Navigation tabs */}
-          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-white/15 overflow-x-auto pb-1 text-xs font-bold">
+            {/* Passo 2 */}
             <button
               type="button"
-              onClick={() => setActiveTab('geral')}
-              className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'geral'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
-                  : 'bg-white/10 text-white hover:bg-white/20'
+              onClick={() => {
+                if (!nomeCompleto.trim()) {
+                  setErrorMessage('Por favor informe o Nome Completo antes de prosseguir.');
+                  return;
+                }
+                setErrorMessage(null);
+                setActiveTab(2);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 2
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              1. Identificação & Foto
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 2 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                2
+              </span>
+              <span className="hidden sm:inline">Natureza & Modalidade</span>
             </button>
+
+            {/* Passo 3 */}
             <button
               type="button"
-              onClick={() => setActiveTab('documentos')}
-              className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'documentos'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
-                  : 'bg-white/10 text-white hover:bg-white/20'
+              onClick={() => {
+                if (!nomeCompleto.trim()) {
+                  setErrorMessage('Por favor informe o Nome Completo antes de prosseguir.');
+                  return;
+                }
+                setErrorMessage(null);
+                setActiveTab(3);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 3
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              2. Documentação Legal
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 3 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                3
+              </span>
+              <span className="hidden sm:inline">Classe & Faixa Etária</span>
             </button>
+
+            {/* Passo 4 */}
             <button
               type="button"
-              onClick={() => setActiveTab('academico')}
-              className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'academico'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
-                  : 'bg-white/10 text-white hover:bg-white/20'
+              onClick={() => {
+                if (!nomeCompleto.trim()) {
+                  setErrorMessage('Por favor informe o Nome Completo antes de prosseguir.');
+                  return;
+                }
+                setErrorMessage(null);
+                setActiveTab(4);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 4
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              3. Turma & Condição
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('familia')}
-              className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'familia'
-                  ? 'bg-white text-[#5067fc] shadow-xs'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              4. Filiação & Contato
+              <span
+                className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                  activeTab === 4 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                4
+              </span>
+              <span className="hidden sm:inline">Família & Documentos</span>
             </button>
           </div>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-7 overflow-y-auto flex-1 space-y-6 text-xs sm:text-sm">
-          {errorNotice && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-2.5 font-medium animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{errorNotice}</span>
-            </div>
-          )}
+        {/* Error message if any */}
+        {errorMessage && (
+          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-xs text-rose-800 font-medium shrink-0 animate-in fade-in duration-150">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
-          {successNotice ? (
-            <div className="py-12 flex flex-col items-center justify-center text-center space-y-3 animate-in fade-in">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-inner">
-                <CheckCircle2 className="w-9 h-9" />
+        {/* ==================== CONTEÚDO (scroll) ==================== */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <form id="student-registration-form" onSubmit={handleSubmit}>
+            {/* ========================================================
+                 PASSO 1 — IDENTIFICAÇÃO
+            ======================================================== */}
+            {activeTab === 1 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                {/* 1. Dados do Aluno */}
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                      1
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-800">Identificação do Aluno</h3>
+                      <p className="text-xs text-slate-500">Dados biográficos, identificação documental e contactos da família</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Nome Completo do Aluno <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={nomeCompleto}
+                        onChange={(e) => setNomeCompleto(e.target.value)}
+                        placeholder="Ex: Teresa Domingos Manuel"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Documento de Identificação <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          value={tipoDocumento}
+                          onChange={(e) => setTipoDocumento(e.target.value as StudentDocumentType)}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                          <option value="BI">Bilhete de Identidade (BI)</option>
+                          <option value="Cedula pessoal">Cédula Pessoal</option>
+                          <option value="Passaporte">Passaporte</option>
+                          <option value="Assento">Assento de Nascimento</option>
+                          <option value="sem Documento">Sem Documento (Pendente de Registo)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Número do Documento <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          disabled={tipoDocumento === 'sem Documento'}
+                          value={tipoDocumento === 'sem Documento' ? 'Sem documento' : numeroDocumento}
+                          onChange={(e) => setNumeroDocumento(e.target.value)}
+                          placeholder="Ex: 008942125ME041"
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Sexo <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setGenero('F')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                              genero === 'F'
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            Feminino
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGenero('M')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                              genero === 'M'
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            Masculino
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGenero('Outro')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                              genero === 'Outro'
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            Outro
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Data de Nascimento <span className="text-rose-500">*</span>
+                          <span className="ml-2 text-xs font-normal text-emerald-600">Cálculo Automático</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={dataNascimento}
+                          onChange={(e) => {
+                            setDataNascimento(e.target.value);
+                            setIsManualClassSelectionMode(false);
+                            setHasConfirmedClassForYear(false);
+                          }}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/50">
+                            Idade: {calculatedAgeData.ageLabel}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/50">
+                            Faixa: {calculatedAgeData.suggestedFaixa}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200/60">
+                            Classe Calculada: {calculatedAgeData.suggestedClass}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Encarregado */}
+                <section>
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3">Encarregado de Educação</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Nome do Encarregado <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={encarregado}
+                        onChange={(e) => setEncarregado(e.target.value)}
+                        placeholder="Ex: Maria António Quessua"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Parentesco / Relação</label>
+                      <select
+                        value={parentescoEncarregado}
+                        onChange={(e) => setParentescoEncarregado(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="Mãe">Mãe</option>
+                        <option value="Pai">Pai</option>
+                        <option value="Avô/Avó">Avô/Avó</option>
+                        <option value="Tio/Tia">Tio/Tia</option>
+                        <option value="Tutor Legal">Tutor Legal</option>
+                        <option value="Outro">Outro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Contacto Telefónico Principal <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={telefone}
+                        onChange={(e) => setTelefone(e.target.value)}
+                        placeholder="+244 923 000 000"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Contacto Alternativo (Opcional)</label>
+                      <input
+                        type="tel"
+                        value={telefoneAlternativo}
+                        onChange={(e) => setTelefoneAlternativo(e.target.value)}
+                        placeholder="+244 931 000 000"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Residência */}
+                <section>
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3">Morada de Residência</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Morada Actual de Residência <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={endereco}
+                        onChange={(e) => setEndereco(e.target.value)}
+                        placeholder="Bairro Modelo - Quéssua"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Província</label>
+                        <input
+                          type="text"
+                          value={provincia}
+                          onChange={(e) => setProvincia(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-slate-50 text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Município</label>
+                        <input
+                          type="text"
+                          value={municipio}
+                          onChange={(e) => setMunicipio(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-slate-50 text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </section>
               </div>
-              <h4 className="text-xl font-black uppercase text-slate-900 tracking-tight">
-                Aluno Matriculado com Sucesso!
-              </h4>
-              <p className="text-xs text-slate-500 max-w-sm">
-                Ficha cadastral completa, documento associado e inclusão confirmada na pauta da {classe} ({turma}).
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* TAB 1: IDENTIFICAÇÃO E FOTO */}
-              {activeTab === 'geral' && (
-                <div className="space-y-5 animate-in fade-in duration-150">
-                  {/* Student Photo Attachment with Interactive Preview */}
-                  <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                    <div className="relative group">
-                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white border-2 border-dashed border-slate-300 overflow-hidden flex items-center justify-center shadow-xs">
-                        {foto ? (
-                          <img src={foto} alt="Foto do aluno" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
-                            <User className="w-10 h-10 mb-1 text-slate-300" />
-                            <span className="text-[10px] font-bold">Sem Foto</span>
+            )}
+
+            {/* ========================================================
+                 PASSO 2 — NATUREZA & MODALIDADE
+            ======================================================== */}
+            {activeTab === 2 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                      2
+                    </span>
+                    <h3 className="text-sm font-semibold text-slate-800">Natureza da Escola & Modalidade</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 ml-8">
+                    Selecione primeiro o tipo de escola / modalidade. Nos casos de Ensino Especial, a natureza fica fixa como Pública.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-cyan-50/70 border border-cyan-200 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#0b3d5c] block">
+                        Unidade Escolar Vinculada (Escolas Cadastradas no Sistema)
+                      </span>
+                      <p className="text-sm font-black text-slate-900 mt-0.5">
+                        {nomeEscola || selectedSchoolObj?.name || 'Unidade Escolar da Direção'}
+                      </p>
+                    </div>
+                    {selectedSchoolObj && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-black uppercase bg-slate-900 text-white px-2 py-0.5 rounded">
+                          {getSchoolRegistrationData(selectedSchoolObj).codigoSIGE || selectedSchoolObj.codigoSIGE || 'SIGE'}
+                        </span>
+                        <span className="text-[11px] font-bold bg-[#0b3d5c] text-white px-2.5 py-0.5 rounded-full">
+                          {selectedSchoolObj.category}
+                        </span>
+                        <span className="text-[11px] font-semibold bg-white text-cyan-900 border border-cyan-300 px-2.5 py-0.5 rounded-full">
+                          {selectedSchoolObj.natureza || naturezaEscola}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {registeredSchools.length > 0 && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-900 mb-1">
+                        Seleccionar Escola Cadastrada:
+                      </label>
+                      <select
+                        value={selectedSchoolObj?.id || selectedSchoolId || ''}
+                        onChange={(e) => {
+                          const found = registeredSchools.find((s) => s.id === e.target.value);
+                          if (found) handleSelectSchoolFromSystem(found);
+                        }}
+                        className="w-full rounded-xl border border-cyan-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-cyan-500 outline-none"
+                      >
+                        {registeredSchools.map((sc) => {
+                          const reg = getSchoolRegistrationData(sc);
+                          return (
+                            <option key={sc.id} value={sc.id}>
+                              {sc.name} [{reg.codigoSIGE || sc.codigoSIGE || 'SIGE'}] ({reg.natureza || sc.natureza || 'Pública'} • {sc.category}) — {sc.location}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedSchoolObj && (() => {
+                    const reg = getSchoolRegistrationData(selectedSchoolObj);
+                    const offered = getOfferedLevelsBadges(reg.oferta);
+                    return (
+                      <div className="p-2.5 rounded-lg bg-white/95 border border-cyan-200/80 text-[11px] text-slate-700 space-y-1.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Salas</span>
+                            <span className="font-bold text-slate-900">{selectedSchoolObj.roomsCount || reg.infraestrutura.totalSalas || 0} salas</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Turmas</span>
+                            <span className="font-bold text-slate-900">{selectedSchoolObj.turmasCount || reg.infraestrutura.turmasFuncionamento || 0} turmas</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Docentes</span>
+                            <span className="font-bold text-slate-900">{selectedSchoolObj.teachersCount || reg.pessoal.totalDocentesProfessores || 0} prof.</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Localização</span>
+                            <span className="font-bold text-slate-900 truncate block">{selectedSchoolObj.location}</span>
+                          </div>
+                        </div>
+                        {offered.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100">
+                            {offered.map((b, idx) => (
+                              <span key={idx} className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-800 border border-cyan-200 text-[10px] font-semibold">
+                                {b}
+                              </span>
+                            ))}
                           </div>
                         )}
                       </div>
+                    );
+                  })()}
 
-                      {foto && (
+                  {selectedSchoolStudentQuota && (
+                    <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                      <div className="bg-white rounded-lg p-2 border border-slate-200">
+                        <span className="block text-[10px] font-bold uppercase text-slate-500">Quota Declarada</span>
+                        <span className="text-sm font-black text-slate-900">{selectedSchoolStudentQuota.declaredTotal}</span>
+                      </div>
+                      <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                        <span className="block text-[10px] font-bold uppercase text-emerald-700">Já Cadastrados</span>
+                        <span className="text-sm font-black text-emerald-800">{selectedSchoolStudentQuota.registeredCount}</span>
+                      </div>
+                      <div className="bg-amber-50 rounded-lg p-2 border border-amber-200">
+                        <span className="block text-[10px] font-bold uppercase text-amber-800">Pendentes</span>
+                        <span className="text-sm font-black text-amber-900">{selectedSchoolStudentQuota.pendingCount}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-cyan-900/85">
+                    ✓ Como o cadastro é realizado pelo <strong>Director de Escola</strong>, o sistema reconhece automaticamente que a escola <strong>{nomeEscola || 'da Direção'}</strong> é quem está a matricular este aluno.
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Categoria / Subsistema de Ensino no Instrumento Complementar 2026/2027 (A a O){' '}
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    {selectedSchoolObj && (
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Escola: {selectedSchoolObj.category}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1">
+                    {STUDENT_MODALITIES_CATALOG.map((mod) => {
+                      const isSelected = tipoEscolaModalidade === mod.key;
+                      const isSuggestedForSchool =
+                        selectedSchoolObj && getSuggestedModalityForSchool(selectedSchoolObj) === mod.key;
+                      const calculatedClassForMod = calculateSuggestedClassForAgeAndModality(
+                        calculatedAgeData.age,
+                        mod.key,
+                        calculatedAgeData.isBaby
+                      );
+                      return (
                         <button
+                          key={mod.key}
                           type="button"
-                          onClick={handleRemovePhoto}
-                          className="absolute -top-2 -right-2 p-1 bg-rose-500 text-white rounded-full hover:bg-rose-600 shadow-md cursor-pointer transition-transform hover:scale-110"
-                          title="Remover foto"
+                          onClick={() => {
+                            const autoClass = calculateSuggestedClassForAgeAndModality(
+                              calculatedAgeData.age,
+                              mod.key,
+                              calculatedAgeData.isBaby
+                            );
+                            setTipoEscolaModalidade(mod.key);
+                            setClasseEtapaModulo(autoClass);
+                            setIsManualClassSelectionMode(false);
+                            setHasConfirmedClassForYear(false);
+                            if (mod.isSpecialEducation) {
+                              setNaturezaEscola('Pública');
+                              setTemNecessidadesEspeciais(true);
+                            }
+                            setIsClassConfirmPromptOpen(true);
+                          }}
+                          className={`text-left p-3.5 rounded-xl transition cursor-pointer relative ${
+                            isSelected
+                              ? 'border-2 border-rose-400 bg-rose-50/40'
+                              : isSuggestedForSchool
+                              ? 'border-2 border-cyan-300 bg-cyan-50/30 hover:border-cyan-400'
+                              : 'border border-slate-200 hover:border-slate-300 bg-white'
+                          }`}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          {isSelected && (
+                            <span className="absolute top-3 right-3 text-xs font-medium text-rose-600 bg-white px-2 py-0.5 rounded-full border border-rose-200 flex items-center gap-1 shadow-2xs">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              Selecionado
+                            </span>
+                          )}
+
+                          <div className="flex items-center flex-wrap gap-1.5 pr-24">
+                            <p className="font-semibold text-sm text-slate-800">{mod.label}</p>
+                            {isSuggestedForSchool && (
+                              <span className="text-[10px] font-bold bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded shrink-0">
+                                Categoria da Escola
+                              </span>
+                            )}
+                            {mod.isSpecialEducation && (
+                              <span className="text-[10px] font-medium bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded shrink-0">
+                                Ensino Especial
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">{mod.description}</p>
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-1 pt-1.5 border-t border-slate-100">
+                            <span className="text-[11px] text-slate-400">
+                              Classes: {mod.etapasOuClasses.join(', ')}
+                            </span>
+                            <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/60">
+                              Pela idade ({calculatedAgeData.ageLabel}) → {calculatedClassForMod}
+                            </span>
+                          </div>
                         </button>
-                      )}
-                    </div>
-
-                    <div className="flex-1 space-y-2 text-center sm:text-left">
-                      <div className="flex items-center gap-2 justify-center sm:justify-start">
-                        <Camera className="w-4 h-4 text-[#5067fc]" />
-                        <span className="font-black text-slate-800 uppercase tracking-wider text-xs">
-                          Fotografia do Aluno
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500">
-                        Anexe uma foto nítida tipo passe ou retrato para identificação oficial na caderneta escolar.
-                      </p>
-                      <div className="pt-1">
-                        <label 
-                          htmlFor={photoInputId}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer shadow-2xs transition-all hover:border-[#5067fc]"
-                        >
-                          <Upload className="w-3.5 h-3.5 text-[#5067fc]" />
-                          <span>{foto ? 'Alterar Fotografia' : 'Carregar Foto do Aluno'}</span>
-                        </label>
-                        <input
-                          id={photoInputId}
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoUpload}
-                          className="hidden"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Nome Completo */}
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Nome Completo do Aluno *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Alberto Domingos António"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc] transition-all"
-                    />
-                  </div>
-
-                  {/* Gênero */}
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Género *
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setGenero('F')}
-                        className={`py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
-                          genero === 'F'
-                            ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-2xs'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-                        <span>Feminino (Menina)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setGenero('M')}
-                        className={`py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
-                          genero === 'M'
-                            ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#5067fc]"></span>
-                        <span>Masculino (Menino)</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Data de Nascimento com CÁLCULO AUTOMÁTICO DA IDADE */}
-                  <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4 text-[#5067fc]" />
-                        <span>Data de Nascimento *</span>
-                      </label>
-                      
-                      {calculatedAge !== null && (
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-white rounded-full text-xs font-black tracking-wide shadow-2xs animate-in zoom-in-90">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Idade: {calculatedAge} {calculatedAge === 1 ? 'ano' : 'anos'}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                      <div className="sm:col-span-8">
-                        <input
-                          type="date"
-                          value={dataNascimento}
-                          onChange={(e) => setDataNascimento(e.target.value)}
-                          max={new Date().toISOString().split('T')[0]}
-                          required
-                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                        />
-                      </div>
-                      <div className="sm:col-span-4 text-xs font-bold text-slate-600 bg-white/80 p-2 rounded-xl border border-blue-100/80 text-center">
-                        {calculatedAge !== null ? (
-                          <span className="text-emerald-700">
-                            Cálculo automático: <strong>{calculatedAge} anos</strong>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">Insira a data para calcular a idade</span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      O sistema calcula automaticamente a idade exata com base na data de nascimento fornecida.
-                    </p>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
 
-              {/* TAB 2: DOCUMENTAÇÃO LEGAL */}
-              {activeTab === 'documentos' && (
-                <div className="space-y-5 animate-in fade-in duration-150">
+                {/* Card de Cálculo Automático da Classe e Confirmação na Etapa 2 */}
+                <div className="p-4 rounded-2xl bg-indigo-50/80 border-2 border-indigo-200 space-y-3 animate-in fade-in duration-150">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-indigo-800">
+                        <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                        Cálculo Automático de Classe pela Idade / Faixa Etária
+                      </span>
+                      <p className="text-sm font-bold text-slate-900 mt-1">
+                        Com base na idade de <span className="text-indigo-700 font-black">{calculatedAgeData.ageLabel}</span> (Faixa: <span className="text-indigo-700 font-black">{calculatedAgeData.suggestedFaixa}</span>) e na modalidade <span className="text-indigo-700 font-black">{selectedModalityConfig.label}</span>, o sistema calculou que o(a) aluno(a) vai frequentar a{' '}
+                        <span className="underline decoration-indigo-500 decoration-2 font-black text-indigo-900">
+                          {classeEtapaModulo}
+                        </span>.
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-indigo-600 text-white px-3 py-1 rounded-full shrink-0">
+                      {classeEtapaModulo}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-white rounded-xl border border-indigo-200/80 space-y-2.5">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900">
+                      Tem a certeza que o(a) aluno(a) vai fazer a <span className="text-rose-600 font-black">{classeEtapaModulo}</span> este ano lectivo?
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleConfirmCalculatedClassAndAdvance}
+                        className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Sim, tenho a certeza (Avançar)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRejectCalculatedClassAndChooseAdequate}
+                        className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition cursor-pointer"
+                      >
+                        Não, escolher uma classe adequada
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Natureza da Escola <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {(['Pública', 'Público-Privada', 'Privada'] as const).map((nat) => {
+                      const isDisabled = selectedModalityConfig.isSpecialEducation && nat !== 'Pública';
+                      const isSelected = naturezaEscola === nat;
+                      return (
+                        <button
+                          key={nat}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => setNaturezaEscola(nat)}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer flex items-center justify-center gap-2 ${
+                            isSelected
+                              ? 'bg-slate-900 text-white'
+                              : isDisabled
+                              ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {nat === 'Pública' && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                          )}
+                          <span>{nat}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedModalityConfig.isSpecialEducation && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      A natureza para instituições de Ensino Especial fica estritamente definida como Pública.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================
+                 PASSO 3 — CLASSE & FAIXA ETÁRIA
+            ======================================================== */}
+            {activeTab === 3 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                      Tipo de Documento do Aluno *
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                        3
+                      </span>
+                      <h3 className="text-sm font-semibold text-slate-800">Classe, Etapa ou Módulo & Validação da Idade</h3>
+                    </div>
+                    <p className="text-xs text-slate-500 ml-8">
+                      Modalidade selecionada: <span className="font-medium text-slate-700">{selectedModalityConfig.label}</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(2)}
+                    className="text-xs font-medium text-rose-600 hover:text-rose-700 cursor-pointer"
+                  >
+                    Alterar Modalidade
+                  </button>
+                </div>
+
+                {/* Painel de Confirmação da Classe Calculada pela Faixa Etária / Idade */}
+                <div
+                  className={`p-4 rounded-2xl border-2 space-y-3 transition ${
+                    isManualClassSelectionMode
+                      ? 'bg-amber-50/80 border-amber-300'
+                      : 'bg-indigo-50/80 border-indigo-200'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span
+                        className={`text-[11px] font-black uppercase tracking-wider block ${
+                          isManualClassSelectionMode ? 'text-amber-900' : 'text-indigo-900'
+                        }`}
+                      >
+                        {isManualClassSelectionMode
+                          ? 'Escolha Manual de Classe Adequada Activa'
+                          : 'Classe Calculada Automaticamente pela Faixa Etária / Idade'}
+                      </span>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Idade do Aluno: <strong>{calculatedAgeData.ageLabel}</strong> • Faixa Etária: <strong>{idadeEspecificaNivel}</strong> • Classe sugerida pela idade: <strong>{calculatedAgeData.suggestedClass}</strong>
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-slate-900 text-white px-3 py-1 rounded-full">
+                      Classe Actual: {classeEtapaModulo}
+                    </span>
+                  </div>
+
+                  {!isManualClassSelectionMode ? (
+                    <div className="p-3.5 bg-white rounded-xl border border-indigo-200/80 space-y-2.5">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">
+                        Tem a certeza que o(a) aluno(a) vai fazer a{' '}
+                        <span className="text-rose-600 font-black">{classeEtapaModulo}</span> este ano lectivo?
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={handleConfirmCalculatedClassAndAdvance}
+                          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>Sim, avança ({classeEtapaModulo})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsManualClassSelectionMode(true);
+                            setHasConfirmedClassForYear(false);
+                          }}
+                          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition cursor-pointer"
+                        >
+                          Não, escolher uma classe adequada
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-white rounded-xl border border-amber-200 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-amber-900">
+                        Selecione abaixo a classe adequada para o(a) aluno(a) neste ano lectivo e clique em confirmar:
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleConfirmCalculatedClassAndAdvance}
+                        className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Confirmar {classeEtapaModulo} e Avançar</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={`p-4 rounded-2xl transition ${
+                    isManualClassSelectionMode
+                      ? 'ring-2 ring-amber-400 bg-amber-50/30'
+                      : 'bg-slate-50/60 border border-slate-200/80'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      {isManualClassSelectionMode
+                        ? 'Escolha a Classe, Etapa ou Módulo adequada para o aluno *'
+                        : 'Classe, Etapa ou Módulo correspondente *'}
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      {(['BI', 'Cedula pessoal', 'Assento', 'sem Documento'] as StudentDocumentType[]).map((doc) => {
-                        const isSelected = tipoDocumento === doc;
+                    {!isManualClassSelectionMode && (
+                      <button
+                        type="button"
+                        onClick={() => setIsManualClassSelectionMode(true)}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                      >
+                        Escolher outra classe manualmente
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {selectedModalityConfig.etapasOuClasses.map((item) => {
+                      const isSelected = classeEtapaModulo === item;
+                      const isSuggestedNormative = calculatedAgeData.suggestedClass === item;
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => {
+                            setClasseEtapaModulo(item);
+                            setIsManualClassSelectionMode(true);
+                            setHasConfirmedClassForYear(true);
+                          }}
+                          className={`py-2.5 px-3 rounded-xl text-sm font-medium transition cursor-pointer flex items-center justify-between gap-1.5 ${
+                            isSelected
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : isSuggestedNormative
+                              ? 'bg-indigo-50 text-indigo-900 border border-indigo-300 hover:bg-indigo-100'
+                              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <div className="flex flex-col text-left">
+                            <span>{item}</span>
+                            {isSuggestedNormative && (
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  isSelected ? 'text-emerald-300' : 'text-indigo-600'
+                                }`}
+                              >
+                                Sugerida p/ {calculatedAgeData.ageLabel}
+                              </span>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <svg className="w-4 h-4 text-white shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Faixa Etária / Idade no Nível Selecionado <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      Idade calculada: {calculatedAgeData.ageLabel}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {selectedModalityConfig.agePresets.map((ageOpt) => {
+                      const isSelected = idadeEspecificaNivel === ageOpt;
+                      return (
+                        <button
+                          key={ageOpt}
+                          type="button"
+                          onClick={() => {
+                            setIdadeEspecificaNivel(ageOpt);
+                            const autoClassForFaixa = calculateSuggestedClassForAgeAndModality(
+                              ageOpt,
+                              tipoEscolaModalidade,
+                              calculatedAgeData.isBaby
+                            );
+                            if (selectedModalityConfig.etapasOuClasses.includes(autoClassForFaixa)) {
+                              setClasseEtapaModulo(autoClassForFaixa);
+                              setIsManualClassSelectionMode(false);
+                              setHasConfirmedClassForYear(false);
+                              setIsClassConfirmPromptOpen(true);
+                            }
+                          }}
+                          className={`py-2 rounded-xl text-sm font-medium transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-rose-500 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {ageOpt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Se Ensino Especial ou Necessidades Inclusivas */}
+                {(selectedModalityConfig.supportsDisabilities || temNecessidadesEspeciais) && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">
+                          Tipo de Deficiência / Necessidades Especiais (Pode marcar mais de uma) *
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          Classificação conforme as diretrizes do Ensino Especial do MED.
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full">
+                        {selectedDisabilities.length} Selecionada(s)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {DISABILITY_TYPES_OPTIONS.map((dis) => {
+                        const isChecked = selectedDisabilities.includes(dis);
                         return (
                           <button
-                            key={doc}
+                            key={dis}
                             type="button"
-                            onClick={() => setTipoDocumento(doc)}
-                            className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#5067fc] text-white border-[#5067fc] shadow-md scale-[1.02]'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            onClick={() => handleToggleDisability(dis)}
+                            className={`p-2.5 rounded-xl border text-xs font-medium transition cursor-pointer flex items-center justify-between ${
+                              isChecked
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
-                            <span className="text-[10px] uppercase font-black tracking-wider opacity-80 mb-1">
-                              {doc === 'sem Documento' ? 'Pendente' : 'Oficial'}
-                            </span>
-                            <span className="text-xs sm:text-sm font-black leading-tight">
-                              {doc === 'Cedula pessoal' ? 'Cédula Pessoal' : doc === 'sem Documento' ? 'Sem Documento' : doc}
-                            </span>
+                            <span>{dis}</span>
+                            <div
+                              className={`w-4 h-4 rounded flex items-center justify-center border ${
+                                isChecked ? 'bg-white text-slate-900 border-white' : 'border-slate-300'
+                              }`}
+                            >
+                              {isChecked && <Check className="w-3 h-3" />}
+                            </div>
                           </button>
                         );
                       })}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
 
-                  {/* If student has document: Number + Attachment */}
-                  {tipoDocumento !== 'sem Documento' ? (
-                    <div className="space-y-4 p-4.5 rounded-2xl bg-slate-50 border border-slate-200">
-                      <div>
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                          Número do Documento ({tipoDocumento}) *
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={
-                            tipoDocumento === 'BI'
-                              ? 'Ex: 008945621LA048'
-                              : tipoDocumento === 'Cedula pessoal'
-                              ? 'Ex: Cédula Nº 45.892, Livro 12'
-                              : 'Ex: Assento Nº 1023, Folha 45, Conservatória de Luanda'
-                          }
-                          value={numeroDocumento}
-                          onChange={(e) => setNumeroDocumento(e.target.value)}
-                          required
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                        />
-                      </div>
-
-                      {/* Attachment file zone */}
-                      <div>
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                          Anexar Cópia do Documento (PDF, PNG ou JPG) *
-                        </label>
-                        
-                        {anexoDocumentoNome ? (
-                          <div className="flex items-center justify-between p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800">
-                            <div className="flex items-center gap-2.5 overflow-hidden">
-                              <FileCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-                              <span className="text-xs font-bold truncate max-w-xs">{anexoDocumentoNome}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleRemoveDoc}
-                              className="p-1 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-100 transition-colors cursor-pointer"
-                              title="Remover anexo"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div>
-                            <label
-                              htmlFor={docInputId}
-                              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 hover:border-[#5067fc] rounded-2xl bg-white text-center cursor-pointer transition-all group"
-                            >
-                              <FileUp className="w-8 h-8 text-slate-400 group-hover:text-[#5067fc] mb-2 transition-colors" />
-                              <span className="text-xs font-bold text-slate-700 group-hover:text-[#5067fc]">
-                                Clique para anexar o documento do aluno
-                              </span>
-                              <span className="text-[10px] text-slate-400 mt-0.5">
-                                Formatos aceitos: PDF, JPG, PNG até 10MB
-                              </span>
-                            </label>
-                            <input
-                              id={docInputId}
-                              ref={docInputRef}
-                              type="file"
-                              accept=".pdf,image/png,image/jpeg,image/webp"
-                              onChange={handleDocUpload}
-                              className="hidden"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Notice for Sem Documento */
-                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
-                      <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wide text-amber-800">
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>Aluno Matriculado sem Registro Civil</span>
-                      </div>
-                      <p className="text-xs text-amber-700 leading-relaxed">
-                        Em conformidade com a legislação escolar angolana, a falta de registro civil não impede a matrícula do educando. A coordenação da escola encaminhará o processo para o Ministério da Justiça para emissão gratuita do Assento de Nascimento.
-                      </p>
-                    </div>
-                  )}
+            {/* ========================================================
+                 PASSO 4 — FAMÍLIA & DOCUMENTOS
+            ======================================================== */}
+            {activeTab === 4 && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">
+                      4
+                    </span>
+                    <h3 className="text-sm font-semibold text-slate-800">Dados Complementares & Documentação Anexa</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 ml-8">
+                    Status de repetência, transferência, turno, turma atribuída e upload de fotos e comprovativos.
+                  </p>
                 </div>
-              )}
 
-              {/* TAB 3: DADOS ACADÊMICOS & CONDIÇÃO */}
-              {activeTab === 'academico' && (
-                <div className="space-y-5 animate-in fade-in duration-150">
-                  {/* CONDIÇÃO DE MATRÍCULA: Pela Primeira Vez vs Repetente */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                      Condição de Matrícula (Ingresso na Classe) *
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      O aluno é repetente nesta classe? <span className="text-rose-500">*</span>
                     </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => setCondicaoMatricula('primeira_vez')}
-                        className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
-                          condicaoMatricula === 'primeira_vez'
-                            ? 'bg-blue-50/80 border-[#5067fc] ring-2 ring-[#5067fc]/20 text-[#5067fc] shadow-sm'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        onClick={() => setAlunoRepetente(false)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          !alunoRepetente
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        <div className={`p-2 rounded-xl shrink-0 ${condicaoMatricula === 'primeira_vez' ? 'bg-[#5067fc] text-white' : 'bg-slate-200 text-slate-600'}`}>
-                          <Sparkles className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <span className="block font-black text-sm text-slate-900">
-                            Pela Primeira Vez
-                          </span>
-                          <span className="text-[11px] text-slate-500 mt-0.5 block">
-                            Novo ingresso na classe, sem histórico prévio de retenção neste nível.
-                          </span>
-                        </div>
+                        Não (1.ª Vez)
                       </button>
-
                       <button
                         type="button"
-                        onClick={() => setCondicaoMatricula('repetente')}
-                        className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
-                          condicaoMatricula === 'repetente'
-                            ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20 text-amber-800 shadow-sm'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        onClick={() => setAlunoRepetente(true)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          alunoRepetente
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        <div className={`p-2 rounded-xl shrink-0 ${condicaoMatricula === 'repetente' ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                          <RefreshCw className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <span className="block font-black text-sm text-slate-900">
-                            Repetente
-                          </span>
-                          <span className="text-[11px] text-slate-500 mt-0.5 block">
-                            Aluno em repetição pedagógica da classe para reforço de competências.
-                          </span>
-                        </div>
+                        Sim (Repetente)
                       </button>
-                    </div>
-                  </div>
-
-                  {/* Classe, Turma, Sala, Período */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Classe *
-                      </label>
-                      <select
-                        value={classe}
-                        onChange={(e) => setClasse(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      >
-                        <option value="Iniciação">Iniciação</option>
-                        <option value="1ª Classe">1ª Classe</option>
-                        <option value="2ª Classe">2ª Classe</option>
-                        <option value="3ª Classe">3ª Classe</option>
-                        <option value="4ª Classe">4ª Classe</option>
-                        <option value="5ª Classe">5ª Classe</option>
-                        <option value="6ª Classe">6ª Classe</option>
-                        <option value="7ª Classe">7ª Classe</option>
-                        <option value="8ª Classe">8ª Classe</option>
-                        <option value="9ª Classe">9ª Classe</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Turma *
-                      </label>
-                      <select
-                        value={turma}
-                        onChange={(e) => setTurma(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      >
-                        <option value="Turma A">Turma A</option>
-                        <option value="Turma B">Turma B</option>
-                        <option value="Turma C">Turma C</option>
-                        <option value="Turma D">Turma D</option>
-                        <option value="Turma Única">Turma Única</option>
-                        <option value="Turma 1">Turma 1</option>
-                        <option value="Turma 2">Turma 2</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Período / Turno *
-                      </label>
-                      <select
-                        value={periodo}
-                        onChange={(e) => setPeriodo(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      >
-                        <option value="Manhã">Manhã (07h30 - 12h30)</option>
-                        <option value="Tarde">Tarde (13h00 - 17h30)</option>
-                        <option value="Integral">Integral</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Sala de Aula *
-                      </label>
-                      <select
-                        value={sala}
-                        onChange={(e) => setSala(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      >
-                        <option value="Sala 01">Sala 01</option>
-                        <option value="Sala 02">Sala 02</option>
-                        <option value="Sala 03">Sala 03</option>
-                        <option value="Sala 04">Sala 04</option>
-                        <option value="Sala 05">Sala 05</option>
-                        <option value="Sala 06">Sala 06</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: FILIAÇÃO & ENCARREGADO */}
-              {activeTab === 'familia' && (
-                <div className="space-y-4 animate-in fade-in duration-150">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Nome do Pai
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Manuel António"
-                        value={nomePai}
-                        onChange={(e) => setNomePai(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Nome da Mãe
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Maria Domingos"
-                        value={nomeMae}
-                        onChange={(e) => setNomeMae(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                    <div className="sm:col-span-8">
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Nome do Encarregado de Educação *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Maria Domingos (Mãe)"
-                        value={encarregado}
-                        onChange={(e) => setEncarregado(e.target.value)}
-                        required
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-4">
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Parentesco
-                      </label>
-                      <select
-                        value={parentescoEncarregado}
-                        onChange={(e) => setParentescoEncarregado(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      >
-                        <option value="Mãe">Mãe</option>
-                        <option value="Pai">Pai</option>
-                        <option value="Avó / Avô">Avó / Avô</option>
-                        <option value="Tia / Tio">Tia / Tio</option>
-                        <option value="Irmã / Irmão">Irmã / Irmão</option>
-                        <option value="Tutor Legal">Tutor Legal</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Telefone Principal *
-                      </label>
-                      <input
-                        type="tel"
-                        placeholder="Ex: +244 923 456 789"
-                        value={telefone}
-                        onChange={(e) => setTelefone(e.target.value)}
-                        required
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Telefone Alternativo / WhatsApp
-                      </label>
-                      <input
-                        type="tel"
-                        placeholder="Ex: +244 912 345 678"
-                        value={telefoneAlternativo}
-                        onChange={(e) => setTelefoneAlternativo(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
-                      />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Endereço / Bairro de Residência
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Possui Necessidades Educativas Especiais?</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTemNecessidadesEspeciais(false)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          !temNecessidadesEspeciais
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        Não
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTemNecessidadesEspeciais(true)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                          temNecessidadesEspeciais
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        Sim (Atendimento Inclusivo)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Turno <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={turno}
+                      onChange={(e) => setTurno(e.target.value as any)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                      <option value="Manhã">Manhã</option>
+                      <option value="Tarde">Tarde</option>
+                      <option value="Noite">Noite</option>
+                      <option value="Integral">Integral</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Turma (A até F)</label>
+                    <select
+                      value={turma}
+                      onChange={(e) => setTurma(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                    >
+                      {STANDARD_TURMAS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Sala (1 a 19)</label>
+                    <select
+                      value={sala}
+                      onChange={(e) => setSala(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                    >
+                      {STANDARD_ROOMS.map((rm) => (
+                        <option key={rm} value={rm}>
+                          {rm}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200">
+                  <span className="text-sm font-medium text-slate-700">O aluno é proveniente de outra escola (Transferido)?</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTransferido(false)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                        !transferido
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTransferido(true)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                        transferido
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Sim
+                    </button>
+                  </div>
+                </div>
+
+                {transferido && (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 animate-in fade-in duration-150">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nome da Escola e Município de Origem
                     </label>
                     <input
                       type="text"
-                      placeholder="Ex: Bairro Palanca, Rua 12, Casa 45, Luanda"
-                      value={endereco}
-                      onChange={(e) => setEndereco(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                      value={escolaOrigem}
+                      onChange={(e) => setEscolaOrigem(e.target.value)}
+                      placeholder="Ex: Escola Primária 28 de Agosto - Malanje"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Observações Médicas ou Pedagógicas (Opcional)
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="Ex: Alergias, cuidados visuais, necessidades educativas especiais..."
-                      value={observacoes}
-                      onChange={(e) => setObservacoes(e.target.value)}
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#5067fc]/20 focus:border-[#5067fc]"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Foto Upload */}
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-slate-500 shrink-0">
+                        {foto ? (
+                          <img src={foto} alt="Foto Aluno" className="w-full h-full object-cover" />
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">Fotografia Tipo Passe</p>
+                        <p className="text-xs text-slate-500">Formatos JPG ou PNG até 2MB</p>
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef}
+                      id={photoInputId}
+                      onChange={handlePhotoUpload}
+                      className="hidden"
                     />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-3 w-full py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      {foto ? 'Alterar Foto' : 'Carregar Foto'}
+                    </button>
+                  </div>
+
+                  {/* Documento Upload */}
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800">Comprovativo / Cópia de Documento</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {anexoDocumentoNome || 'Cópia do BI, Cédula, Atestado de Residência ou Ficha'}
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      ref={docInputRef}
+                      id={docInputId}
+                      onChange={handleDocUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => docInputRef.current?.click()}
+                      className="mt-3 w-full py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      <span>{anexoDocumentoNome ? 'Substituir Documento' : 'Anexar Ficheiro'}</span>
+                    </button>
                   </div>
                 </div>
-              )}
-            </>
-          )}
 
-          {/* Modal Actions Footer */}
-          {!successNotice && (
-            <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Observações Administrativas / Pedagógicas
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={observacoes}
+                    onChange={(e) => setObservacoes(e.target.value)}
+                    placeholder="Informações adicionais relevantes sobre saúde, apoio pedagógico ou documentação..."
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                  />
+                </div>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* ==================== FOOTER ==================== */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+          >
+            Cancelar
+          </button>
+
+          <div className="flex items-center gap-3">
+            {activeTab > 1 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab((activeTab - 1) as any)}
+                className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Voltar
+              </button>
+            )}
+
+            {activeTab < 4 ? (
+              <button
+                type="button"
+                onClick={handleNextStep}
+                className="px-6 py-2.5 rounded-xl text-sm font-medium bg-slate-900 hover:bg-slate-800 text-white transition shadow-sm cursor-pointer"
+              >
+                Continuar
+              </button>
+            ) : (
+              <button
+                type="submit"
+                form="student-registration-form"
+                className="px-6 py-2.5 rounded-xl text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center gap-2 cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>{initialData ? 'Actualizar Matrícula' : 'Finalizar Cadastro Oficial'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Modal de Confirmação da Classe Calculada pela Idade / Faixa Etária */}
+        {isClassConfirmPromptOpen && (
+          <div
+            className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/65 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={() => setIsClassConfirmPromptOpen(false)}
+          >
+            <div
+              className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block">
+                    Cálculo Automático de Classe • Ano Lectivo 2026/2027
+                  </span>
+                  <h4 className="text-base font-black text-slate-900 mt-0.5">
+                    Confirmação da Classe do Aluno
+                  </h4>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs text-slate-700">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Aluno(a):</span>
+                  <span className="font-bold text-slate-900">{nomeCompleto.trim() || 'Novo Aluno'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Idade / Faixa Etária:</span>
+                  <span className="font-bold text-emerald-700">
+                    {calculatedAgeData.ageLabel} ({idadeEspecificaNivel || calculatedAgeData.suggestedFaixa})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Modalidade Escolhida:</span>
+                  <span className="font-bold text-slate-900">{selectedModalityConfig.label}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                  <span className="text-slate-600 font-semibold">Classe Calculada pelo Sistema:</span>
+                  <span className="text-sm font-black text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                    {classeEtapaModulo}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm font-bold text-slate-900 leading-snug">
+                Tem a certeza que o(a) aluno(a) vai fazer a{' '}
+                <span className="text-rose-600 font-black underline">{classeEtapaModulo}</span> este ano lectivo?
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                  onClick={handleConfirmCalculatedClassAndAdvance}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  Cancelar
+                  <Check className="w-4 h-4" />
+                  <span>Sim, avança</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRejectCalculatedClassAndChooseAdequate}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition cursor-pointer"
+                >
+                  Não, escolher classe adequada
                 </button>
               </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {activeTab !== 'geral' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeTab === 'documentos') setActiveTab('geral');
-                      if (activeTab === 'academico') setActiveTab('documentos');
-                      if (activeTab === 'familia') setActiveTab('academico');
-                    }}
-                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
-                  >
-                    Voltar
-                  </button>
-                )}
-
-                {activeTab !== 'familia' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeTab === 'geral') setActiveTab('documentos');
-                      else if (activeTab === 'documentos') setActiveTab('academico');
-                      else if (activeTab === 'academico') setActiveTab('familia');
-                    }}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-[#5067fc] hover:bg-[#4359eb] text-white font-black uppercase tracking-wider rounded-xl text-xs cursor-pointer shadow-sm transition-all"
-                  >
-                    Avançar
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider rounded-xl text-xs cursor-pointer shadow-sm transition-all flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <span>Processando Matrícula...</span>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Concluir Matrícula do Aluno</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
             </div>
-          )}
-        </form>
+          </div>
+        )}
       </div>
     </div>
   );

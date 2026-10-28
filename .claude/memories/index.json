@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "lastSynced": "2026-09-12T08:27:00Z",
+  "project": "ucore-school-platform",
+  "entries": [
+    {
+      "id": "arch-overview",
+      "title": "Arquitetura Persistente do uCore",
+      "file": "architecture.md",
+      "tags": ["supabase", "database", "rls", "angola-med", "react"]
+    },
+    {
+      "id": "adr-decisions",
+      "title": "Registo de Decisões de Arquitetura",
+      "file": "decisions.md",
+      "tags": ["adr", "decisions", "grades", "security", "useSupabase"]
+    }
+  ]
+}

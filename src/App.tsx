@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+"use client";
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { StatCards } from './components/StatCards';
@@ -10,6 +13,7 @@ import { ModuleDetailModal } from './components/ModuleDetailModal';
 import { InfoModal, InfoModalType } from './components/InfoModal';
 import { SessionSettingsModal } from './components/SessionSettingsModal';
 import { sessionsData } from './data/sessionsData';
+import { initTheme } from './utils/themeService';
 
 // Director Pages
 import { DirectorStatisticsPage } from './components/pages/director/DirectorStatisticsPage';
@@ -18,6 +22,9 @@ import { DirectorStudentsPage } from './components/pages/director/DirectorStuden
 import { DirectorRoomsPage } from './components/pages/director/DirectorRoomsPage';
 import { DirectorClassesPage } from './components/pages/director/DirectorClassesPage';
 import { DirectorProfilePage } from './components/pages/director/DirectorProfilePage';
+import { DirectorAttendancePage } from './components/pages/director/DirectorAttendancePage';
+import { DirectorApprovalsPage } from './components/pages/director/DirectorApprovalsPage';
+import { DirectorPautasPage } from './components/pages/director/DirectorPautasPage';
 
 // Admin Pages & Components
 import { AdminStatisticsPage } from './components/pages/admin/AdminStatisticsPage';
@@ -26,18 +33,41 @@ import { AdminTeachersPage } from './components/pages/admin/AdminTeachersPage';
 import { AdminStudentsPage } from './components/pages/admin/AdminStudentsPage';
 import { AdminDirectorsPage } from './components/pages/admin/AdminDirectorsPage';
 import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
+import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
+import { AdminApprovalsPage } from './components/pages/admin/AdminApprovalsPage';
 import { AdminRegistrationModal, AdminModalType } from './components/pages/admin/AdminRegistrationModal';
+import { AdminAuditLogsModal } from './components/pages/admin/AdminAuditLogsModal';
+import { ExcelExportModal } from './components/modals/ExcelExportModal';
+import { GoogleSheetsModal } from './components/modals/GoogleSheetsModal';
 import { 
   initialAdminSchools, 
   initialAdminTeachers, 
   initialAdminStudents, 
   initialAdminDirectors 
 } from './data/adminData';
+import {
+  purgeModeloCentralData,
+  deleteSchoolAndRelatedData,
+  isModeloCentralSchool,
+  saveRegisteredSchool,
+  syncSchoolsFromServer,
+} from './utils/schoolStorage';
+import { syncApplicationsFromServer, initRealtimeApplicationsSync } from './utils/authApprovalStorage';
+import { initRealtimeQuickRequestsSync } from './utils/quickServicesStorage';
+import {
+  initUnifiedRealtimeDatabaseSync,
+  saveTeacherToFirestore,
+  saveStudentToFirestore,
+  saveDirectorToFirestore,
+  saveUserToFirestore,
+} from './utils/firestoreSync';
+import { saveStudent } from './utils/studentStorage';
 
 // Teacher & Student Pages
 import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
 import { TeacherClassPage } from './components/pages/TeacherClassPage';
 import { TeacherProfilePage } from './components/pages/TeacherProfilePage';
+import { TeacherAttendancePage } from './components/pages/TeacherAttendancePage';
 import { StudentProfilePage } from './components/pages/StudentProfilePage';
 import { 
   initialStudentsData, 
@@ -52,6 +82,40 @@ import { SupportChatModal } from './components/chat/SupportChatModal';
 import { FloatingChatButton } from './components/chat/FloatingChatButton';
 import { initialChatChannels, initialChatMessages } from './data/chatData';
 import { realtimeChat } from './utils/realtimeChat';
+import { initSmoothScroll, scrollToTop, refreshScrollReveals } from './utils/scrollManager';
+
+// School Team Section (Professores, Gestores e Coordenadores)
+import SchoolTeamSection, { defaultSchoolMembers, SchoolMember } from './components/ui/school-team-section';
+import { AIInputWithLoading } from './components/ui/ai-input-with-loading';
+import { PublicLandingPage } from './components/pages/PublicLandingPage';
+import { PendingApprovalPage } from './components/pages/PendingApprovalPage';
+import { DemoRequestModal } from './components/modals/DemoRequestModal';
+import { AccessDeniedGuard } from './components/common/AccessDeniedGuard';
+import { canUserAccessView, getOwnProfileViewForUser } from './utils/authGuard';
+
+// Cookie Consent & Legal Pages
+import { CookieConsentBanner } from './components/cookies/CookieConsentBanner';
+import { AboutPlatformPage } from './components/pages/legal/AboutPlatformPage';
+import { TermsOfUsePage } from './components/pages/legal/TermsOfUsePage';
+import { PrivacyPolicyPage } from './components/pages/legal/PrivacyPolicyPage';
+import { SecurityDataProtectionPage } from './components/pages/legal/SecurityDataProtectionPage';
+
+// Real-Time Meetings & Video Calls (Zoom-style)
+import { ZoomMeetingModal } from './components/meetings/ZoomMeetingModal';
+import { MeetingsHubPage } from './components/pages/MeetingsHubPage';
+
+// Intelligent RAG Vector Engine & Academic Opinions
+import { RagIntelligenceModal } from './components/rag/RagIntelligenceModal';
+import { Sparkles, X } from 'lucide-react';
+
+// Public Institutional Pages: 404, Thank You, and Cases of Success
+import { NotFoundPage } from './components/pages/NotFoundPage';
+import { ThankYouPage } from './components/pages/ThankYouPage';
+import { CasesPage } from './components/pages/CasesPage';
+import { DeclaracaoEfectividadePage } from './components/pages/DeclaracaoEfectividadePage';
+import { QuickServicesPage } from './components/pages/QuickServicesPage';
+import { BackupManagerModal } from './components/modals/BackupManagerModal';
+import { QuickRequestsManagementView } from './components/quick-services/QuickRequestsManagementView';
 
 import type { 
   EducationalModule, 
@@ -70,18 +134,52 @@ import type {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'login' | 'register'>('home');
-  const [currentView, setCurrentView] = useState<string>('home');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authLoadingAction, setAuthLoadingAction] = useState<'login' | 'register' | null>(null);
+  const [currentView, setCurrentView] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('ucore_current_view');
+      if (saved === 'ucore-home' || saved === 'ucore-parallax') {
+        return 'home';
+      }
+      return saved || 'home';
+    } catch {
+      return 'home';
+    }
+  });
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SessionCard | null>(null);
   const [selectedModule, setSelectedModule] = useState<EducationalModule | null>(null);
   const [infoModalType, setInfoModalType] = useState<InfoModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [isGlobalBackupModalOpen, setIsGlobalBackupModalOpen] = useState(false);
+  const [isQuickServicesModalOpen, setIsQuickServicesModalOpen] = useState(false);
+  const [thankYouConfig, setThankYouConfig] = useState<{
+    type?: 'enrollment' | 'school-registration' | 'contact' | 'support' | 'general';
+    title?: string;
+    subtitle?: string;
+    referenceCode?: string;
+    recipientName?: string;
+    userEmail?: string;
+    schoolName?: string;
+  }>({
+    type: 'general',
+    title: 'Ação Concluída com Sucesso!',
+    subtitle: 'A sua solicitação foi recebida e registada na plataforma Sigre.',
+  });
+
+  // Purge any "Escola Modelo Central" and related records immediately on startup
+  if (typeof window !== 'undefined') {
+    purgeModeloCentralData();
+  }
 
   // Admin dynamic state
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_schools');
-      return saved ? JSON.parse(saved) : initialAdminSchools;
+      const list: AdminSchool[] = saved ? JSON.parse(saved) : initialAdminSchools;
+      return Array.isArray(list) ? list.filter((s) => !isModeloCentralSchool(s.name)) : [];
     } catch {
       return initialAdminSchools;
     }
@@ -90,7 +188,8 @@ export default function App() {
   const [adminTeachers, setAdminTeachers] = useState<AdminTeacher[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_teachers');
-      return saved ? JSON.parse(saved) : initialAdminTeachers;
+      const list: AdminTeacher[] = saved ? JSON.parse(saved) : initialAdminTeachers;
+      return Array.isArray(list) ? list.filter((t) => !isModeloCentralSchool(t.schoolName)) : [];
     } catch {
       return initialAdminTeachers;
     }
@@ -99,7 +198,8 @@ export default function App() {
   const [adminStudents, setAdminStudents] = useState<AdminStudent[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_students');
-      return saved ? JSON.parse(saved) : initialAdminStudents;
+      const list: AdminStudent[] = saved ? JSON.parse(saved) : initialAdminStudents;
+      return Array.isArray(list) ? list.filter((st) => !isModeloCentralSchool(st.schoolName)) : [];
     } catch {
       return initialAdminStudents;
     }
@@ -108,22 +208,150 @@ export default function App() {
   const [adminDirectors, setAdminDirectors] = useState<AdminDirector[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_directors');
-      return saved ? JSON.parse(saved) : initialAdminDirectors;
+      const list: AdminDirector[] = saved ? JSON.parse(saved) : initialAdminDirectors;
+      return Array.isArray(list) ? list.filter((d) => !isModeloCentralSchool(d.schoolName)) : [];
     } catch {
       return initialAdminDirectors;
     }
   });
 
   const [adminModalType, setAdminModalType] = useState<AdminModalType>(null);
+  const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
+  const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
+  const [isAuditLogsModalOpen, setIsAuditLogsModalOpen] = useState(false);
+  const [isRagModalOpen, setIsRagModalOpen] = useState(false);
+  const [ragInitialQuery, setRagInitialQuery] = useState('');
+  const [homeAIResponse, setHomeAIResponse] = useState<string | null>(null);
+  const [directorPautaTarget, setDirectorPautaTarget] = useState<{ classe: string; turma: string }>({
+    classe: '4ª Classe',
+    turma: 'Turma A',
+  });
 
-  // Persist admin schools on change
+  const handleHomeAICommand = (prompt: string) => {
+    if (!prompt.trim()) return;
+    const p = prompt.toLowerCase();
+    if (p.includes('ponto') || p.includes('presen') || p.includes('falta') || p.includes('docente') || p.includes('professor')) {
+      setHomeAIResponse(
+        `📊 Análise de Presenças (Livro de Ponto Docente):\n• Total de Professores Cadastrados: ${adminTeachers.length} docentes.\n• Presentes: 0 docentes.\n• Falta Justificada: 0 docentes.\n• O sistema está pronto para registo de novos docentes.`
+      );
+    } else if (p.includes('turma') || p.includes('aluno') || p.includes('sala')) {
+      setHomeAIResponse(
+        `🎓 Panorama Discente & Turmas:\n• ${adminStudents.length} alunos cadastrados em ${adminSchools.length} escolas ativas.\n• Sem pendências ou registros arquivados no momento.`
+      );
+    } else {
+      setHomeAIResponse(
+        `✨ Parecer Institucional Inteligente Sigre:\nRecebido: "${prompt}".\nA plataforma municipal da Educação de Quêssua está inicializada e pronta para novos cadastros no ano lectivo 2026/2027.`
+      );
+    }
+  };
+
+  // Initialize theme mode and sync network schools/data from server
+  useEffect(() => {
+    initTheme();
+    syncSchoolsFromServer().catch(() => {
+      // ignore offline
+    });
+  }, []);
+
+  // Persist admin entities on change and sync to backend network store
   useEffect(() => {
     try {
       localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schools: adminSchools }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
   }, [adminSchools]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teachers: adminTeachers }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+  }, [adminTeachers]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directors: adminDirectors }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+  }, [adminDirectors]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: adminStudents }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+  }, [adminStudents]);
+
+  // Listen for sigre-data-synced and ucore-teachers-updated events so adminStudents, adminTeachers, adminSchools, and teacherStudents stay in real-time sync
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const savedStudents = localStorage.getItem('ucore_admin_students');
+        if (savedStudents) {
+          setAdminStudents(JSON.parse(savedStudents));
+        }
+        const savedTeachers = localStorage.getItem('ucore_admin_teachers');
+        if (savedTeachers) {
+          setAdminTeachers(JSON.parse(savedTeachers));
+        }
+        const savedSchools = localStorage.getItem('ucore_admin_schools');
+        if (savedSchools) {
+          setAdminSchools(JSON.parse(savedSchools));
+        }
+        const savedDirectors = localStorage.getItem('ucore_admin_directors');
+        if (savedDirectors) {
+          setAdminDirectors(JSON.parse(savedDirectors));
+        }
+        const savedTeacherStudents = localStorage.getItem('ucore_teacher_students');
+        if (savedTeacherStudents) {
+          setTeacherStudents(JSON.parse(savedTeacherStudents));
+        }
+      } catch {
+        // ignore
+      }
+    };
+    syncApplicationsFromServer().catch(() => {});
+    const unsubApps = initRealtimeApplicationsSync();
+    const unsubQuick = initRealtimeQuickRequestsSync();
+    const unsubUnifiedDb = initUnifiedRealtimeDatabaseSync();
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('ucore-teachers-updated', handleSync);
+    const pollInterval = setInterval(() => {
+      syncApplicationsFromServer().catch(() => {});
+    }, 5000);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('ucore-teachers-updated', handleSync);
+      clearInterval(pollInterval);
+      if (typeof unsubApps === 'function') unsubApps();
+      if (typeof unsubQuick === 'function') unsubQuick();
+      if (typeof unsubUnifiedDb === 'function') unsubUnifiedDb();
+    };
+  }, []);
 
   // Teacher dynamic state
   const [teacherStudents, setTeacherStudents] = useState<StudentProfile[]>(() => {
@@ -164,9 +392,13 @@ export default function App() {
     }
   }, [teacherProfile]);
 
-  // User persistence
+  // User persistence (starts on pre-session landing page unless active session exists)
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
+      const isSessionActive = sessionStorage.getItem('ucore_session_active') === 'true';
+      if (!isSessionActive) {
+        return null;
+      }
       const saved = localStorage.getItem('ucore_active_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
@@ -176,14 +408,160 @@ export default function App() {
 
   // Active Role and session configuration state
   const [activeRole, setActiveRole] = useState<'admin' | 'diretor' | 'professor'>(() => {
+    try {
+      const savedRole = localStorage.getItem('ucore_active_role');
+      if (savedRole === 'admin' || savedRole === 'diretor' || savedRole === 'professor') {
+        return savedRole;
+      }
+    } catch {
+      // ignore
+    }
     if (currentUser?.role === 'admin' || currentUser?.role === 'diretor' || currentUser?.role === 'professor') {
       return currentUser.role;
     }
     return 'diretor'; // default to diretor as requested by user
   });
 
+  // Persist currentView and activeRole on changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_current_view', currentView);
+    } catch {
+      // ignore
+    }
+  }, [currentView]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ucore_active_role', activeRole);
+    } catch {
+      // ignore
+    }
+  }, [activeRole]);
+
+  // Profile view states for direct navigation to general vs settings/password zone
+  const [profileInitialTab, setProfileInitialTab] = useState<'visao-geral' | 'configuracoes'>('visao-geral');
+  const [profileFocusZone, setProfileFocusZone] = useState(false);
+  const [settingsTriggerCount, setSettingsTriggerCount] = useState(0);
+
+  // Curated faculty portraits assigned consistently to registered teachers
+  const TEACHER_PORTRAITS: string[] = [
+    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1580894732444-8ecded7900cd?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1573496799652-408c2ac9fe98?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1548142813-c348350df52b?q=80&w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?q=80&w=400&auto=format&fit=crop',
+  ];
+
+  // Strictly use teachers registered in the system (adminTeachers)
+  const schoolMembers: SchoolMember[] = useMemo(() => {
+    return adminTeachers.map((t, idx) => {
+      const emailSlug = t.name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '.')
+        .replace(/\.+/g, '.');
+
+      const photo = TEACHER_PORTRAITS[idx % TEACHER_PORTRAITS.length];
+
+      return {
+        id: t.id,
+        name: t.name,
+        role: t.category || `Professor(a) de ${t.subject || 'Ensino Geral'}`,
+        photo,
+        department: t.schoolName || 'Corpo Docente',
+        schoolName: t.schoolName,
+        subject: t.subject,
+        gradeClass: t.gradeClass,
+        turma: t.turma,
+        room: t.room,
+        location: t.location,
+        presenceRate: t.presenceRate,
+        phone: t.phone,
+        email: `${emailSlug}@educacao.gov.ao`,
+        bio: `Professor(a) com registro oficial ativo no sistema escolar de Quêssua (${t.schoolName}). Leciona ${t.subject} (${t.gradeClass || 'Ensino Regular'} - ${t.turma || 'Turma A'}) na ${t.room || 'Sala de Aula'} (${t.location || 'Bloco Central'}), com taxa de assiduidade pedagógica registada de ${t.presenceRate}%.`,
+      };
+    });
+  }, [adminTeachers]);
+
   // Chat System Dynamic State
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Real-Time Zoom-style Video Meeting State
+  const [activeMeeting, setActiveMeeting] = useState<{
+    isOpen: boolean;
+    roomId: string;
+    roomTitle: string;
+    initialVideo: boolean;
+    initialAudio: boolean;
+  }>({
+    isOpen: false,
+    roomId: '',
+    roomTitle: '',
+    initialVideo: true,
+    initialAudio: true,
+  });
+
+  const handleOpenMeeting = (roomId: string, roomTitle?: string, initialVideo = true, initialAudio = true) => {
+    setActiveMeeting({
+      isOpen: true,
+      roomId,
+      roomTitle: roomTitle || `Reunião ${roomId.toUpperCase()}`,
+      initialVideo,
+      initialAudio,
+    });
+  };
+
+  const handleCloseMeeting = () => {
+    setActiveMeeting((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  // Check URL query parameters for direct meeting joins (?meet=id or ?room=id) and direct routing
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const meetCode = params.get('meet') || params.get('room') || params.get('sala');
+      if (meetCode) {
+        const cleanCode = meetCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        if (cleanCode) {
+          handleOpenMeeting(cleanCode, `Reunião ${cleanCode.toUpperCase()}`, true);
+        }
+      }
+
+      const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+      const pageParam = (params.get('view') || params.get('page') || path).toLowerCase();
+
+      if (pageParam === 'cases' || pageParam === 'casos' || pageParam === 'casos-de-sucesso') {
+        setCurrentView('cases');
+      } else if (pageParam === 'obrigado' || pageParam === 'thank-you' || pageParam === 'agradecimento') {
+        setCurrentView('obrigado');
+      } else if (pageParam === '404' || pageParam === 'not-found') {
+        setCurrentView('404');
+      } else if (
+        pageParam === 'servicos-rapidos' ||
+        pageParam === 'servicos-sem-login' ||
+        pageParam === 'servicos' ||
+        pageParam === 'servicos-cidadao' ||
+        pageParam === 'balcao-rapido'
+      ) {
+        setCurrentView('servicos-rapidos');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
   const [chatChannels, setChatChannels] = useState<ChatChannel[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_chat_channels_v3');
@@ -254,6 +632,84 @@ export default function App() {
     };
   }, []);
 
+  // Initialize Lenis global smooth scrolling and scroll reveals across all pages
+  useEffect(() => {
+    const cleanup = initSmoothScroll();
+    return cleanup;
+  }, []);
+
+  // When switching page or view, smoothly reset scroll to top, refresh reveals, and update document.title (Prompt Mestre v4 Seção 15.1 & 23.1)
+  useEffect(() => {
+    scrollToTop(true);
+    const viewTitles: Record<string, string> = {
+      home: 'Painel Institucional',
+      'admin-dashboard': 'Painel Central da Administração',
+      'admin-estatisticas': 'Estatísticas da Rede Escolar',
+      'admin-escolas': 'Gestão da Rede de Escolas',
+      'admin-directores': 'Corpo Directivo Municipal',
+      'admin-professores': 'Quadro Docente Municipal',
+      'admin-alunos': 'Registo Geral de Alunos',
+      'admin-anuncios': 'Demandas, Circulares e Editais',
+      'admin-aprovacoes': 'Central de Homologações',
+      'admin-inscricoes': 'Homologação de Inscrições',
+      'admin-perfil': 'Perfil do Administrador',
+      'diretor-dashboard': 'Painel da Direcção Escolar',
+      'diretor-estatisticas': 'Estatísticas da Unidade Escolar',
+      'diretor-professores': 'Corpo Docente da Escola',
+      'diretor-presenca': 'Livro de Ponto Docente',
+      'diretor-alunos': 'Alunos Matriculados',
+      'diretor-salas': 'Gestão de Salas de Aula',
+      'diretor-turmas': 'Gestão de Turmas e Horários',
+      'diretor-pautas': 'Mini-Pautas e Pauta Final',
+      'diretor-aprovacoes': 'Aprovação de Inscrições da Escola',
+      'diretor-perfil': 'Perfil do Director',
+      estatisticas: 'Estatísticas da Turma',
+      'minha-turma': 'Diário de Classe e Notas',
+      'professor-turma': 'Diário de Classe e Notas',
+      'professor-presenca': 'Chamada Diária de Alunos',
+      'perfil-professor': 'Perfil do Docente',
+      'aluno-perfil': 'Ficha Individual do Aluno',
+      'declaracao-efectividade': 'Declaração de Efectividade Oficial',
+      efectividade: 'Declaração de Efectividade Oficial',
+      sobre: 'Sobre a Plataforma Sigre',
+      termos: 'Termos de Utilização',
+      privacidade: 'Política de Privacidade',
+      seguranca: 'Segurança e Proteção de Dados',
+      cases: 'Casos de Sucesso',
+      obrigado: 'Confirmação de Solicitação',
+      'servicos-rapidos': 'Serviços Rápidos ao Cidadão (Sem Login)',
+      'servicos-sem-login': 'Serviços Rápidos ao Cidadão (Sem Login)',
+      'servicos-cidadao': 'Serviços Rápidos ao Cidadão (Sem Login)',
+    };
+    const pageTitle =
+      currentPage === 'login'
+        ? 'Iniciar Sessão'
+        : currentPage === 'register'
+        ? 'Criar Conta Institucional'
+        : viewTitles[currentView] || 'Sistema Integrado de Gestão Escolar';
+    document.title = `${pageTitle} | Sigre Angola`;
+
+    const timer = setTimeout(() => {
+      refreshScrollReveals();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [currentPage, currentView]);
+
+  // Prompt Mestre v4 Seção 18.4: Fecho previsível de modais informativos via tecla Escape
+  useEffect(() => {
+    const handleGlobalEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedCard) setSelectedCard(null);
+        else if (selectedModule) setSelectedModule(null);
+        else if (infoModalType) setInfoModalType(null);
+        else if (settingsModalOpen) setSettingsModalOpen(false);
+        else if (isDemoModalOpen) setIsDemoModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalEscape);
+    return () => window.removeEventListener('keydown', handleGlobalEscape);
+  }, [selectedCard, selectedModule, infoModalType, settingsModalOpen, isDemoModalOpen]);
+
   const unreadChatCount = useMemo(() => {
     return chatChannels.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
   }, [chatChannels]);
@@ -291,6 +747,7 @@ export default function App() {
       if (prev.some((m) => m.id === newMsg.id)) return prev;
       return [...prev, newMsg];
     });
+    realtimeChat.sendMessage(newMsg);
 
     setChatChannels((prev) =>
       prev.map((c) =>
@@ -312,9 +769,21 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
-          admin: { ...sessionsData.admin, ...parsed.admin },
-          diretor: { ...sessionsData.diretor, ...parsed.diretor },
-          professor: { ...sessionsData.professor, ...parsed.professor },
+          admin: {
+            ...sessionsData.admin,
+            ...parsed.admin,
+            settings: { ...sessionsData.admin.settings, ...(parsed.admin?.settings || {}) },
+          },
+          diretor: {
+            ...sessionsData.diretor,
+            ...parsed.diretor,
+            settings: { ...sessionsData.diretor.settings, ...(parsed.diretor?.settings || {}) },
+          },
+          professor: {
+            ...sessionsData.professor,
+            ...parsed.professor,
+            settings: { ...sessionsData.professor.settings, ...(parsed.professor?.settings || {}) },
+          },
         };
       }
     } catch {
@@ -333,7 +802,7 @@ export default function App() {
       const totalStudents = adminSchools.reduce((acc, s) => acc + s.studentsWithDocs + s.studentsWithoutDocs, 0);
       const avgPerf = adminSchools.length > 0 
         ? Math.round(adminSchools.reduce((acc, s) => acc + s.performanceRate, 0) / adminSchools.length)
-        : 79;
+        : 0;
 
       computedBase = {
         ...base,
@@ -361,13 +830,13 @@ export default function App() {
         ...base,
         cards: base.cards.map((c) => {
           if (c.title.toLowerCase().includes('turma') || c.id.includes('turma')) {
-            return { ...c, value: '1' };
+            return { ...c, value: teacherStudents.length > 0 ? '1' : '0' };
           }
           if (c.title.toLowerCase().includes('aluno') || c.id.includes('aluno')) {
-            return { ...c, value: String(teacherStudents.length || 46) };
+            return { ...c, value: String(teacherStudents.length) };
           }
           if (c.title.toLowerCase().includes('desempenho') || c.title.toLowerCase().includes('estatística')) {
-            return { ...c, value: '88%' };
+            return { ...c, value: teacherStudents.length > 0 ? '88%' : '0%' };
           }
           return c;
         }),
@@ -386,11 +855,17 @@ export default function App() {
     return computedBase;
   }, [allSessions, activeRole, currentUser, adminSchools, teacherStudents]);
 
+  const toastTimerRef = useRef<any>(null);
+
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(msg);
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
-    }, 4000);
+      toastTimerRef.current = null;
+    }, 3500);
   };
 
   const handleOpenAuth = (mode: 'login' | 'register' = 'login') => {
@@ -403,16 +878,20 @@ export default function App() {
   };
 
   const handleLoginSuccess = (user: UserAccount) => {
+    setIsAuthLoading(false);
+    setAuthLoadingAction(null);
+    try {
+      sessionStorage.setItem('ucore_session_active', 'true');
+      if (user.rememberMe) {
+        localStorage.setItem('ucore_active_user', JSON.stringify(user));
+      }
+    } catch {
+      // ignore
+    }
     setCurrentUser(user);
+    saveUserToFirestore(user).catch(() => {});
     if (user.role === 'admin' || user.role === 'diretor' || user.role === 'professor') {
       setActiveRole(user.role);
-    }
-    if (user.rememberMe) {
-      try {
-        localStorage.setItem('ucore_active_user', JSON.stringify(user));
-      } catch {
-        // ignore
-      }
     }
     setCurrentPage('home');
     setCurrentView('home');
@@ -421,13 +900,61 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setCurrentPage('home');
     setCurrentView('home');
     try {
+      sessionStorage.removeItem('ucore_session_active');
       localStorage.removeItem('ucore_active_user');
     } catch {
       // ignore
     }
     showToast('Sessão encerrada com sucesso.');
+  };
+
+  const handleDirectDemoLogin = (role: 'admin' | 'diretor' | 'professor' = 'diretor') => {
+    let demoUser: UserAccount;
+    if (role === 'admin') {
+      demoUser = {
+        id: 'usr-dir-municipal-quessua',
+        firstName: 'Director Municipal',
+        lastName: 'da Educação',
+        email: 'dmedoquessua@gmail.com',
+        role: 'admin',
+        scope: 'administracao',
+        adminRole: 'diretor_municipal',
+        cargoTitle: 'Director Municipal da Educação de Quessua',
+        schoolName: 'Direcção Municipal da Educação de Quessua',
+        municipalityOrDepartment: 'Quessua',
+        titlePrefix: 'Dr.',
+        greeting: 'Olá Dr. Director Municipal',
+        rememberMe: true,
+      };
+    } else if (role === 'professor') {
+      demoUser = {
+        id: 'user-docente',
+        firstName: 'Professor(a)',
+        lastName: 'Docente',
+        email: 'professor@sigre.edu.ao',
+        role: 'professor',
+        scope: 'escola',
+        cargoTitle: 'Professor(a) Titular',
+        greeting: 'Olá Professor(a)',
+        rememberMe: true,
+      };
+    } else {
+      demoUser = {
+        id: 'user-diretor-escola',
+        firstName: 'Diretor(a)',
+        lastName: 'Geral',
+        email: 'diretor@sigre.edu.ao',
+        role: 'diretor',
+        scope: 'escola',
+        cargoTitle: 'Diretor(a) Geral da Escola',
+        greeting: 'Olá Diretor(a)',
+        rememberMe: true,
+      };
+    }
+    handleLoginSuccess(demoUser);
   };
 
   const handleSaveSettings = (updated: SessionSettings) => {
@@ -450,8 +977,128 @@ export default function App() {
   };
 
   const handleSelectPage = (pageId: string) => {
+    setCurrentPage('home');
     if (pageId === 'home' || pageId === 'diretor-dashboard' || pageId === 'admin-dashboard') {
       setCurrentView('home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Public Legal & Institutional Pages
+    if (
+      pageId === 'reunioes' ||
+      pageId === 'reunioes-salas' ||
+      pageId === 'zoom' ||
+      pageId === 'meet'
+    ) {
+      setCurrentView('reunioes');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (
+      pageId === 'sobre' ||
+      pageId === 'about' ||
+      pageId === 'termos' ||
+      pageId === 'terms' ||
+      pageId === 'privacidade' ||
+      pageId === 'privacy' ||
+      pageId === 'seguranca' ||
+      pageId === 'security'
+    ) {
+      const normalizedView =
+        pageId === 'about'
+          ? 'sobre'
+          : pageId === 'terms'
+          ? 'termos'
+          : pageId === 'privacy'
+          ? 'privacidade'
+          : pageId === 'security'
+          ? 'seguranca'
+          : pageId;
+      setCurrentView(normalizedView);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Success Cases, Thank You & 404 Pages
+    if (
+      pageId === 'cases' ||
+      pageId === 'casos' ||
+      pageId === 'casos-de-sucesso' ||
+      pageId === 'sucesso'
+    ) {
+      setCurrentView('cases');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (
+      pageId === 'obrigado' ||
+      pageId === 'thank-you' ||
+      pageId === 'agradecimento' ||
+      pageId === 'confirmacao'
+    ) {
+      setCurrentView('obrigado');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (pageId === '404' || pageId === 'not-found' || pageId === 'erro-404') {
+      setCurrentView('404');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (pageId === 'rag' || pageId === 'rag-inteligente' || pageId === 'pareceres') {
+      setRagInitialQuery('');
+      setIsRagModalOpen(true);
+      return;
+    }
+
+    // 1. Strict Authorization Guard: A user can never and must never enter or tamper with someone else's profile
+    if (currentUser) {
+      let targetView = pageId;
+      if (pageId === 'perfil-professor') targetView = 'professor-perfil';
+      if (pageId === 'perfil') targetView = getOwnProfileViewForUser(currentUser);
+      if (pageId === 'perfil-aluno') targetView = 'aluno-perfil';
+      if (pageId === 'minha-turma' || pageId === 'turma' || pageId === 'turmas' || (activeRole === 'professor' && pageId === 'alunos')) {
+        targetView = 'professor-turma';
+      }
+      if (activeRole === 'professor' && (pageId === 'chamada' || pageId === 'presenca' || pageId === 'presenca-alunos')) {
+        targetView = 'professor-presenca';
+      }
+      if (activeRole === 'professor' && pageId === 'estatisticas') {
+        targetView = 'professor-estatisticas';
+      }
+
+      const accessCheck = canUserAccessView(currentUser, targetView);
+      if (!accessCheck.allowed) {
+        showToast(
+          accessCheck.reason ||
+            'Acesso negado: Política de segurança Sigre proíbe entrar ou alterar o perfil de outros utilizadores.'
+        );
+        return;
+      }
+    }
+
+    // Quick Services & User Requests Routing (Serviços Rápidos & Efectividade)
+    if (
+      pageId === 'admin-servicos-rapidos' ||
+      pageId === 'diretor-servicos-rapidos' ||
+      pageId === 'servicos-rapidos' ||
+      pageId === 'pedidos-rapidos' ||
+      pageId === 'pedidos' ||
+      pageId === 'servicos-rapidos-efectividade' ||
+      pageId === 'pedidos-usuarios'
+    ) {
+      if (activeRole === 'admin') {
+        setCurrentView('admin-servicos-rapidos');
+      } else if (activeRole === 'diretor') {
+        setCurrentView('diretor-servicos-rapidos');
+      } else {
+        setCurrentView('servicos-rapidos');
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -463,6 +1110,9 @@ export default function App() {
       pageId === 'admin-directores' ||
       pageId === 'admin-professores' ||
       pageId === 'admin-alunos' ||
+      pageId === 'admin-anuncios' ||
+      pageId === 'admin-aprovacoes' ||
+      pageId === 'admin-inscricoes' ||
       pageId === 'admin-perfil'
     ) {
       setCurrentView(pageId);
@@ -471,8 +1121,28 @@ export default function App() {
     }
 
     if (activeRole === 'admin') {
+      if (pageId === 'perfil') {
+        setCurrentView('admin-perfil');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (pageId === 'aprovacoes' || pageId === 'inscricoes' || pageId === 'homologacao' || pageId === 'homologacoes') {
+        setCurrentView('admin-aprovacoes');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (pageId === 'anuncios' || pageId === 'editais' || pageId === 'demandas') {
+        setCurrentView('admin-anuncios');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       if (pageId === 'escolas') {
         setCurrentView('admin-escolas');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (pageId === 'directores' || pageId === 'diretores') {
+        setCurrentView('admin-directores');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -496,6 +1166,11 @@ export default function App() {
     if (activeRole === 'professor') {
       if (pageId === 'minha-turma' || pageId === 'turma' || pageId === 'turmas' || pageId === 'alunos') {
         setCurrentView('professor-turma');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (pageId === 'professor-presenca' || pageId === 'chamada' || pageId === 'presenca-alunos' || pageId === 'presenca') {
+        setCurrentView('professor-presenca');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -523,9 +1198,31 @@ export default function App() {
       pageId === 'diretor-alunos' ||
       pageId === 'diretor-salas' ||
       pageId === 'diretor-classes' ||
-      pageId === 'diretor-perfil'
+      pageId === 'diretor-pautas' ||
+      pageId === 'diretor-aprovacoes' ||
+      pageId === 'diretor-inscricoes' ||
+      pageId === 'diretor-perfil' ||
+      pageId === 'diretor-presenca'
     ) {
       setCurrentView(pageId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (
+      activeRole === 'diretor' &&
+      (pageId === 'pautas' || pageId === 'mini-pautas' || pageId === 'pauta-final')
+    ) {
+      setCurrentView('diretor-pautas');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (activeRole === 'diretor' && (pageId === 'aprovacoes' || pageId === 'inscricoes' || pageId === 'homologacao' || pageId === 'homologacoes')) {
+      setCurrentView('diretor-aprovacoes');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (pageId === 'ponto-professores' || pageId === 'presenca-professores' || (pageId === 'presenca' && activeRole === 'diretor')) {
+      setCurrentView('diretor-presenca');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -548,7 +1245,7 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    if (pageId === 'minha-turma') {
+    if (pageId === 'minha-turma' || pageId === 'turma' || pageId === 'turmas' || pageId === 'professor-turma') {
       setCurrentView('professor-turma');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -560,6 +1257,16 @@ export default function App() {
     }
     if (pageId === 'perfil-aluno') {
       setCurrentView('aluno-perfil');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (
+      pageId === 'declaracao-efectividade' ||
+      pageId === 'efectividade' ||
+      pageId === 'mapa-efectividade' ||
+      pageId === 'efectividade-branco'
+    ) {
+      setCurrentView('declaracao-efectividade');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -576,28 +1283,119 @@ export default function App() {
 
   const isSessionStarted = Boolean(currentUser);
 
-  // If user navigated to Login or Register, render the dedicated full page!
-  if (currentPage === 'login' || currentPage === 'register') {
-    return (
-      <div className="min-h-screen bg-[#f7f3f3] text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
-        {toastMessage && (
-          <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-[#4f67ff] animate-ping" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
+  // Render view router based on currentView and currentPage
+  const renderCurrentView = () => {
+    // 0. Dedicated Login and Registration Pages (shares the global Navbar)
+    if (currentPage === 'login' || currentPage === 'register') {
+      return (
         <AuthPage
           initialMode={currentPage}
+          schools={adminSchools}
           onLoginSuccess={handleLoginSuccess}
-          onBackToHome={() => setCurrentPage('home')}
+          onBackToHome={() => {
+            setCurrentPage('home');
+            setCurrentView('home');
+          }}
+          hideHeader={true}
+          onAuthLoadingChange={(loading, action) => {
+            setIsAuthLoading(loading);
+            setAuthLoadingAction(loading ? (action || null) : null);
+          }}
         />
-      </div>
-    );
-  }
+      );
+    }
 
-  // Render view router based on currentView
-  const renderCurrentView = () => {
-    // 0. Admin Pages
+    // 0.1 Public Pre-contact / Pre-session Landing Page
+    // "antes do usario entrar contacto com o nosso sistema devemos exibir uma pagina, assim que ele iniciar a sessão poderá ver"
+    if (!currentUser) {
+      const isPublicView =
+        currentView === 'sobre' ||
+        currentView === 'termos' ||
+        currentView === 'privacidade' ||
+        currentView === 'seguranca' ||
+        currentView === 'reunioes' ||
+        currentView === 'reunioes-salas' ||
+        currentView === 'cases' ||
+        currentView === 'casos' ||
+        currentView === 'casos-de-sucesso' ||
+        currentView === 'obrigado' ||
+        currentView === 'thank-you' ||
+        currentView === 'agradecimento' ||
+        currentView === '404' ||
+        currentView === 'not-found' ||
+        currentView === 'servicos-rapidos' ||
+        currentView === 'servicos-sem-login' ||
+        currentView === 'servicos-cidadao' ||
+        currentView === 'balcao-rapido' ||
+        currentView === 'pedidos-rapidos' ||
+        currentView === 'declaracao-efectividade' ||
+        currentView === 'declaracao-servico' ||
+        currentView === 'declaracao-de-servico' ||
+        currentView === 'efectividade' ||
+        currentView === 'servico';
+
+      if (!isPublicView) {
+        return (
+          <PublicLandingPage
+            onAcessarPlataforma={() => handleOpenAuth('login')}
+            onOpenDemoModal={() => setIsDemoModalOpen(true)}
+            onDirectLogin={(role) => handleDirectDemoLogin(role)}
+            onOpenAbout={() => setInfoModalType('about')}
+            onOpenSupport={() => setInfoModalType('support')}
+            onOpenQuickServices={() => {
+              setCurrentView('servicos-rapidos');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        );
+      }
+    }
+
+    // 0.2 Pending Approval Waiting Screen
+    // "se um diretor de escola criar a conta dele , vai ficar pendente em uma tela de espera até o admin autorizar, se for o professor o director é quem deve autorizar"
+    if (currentUser?.status === 'pendente') {
+      return (
+        <PendingApprovalPage
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onApprovalConfirmed={(updatedUser) => {
+            setCurrentUser(updatedUser);
+            try {
+              localStorage.setItem('ucore_active_user', JSON.stringify(updatedUser));
+            } catch {}
+            showToast(`Conta ativada com sucesso! Bem-vindo(a) à plataforma Sigre, ${updatedUser.firstName}.`);
+          }}
+          showToast={showToast}
+          onOpenSupport={() => setInfoModalType('support')}
+        />
+      );
+    }
+
+    // 0.3 Strict Privacy & Identity Protection Guard:
+    // "um usuario nunca pode e nem deve mexer e nem entrar no perfil dos outros"
+    const accessCheck = canUserAccessView(currentUser, currentView);
+    if (!accessCheck.allowed) {
+      return (
+        <AccessDeniedGuard
+          currentUser={currentUser}
+          attemptedView={currentView}
+          reason={accessCheck.reason}
+          onNavigateToOwnProfile={() => {
+            const ownProfile = getOwnProfileViewForUser(currentUser);
+            setCurrentView(ownProfile);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToHome={() => {
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={handleLogout}
+          onNavigateToLogin={() => handleOpenAuth('login')}
+        />
+      );
+    }
+
+    // 1. Admin Pages
     if (currentView === 'admin-estatisticas') {
       return (
         <AdminStatisticsPage
@@ -605,6 +1403,10 @@ export default function App() {
           schools={adminSchools}
           teachers={adminTeachers}
           students={adminStudents}
+          directors={adminDirectors}
+          onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
+          onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+          onOpenAuditLogs={() => setIsAuditLogsModalOpen(true)}
           onOpenRegisterModal={() => setAdminModalType('school')}
           onNavigateToSchools={() => {
             setCurrentView('admin-escolas');
@@ -629,8 +1431,14 @@ export default function App() {
           schools={adminSchools}
           onOpenRegisterModal={() => setAdminModalType('school')}
           onUpdateSchool={(updated) => {
+            saveRegisteredSchool(updated);
             setAdminSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-            showToast(`Brasão da escola "${updated.name}" atualizado com sucesso!`);
+            showToast(`Dados da escola "${updated.name}" atualizados com sucesso!`);
+          }}
+          onDeleteSchool={(schoolId, schoolName) => {
+            const nextSchools = deleteSchoolAndRelatedData(schoolId, schoolName);
+            setAdminSchools(nextSchools);
+            showToast(`Escola "${schoolName}" e todos os dados relacionados foram apagados com sucesso!`);
           }}
           isLoggedIn={isSessionStarted}
         />
@@ -643,6 +1451,20 @@ export default function App() {
           directors={adminDirectors}
           schools={adminSchools}
           onOpenRegisterModal={() => setAdminModalType('director')}
+          onUpdateDirector={(updatedDir) => {
+            setAdminDirectors((prev) =>
+              prev.map((d) => (d.id === updatedDir.id ? updatedDir : d))
+            );
+            showToast(`Ficha do Director(a) "${updatedDir.name}" atualizada com sucesso!`);
+          }}
+          onAddDirector={(newDir) => {
+            setAdminDirectors((prev) => [newDir, ...prev]);
+            showToast(`Diretor(a) "${newDir.name}" homologado(a) com sucesso!`);
+          }}
+          onNavigateToApprovals={() => {
+            setCurrentView('admin-aprovacoes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           isLoggedIn={isSessionStarted}
         />
       );
@@ -664,7 +1486,16 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           students={adminStudents}
           schools={adminSchools}
-          onOpenRegisterModal={() => setAdminModalType('student')}
+          onSwitchToDirectorStudents={(_schoolId, schoolName) => {
+            setActiveRole('diretor');
+            setCurrentView('diretor-alunos');
+            if (schoolName) {
+              showToast(`Alternado para a Direção da escola "${schoolName}" para cadastro de alunos.`);
+            } else {
+              showToast('Alternado para o Painel do Director de Escola (Cadastro de Alunos).');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           isLoggedIn={isSessionStarted}
         />
       );
@@ -674,16 +1505,160 @@ export default function App() {
         <AdminProfilePage
           onOpenGetStarted={() => handleOpenAuth('login')}
           schools={adminSchools}
+          directors={adminDirectors}
+          teachers={adminTeachers}
+          students={adminStudents}
           onNavigateToStatistics={() => {
             setCurrentView('admin-estatisticas');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
+          onSelectPage={handleSelectPage}
           isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          onNavigateToOwnProfile={() => {
+            const own = getOwnProfileViewForUser(currentUser);
+            setCurrentView(own);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToHome={() => {
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={handleLogout}
+          onOpenSettings={() => {
+            setSettingsModalOpen(true);
+          }}
+          onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
+          onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+          onOpenBackupManager={() => setIsGlobalBackupModalOpen(true)}
+          onOpenAuditLogs={() => setIsAuditLogsModalOpen(true)}
+          onOpenRag={() => {
+            setRagInitialQuery('');
+            setIsRagModalOpen(true);
+          }}
+          onOpenRegisterModal={(type) => setAdminModalType(type)}
+          sessionSettings={activeSession.settings}
+          onSaveSessionSettings={handleSaveSettings}
+          initialTab={profileInitialTab}
+          focusZone={profileFocusZone}
+          settingsTrigger={settingsTriggerCount}
+        />
+      );
+    }
+    if (currentView === 'admin-anuncios') {
+      return (
+        <AdminAnnouncementsPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          onNavigateToGrades={() => {
+            setActiveRole('professor');
+            setCurrentView('aluno-perfil');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToMatriculas={() => {
+            setActiveRole('diretor');
+            setCurrentView('diretor-alunos');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+    if (currentView === 'admin-aprovacoes' || currentView === 'admin-inscricoes') {
+      return (
+        <AdminApprovalsPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          adminName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Administrador Municipal Sigre'}
+          directors={adminDirectors}
+          schools={adminSchools}
+          onAddDirectorGlobal={(director) => {
+            setAdminDirectors((prev) => [director, ...prev]);
+            if (director.schoolName) {
+              const normTarget = director.schoolName.trim().toLowerCase();
+              setAdminSchools((prev) =>
+                prev.map((sc) => {
+                  const scNorm = sc.name.trim().toLowerCase();
+                  if (scNorm === normTarget || scNorm.includes(normTarget) || normTarget.includes(scNorm)) {
+                    return { ...sc, directorName: director.name };
+                  }
+                  return sc;
+                })
+              );
+            }
+            showToast(`Diretor(a) "${director.name}" homologado(a) no Sigre!`);
+          }}
+          onAddTeacherGlobal={(teacher) => {
+            setAdminTeachers((prev) => [teacher, ...prev]);
+            showToast(`Professor(a) "${teacher.name}" homologado(a) no Sigre!`);
+          }}
+          showToast={showToast}
         />
       );
     }
 
+    // Quick Requests Internal Management Views for Admin and Director
+    if (
+      currentView === 'admin-servicos-rapidos' ||
+      currentView === 'diretor-servicos-rapidos' ||
+      (currentView === 'pedidos-rapidos' && Boolean(currentUser && (currentUser.role === 'admin' || currentUser.role === 'diretor')))
+    ) {
+      return (
+        <div className="w-full min-h-screen bg-[#f8f9fb]">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Serviços Rápidos & Efectividade"
+            customSubtitle="Gestão e despacho centralizado de solicitações de cidadãos: Declarações de Efectividade, Boletins de Notas e Transferências."
+            badge="Pedidos dos Usuários"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Serviços ao Cidadão' },
+              { label: 'Pedidos dos Usuários' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <QuickRequestsManagementView
+              currentUser={currentUser}
+              activeRole={
+                currentUser?.role === 'admin' || currentUser?.email === 'dmedoquessua@gmail.com'
+                  ? 'admin'
+                  : currentView === 'diretor-servicos-rapidos'
+                  ? 'diretor'
+                  : (activeRole as any)
+              }
+              schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
+              onNavigateToDeclaracaoEfectividade={() => {
+                setCurrentView('declaracao-efectividade');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenNewRequestModal={() => setIsQuickServicesModalOpen(true)}
+              showToast={showToast}
+            />
+          </main>
+        </div>
+      );
+    }
+
     // 1. Director Pages
+    if (currentView === 'diretor-aprovacoes' || currentView === 'diretor-inscricoes') {
+      return (
+        <DirectorApprovalsPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          directorName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Fert Horlan (Diretor Geral)'}
+          schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
+          onAddTeacherGlobal={(teacher) => {
+            setAdminTeachers((prev) => [teacher, ...prev]);
+            showToast(`Professor(a) "${teacher.name}" integrado(a) no quadro docente!`);
+          }}
+          onAddStudentGlobal={(student) => {
+            setAdminStudents((prev) => [student, ...prev]);
+            showToast(`Aluno(a) "${student.name}" matriculado(a) na escola com sucesso!`);
+          }}
+          showToast={showToast}
+        />
+      );
+    }
     if (currentView === 'diretor-estatisticas') {
       return (
         <DirectorStatisticsPage
@@ -697,6 +1672,14 @@ export default function App() {
         <DirectorTeachersPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          onNavigateToAttendance={() => {
+            setCurrentView('diretor-presenca');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToApprovals={() => {
+            setCurrentView('diretor-aprovacoes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           onAddTeacherGlobal={(teacher) => {
             setAdminTeachers((prev) => [teacher, ...prev]);
             showToast(`Professor(a) "${teacher.name}" cadastrado(a) pela Direção Escolar com sucesso!`);
@@ -709,6 +1692,8 @@ export default function App() {
         <DirectorStudentsPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          schools={adminSchools}
+          currentUser={currentUser}
           onAddStudentGlobal={(student) => {
             setAdminStudents((prev) => [student, ...prev]);
             showToast(`Aluno(a) "${student.name}" matriculado(a) pela Direção Escolar com sucesso!`);
@@ -729,6 +1714,28 @@ export default function App() {
         <DirectorClassesPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          onNavigateToPautas={(classe, turma) => {
+            if (classe || turma) {
+              setDirectorPautaTarget({
+                classe: classe || '4ª Classe',
+                turma: turma || 'Turma A',
+              });
+            }
+            setCurrentView('diretor-pautas');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+    if (currentView === 'diretor-pautas') {
+      return (
+        <DirectorPautasPage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          schoolName={currentUser?.schoolName || adminSchools[0]?.name || 'Complexo Escolar Nº 1024 - Quêssua'}
+          directorName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Fert Horlan (Director da Escola)'}
+          initialClasse={directorPautaTarget.classe}
+          initialTurma={directorPautaTarget.turma}
         />
       );
     }
@@ -737,7 +1744,52 @@ export default function App() {
         <DirectorProfilePage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          onNavigateToOwnProfile={() => {
+            const own = getOwnProfileViewForUser(currentUser);
+            setCurrentView(own);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToHome={() => {
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={handleLogout}
+          onOpenSettings={() => {
+            setProfileFocusZone(true);
+            setSettingsTriggerCount((c) => c + 1);
+          }}
+          focusZone={profileFocusZone}
+          settingsTrigger={settingsTriggerCount}
         />
+      );
+    }
+    if (currentView === 'diretor-presenca') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Livro de Ponto dos Professores"
+            customSubtitle="Homologação diária, assiduidade e controle de presenças da equipa docente da escola."
+            badge="Direção Escolar"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Professores', onClick: () => { setCurrentView('diretor-professores'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Livro de Ponto' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <DirectorAttendancePage
+            onBackToTeachers={() => {
+              setCurrentView('diretor-professores');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToDashboard={() => {
+              setCurrentView('diretor-estatisticas');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </div>
       );
     }
 
@@ -748,6 +1800,12 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Analisa as suas estatísticas"
+            customSubtitle="Desempenho acadêmico, assiduidade e notas dos alunos da Turma 1 - 4ª Classe."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Estatísticas' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <TeacherStatisticsPage
@@ -772,17 +1830,28 @@ export default function App() {
         </div>
       );
     }
-    if (currentView === 'professor-turma') {
+    if (currentView === 'professor-turma' || currentView === 'minha-turma' || currentView === 'turma') {
       return (
         <div className="w-full">
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Minha Turma"
+            customSubtitle="Gestão acadêmica, fichas cadastrais e acompanhamento pedagógico da 4ª Classe."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Estatísticas', onClick: () => { setCurrentView('professor-estatisticas'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Minha Turma' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <TeacherClassPage
             onBackToStats={() => {
               setCurrentView('professor-estatisticas');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToAttendance={() => {
+              setCurrentView('professor-presenca');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSelectStudent={(student) => {
@@ -830,9 +1899,69 @@ export default function App() {
                 })),
               };
               setTeacherStudents((prev) => [newStudent, ...prev]);
+              saveStudent({
+                id: newStudent.id,
+                name: newStudent.name,
+                nomeCompleto: newStudent.name,
+                genero: newStudent.genero === 'Masculino' ? 'M' : 'F',
+                dataNascimento: newStudent.dataNascimento || '2016-05-10',
+                idade: newStudent.idade || 10,
+                tipoDocumento: (newStudent.tipoDocumento as any) || (hasDocs ? 'BI' : 'sem Documento'),
+                numeroDocumento: newStudent.numeroDocumento,
+                naturezaEscola: 'Pública',
+                tipoEscolaModalidade: 'primario_regular',
+                classeEtapaModulo: newStudent.classe || '4.ª Classe',
+                classe: newStudent.classe || '4ª Classe',
+                turma: newStudent.turma || 'Turma A',
+                sala: newStudent.sala || 'Sala 04',
+                periodo: (newStudent.periodo as any) || 'Manhã',
+                turno: (newStudent.periodo as any) || 'Manhã',
+                escola: currentUser?.schoolName || adminSchools[0]?.name || 'Escola Municipal de Quêssua',
+                condicaoMatricula: (newStudent.condicaoMatricula as any) || 'primeira_vez',
+                alunoRepetente: newStudent.condicaoMatricula === 'repetente',
+                encarregado: newStudent.encarregado || 'Encarregado de Educação',
+                telefone: newStudent.telefone || '+244 923 000 000',
+                endereco: newStudent.endereco || 'Quêssua, Malanje',
+              });
               showToast(`Aluno(a) ${newStudent.name} matriculado(a) com sucesso!`);
             }}
             students={teacherStudents}
+          />
+        </div>
+      );
+    }
+    if (currentView === 'professor-presenca') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Presença dos Alunos"
+            customSubtitle="Chamada eletrônica diária com validação biométrica e controle de faltas da turma."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Minha Turma', onClick: () => { setCurrentView('professor-turma'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Chamada Diária' },
+            ]}
+            isLoggedIn={isSessionStarted}
+            compact={true}
+          />
+          <TeacherAttendancePage
+            onBackToClass={() => {
+              setCurrentView('professor-turma');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToStudent={(studentId) => {
+              if (studentId) {
+                const found = teacherStudents.find((s) => s.id === studentId);
+                if (found) setSelectedStudent(found);
+              }
+              setCurrentView('aluno-perfil');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            students={teacherStudents}
+            teacherName={teacherProfile.name}
+            turmaName={teacherProfile.turma}
           />
         </div>
       );
@@ -843,6 +1972,14 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Perfil do Professor"
+            customSubtitle="Identificação profissional, turma atribuída, horário letivo e definições de conta."
+            badge="Corpo Docente"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Estatísticas', onClick: () => { setCurrentView('professor-estatisticas'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Perfil do Professor' },
+            ]}
+            compact={true}
             isLoggedIn={isSessionStarted}
           />
           <TeacherProfilePage
@@ -856,6 +1993,23 @@ export default function App() {
             }}
             teacher={teacherProfile}
             students={teacherStudents}
+            currentUser={currentUser}
+            onNavigateToOwnProfile={() => {
+              const own = getOwnProfileViewForUser(currentUser);
+              setCurrentView(own);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onBackToHome={() => {
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onLogout={handleLogout}
+            onUpdateTeacher={(updated) => {
+              setTeacherProfile((prev) => ({ ...prev, ...updated }));
+            }}
+            initialTab={profileInitialTab}
+            focusZone={profileFocusZone}
+            settingsTrigger={settingsTriggerCount}
           />
         </div>
       );
@@ -866,6 +2020,14 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Perfil do Aluno"
+            customSubtitle="Identificação cadastral, indicadores acadêmicos e pauta curricular."
+            compact="ultra"
+            badge="Ficha do Aluno"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Minha Turma', onClick: () => { setCurrentView('professor-turma'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: selectedStudent?.name || 'Aluno' },
+            ]}
             isLoggedIn={isSessionStarted}
           />
           <StudentProfilePage
@@ -890,6 +2052,370 @@ export default function App() {
       );
     }
 
+    // 3. Real-Time Virtual Meetings & Video Conferences (Zoom Style)
+    if (currentView === 'reunioes' || currentView === 'reunioes-salas') {
+      return (
+        <MeetingsHubPage
+          currentUser={currentUser}
+          onJoinMeeting={(roomId, title, initialVideo) => {
+            handleOpenMeeting(roomId, title, initialVideo);
+          }}
+        />
+      );
+    }
+
+    // Declaração de Efectividade / Serviços SIGRE (Modelo Oficial em Branco)
+    if (
+      currentView === 'declaracao-efectividade' ||
+      currentView === 'servicos-sigre' ||
+      currentView === 'sigre-servicos' ||
+      currentView === 'efectividade' ||
+      currentView === 'mapa-efectividade'
+    ) {
+      // Regra de Privacidade e Sigilo: Usuários sem sessão iniciada ou sem privilégios de Administração/Direção
+      // não têm acesso à Base de Dados dos funcionários nem à Pré-visualização ou Botões de Emissão/Download A4.
+      // Emitem o seu próprio requerimento e enviam diretamente para a Administração Municipal.
+      const isAdminOrDirector = Boolean(
+        isSessionStarted &&
+          currentUser &&
+          (currentUser.role === 'admin' || currentUser.role === 'diretor')
+      );
+
+      if (!isAdminOrDirector) {
+        return (
+          <QuickServicesPage
+            initialServiceType="DECLARACAO_EFECTIVIDADE"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToLogin={() => handleOpenAuth('login')}
+          />
+        );
+      }
+
+      return (
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          initialTab="form"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+
+    // Guia de Férias (Serviços SIGRE)
+    if (
+      currentView === 'guia-ferias' ||
+      currentView === 'guia-de-ferias'
+    ) {
+      const isAdminOrDirector = Boolean(
+        isSessionStarted &&
+          currentUser &&
+          (currentUser.role === 'admin' || currentUser.role === 'diretor')
+      );
+
+      if (!isAdminOrDirector) {
+        return (
+          <QuickServicesPage
+            initialServiceType="GUIA_FERIAS"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToLogin={() => handleOpenAuth('login')}
+          />
+        );
+      }
+
+      return (
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          initialTab="guia-ferias"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+
+    // Declaração de Serviço (Nova Aba Oficial em Branco)
+    if (
+      currentView === 'declaracao-servico' ||
+      currentView === 'declaracao-de-servico' ||
+      currentView === 'servico'
+    ) {
+      const isAdminOrDirector = Boolean(
+        isSessionStarted &&
+          currentUser &&
+          (currentUser.role === 'admin' || currentUser.role === 'diretor')
+      );
+
+      if (!isAdminOrDirector) {
+        return (
+          <QuickServicesPage
+            initialServiceType="DECLARACAO_SERVICO"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToLogin={() => handleOpenAuth('login')}
+          />
+        );
+      }
+
+      return (
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          initialTab="declaracao-servico"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+
+    // 4. Dedicated Legal & Institutional Pages
+    if (currentView === 'sobre') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Sobre a Plataforma Sigre"
+            customSubtitle="Inovação e modernização da gestão escolar em Angola, unificando directores, docentes e alunos."
+            badge="Institucional"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Sobre a Plataforma' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <AboutPlatformPage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateTerms={() => { setCurrentView('termos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigatePrivacy={() => { setCurrentView('privacidade'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateSecurity={() => { setCurrentView('seguranca'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            isLoggedIn={isSessionStarted}
+          />
+        </div>
+      );
+    }
+
+    if (currentView === 'termos') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Termos de Utilização"
+            customSubtitle="Normas legais de uso institucional, sigilo de credenciais e validade do Livro de Ponto eletrónico."
+            badge="Regulamentar"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Termos de Utilização' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <TermsOfUsePage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateAbout={() => { setCurrentView('sobre'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigatePrivacy={() => { setCurrentView('privacidade'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateSecurity={() => { setCurrentView('seguranca'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+          />
+        </div>
+      );
+    }
+
+    if (currentView === 'privacidade') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Política de Privacidade"
+            customSubtitle="Proteção integral dos dados pessoais e académicos de menores e docentes conforme a Lei 22/11 da APD Angola."
+            badge="Privacidade"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Política de Privacidade' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <PrivacyPolicyPage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateAbout={() => { setCurrentView('sobre'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateTerms={() => { setCurrentView('termos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateSecurity={() => { setCurrentView('seguranca'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+          />
+        </div>
+      );
+    }
+
+    if (currentView === 'seguranca') {
+      return (
+        <div className="w-full">
+          <Hero
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            customTitle="Segurança e Proteção de Dados"
+            customSubtitle="Criptografia militar AES-256, isolamento de permissões (RBAC) e auditoria digital forense."
+            badge="Cibersegurança"
+            breadcrumbs={[
+              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+              { label: 'Segurança & Proteção' },
+            ]}
+            isLoggedIn={isSessionStarted}
+          />
+          <SecurityDataProtectionPage
+            onNavigateHome={() => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateAbout={() => { setCurrentView('sobre'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateTerms={() => { setCurrentView('termos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigatePrivacy={() => { setCurrentView('privacidade'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onOpenSupport={() => setInfoModalType('support')}
+            currentUserRole={currentUser?.role || 'convidado'}
+          />
+        </div>
+      );
+    }
+
+    // 5. Success Cases Page (Casos de Sucesso Escolar)
+    if (
+      currentView === 'cases' ||
+      currentView === 'casos' ||
+      currentView === 'casos-de-sucesso' ||
+      currentView === 'sucesso'
+    ) {
+      return (
+        <CasesPage
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateThankYou={(name) => {
+            setThankYouConfig({
+              type: 'school-registration',
+              title: 'Candidatura de Adesão Submetida!',
+              subtitle: 'A manifestação de interesse da sua instituição foi acolhida no portal Sigre Angola. Em breve a equipa técnica entrará em contacto.',
+              schoolName: name || 'Complexo Escolar Solicitante',
+              referenceCode: `CASO-${Math.floor(100000 + Math.random() * 900000)}`,
+            });
+            setCurrentView('obrigado');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateMeetings={() => {
+            setCurrentView('reunioes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenGetStarted={() => handleOpenAuth('login')}
+        />
+      );
+    }
+
+    // 6. Thank You / Confirmation Page (Página de Obrigado)
+    if (
+      currentView === 'obrigado' ||
+      currentView === 'thank-you' ||
+      currentView === 'agradecimento' ||
+      currentView === 'confirmacao'
+    ) {
+      return (
+        <ThankYouPage
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateCases={() => {
+            setCurrentView('cases');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateMeetings={() => {
+            setCurrentView('reunioes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          type={thankYouConfig.type}
+          title={thankYouConfig.title}
+          subtitle={thankYouConfig.subtitle}
+          referenceCode={thankYouConfig.referenceCode}
+          recipientName={thankYouConfig.recipientName || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : undefined)}
+          userEmail={thankYouConfig.userEmail || currentUser?.email}
+          schoolName={thankYouConfig.schoolName}
+        />
+      );
+    }
+
+    // 7. Not Found 404 Page (Página Não Encontrada)
+    if (
+      currentView === '404' ||
+      currentView === 'not-found' ||
+      currentView === 'erro-404'
+    ) {
+      return (
+        <NotFoundPage
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateMeetings={() => {
+            setCurrentView('reunioes');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateAbout={() => {
+            setCurrentView('sobre');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateCases={() => {
+            setCurrentView('cases');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateSupport={() => setInfoModalType('support')}
+          requestedPath={window.location.pathname !== '/' ? window.location.pathname : undefined}
+          isLoggedIn={isSessionStarted}
+        />
+      );
+    }
+
+    // 8. Dedicated Full-Page Public Citizen Self-Service (Serviços Rápidos Sem Login)
+    if (
+      currentView === 'servicos-rapidos' ||
+      currentView === 'servicos-sem-login' ||
+      currentView === 'servicos-cidadao' ||
+      currentView === 'balcao-rapido'
+    ) {
+      return (
+        <QuickServicesPage
+          key="quick-services-page-catalog"
+          initialPageView="catalog"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToLogin={() => handleOpenAuth('login')}
+          availableSchools={adminSchools}
+        />
+      );
+    }
+
     // Default: Dashboard / Home View matching 4.png for Director or 8.png / 6.png
     return (
       <>
@@ -901,11 +2427,14 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 w-full bg-white relative">
-          {/* Dynamic Blue Stat Cards Grid matching images 4.png (director), 8.png (admin), 6.png (teacher) */}
+        <main className="flex-1 w-full bg-[#f7f3f3] relative">
+          {/* Dynamic Stat Cards Grid with distinct clickable vs non-clickable designs */}
           <StatCards
             session={activeSession}
             onSelectCard={(card) => {
+              if (card.isClickable === false) {
+                return;
+              }
               if (activeRole === 'admin') {
                 if (card.id.includes('escola') || card.title.toLowerCase().includes('escola')) {
                   if (card.title.toLowerCase().includes('desempenho')) {
@@ -991,20 +2520,146 @@ export default function App() {
             }}
           />
 
+          {/* Seção Principal: Assistente Inteligente IA & Central com AIInputWithLoading */}
+          <section className="max-w-4xl mx-auto px-4 sm:px-6 mb-12">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-[0_10px_35px_rgba(0,0,0,0.04)] text-center relative overflow-hidden">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#002133] text-white text-xs font-bold mb-3 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-[#f75142] animate-pulse" />
+                <span>Assistente de Gestão Escolar Inteligente (IA)</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
+                Central de Pareceres & Análises Rápidas
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto mb-6">
+                Utilize o novo componente com suporte a auto-redimensionamento e digitação inteligente para consultar dados ou registar despachos:
+              </p>
+
+              <div className="w-full flex justify-center">
+                <AIInputWithLoading
+                  placeholder="Pergunte sobre presenças docentes, turmas ou digite uma ocorrência..."
+                  onSubmit={handleHomeAICommand}
+                />
+              </div>
+
+              {/* Sugestões de cliques rápidos */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRagInitialQuery('Como é calculada a nota trimestral (MT) e qual o peso da MAC no Ensino Geral?');
+                    setIsRagModalOpen(true);
+                  }}
+                  className="text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>🧠 Pareceres & RAG Inteligente MED</span>
+                </button>
+                {activeRole === 'diretor' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentView('diretor-pautas');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-xs font-black bg-[#fef2f1] hover:bg-[#fee4e2] text-[#f75142] px-3.5 py-1.5 rounded-full border border-[#f75142]/30 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    📋 Aba de Mini-Pautas & Pauta Final (Por Turma)
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView('diretor-presenca');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                >
+                  📅 Abrir Livro de Ponto (Calendário)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHomeAICommand('Resumo de presenças dos professores')}
+                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                >
+                  📊 Resumo de Presenças Docentes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHomeAICommand('Panorama de turmas e alunos')}
+                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                >
+                  🎓 Panorama Geral de Alunos
+                </button>
+              </div>
+
+              {homeAIResponse && (
+                <div className="mt-6 text-left p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>Resposta do Assistente Sigre:</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRagInitialQuery('Consultar base normativa e regulamentar oficial');
+                        setIsRagModalOpen(true);
+                      }}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Abrir Parecer RAG →</span>
+                    </button>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                    {homeAIResponse}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
           {/* Optional Academic Modules Section */}
           <CyanCardsSection onSelectModule={(module) => setSelectedModule(module)} />
+
+          {/* School Team Showcase (Professores Cadastrados no Sistema) - Only on home dashboard when session is started */}
+          {currentPage === 'home' && currentView === 'home' && isSessionStarted && (
+            <SchoolTeamSection
+              members={schoolMembers}
+              title="Professores Cadastrados no Sistema"
+              subtitle="Corpo docente oficial registado na rede escolar do município de Quêssua."
+            />
+          )}
         </main>
       </>
     );
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f3f3] text-slate-900 flex flex-col font-sans selection:bg-[#5067fc] selection:text-white relative">
-      {/* Toast Alert Notification */}
+    <div className="min-h-screen bg-[#f7f3f3] text-[#002133] flex flex-col font-sans selection:bg-[#f75142] selection:text-white relative">
+      {/* Toast Alert Notification (Posicionado no canto inferior direito com região viva acessível WCAG 4.1.3) */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/20 text-xs font-bold tracking-wide animate-in fade-in slide-in-from-top-4 flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-[#4f67ff] animate-ping" />
-          <span>{toastMessage}</span>
+        <div 
+          id="system-toast-notification"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="fixed bottom-6 right-6 z-50 max-w-sm bg-[#002133]/95 backdrop-blur-md text-white pl-4 pr-3 py-3 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.3)] border border-white/20 text-xs font-medium tracking-wide animate-in fade-in slide-in-from-bottom-5 flex items-center justify-between gap-3 pointer-events-auto"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-[#f75142] shrink-0" aria-hidden="true" />
+            <span className="leading-snug">{toastMessage}</span>
+          </div>
+          <button
+            id="btn-dismiss-toast"
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="p-1 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+            title="Fechar notificação"
+            aria-label="Fechar notificação"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -1013,41 +2668,173 @@ export default function App() {
         onOpenGetStarted={() => handleOpenAuth('login')}
         onNavigateToLogin={() => handleOpenAuth('login')}
         onNavigateToRegister={() => handleOpenAuth('register')}
+        onNavigateToHome={() => {
+          setCurrentPage('home');
+          setCurrentView('home');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        currentPage={currentPage}
+        currentView={currentView}
+        isAuthLoading={isAuthLoading}
+        authLoadingAction={authLoadingAction}
         onOpenAbout={() => setInfoModalType('about')}
         onOpenProfile={() => {
-          if (activeRole === 'admin') {
-            setCurrentView('admin-perfil');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else if (activeRole === 'diretor') {
-            setCurrentView('diretor-perfil');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else {
-            setInfoModalType('profile');
-          }
+          setCurrentPage('home');
+          setProfileInitialTab('visao-geral');
+          setProfileFocusZone(false);
+          const ownProfile = getOwnProfileViewForUser(currentUser);
+          setCurrentView(ownProfile);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenSupport={() => setInfoModalType('support')}
         onOpenChat={() => setIsChatOpen(true)}
+        onOpenRag={() => {
+          setRagInitialQuery('');
+          setIsRagModalOpen(true);
+        }}
         unreadChatCount={unreadChatCount}
         onSelectPage={handleSelectPage}
         currentUser={currentUser}
         onLogout={handleLogout}
         activeRole={activeRole}
+        onSwitchRole={(newRole) => {
+          if (currentUser) {
+            showToast(
+              `Operação bloqueada: A sua conta está autenticada como ${currentUser.firstName} (${currentUser.role.toUpperCase()}). Por segurança, encerre a sessão para aceder com outro utilizador.`
+            );
+            return;
+          }
+          setActiveRole(newRole);
+          setCurrentView('home');
+          setCurrentPage('home');
+          showToast(
+            `Perfil alternado para: ${
+              newRole === 'admin'
+                ? 'Administração Central'
+                : newRole === 'diretor'
+                ? 'Direção Escolar'
+                : 'Corpo Docente'
+            }`
+          );
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenSettings={() => {
+          setCurrentPage('home');
+          setProfileInitialTab('configuracoes');
+          setProfileFocusZone(true);
+          setSettingsTriggerCount((c) => c + 1);
+          const ownProfile = getOwnProfileViewForUser(currentUser);
+          setCurrentView(ownProfile);
+          setTimeout(() => {
+            const el = document.getElementById('zona-dados-senha');
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 250);
+        }}
+        onOpenDemoModal={() => setIsDemoModalOpen(true)}
+        onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+        onOpenBackupManager={() => setIsGlobalBackupModalOpen(true)}
+        onOpenQuickServices={() => {
+          setCurrentView('servicos-rapidos');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
-      {/* Main Routed View */}
-      {renderCurrentView()}
+      {/* Main Routed View with smooth page transitions & skip-link landmark */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          id="main-content"
+          tabIndex={-1}
+          key={
+            !currentUser
+              ? `public-${currentView}-${currentPage}`
+              : currentPage === 'login' || currentPage === 'register'
+              ? `auth-${currentPage}`
+              : currentView === 'aluno-perfil'
+              ? `aluno-perfil-${selectedStudent?.id || 'current'}`
+              : `${activeRole}-${currentView}`
+          }
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="w-full flex-1 flex flex-col focus:outline-none"
+        >
+          {renderCurrentView()}
+        </motion.div>
+      </AnimatePresence>
 
-      {/* Organic Cloud Wave Footer */}
-      <CloudFooter
-        onOpenAbout={() => setInfoModalType('about')}
-        onOpenTerms={() => setInfoModalType('terms')}
-        onOpenSupport={() => setInfoModalType('support')}
+      {/* Organic Cloud Wave Footer (only visible when session is started) */}
+      {isSessionStarted && (
+        <CloudFooter
+          onOpenAbout={() => {
+            setCurrentView('sobre');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenTerms={() => {
+            setCurrentView('termos');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenPrivacy={() => {
+            setCurrentView('privacidade');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenSecurity={() => {
+            setCurrentView('seguranca');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenCases={() => {
+            setCurrentView('cases');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenCookieSettings={() => window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'))}
+          onOpenSupport={() => setInfoModalType('support')}
+        />
+      )}
+
+      {/* Cookie Consent Banner & Preferences Modal */}
+      <CookieConsentBanner
+        onNavigateToPrivacy={() => {
+          setCurrentView('privacidade');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateToTerms={() => {
+          setCurrentView('termos');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateToSecurity={() => {
+          setCurrentView('seguranca');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
-      {/* Floating Support Chat Button */}
-      <FloatingChatButton
-        onClick={() => setIsChatOpen(true)}
-        unreadCount={unreadChatCount}
+      {/* Floating Support Chat Button (only visible when session is started) */}
+      {isSessionStarted && (
+        <FloatingChatButton
+          onClick={() => setIsChatOpen(true)}
+          unreadCount={unreadChatCount}
+        />
+      )}
+
+      {/* Demo Request Modal */}
+      <DemoRequestModal
+        isOpen={isDemoModalOpen}
+        onClose={() => setIsDemoModalOpen(false)}
+        onStartDemoSession={(role) => handleDirectDemoLogin(role || 'diretor')}
+        onOpenThankYouPage={(details) => {
+          setThankYouConfig({
+            type: 'school-registration',
+            title: 'Solicitação de Demonstração Recebida!',
+            subtitle: `Agradecemos o interesse, ${details.recipientName}. A equipa Sigre entrará em contacto para o agendamento da sessão experimental.`,
+            recipientName: details.recipientName,
+            schoolName: details.schoolName,
+            userEmail: details.userEmail,
+            referenceCode: details.referenceCode,
+          });
+          setCurrentView('obrigado');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       {/* Card Detail Modal */}
@@ -1079,22 +2866,52 @@ export default function App() {
         isOpen={adminModalType !== null}
         onClose={() => setAdminModalType(null)}
         onAddSchool={(newSchool) => {
-          setAdminSchools((prev) => [newSchool, ...prev]);
+          const next = saveRegisteredSchool(newSchool);
+          setAdminSchools(next);
           showToast(`Escola "${newSchool.name}" cadastrada na rede com sucesso!`);
         }}
         onAddTeacher={(newTeacher) => {
           setAdminTeachers((prev) => [newTeacher, ...prev]);
+          saveTeacherToFirestore(newTeacher).catch(() => {});
           showToast(`Docente "${newTeacher.name}" registrado com sucesso!`);
         }}
         onAddStudent={(newStudent) => {
-          setAdminStudents((prev) => [newStudent, ...prev]);
-          showToast(`Aluno(a) "${newStudent.name}" cadastrado(a) com sucesso!`);
+          setAdminStudents((prev) => {
+            const existingIdx = prev.findIndex((s) => s.id === newStudent.id);
+            if (existingIdx >= 0) {
+              const copy = [...prev];
+              copy[existingIdx] = newStudent;
+              return copy;
+            }
+            return [newStudent, ...prev];
+          });
+          saveStudentToFirestore(newStudent).catch(() => {});
+          setAdminSchools((prevSchools) =>
+            prevSchools.map((sc) => {
+              const isMatch =
+                (newStudent.schoolId && newStudent.schoolId === sc.id) ||
+                newStudent.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase();
+              if (isMatch) {
+                return {
+                  ...sc,
+                  studentsWithDocs: sc.studentsWithDocs + (newStudent.hasDocuments ? 1 : 0),
+                  studentsWithoutDocs: sc.studentsWithoutDocs + (newStudent.hasDocuments ? 0 : 1),
+                };
+              }
+              return sc;
+            })
+          );
+          showToast(
+            `Aluno(a) "${newStudent.name}" cadastrado(a) na escola "${newStudent.schoolName}" (${newStudent.registrationData?.tipoEscolaNome || newStudent.gradeClass}) com sucesso!`
+          );
         }}
         onAddDirector={(newDirector) => {
           setAdminDirectors((prev) => [newDirector, ...prev]);
+          saveDirectorToFirestore(newDirector).catch(() => {});
           showToast(`Diretor(a) "${newDirector.name}" homologado(a) com sucesso!`);
         }}
         availableSchools={adminSchools.map((s) => s.name)}
+        schools={adminSchools}
       />
 
       {/* Info Modal (About, Support, Terms, Profile) */}
@@ -1110,6 +2927,33 @@ export default function App() {
         }}
       />
 
+      {/* Excel Export Modal for Admin */}
+      <ExcelExportModal
+        isOpen={isExcelExportModalOpen}
+        onClose={() => setIsExcelExportModalOpen(false)}
+        schools={adminSchools}
+        teachers={adminTeachers}
+        directors={adminDirectors}
+        students={adminStudents}
+        onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+      />
+
+      {/* Google Sheets Integration Modal */}
+      <GoogleSheetsModal
+        isOpen={isGoogleSheetsModalOpen}
+        onClose={() => setIsGoogleSheetsModalOpen(false)}
+        schools={adminSchools}
+        teachers={adminTeachers}
+        directors={adminDirectors}
+        students={adminStudents}
+      />
+
+      {/* Admin Audit Logs & Security Modal (SSD & RLS) */}
+      <AdminAuditLogsModal
+        isOpen={isAuditLogsModalOpen}
+        onClose={() => setIsAuditLogsModalOpen(false)}
+      />
+
       {/* Live Support & Assistance Chat Modal */}
       <SupportChatModal
         isOpen={isChatOpen}
@@ -1119,6 +2963,38 @@ export default function App() {
         channels={chatChannels}
         messages={chatMessages}
         onSendMessage={handleSendMessage}
+        onStartCall={(roomId, title, isVideo) => {
+          handleOpenMeeting(roomId, title, isVideo);
+        }}
+      />
+
+      {/* Real-time Video/Voice Meetings & Zoom Conference Modal — mounted only during an active call */}
+      {activeMeeting.isOpen && (
+        <ZoomMeetingModal
+          isOpen={activeMeeting.isOpen}
+          onClose={handleCloseMeeting}
+          roomId={activeMeeting.roomId}
+          roomTitle={activeMeeting.roomTitle}
+          currentUser={currentUser}
+          initialVideo={activeMeeting.initialVideo}
+          initialAudio={activeMeeting.initialAudio}
+        />
+      )}
+
+      {/* Intelligent RAG Vector Knowledge Center Modal (MED Angola & Sigre) */}
+      <RagIntelligenceModal
+        isOpen={isRagModalOpen}
+        onClose={() => setIsRagModalOpen(false)}
+        currentUser={currentUser}
+        activeRole={activeRole}
+        initialQuery={ragInitialQuery}
+      />
+
+      {/* Global Backup Vault & 1-Click Restoration Modal */}
+      <BackupManagerModal
+        isOpen={isGlobalBackupModalOpen}
+        onClose={() => setIsGlobalBackupModalOpen(false)}
+        currentUser={currentUser}
       />
     </div>
   );

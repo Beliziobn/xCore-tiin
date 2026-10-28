@@ -1,169 +1,1842 @@
 import express from "express";
+import http from "http";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import { setupSignalingServer, getRoomsList, createOrGetRoom, getRoomPresence, dispatchHttpSignal } from "./server/signaling";
+import {
+  executeRagQuery,
+  retrieveRelevantChunks,
+  ingestCustomDocument,
+  getAllDocuments,
+  getKnowledgeBaseStats,
+  deleteCustomDocument,
+} from "./server/rag";
+import {
+  validateAngolaBI,
+  validateAngolaPhone,
+  validateEmail,
+  validateGrade,
+  validateFullName,
+  validateBirthDate,
+  validateTrimestre,
+} from "./src/utils/formConstraints";
 
 dotenv.config();
-
-function generateDefaultSchoolSvg(prompt: string): string {
-  const cleanPrompt = (prompt || "Quêssua Educação").replace(/<[^>]*>/g, "");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
-  <defs>
-    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stopColor="#1e3a8a"/>
-      <stop offset="100%" stopColor="#3b82f6"/>
-    </linearGradient>
-    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stopColor="#f59e0b"/>
-      <stop offset="100%" stopColor="#fbbf24"/>
-    </linearGradient>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#0f172a" floodOpacity="0.25"/>
-    </filter>
-  </defs>
-
-  <!-- Escudo Principal -->
-  <path d="M 200 30 C 300 30 350 70 350 170 C 350 280 250 345 200 375 C 150 345 50 280 50 170 C 50 70 100 30 200 30 Z" 
-        fill="url(#shieldGrad)" stroke="url(#goldGrad)" stroke-width="8" filter="url(#shadow)"/>
-
-  <!-- Borda interna dourada -->
-  <path d="M 200 48 C 285 48 330 82 330 170 C 330 265 242 325 200 352 C 158 325 70 265 70 170 C 70 82 115 48 200 48 Z" 
-        fill="none" stroke="#fef08a" stroke-width="2.5" stroke-dasharray="6,4"/>
-
-  <!-- Sol do Conhecimento -->
-  <circle cx="200" cy="130" r="32" fill="url(#goldGrad)"/>
-  <g stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round">
-    <line x1="200" y1="84" x2="200" y2="72"/>
-    <line x1="200" y1="176" x2="200" y2="188"/>
-    <line x1="154" y1="130" x2="142" y2="130"/>
-    <line x1="246" y1="130" x2="258" y2="130"/>
-    <line x1="167" y1="97" x2="158" y2="88"/>
-    <line x1="233" y1="163" x2="242" y2="172"/>
-    <line x1="167" y1="163" x2="158" y2="172"/>
-    <line x1="233" y1="97" x2="242" y2="88"/>
-  </g>
-
-  <!-- Livro Aberto do Saber -->
-  <g transform="translate(200, 220)">
-    <path d="M 0 -10 C -25 -25 -65 -20 -90 -5 L -90 40 C -65 25 -25 20 0 35 C 25 20 65 25 90 40 L 90 -5 C 65 -20 25 -25 0 -10 Z" 
-          fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
-    <!-- Linhas do Livro -->
-    <path d="M -75 5 C -55 -5 -30 -2 -12 8" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
-    <path d="M -75 18 C -55 8 -30 11 -12 21" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
-    <path d="M 12 8 C 30 -2 55 -5 75 5" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
-    <path d="M 12 21 C 30 11 55 8 75 18" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
-    <!-- Centro do Livro -->
-    <line x1="0" y1="-10" x2="0" y2="35" stroke="#64748b" stroke-width="3"/>
-  </g>
-
-  <!-- Ramos de Louro -->
-  <g fill="none" stroke="url(#goldGrad)" stroke-width="3" stroke-linecap="round">
-    <path d="M 85 240 C 80 290 120 330 160 345"/>
-    <circle cx="95" cy="255" r="4" fill="url(#goldGrad)"/>
-    <circle cx="115" cy="285" r="4" fill="url(#goldGrad)"/>
-    <circle cx="140" cy="315" r="4" fill="url(#goldGrad)"/>
-
-    <path d="M 315 240 C 320 290 280 330 240 345"/>
-    <circle cx="305" cy="255" r="4" fill="url(#goldGrad)"/>
-    <circle cx="285" cy="285" r="4" fill="url(#goldGrad)"/>
-    <circle cx="260" cy="315" r="4" fill="url(#goldGrad)"/>
-  </g>
-
-  <!-- Faixa de Texto -->
-  <rect x="70" y="278" width="260" height="34" rx="17" fill="#0f172a" stroke="url(#goldGrad)" stroke-width="2"/>
-  <text x="200" y="300" text-anchor="middle" fill="#ffffff" font-size="12" font-family="system-ui, sans-serif" font-weight="bold" letter-spacing="1">
-    QUÊSSUA • EDUCAÇÃO
-  </text>
-</svg>`;
-}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // SSD: High-Capacity Request Payload Limit (50MB for large batches of alunos, professores & outros funcionários)
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // SSD: Essential Security Headers
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    // Allow embedding in AI Studio preview iframe while securing other surfaces
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    // Explicitly grant camera, microphone and display-capture permissions
+    res.setHeader("Permissions-Policy", "camera=(self *), microphone=(self *), display-capture=(self *)");
+    next();
+  });
+
+  // ============================================================================
+  // LIMITS OF REQUEST: Sliding Window Rate Limiting Engine (In-Memory)
+  // ============================================================================
+  interface RateRecord {
+    count: number;
+    firstRequestTime: number;
+  }
+  const apiRateMap = new Map<string, RateRecord>();
+  const sensitiveRateMap = new Map<string, RateRecord>();
+
+  // In-memory persistent audit log buffer (synchronized with frontend/Firebase)
+  const auditLogsStore: Array<{
+    id: string;
+    action: string;
+    severity: string;
+    actorId: string;
+    actorRole: string;
+    targetId?: string;
+    targetType?: string;
+    details: string;
+    timestamp: string;
+    ipAddress?: string;
+  }> = [];
+
+  // In-memory persistent transaction store for state rollbacks
+  interface ServerTransaction {
+    id: string;
+    timestamp: string;
+    entityType: string;
+    entityId: string;
+    action: string;
+    description: string;
+    authorId: string;
+    authorName: string;
+    authorRole: string;
+    previousState: any;
+    newState: any;
+    rolledBack: boolean;
+    rolledBackAt?: string;
+    rolledBackBy?: string;
+  }
+  const serverTransactionsStore: ServerTransaction[] = [];
+
+  // ============================================================================
+  // SHARED NETWORK REGISTRY STORE (PERSISTED ON DISK FOR ALL USERS / SESSIONS)
+  // ============================================================================
+  interface NetworkRegistryStore {
+    schools: any[];
+    directors: any[];
+    teachers: any[];
+    students: any[];
+    staff?: any[];
+    applications: any[];
+    efectividade: any[];
+    declaracaoServico?: any[];
+    quickRequests: any[];
+    updatedAt: string;
+  }
+
+  const networkDataDir = path.join(process.cwd(), "data");
+  const networkStoreFile = path.join(networkDataDir, "sigre-network-store.json");
+
+  function loadNetworkStore(): NetworkRegistryStore {
+    try {
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          return {
+            schools: Array.isArray(parsed.schools) ? parsed.schools : [],
+            directors: Array.isArray(parsed.directors) ? parsed.directors : [],
+            teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
+            students: Array.isArray(parsed.students) ? parsed.students : [],
+            staff: Array.isArray(parsed.staff) ? parsed.staff : [],
+            applications: Array.isArray(parsed.applications) ? parsed.applications : [],
+            efectividade: Array.isArray(parsed.efectividade) ? parsed.efectividade : [],
+            declaracaoServico: Array.isArray(parsed.declaracaoServico) ? parsed.declaracaoServico : [],
+            quickRequests: Array.isArray(parsed.quickRequests) ? parsed.quickRequests : [],
+            updatedAt: parsed.updatedAt || new Date().toISOString(),
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("[NetworkStore] Failed to read store file, initializing empty:", err);
+    }
+    return {
+      schools: [],
+      directors: [],
+      teachers: [],
+      students: [],
+      staff: [],
+      applications: [],
+      efectividade: [],
+      declaracaoServico: [],
+      quickRequests: [],
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const networkStore: NetworkRegistryStore = loadNetworkStore();
+
+  function persistNetworkStore() {
+    try {
+      if (!fs.existsSync(networkDataDir)) {
+        fs.mkdirSync(networkDataDir, { recursive: true });
+      }
+      networkStore.updatedAt = new Date().toISOString();
+      fs.writeFileSync(networkStoreFile, JSON.stringify(networkStore, null, 2), "utf-8");
+    } catch (err) {
+      console.warn("[NetworkStore] Failed to write store file:", err);
+    }
+  }
+
+  // Ensure data directory and initial persistence file exist immediately
+  if (!fs.existsSync(networkStoreFile)) {
+    persistNetworkStore();
+  }
+
+  // ============================================================================
+  // BACKUP ENGINE & DATA PRESERVATION VAULT (DAILY SNAPSHOTS & 1-CLICK RESTORE)
+  // ============================================================================
+  const backupsDir = path.join(networkDataDir, "backups");
+  if (!fs.existsSync(backupsDir)) {
+    fs.mkdirSync(backupsDir, { recursive: true });
+  }
+
+  interface BackupSnapshotMeta {
+    id: string;
+    filename: string;
+    timestamp: string;
+    isoDate: string;
+    label: string;
+    actor: string;
+    stats: {
+      schools: number;
+      directors: number;
+      teachers: number;
+      students: number;
+      applications: number;
+      efectividade: number;
+      totalRecords: number;
+    };
+    sizeBytes: number;
+  }
+
+  function createBackupSnapshot(label: string = "manual", actor: string = "sistema"): BackupSnapshotMeta | null {
+    try {
+      if (!fs.existsSync(backupsDir)) {
+        fs.mkdirSync(backupsDir, { recursive: true });
+      }
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const dateSlug = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const cleanLabel = label.replace(/[^a-zA-Z0-9-_]/g, '_');
+      const filename = `sigre-backup_${dateSlug}_${cleanLabel}.json`;
+      const filePath = path.join(backupsDir, filename);
+
+      const stats = {
+        schools: (networkStore.schools || []).length,
+        directors: (networkStore.directors || []).length,
+        teachers: (networkStore.teachers || []).length,
+        students: (networkStore.students || []).length,
+        applications: (networkStore.applications || []).length,
+        efectividade: (networkStore.efectividade || []).length,
+        quickRequests: (networkStore.quickRequests || []).length,
+        totalRecords:
+          (networkStore.schools || []).length +
+          (networkStore.teachers || []).length +
+          (networkStore.students || []).length +
+          (networkStore.efectividade || []).length +
+          (networkStore.quickRequests || []).length,
+      };
+
+      const payload = {
+        meta: {
+          id: `bkp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          filename,
+          timestamp: now.toISOString(),
+          label,
+          actor,
+          stats,
+        },
+        store: {
+          schools: networkStore.schools || [],
+          directors: networkStore.directors || [],
+          teachers: networkStore.teachers || [],
+          students: networkStore.students || [],
+          applications: networkStore.applications || [],
+          efectividade: networkStore.efectividade || [],
+          quickRequests: networkStore.quickRequests || [],
+          updatedAt: networkStore.updatedAt,
+        },
+      };
+
+      const content = JSON.stringify(payload, null, 2);
+      fs.writeFileSync(filePath, content, "utf-8");
+
+      return {
+        id: payload.meta.id,
+        filename,
+        timestamp: payload.meta.timestamp,
+        isoDate: now.toLocaleDateString("pt-PT"),
+        label,
+        actor,
+        stats,
+        sizeBytes: Buffer.byteLength(content, "utf-8"),
+      };
+    } catch (err) {
+      console.error("[Backup] Failed to create snapshot:", err);
+      return null;
+    }
+  }
+
+  function listBackupSnapshots(): BackupSnapshotMeta[] {
+    try {
+      if (!fs.existsSync(backupsDir)) return [];
+      const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith(".json"));
+      const list: BackupSnapshotMeta[] = [];
+
+      for (const file of files) {
+        try {
+          const fullPath = path.join(backupsDir, file);
+          const stat = fs.statSync(fullPath);
+          const raw = fs.readFileSync(fullPath, "utf-8");
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.meta) {
+            list.push({
+              id: parsed.meta.id || file,
+              filename: file,
+              timestamp: parsed.meta.timestamp || stat.mtime.toISOString(),
+              isoDate: new Date(parsed.meta.timestamp || stat.mtime).toLocaleString("pt-PT"),
+              label: parsed.meta.label || "Snapshot",
+              actor: parsed.meta.actor || "sistema",
+              stats: parsed.meta.stats || {
+                schools: parsed.store?.schools?.length || 0,
+                directors: parsed.store?.directors?.length || 0,
+                teachers: parsed.store?.teachers?.length || 0,
+                students: parsed.store?.students?.length || 0,
+                applications: parsed.store?.applications?.length || 0,
+                efectividade: parsed.store?.efectividade?.length || 0,
+                totalRecords:
+                  (parsed.store?.schools?.length || 0) +
+                  (parsed.store?.teachers?.length || 0) +
+                  (parsed.store?.students?.length || 0) +
+                  (parsed.store?.efectividade?.length || 0),
+              },
+              sizeBytes: stat.size,
+            });
+          }
+        } catch (e) {
+          console.warn("[Backup] Could not parse backup file:", file, e);
+        }
+      }
+
+      return list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch (err) {
+      console.error("[Backup] Failed to list backups:", err);
+      return [];
+    }
+  }
+
+  function checkDailyBackup() {
+    try {
+      if (!fs.existsSync(backupsDir)) {
+        fs.mkdirSync(backupsDir, { recursive: true });
+      }
+      const todayPrefix = `sigre-backup_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+      const files = fs.readdirSync(backupsDir);
+      const existsToday = files.some((f) => f.startsWith(todayPrefix));
+      if (!existsToday) {
+        createBackupSnapshot("diario-automatico", "sistema");
+      }
+    } catch (e) {
+      console.warn("[Backup] checkDailyBackup error:", e);
+    }
+  }
+  checkDailyBackup();
+
+  function upsertByKey(list: any[], incomingItems: any[], getKey: (item: any) => string): any[] {
+    const map = new Map<string, any>();
+    list.forEach((item) => {
+      const k = getKey(item);
+      if (k) map.set(k, item);
+    });
+    incomingItems.forEach((item) => {
+      if (!item) return;
+      const k = getKey(item);
+      if (k) {
+        const existing = map.get(k);
+        map.set(k, existing ? { ...existing, ...item } : item);
+      }
+    });
+    return Array.from(map.values());
+  }
+
+  function createRateLimiter(options: { windowMs: number; maxRequests: number; message: string; map: Map<string, RateRecord> }) {
+    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1";
+      const now = Date.now();
+      const record = options.map.get(clientIp);
+
+      if (!record || now - record.firstRequestTime > options.windowMs) {
+        options.map.set(clientIp, { count: 1, firstRequestTime: now });
+        res.setHeader("X-RateLimit-Limit", options.maxRequests);
+        res.setHeader("X-RateLimit-Remaining", options.maxRequests - 1);
+        res.setHeader("X-RateLimit-Reset", Math.ceil((now + options.windowMs) / 1000));
+        return next();
+      }
+
+      record.count++;
+      const remaining = Math.max(0, options.maxRequests - record.count);
+      const resetTimeSeconds = Math.ceil((record.firstRequestTime + options.windowMs) / 1000);
+
+      res.setHeader("X-RateLimit-Limit", options.maxRequests);
+      res.setHeader("X-RateLimit-Remaining", remaining);
+      res.setHeader("X-RateLimit-Reset", resetTimeSeconds);
+
+      if (record.count > options.maxRequests) {
+        const retryAfterSec = Math.ceil((record.firstRequestTime + options.windowMs - now) / 1000);
+        res.setHeader("Retry-After", retryAfterSec);
+        return res.status(429).json({
+          error: "LIMITS_EXCEEDED",
+          message: options.message,
+          retryAfterSeconds: retryAfterSec,
+          status: 429,
+        });
+      }
+
+      next();
+    };
+  }
+
+  // Rate Limiter 1: Standard API (120 req / minute)
+  const standardApiLimiter = createRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 120,
+    message: "Limite de requisições excedido. Por favor aguarde 60 segundos.",
+    map: apiRateMap,
+  });
+
+  // Rate Limiter 2: Sensitive Operations (30 req / minute) - Meetings, Logins, Audit writes
+  const sensitiveApiLimiter = createRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 30,
+    message: "Limite de operações sensíveis atingido para o seu endereço de rede.",
+    map: sensitiveRateMap,
+  });
+
+  // Apply standard rate limiting to all /api/ endpoints
+  app.use("/api", standardApiLimiter);
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      security: {
+        rateLimiterActive: true,
+        rlsPolicy: "least-privilege",
+        ssdHeadersEnabled: true,
+      },
+    });
   });
 
-  // SVG AI generation proxy
-  app.post("/api/svgai/generate", async (req, res) => {
+  // ============================================================================
+  // NETWORK REGISTRY API (SCHOOLS, DIRECTORS, TEACHERS, STUDENTS, APPLICATIONS)
+  // Ensures registered schools and their data appear for all users signing up
+  // ============================================================================
+  app.get("/api/network/state", (req, res) => {
+    res.json({
+      success: true,
+      ...networkStore,
+    });
+  });
+
+  app.get("/api/network/schools", (req, res) => {
+    res.json({
+      success: true,
+      schools: networkStore.schools,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/network/schools", (req, res) => {
+    const { school, schools } = req.body || {};
+    const incoming: any[] = [];
+    if (school && typeof school === "object") incoming.push(school);
+    if (Array.isArray(schools)) incoming.push(...schools);
+
+    const validIncoming = incoming.filter(
+      (sc) =>
+        sc &&
+        (sc.name || sc.nomeOficial) &&
+        !String(sc.name || sc.nomeOficial)
+          .trim()
+          .toLowerCase()
+          .includes("modelo central")
+    );
+
+    if (validIncoming.length > 0) {
+      networkStore.schools = upsertByKey(
+        networkStore.schools,
+        validIncoming,
+        (sc) => String(sc.id || sc.name || sc.nomeOficial || "").trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      schools: networkStore.schools,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/network/schools/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim().toLowerCase();
+    const targetName = String(req.query.name || "").trim().toLowerCase();
+
+    networkStore.schools = networkStore.schools.filter((sc) => {
+      const sId = String(sc?.id || "").trim().toLowerCase();
+      const sName = String(sc?.name || sc?.nomeOficial || "").trim().toLowerCase();
+      if (targetId && sId === targetId) return false;
+      if (targetName && sName === targetName) return false;
+      return true;
+    });
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      schools: networkStore.schools,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.get("/api/network/applications", (req, res) => {
     try {
-      const { prompt, model = "classic", variations = 1 } = req.body;
-
-      if (!prompt || typeof prompt !== "string") {
-        return res.status(400).json({
-          success: false,
-          error: "O campo 'prompt' é obrigatório.",
-        });
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.applications)) {
+          networkStore.applications = parsed.applications;
+        }
       }
+    } catch (e) {
+      console.warn("[NetworkStore] Error reading applications:", e);
+    }
+    res.json({
+      success: true,
+      applications: networkStore.applications || [],
+      count: (networkStore.applications || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
 
-      const apiKey = process.env.SVGAI_API_KEY;
+  app.post("/api/network/applications", (req, res) => {
+    const { application, applications } = req.body || {};
+    const incoming: any[] = [];
+    if (application && typeof application === "object") incoming.push(application);
+    if (Array.isArray(applications)) incoming.push(...applications);
 
-      if (!apiKey) {
-        // Fallback when API key is not yet set in environment
-        const generatedSvg = generateDefaultSchoolSvg(prompt);
-        return res.json({
-          success: true,
-          svg: generatedSvg,
-          isSimulated: true,
-          message: "A chave SVGAI_API_KEY não foi detetada no ambiente. Um brasão vetorial emblemático de Quêssua foi gerado como demonstração.",
-        });
-      }
+    if (incoming.length > 0) {
+      try {
+        if (fs.existsSync(networkStoreFile)) {
+          const raw = fs.readFileSync(networkStoreFile, "utf-8");
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.applications)) {
+            networkStore.applications = parsed.applications;
+          }
+        }
+      } catch {}
 
-      // Proxy request to official svgai.org endpoint
-      const response = await fetch("https://www.svgai.org/api/v1/generate", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          model,
-          variations,
-        }),
+      networkStore.applications = upsertByKey(
+        networkStore.applications,
+        incoming,
+        (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
+      );
+
+      // Handle approved roles synchronization
+      incoming.forEach((appItem) => {
+        if (!appItem) return;
+
+        // If approved director, update schools and directors
+        if (appItem.type === "diretor" && appItem.status === "aprovado" && appItem.fullName) {
+          if (appItem.schoolName) {
+            const normSchool = String(appItem.schoolName).trim().toLowerCase();
+            networkStore.schools = networkStore.schools.map((sc) => {
+              const scName = String(sc.name || sc.nomeOficial || "").trim().toLowerCase();
+              if (scName && (scName === normSchool || scName.includes(normSchool) || normSchool.includes(scName))) {
+                return {
+                  ...sc,
+                  directorName: appItem.fullName,
+                  registrationData: sc.registrationData
+                    ? {
+                        ...sc.registrationData,
+                        director: {
+                          ...(sc.registrationData.director || {}),
+                          nome: appItem.fullName,
+                          email: appItem.email || sc.registrationData.director?.email,
+                          contacto: appItem.phone || sc.registrationData.director?.contacto,
+                        },
+                      }
+                    : sc.registrationData,
+                };
+              }
+              return sc;
+            });
+          }
+
+          const dirEntry = {
+            id: appItem.userId || appItem.id,
+            name: appItem.fullName,
+            schoolName: appItem.schoolName || "",
+            email: appItem.email,
+            phone: appItem.phone,
+            status: "Ativo",
+            approvedAt: appItem.approvedAt || new Date().toISOString(),
+          };
+          networkStore.directors = upsertByKey(networkStore.directors, [dirEntry], (d) =>
+            String(d.id || d.email || d.name).trim().toLowerCase()
+          );
+        }
+
+        // If approved teacher, update networkStore.teachers
+        if (appItem.type === "professor" && appItem.status === "aprovado" && appItem.fullName) {
+          const teacherEntry = {
+            id: appItem.userId || appItem.id,
+            name: appItem.fullName,
+            schoolName: appItem.schoolName || "Complexo Escolar do Quêssua",
+            subject: appItem.subject || "Língua Portuguesa",
+            gradeClass: appItem.gradeClass || "4ª Classe",
+            email: appItem.email,
+            phone: appItem.phone,
+            status: "Ativo",
+            approvedAt: appItem.approvedAt || new Date().toISOString(),
+          };
+          networkStore.teachers = upsertByKey(networkStore.teachers, [teacherEntry], (t) =>
+            String(t.id || t.email || t.name).trim().toLowerCase()
+          );
+        }
       });
 
-      const data = (await response.json()) as any;
+      persistNetworkStore();
+    }
 
-      if (!response.ok) {
-        const errorMsg = data?.error || data?.message || `SVG AI respondeu com código ${response.status}`;
-        return res.status(response.status).json({
-          success: false,
-          error: errorMsg,
-          raw: data,
-        });
-      }
+    res.json({
+      success: true,
+      applications: networkStore.applications,
+      schools: networkStore.schools,
+      teachers: networkStore.teachers,
+      directors: networkStore.directors,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
 
-      // Extract SVG from response payload
-      let svgCode = data.svg || data.svgText;
-      if (!svgCode && Array.isArray(data.data) && data.data.length > 0) {
-        svgCode = data.data[0]?.svg || data.data[0]?.svgText || data.data[0]?.content;
-      }
-      if (!svgCode && typeof data === "string" && data.includes("<svg")) {
-        svgCode = data;
-      }
+  // Delete individual application
+  app.delete("/api/network/applications/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim().toLowerCase();
+    const beforeCount = (networkStore.applications || []).length;
+    
+    // Find target application to see if it was approved
+    const targetApp = (networkStore.applications || []).find(
+      (a) => String(a.id || a.userId || "").trim().toLowerCase() === targetId
+    );
 
-      if (!svgCode) {
-        svgCode = generateDefaultSchoolSvg(prompt);
-      }
+    networkStore.applications = (networkStore.applications || []).filter((a) => {
+      const aId = String(a.id || "").trim().toLowerCase();
+      const uId = String(a.userId || "").trim().toLowerCase();
+      return aId !== targetId && uId !== targetId;
+    });
 
-      return res.json({
-        success: true,
-        svg: svgCode,
-        data,
+    // Also remove from directors/teachers if it was linked
+    if (targetApp) {
+      if (targetApp.type === "diretor") {
+        networkStore.directors = (networkStore.directors || []).filter(
+          (d) => String(d.id || d.email || "").trim().toLowerCase() !== String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
+        );
+      } else if (targetApp.type === "professor") {
+        networkStore.teachers = (networkStore.teachers || []).filter(
+          (t) => String(t.id || t.email || "").trim().toLowerCase() !== String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
+        );
+      }
+    }
+
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      deleted: beforeCount !== (networkStore.applications || []).length,
+      applications: networkStore.applications,
+      directors: networkStore.directors,
+      teachers: networkStore.teachers,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // Bulk wipe all homologated / approved data across the network
+  const clearHomologadosHandler = (req: express.Request, res: express.Response) => {
+    const beforeApps = (networkStore.applications || []).length;
+    const beforeDirs = (networkStore.directors || []).length;
+    const beforeTeachers = (networkStore.teachers || []).length;
+
+    // Collect IDs of approved applications
+    const approvedAppUserIds = new Set<string>();
+    const approvedAppEmails = new Set<string>();
+    (networkStore.applications || []).forEach((a) => {
+      if (a.status === "aprovado" || a.approvedAt) {
+        if (a.userId) approvedAppUserIds.add(String(a.userId).trim().toLowerCase());
+        if (a.id) approvedAppUserIds.add(String(a.id).trim().toLowerCase());
+        if (a.email) approvedAppEmails.add(String(a.email).trim().toLowerCase());
+      }
+    });
+
+    // 1. Filter out approved applications
+    networkStore.applications = (networkStore.applications || []).filter(
+      (a) => a.status !== "aprovado" && !a.approvedAt
+    );
+
+    // 2. Filter out homologated directors
+    networkStore.directors = (networkStore.directors || []).filter((d) => {
+      if (d.approvedAt) return false;
+      const dId = String(d.id || "").trim().toLowerCase();
+      const dEmail = String(d.email || "").trim().toLowerCase();
+      if (approvedAppUserIds.has(dId) || approvedAppEmails.has(dEmail)) return false;
+      return true;
+    });
+
+    // 3. Filter out homologated teachers
+    networkStore.teachers = (networkStore.teachers || []).filter((t) => {
+      if (t.approvedAt) return false;
+      const tId = String(t.id || "").trim().toLowerCase();
+      const tEmail = String(t.email || "").trim().toLowerCase();
+      if (approvedAppUserIds.has(tId) || approvedAppEmails.has(tEmail)) return false;
+      return true;
+    });
+
+    // 4. Filter out homologated efectividade records
+    if (Array.isArray(networkStore.efectividade)) {
+      networkStore.efectividade = networkStore.efectividade.filter(
+        (e) => e.status !== "homologado" && e.status !== "HOMOLOGADO"
+      );
+    }
+
+    // 5. Filter out resolved/concluded quickRequests
+    if (Array.isArray(networkStore.quickRequests)) {
+      networkStore.quickRequests = networkStore.quickRequests.filter(
+        (q) => q.status !== "CONCLUIDO" && q.status !== "APROVADO"
+      );
+    }
+
+    persistNetworkStore();
+
+    const removedApps = beforeApps - networkStore.applications.length;
+    const removedDirs = beforeDirs - networkStore.directors.length;
+    const removedTeachers = beforeTeachers - networkStore.teachers.length;
+
+    res.json({
+      success: true,
+      message: "Todos os dados homologados foram eliminados com sucesso do sistema central.",
+      removed: {
+        applications: removedApps,
+        directors: removedDirs,
+        teachers: removedTeachers,
+        total: removedApps + removedDirs + removedTeachers,
+      },
+      applications: networkStore.applications,
+      directors: networkStore.directors,
+      teachers: networkStore.teachers,
+      efectividade: networkStore.efectividade,
+      quickRequests: networkStore.quickRequests,
+      updatedAt: networkStore.updatedAt,
+    });
+  };
+
+  app.delete("/api/network/homologados", clearHomologadosHandler);
+  app.post("/api/network/clear-homologated", clearHomologadosHandler);
+
+  app.post("/api/network/sync", (req, res) => {
+    const { schools, directors, teachers, students, staff, applications, efectividade, declaracaoServico } = req.body || {};
+    let changed = false;
+
+    if (Array.isArray(schools) && schools.length > 0) {
+      const validSchools = schools.filter(
+        (sc) =>
+          sc &&
+          (sc.name || sc.nomeOficial) &&
+          !String(sc.name || sc.nomeOficial)
+            .trim()
+            .toLowerCase()
+            .includes("modelo central")
+      );
+      if (validSchools.length > 0) {
+        networkStore.schools = upsertByKey(
+          networkStore.schools,
+          validSchools,
+          (sc) => String(sc.id || sc.name || sc.nomeOficial || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(directors) && directors.length > 0) {
+      networkStore.directors = upsertByKey(
+        networkStore.directors,
+        directors,
+        (d) => String(d.id || d.name || d.nomeCompleto || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(teachers) && teachers.length > 0) {
+      networkStore.teachers = upsertByKey(
+        networkStore.teachers,
+        teachers,
+        (t) => String(t.id || t.name || t.nomeCompleto || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(students) && students.length > 0) {
+      networkStore.students = upsertByKey(
+        networkStore.students,
+        students,
+        (s) => String(s.id || s.name || s.nomeCompleto || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(staff) && staff.length > 0) {
+      if (!Array.isArray(networkStore.staff)) {
+        networkStore.staff = [];
+      }
+      networkStore.staff = upsertByKey(
+        networkStore.staff,
+        staff,
+        (st) => String(st.id || st.bi || st.agente || st.nomeCompleto || st.name || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(applications) && applications.length > 0) {
+      networkStore.applications = upsertByKey(
+        networkStore.applications,
+        applications,
+        (a) => String(a.id || a.userId || a.email || "").trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(efectividade) && efectividade.length > 0) {
+      if (!Array.isArray(networkStore.efectividade)) {
+        networkStore.efectividade = [];
+      }
+      networkStore.efectividade = upsertByKey(
+        networkStore.efectividade,
+        efectividade,
+        (e) => String(e.id || `${e.bi || ''}::${e.agente || ''}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(declaracaoServico) && declaracaoServico.length > 0) {
+      if (!Array.isArray(networkStore.declaracaoServico)) {
+        networkStore.declaracaoServico = [];
+      }
+      networkStore.declaracaoServico = upsertByKey(
+        networkStore.declaracaoServico,
+        declaracaoServico,
+        (rec) => String(rec.id || rec.ref || `${rec.bi || ""}::${rec.agente || ""}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (changed) {
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      ...networkStore,
+    });
+  });
+
+  // ============================================================================
+  // EFECTIVIDADE & CADASTRAMENTO DE PESSOAL (SHARED, ISOLATED & RIGID DATABASE)
+  // Ensures personnel cadastros persist on disk, with strict Belízio wipe guards
+  // ============================================================================
+  app.get("/api/efectividade", (req, res) => {
+    const schoolQuery = String(req.query.school || req.query.schoolId || "").trim().toLowerCase();
+    const userEmail = String(req.headers["x-user-email"] || req.query.email || "").trim().toLowerCase();
+
+    let records = networkStore.efectividade || [];
+
+    // Isolation: If a school filter is provided and the caller is not the Super Admin Belízio, scope results
+    if (schoolQuery && schoolQuery !== "all" && userEmail !== "beliziodos20@gmail.com") {
+      records = records.filter((r) => {
+        const sc = String(r.escola || r.schoolId || "").toLowerCase();
+        return sc.includes(schoolQuery) || schoolQuery.includes(sc);
       });
-    } catch (error: any) {
-      console.error("Erro na rota /api/svgai/generate:", error);
-      return res.status(500).json({
+    }
+
+    res.json({
+      success: true,
+      records,
+      count: records.length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/efectividade", (req, res) => {
+    const { record, records } = req.body || {};
+    const incoming: any[] = [];
+    if (record && typeof record === "object") incoming.push(record);
+    if (Array.isArray(records)) incoming.push(...records);
+
+    if (incoming.length > 0) {
+      if (!Array.isArray(networkStore.efectividade)) {
+        networkStore.efectividade = [];
+      }
+      networkStore.efectividade = upsertByKey(
+        networkStore.efectividade,
+        incoming,
+        (rec) => String(rec.id || `${rec.bi || ''}::${rec.agente || ''}::${rec.nome || ''}`).trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.efectividade || [],
+      count: (networkStore.efectividade || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // Individual record deletion: matches ID, BI, or Agente so the specific record is permanently deleted
+  app.delete("/api/efectividade/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim();
+    if (Array.isArray(networkStore.efectividade) && targetId) {
+      const initialCount = networkStore.efectividade.length;
+      networkStore.efectividade = networkStore.efectividade.filter((r) => {
+        const rId = String(r.id || "").trim();
+        const rBi = String(r.bi || "").trim().toUpperCase();
+        const rAgente = String(r.agente || "").trim();
+        if (rId === targetId || rBi === targetId.toUpperCase() || rAgente === targetId) {
+          return false;
+        }
+        return true;
+      });
+
+      if (networkStore.efectividade.length !== initialCount) {
+        persistNetworkStore();
+      }
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.efectividade || [],
+      count: (networkStore.efectividade || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // Bulk wipe protection: STRICTLY RESTRICTED TO BELÍZIO WITH CONFIRMATION CODE
+  app.delete("/api/efectividade", (req, res) => {
+    const adminEmail = String(
+      req.headers["x-admin-email"] || req.query.adminEmail || req.body?.adminEmail || ""
+    ).trim().toLowerCase();
+    const confirmationCode = String(
+      req.headers["x-confirmation-code"] || req.query.confirmationCode || req.body?.confirmationCode || ""
+    ).trim();
+
+    // Verification guard
+    if (adminEmail !== "beliziodos20@gmail.com" || confirmationCode !== "SIGRE-BELIZIO-2026") {
+      return res.status(403).json({
         success: false,
-        error: error?.message || "Erro de comunicação com o servidor SVG AI",
+        error: "Acesso Negado: Apenas o Administrador Máximo (beliziodos20@gmail.com) tem permissão para esvaziar a base de dados mediante o código de autorização 'SIGRE-BELIZIO-2026'.",
+      });
+    }
+
+    // Capture safety snapshot before wipe so data can NEVER be permanently lost!
+    createBackupSnapshot("pre-esvaziamento-efectividade", adminEmail);
+
+    networkStore.efectividade = [];
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      message: "Base de dados de efectividade esvaziada pelo Administrador Máximo. Ponto de restauração gerado com sucesso.",
+      records: [],
+      count: 0,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // ============================================================================
+  // DECLARAÇÃO DE SERVIÇO (MÓDULO INDEPENDENTE • CONTA BANCÁRIA & SALÁRIO)
+  // ============================================================================
+  app.get("/api/declaracao-servico", (req, res) => {
+    try {
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.declaracaoServico)) {
+          networkStore.declaracaoServico = parsed.declaracaoServico;
+        }
+      }
+    } catch {}
+    const records = Array.isArray(networkStore.declaracaoServico) ? networkStore.declaracaoServico : [];
+    res.json({
+      success: true,
+      records,
+      count: records.length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/declaracao-servico", (req, res) => {
+    const { record, records } = req.body || {};
+    const incoming: any[] = [];
+    if (record && typeof record === "object") incoming.push(record);
+    if (Array.isArray(records)) incoming.push(...records);
+
+    if (incoming.length > 0) {
+      if (!Array.isArray(networkStore.declaracaoServico)) {
+        networkStore.declaracaoServico = [];
+      }
+      networkStore.declaracaoServico = upsertByKey(
+        networkStore.declaracaoServico,
+        incoming,
+        (rec) => String(rec.id || rec.ref || `${rec.bi || ""}::${rec.agente || ""}::${rec.nome || ""}`).trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.declaracaoServico || [],
+      count: (networkStore.declaracaoServico || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/declaracao-servico/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim();
+    if (Array.isArray(networkStore.declaracaoServico) && targetId) {
+      const initialCount = networkStore.declaracaoServico.length;
+      networkStore.declaracaoServico = networkStore.declaracaoServico.filter((r) => {
+        const rId = String(r.id || "").trim();
+        const rRef = String(r.ref || "").trim();
+        const rBi = String(r.bi || "").trim().toUpperCase();
+        const rAgente = String(r.agente || "").trim();
+        if (
+          rId === targetId ||
+          rRef.toUpperCase() === targetId.toUpperCase() ||
+          rBi === targetId.toUpperCase() ||
+          rAgente === targetId
+        ) {
+          return false;
+        }
+        return true;
+      });
+      if (networkStore.declaracaoServico.length !== initialCount) {
+        persistNetworkStore();
+      }
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.declaracaoServico || [],
+      count: (networkStore.declaracaoServico || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // ============================================================================
+  // OUTROS FUNCIONÁRIOS (ADMINISTRATIVOS, SECRETARIADO, AUXILIARES, SEGURANÇA E APOIO)
+  // ============================================================================
+  app.get("/api/staff", (req, res) => {
+    const records = Array.isArray(networkStore.staff) ? networkStore.staff : [];
+    res.json({
+      success: true,
+      records,
+      count: records.length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/staff", (req, res) => {
+    const { record, records } = req.body || {};
+    const incoming: any[] = [];
+    if (record && typeof record === "object") incoming.push(record);
+    if (Array.isArray(records)) incoming.push(...records);
+
+    if (incoming.length > 0) {
+      if (!Array.isArray(networkStore.staff)) {
+        networkStore.staff = [];
+      }
+      networkStore.staff = upsertByKey(
+        networkStore.staff,
+        incoming,
+        (rec) => String(rec.id || rec.bi || rec.agente || rec.nomeCompleto || rec.name || "").trim().toLowerCase()
+      );
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      records: networkStore.staff || [],
+      count: (networkStore.staff || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.delete("/api/staff/:id", (req, res) => {
+    const targetId = String(req.params.id || "").trim().toLowerCase();
+    if (Array.isArray(networkStore.staff) && targetId) {
+      const initialCount = networkStore.staff.length;
+      networkStore.staff = networkStore.staff.filter((r) => {
+        const rId = String(r.id || "").trim().toLowerCase();
+        const rBi = String(r.bi || "").trim().toLowerCase();
+        const rAgente = String(r.agente || "").trim().toLowerCase();
+        return rId !== targetId && rBi !== targetId && rAgente !== targetId;
+      });
+      if (networkStore.staff.length !== initialCount) {
+        persistNetworkStore();
+      }
+    }
+    res.json({
+      success: true,
+      records: networkStore.staff || [],
+      count: (networkStore.staff || []).length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // ============================================================================
+  // CAPACIDADE E ESTADO UNIFICADO DA BASE DE DADOS (ALUNOS, PROFESSORES E OUTROS FUNCIONÁRIOS)
+  // ============================================================================
+  app.get("/api/database/capacity-status", (_req, res) => {
+    res.json({
+      success: true,
+      engine: "Firestore Enterprise Cloud + Servidor Persistente (Dual-Sync)",
+      maxPayloadSizeMb: 50,
+      batchChunkCapacity: 450,
+      collections: {
+        students: (networkStore.students || []).length,
+        teachers: (networkStore.teachers || []).length,
+        staff: (networkStore.staff || []).length,
+        directors: (networkStore.directors || []).length,
+        schools: (networkStore.schools || []).length,
+        efectividade: (networkStore.efectividade || []).length,
+        declaracaoServico: (networkStore.declaracaoServico || []).length,
+        quickRequests: (networkStore.quickRequests || []).length,
+      },
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // ============================================================================
+  // SERVIÇOS RÁPIDOS (SELF-SERVICE / PEDIDOS PÚBLICOS SEM LOGIN)
+  // ============================================================================
+  app.get("/api/quick-requests", (req, res) => {
+    try {
+      if (fs.existsSync(networkStoreFile)) {
+        const raw = fs.readFileSync(networkStoreFile, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.quickRequests)) {
+          networkStore.quickRequests = parsed.quickRequests;
+        }
+      }
+    } catch {}
+    let requests = Array.isArray(networkStore.quickRequests) ? networkStore.quickRequests : [];
+    const { schoolId, targetRole, protocol, phone, id } = req.query as Record<string, string>;
+
+    if (id) {
+      requests = requests.filter((r) => String(r.id) === String(id));
+    }
+    if (protocol) {
+      const cleanProt = String(protocol).trim().toUpperCase();
+      requests = requests.filter((r) => String(r.protocol || '').toUpperCase() === cleanProt);
+    }
+    if (phone) {
+      const cleanPhone = String(phone).replace(/\D/g, '');
+      requests = requests.filter((r) => String(r.requesterPhone || '').replace(/\D/g, '').includes(cleanPhone));
+    }
+    if (schoolId) {
+      requests = requests.filter((r) => String(r.targetSchoolId || '') === String(schoolId));
+    }
+    if (targetRole) {
+      requests = requests.filter((r) => String(r.targetRole || '').toUpperCase() === String(targetRole).toUpperCase());
+    }
+
+    res.json({
+      success: true,
+      requests,
+      count: requests.length,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  app.post("/api/quick-requests", (req, res) => {
+    const data = req.body || {};
+    if (!data.requesterName || !data.serviceType) {
+      return res.status(400).json({ success: false, error: "Nome do requerente e tipo de serviço são obrigatórios." });
+    }
+
+    if (!Array.isArray(networkStore.quickRequests)) {
+      networkStore.quickRequests = [];
+    }
+
+    const pad = (n: number) => String(n).padStart(4, '0');
+    const randomCode = pad(Math.floor(1000 + Math.random() * 9000));
+    const now = new Date();
+    const protocol = `SR-2026-${randomCode}`;
+    const id = `req_${Date.now()}_${randomCode}`;
+
+    // Target routing logic:
+    // If Boletim de Notas or Matricula or Transferencia -> Routes to the school's Director
+    // If Declaracao de Efectividade -> Routes to Admin Belízio
+    let targetRole: 'DIRECTOR' | 'ADMIN' = 'ADMIN';
+    if (
+      data.serviceType === 'BOLETIM_NOTAS' ||
+      data.serviceType === 'DECLARACAO_MATRICULA' ||
+      data.serviceType === 'GUIA_TRANSFERENCIA'
+    ) {
+      targetRole = 'DIRECTOR';
+    } else if (data.serviceType === 'DECLARACAO_EFECTIVIDADE') {
+      targetRole = 'ADMIN';
+    }
+
+    // Try to resolve Director email if schoolId or schoolName is provided
+    let resolvedDirectorEmail = data.targetDirectorEmail || '';
+    if (targetRole === 'DIRECTOR' && (data.targetSchoolId || data.targetSchoolName)) {
+      const school = (networkStore.schools || []).find((s) => 
+        (data.targetSchoolId && s.id === data.targetSchoolId) ||
+        (data.targetSchoolName && s.name?.toLowerCase().includes(String(data.targetSchoolName).toLowerCase()))
+      );
+      if (school) {
+        resolvedDirectorEmail = school.directorEmail || '';
+      }
+    }
+
+    const newRequest = {
+      id,
+      protocol,
+      serviceType: data.serviceType,
+      title: data.title || (data.serviceType === 'BOLETIM_NOTAS' ? 'Pedido de Boletim de Notas' : 'Declaração de Efectividade'),
+      status: 'PENDENTE',
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      requesterName: String(data.requesterName || '').trim(),
+      requesterPhone: String(data.requesterPhone || '').trim(),
+      requesterEmail: String(data.requesterEmail || '').trim(),
+      requesterRoleTitle: String(data.requesterRoleTitle || (data.serviceType === 'BOLETIM_NOTAS' ? 'Encarregado de Educação' : 'Docente / Funcionário')).trim(),
+      targetRole,
+      targetSchoolId: data.targetSchoolId || '',
+      targetSchoolName: data.targetSchoolName || '',
+      targetDirectorEmail: resolvedDirectorEmail,
+      targetAdminEmail: 'dmedoquessua@gmail.com',
+      details: data.details || {},
+    };
+
+    networkStore.quickRequests.unshift(newRequest);
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      message: targetRole === 'DIRECTOR' 
+        ? `Pedido registado com sucesso e encaminhado diretamente ao Diretor Escolar da escola ${newRequest.targetSchoolName || 'selecionada'}.`
+        : `Pedido registado com sucesso e encaminhado diretamente ao Gabinete do Administrador Municipal (Belízio).`,
+      request: newRequest,
+      protocol: newRequest.protocol,
+    });
+  });
+
+  app.patch("/api/quick-requests/:id", (req, res) => {
+    const id = String(req.params.id || "").trim();
+    if (!Array.isArray(networkStore.quickRequests)) {
+      networkStore.quickRequests = [];
+    }
+
+    const index = networkStore.quickRequests.findIndex((r) => r.id === id);
+    if (index === -1) {
+      return res.status(404).json({ success: false, error: "Pedido não encontrado." });
+    }
+
+    const existing = networkStore.quickRequests[index];
+    const { status, responseMessage, resolvedBy, details } = req.body || {};
+
+    const updated = {
+      ...existing,
+      status: status || existing.status,
+      updatedAt: new Date().toISOString(),
+      details: {
+        ...(existing.details || {}),
+        ...(details || {}),
+        responseMessage: responseMessage !== undefined ? responseMessage : existing.details?.responseMessage,
+        resolvedBy: resolvedBy !== undefined ? resolvedBy : existing.details?.resolvedBy,
+        resolvedAt: status === 'CONCLUIDO' || status === 'REJEITADO' ? new Date().toISOString() : existing.details?.resolvedAt,
+      },
+    };
+
+    networkStore.quickRequests[index] = updated;
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      request: updated,
+    });
+  });
+
+  app.delete("/api/quick-requests/:id", (req, res) => {
+    const id = String(req.params.id || "").trim();
+    if (!Array.isArray(networkStore.quickRequests)) {
+      networkStore.quickRequests = [];
+    }
+
+    const prevCount = networkStore.quickRequests.length;
+    networkStore.quickRequests = networkStore.quickRequests.filter((r) => r.id !== id);
+    if (networkStore.quickRequests.length !== prevCount) {
+      persistNetworkStore();
+    }
+
+    res.json({
+      success: true,
+      count: networkStore.quickRequests.length,
+    });
+  });
+
+  app.post("/api/quick-requests/clear-all", (req, res) => {
+    networkStore.quickRequests = [];
+    persistNetworkStore();
+    res.json({ success: true, count: 0, message: "Todos os pedidos foram zerados com sucesso." });
+  });
+
+  app.delete("/api/quick-requests", (req, res) => {
+    networkStore.quickRequests = [];
+    persistNetworkStore();
+    res.json({ success: true, count: 0, message: "Todos os pedidos foram zerados com sucesso." });
+  });
+
+  // ============================================================================
+  // BACKUP MANAGEMENT & RESTORATION API (1-CLICK RESTORE & DAILY SNAPSHOTS)
+  // ============================================================================
+  app.get("/api/backup/list", (req, res) => {
+    const backups = listBackupSnapshots();
+    res.json({
+      success: true,
+      count: backups.length,
+      backups,
+      currentStats: {
+        schools: (networkStore.schools || []).length,
+        directors: (networkStore.directors || []).length,
+        teachers: (networkStore.teachers || []).length,
+        students: (networkStore.students || []).length,
+        efectividade: (networkStore.efectividade || []).length,
+      },
+    });
+  });
+
+  app.post("/api/backup/create", (req, res) => {
+    const { label = "manual", actorEmail = "beliziodos20@gmail.com" } = req.body || {};
+    const snapshot = createBackupSnapshot(label, actorEmail);
+    if (!snapshot) {
+      return res.status(500).json({ success: false, error: "Falha ao gravar snapshot de backup no disco." });
+    }
+    res.json({
+      success: true,
+      message: "Ponto de restauração gravado com sucesso no cofre de segurança.",
+      backup: snapshot,
+    });
+  });
+
+  app.post("/api/backup/restore", (req, res) => {
+    const { backupId, filename, adminEmail, confirmationCode } = req.body || {};
+    const cleanEmail = String(adminEmail || "").trim().toLowerCase();
+    const cleanCode = String(confirmationCode || "").trim();
+
+    if (cleanEmail !== "beliziodos20@gmail.com" || cleanCode !== "SIGRE-BELIZIO-2026") {
+      return res.status(403).json({
+        success: false,
+        error: "Acesso Negado: A restauração da base de dados requer a conta do Administrador Máximo (beliziodos20@gmail.com) e o código de autorização 'SIGRE-BELIZIO-2026'.",
+      });
+    }
+
+    try {
+      const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith(".json"));
+      let targetFile = files.find((f) => f === filename);
+
+      if (!targetFile && backupId) {
+        for (const f of files) {
+          const raw = fs.readFileSync(path.join(backupsDir, f), "utf-8");
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.meta && parsed.meta.id === backupId) {
+            targetFile = f;
+            break;
+          }
+        }
+      }
+
+      if (!targetFile) {
+        return res.status(404).json({ success: false, error: "Ponto de backup não encontrado no cofre." });
+      }
+
+      // Automatically capture snapshot of current state before applying restore
+      createBackupSnapshot("pre-restauracao-segura", cleanEmail);
+
+      const backupRaw = fs.readFileSync(path.join(backupsDir, targetFile), "utf-8");
+      const backupData = JSON.parse(backupRaw);
+
+      if (!backupData || !backupData.store) {
+        return res.status(400).json({ success: false, error: "Arquivo de backup corrompido ou inválido." });
+      }
+
+      // Restore in memory
+      networkStore.schools = Array.isArray(backupData.store.schools) ? backupData.store.schools : [];
+      networkStore.directors = Array.isArray(backupData.store.directors) ? backupData.store.directors : [];
+      networkStore.teachers = Array.isArray(backupData.store.teachers) ? backupData.store.teachers : [];
+      networkStore.students = Array.isArray(backupData.store.students) ? backupData.store.students : [];
+      networkStore.applications = Array.isArray(backupData.store.applications) ? backupData.store.applications : [];
+      networkStore.efectividade = Array.isArray(backupData.store.efectividade) ? backupData.store.efectividade : [];
+      networkStore.quickRequests = Array.isArray(backupData.store.quickRequests) ? backupData.store.quickRequests : [];
+      networkStore.updatedAt = new Date().toISOString();
+
+      persistNetworkStore();
+
+      res.json({
+        success: true,
+        message: "Base de dados restaurada com sucesso!",
+        restoredFrom: targetFile,
+        stats: {
+          schools: networkStore.schools.length,
+          teachers: networkStore.teachers.length,
+          students: networkStore.students.length,
+          efectividade: networkStore.efectividade.length,
+        },
+      });
+    } catch (err: any) {
+      console.error("[Backup] Restore error:", err);
+      res.status(500).json({ success: false, error: err?.message || "Erro interno ao restaurar backup." });
+    }
+  });
+
+  // Audit Logs API (Append-only & Query with limits)
+  app.get("/api/audit/logs", (req, res) => {
+    const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "50", 10)));
+    res.json({
+      success: true,
+      count: auditLogsStore.length,
+      logs: auditLogsStore.slice(-limit).reverse(),
+    });
+  });
+
+  app.post("/api/audit/log", sensitiveApiLimiter, (req, res) => {
+    const { action, actorId, actorRole, details, severity, targetId, targetType } = req.body;
+    if (!action || !actorId || !details) {
+      return res.status(400).json({ error: "Campos de auditoria obrigatórios em falta (action, actorId, details)." });
+    }
+
+    const logEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      action: String(action).substring(0, 60),
+      severity: severity || "INFO",
+      actorId: String(actorId).substring(0, 128),
+      actorRole: actorRole || "sistema",
+      targetId: targetId ? String(targetId).substring(0, 128) : undefined,
+      targetType: targetType ? String(targetType).substring(0, 50) : undefined,
+      details: String(details).substring(0, 500),
+      timestamp: new Date().toISOString(),
+      ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress,
+    };
+
+    auditLogsStore.push(logEntry);
+    // Keep max 1000 in memory buffer
+    if (auditLogsStore.length > 1000) auditLogsStore.shift();
+
+    res.status(201).json({ success: true, log: logEntry });
+  });
+
+  // ============================================================================
+  // VALIDAÇÃO DUAL SIMULTÂNEA (BACKEND + FRONTEND PARITY)
+  // ============================================================================
+  app.post("/api/validate/student", (req, res) => {
+    const { nomeCompleto, biOuCedula, tipoDocumento, dataNascimento, nomeEscola } = req.body;
+    const errors: string[] = [];
+
+    const nameVal = validateFullName(nomeCompleto || "");
+    if (!nameVal.isValid && nameVal.error) errors.push(nameVal.error);
+
+    if (tipoDocumento === "BI" || (!tipoDocumento && biOuCedula)) {
+      const biVal = validateAngolaBI(biOuCedula || "");
+      if (!biVal.isValid && biVal.error) errors.push(biVal.error);
+    }
+
+    if (dataNascimento) {
+      const bVal = validateBirthDate(dataNascimento);
+      if (!bVal.isValid && bVal.error) errors.push(bVal.error);
+    }
+
+    if (!nomeEscola || !String(nomeEscola).trim()) {
+      errors.push("A instituição escolar é obrigatória.");
+    }
+
+    if (errors.length > 0) {
+      return res.status(422).json({ isValid: false, errors, layer: "backend" });
+    }
+
+    res.json({ isValid: true, layer: "backend", sanitizedValue: nameVal.sanitizedValue });
+  });
+
+  app.post("/api/validate/teacher", (req, res) => {
+    const { nomeCompleto, biNif, telefone, email, nomeEscola } = req.body;
+    const errors: string[] = [];
+
+    const nameVal = validateFullName(nomeCompleto || "");
+    if (!nameVal.isValid && nameVal.error) errors.push(nameVal.error);
+
+    const biVal = validateAngolaBI(biNif || "");
+    if (!biVal.isValid && biVal.error) errors.push(biVal.error);
+
+    const phoneVal = validateAngolaPhone(telefone || "");
+    if (!phoneVal.isValid && phoneVal.error) errors.push(phoneVal.error);
+
+    if (email) {
+      const emailVal = validateEmail(email, false);
+      if (!emailVal.isValid && emailVal.error) errors.push(emailVal.error);
+    }
+
+    if (!nomeEscola || !String(nomeEscola).trim()) {
+      errors.push("A instituição escolar onde leciona é obrigatória.");
+    }
+
+    if (errors.length > 0) {
+      return res.status(422).json({ isValid: false, errors, layer: "backend" });
+    }
+
+    res.json({ isValid: true, layer: "backend" });
+  });
+
+  app.post("/api/validate/grade", (req, res) => {
+    const { nota, trimestre, studentId } = req.body;
+    const errors: string[] = [];
+
+    const gVal = validateGrade(nota);
+    if (!gVal.isValid && gVal.error) errors.push(gVal.error);
+
+    const tVal = validateTrimestre(trimestre);
+    if (!tVal.isValid && tVal.error) errors.push(tVal.error);
+
+    if (!studentId) errors.push("O identificador do estudante é obrigatório.");
+
+    if (errors.length > 0) {
+      return res.status(422).json({ isValid: false, errors, layer: "backend" });
+    }
+
+    res.json({ isValid: true, layer: "backend", sanitizedNota: gVal.sanitizedValue });
+  });
+
+  // ============================================================================
+  // IDOR PROTECTION & ACCESS CONTROL MIDDLEWARE
+  // ============================================================================
+  app.post("/api/security/verify-access", (req, res) => {
+    const { actor, target, action = "READ" } = req.body;
+
+    if (!actor || actor.role === "visitante") {
+      auditLogsStore.push({
+        id: `idor-${Date.now()}`,
+        action: "SECURITY_IDOR_VIOLATION",
+        severity: "CRITICAL",
+        actorId: "visitante-anonimo",
+        actorRole: "visitante",
+        details: `[IDOR BLOQUEADO] Tentativa de acesso não autenticado a ${target?.type} ID: ${target?.id}`,
+        timestamp: new Date().toISOString(),
+        ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress,
+      });
+      return res.status(403).json({
+        allowed: false,
+        error: "Acesso negado: Autenticação obrigatória para aceder a este registo.",
+        violationType: "PUBLIC_DENIED",
+      });
+    }
+
+    // Admin has global privileges
+    if (actor.role === "admin") {
+      return res.json({ allowed: true });
+    }
+
+    // Student role: can only access their own object
+    if (actor.role === "estudante") {
+      const isSelf = (actor.studentId && actor.studentId === target?.id) ||
+                     (actor.studentId && actor.studentId === target?.studentId) ||
+                     (actor.id && actor.id === target?.ownerUserId);
+
+      if (action !== "READ" || !isSelf) {
+        auditLogsStore.push({
+          id: `idor-${Date.now()}`,
+          action: "SECURITY_IDOR_VIOLATION",
+          severity: "CRITICAL",
+          actorId: actor.id,
+          actorRole: actor.role,
+          details: `[IDOR BLOQUEADO] Estudante ${actor.name || actor.id} tentou aceder/modificar registo alheio ${target?.id}`,
+          timestamp: new Date().toISOString(),
+          ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress,
+        });
+        return res.status(403).json({
+          allowed: false,
+          error: "Violação de Segurança (IDOR): Não possui autorização para aceder a registos de outro estudante.",
+          violationType: "UNAUTHORIZED_CROSS_STUDENT",
+        });
+      }
+      return res.json({ allowed: true });
+    }
+
+    // Director / Teacher: must match school
+    if (actor.role === "diretor" || actor.role === "professor") {
+      const actorSchool = (actor.schoolId || actor.schoolName || "").trim().toLowerCase();
+      const targetSchool = (target?.schoolId || target?.schoolName || "").trim().toLowerCase();
+
+      if (targetSchool && actorSchool && targetSchool !== actorSchool) {
+        auditLogsStore.push({
+          id: `idor-${Date.now()}`,
+          action: "SECURITY_IDOR_VIOLATION",
+          severity: "CRITICAL",
+          actorId: actor.id,
+          actorRole: actor.role,
+          details: `[IDOR BLOQUEADO] ${actor.role} da escola "${actorSchool}" tentou aceder a recurso da escola "${targetSchool}"`,
+          timestamp: new Date().toISOString(),
+          ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress,
+        });
+        return res.status(403).json({
+          allowed: false,
+          error: "Violação de Segurança (IDOR): Acesso negado a registos de outra instituição escolar.",
+          violationType: "UNAUTHORIZED_CROSS_SCHOOL",
+        });
+      }
+      return res.json({ allowed: true });
+    }
+
+    res.status(403).json({ allowed: false, error: "Acesso negado: Perfil não autorizado." });
+  });
+
+  // ============================================================================
+  // TRANSACTIONS & ROLLBACK MANAGEMENT (ATOMIC STATE RECOVERY)
+  // ============================================================================
+  app.get("/api/transactions", (req, res) => {
+    const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) || "20", 10)));
+    res.json({
+      success: true,
+      count: serverTransactionsStore.length,
+      transactions: serverTransactionsStore.slice(-limit).reverse(),
+    });
+  });
+
+  app.post("/api/transactions", sensitiveApiLimiter, (req, res) => {
+    const { entityType, entityId, action, description, authorId, authorName, authorRole, previousState, newState } = req.body;
+    const tx: ServerTransaction = {
+      id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      entityType: entityType || "student",
+      entityId: String(entityId || "unknown"),
+      action: action || "UPDATE",
+      description: description || "Operação cadastral",
+      authorId: String(authorId || "sys"),
+      authorName: authorName || "Administrador",
+      authorRole: authorRole || "admin",
+      previousState: previousState ? JSON.parse(JSON.stringify(previousState)) : null,
+      newState: newState ? JSON.parse(JSON.stringify(newState)) : null,
+      rolledBack: false,
+    };
+
+    serverTransactionsStore.push(tx);
+    if (serverTransactionsStore.length > 500) serverTransactionsStore.shift();
+
+    res.status(201).json({ success: true, transaction: tx });
+  });
+
+  app.post("/api/transactions/rollback", sensitiveApiLimiter, (req, res) => {
+    const { transactionId, performerName = "Administrador", performerRole = "admin" } = req.body;
+    const tx = serverTransactionsStore.find((t) => t.id === transactionId);
+
+    if (!tx) {
+      return res.status(404).json({ success: false, error: "Transação não encontrada no servidor." });
+    }
+
+    if (tx.rolledBack) {
+      return res.status(400).json({
+        success: false,
+        error: `Transação já revertida em ${tx.rolledBackAt} por ${tx.rolledBackBy}.`,
+      });
+    }
+
+    tx.rolledBack = true;
+    tx.rolledBackAt = new Date().toISOString();
+    tx.rolledBackBy = performerName;
+
+    // Regista log de auditoria no servidor
+    auditLogsStore.push({
+      id: `audit-${Date.now()}`,
+      action: "TRANSACTION_ROLLBACK",
+      severity: "WARNING",
+      actorId: performerName,
+      actorRole: performerRole,
+      targetId: tx.entityId,
+      targetType: tx.entityType,
+      details: `[ROLLBACK] Reversão executada com sucesso para a transação ${tx.id} (${tx.action} em ${tx.entityType} ID: ${tx.entityId}) por ${performerName}.`,
+      timestamp: new Date().toISOString(),
+      ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress,
+    });
+
+    res.json({
+      success: true,
+      message: `Rollback efetuado com sucesso para transação ${tx.id}.`,
+      transaction: tx,
+    });
+  });
+
+  // Active Real-time Video/Audio Meeting Rooms (Protected by sensitive limiter)
+  app.get("/api/meetings/rooms", (req, res) => {
+    res.json({ success: true, rooms: getRoomsList() });
+  });
+
+  // Query specific room status, presence, and active participants
+  app.get("/api/meetings/rooms/:roomId", (req, res) => {
+    const presence = getRoomPresence(req.params.roomId);
+    if (!presence) {
+      return res.json({ success: true, room: null, exists: false });
+    }
+    res.json({ success: true, room: presence, exists: true });
+  });
+
+  // HTTP Signaling fallback endpoint (for networks/proxies with WebSocket limitations)
+  app.post("/api/meetings/rooms/:roomId/signal", (req, res) => {
+    const { fromSocketId, targetSocketId, signalData, fromUser } = req.body;
+    if (!fromSocketId || !targetSocketId || !signalData) {
+      return res.status(400).json({ error: "Missing required signal parameters" });
+    }
+    const forwarded = dispatchHttpSignal(req.params.roomId, fromSocketId, targetSocketId, signalData, fromUser);
+    res.json({ success: forwarded });
+  });
+
+  app.post("/api/meetings/rooms", sensitiveApiLimiter, (req, res) => {
+    const { id, title, hostName, schoolName } = req.body;
+    const roomId = id || `ucore-meet-${Math.random().toString(36).substring(2, 8)}`;
+    const room = createOrGetRoom(roomId, title, hostName, schoolName);
+    res.json({
+      success: true,
+      room: {
+        id: room.id,
+        title: room.title,
+        hostName: room.hostName,
+        schoolName: room.schoolName,
+        createdAt: room.createdAt,
+        participantCount: room.participants.size,
+      },
+    });
+  });
+
+  // ============================================================================
+  // RAG INTELIGENTE: ROTAS DE RECUPERAÇÃO E GERAÇÃO AUMENTADA (GEMINI + VETORES)
+  // ============================================================================
+  app.get("/api/rag/stats", (req, res) => {
+    res.json({
+      success: true,
+      stats: getKnowledgeBaseStats(),
+    });
+  });
+
+  app.get("/api/rag/documents", (req, res) => {
+    res.json({
+      success: true,
+      documents: getAllDocuments(),
+    });
+  });
+
+  app.post("/api/rag/search", (req, res) => {
+    const { query, category, maxChunks, threshold } = req.body;
+    if (!query || typeof query !== "string") {
+      return res.status(400).json({ error: "Termo de pesquisa 'query' obrigatório." });
+    }
+    const chunks = retrieveRelevantChunks(query, {
+      category,
+      maxChunks: maxChunks ? Number(maxChunks) : 5,
+      threshold: threshold ? Number(threshold) : 0.1,
+    });
+    res.json({
+      success: true,
+      query,
+      count: chunks.length,
+      chunks,
+    });
+  });
+
+  app.post("/api/rag/query", standardApiLimiter, async (req, res) => {
+    try {
+      const { query, category, userRole, userName, maxChunks } = req.body;
+      if (!query || typeof query !== "string" || !query.trim()) {
+        return res.status(400).json({ error: "A pergunta (query) não pode estar vazia." });
+      }
+
+      const result = await executeRagQuery({
+        query: query.trim(),
+        category,
+        userRole,
+        userName,
+        maxChunks: maxChunks ? Number(maxChunks) : 4,
+      });
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (err: any) {
+      console.error("[RAG] Erro ao processar consulta:", err);
+      res.status(500).json({
+        error: "Falha interna no motor RAG",
+        message: err?.message || "Ocorreu um erro ao processar a consulta.",
       });
     }
   });
+
+  app.post("/api/rag/ingest", sensitiveApiLimiter, (req, res) => {
+    try {
+      const { title, category, summary, author, legalReference, content } = req.body;
+      if (!title || !content || !author) {
+        return res.status(400).json({ error: "Título, autor e conteúdo textual são obrigatórios para ingestão RAG." });
+      }
+
+      const ingested = ingestCustomDocument({
+        title: String(title).substring(0, 150),
+        category: category || "institucional",
+        summary: summary ? String(summary).substring(0, 300) : undefined,
+        author: String(author).substring(0, 100),
+        legalReference: legalReference ? String(legalReference).substring(0, 120) : undefined,
+        content: String(content),
+      });
+
+      // Audit log registration
+      auditLogsStore.push({
+        id: `rag-ingest-${Date.now()}`,
+        action: "RAG_DOCUMENT_INGESTED",
+        severity: "INFO",
+        actorId: author,
+        actorRole: "administrador",
+        targetId: ingested.document.id,
+        targetType: "rag_document",
+        details: `[RAG INGESTÃO] Documento "${ingested.document.title}" indexado com ${ingested.newChunks.length} chunks vetoriais.`,
+        timestamp: new Date().toISOString(),
+        ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Documento indexado com sucesso na base vetorial RAG.",
+        document: ingested.document,
+        chunksCreated: ingested.newChunks.length,
+      });
+    } catch (err: any) {
+      console.error("[RAG] Erro na ingestão:", err);
+      res.status(500).json({ error: "Falha na ingestão do documento RAG." });
+    }
+  });
+
+  app.delete("/api/rag/documents/:id", sensitiveApiLimiter, (req, res) => {
+    const docId = req.params.id;
+    const deleted = deleteCustomDocument(docId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Documento não encontrado ou não permitido para remoção." });
+    }
+    res.json({ success: true, message: "Documento removido da base vetorial RAG." });
+  });
+
+  // SEO files: robots.txt and sitemap.xml
+  app.get("/robots.txt", (req, res) => {
+    const pub = path.join(process.cwd(), "public", "robots.txt");
+    const dist = path.join(process.cwd(), "dist", "robots.txt");
+    const target = fs.existsSync(pub) ? pub : dist;
+    res.type("text/plain").sendFile(target);
+  });
+
+  app.get("/sitemap.xml", (req, res) => {
+    const pub = path.join(process.cwd(), "public", "sitemap.xml");
+    const dist = path.join(process.cwd(), "dist", "sitemap.xml");
+    const target = fs.existsSync(pub) ? pub : dist;
+    res.type("application/xml").sendFile(target);
+  });
+
+  // Create HTTP server for both Express and WebSocket upgrades
+  const httpServer = http.createServer(app);
+
+  // Setup WebSocket signaling server for WebRTC Video & Audio calls
+  setupSignalingServer(httpServer);
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {
@@ -180,8 +1853,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server with WebRTC signaling running on http://0.0.0.0:${PORT}`);
   });
 }
 
