@@ -5,6 +5,8 @@ import type { DeclaracaoServicoRecord } from './declaracaoServicoStorage';
 import { fmtDateDeclaracaoServico, fmtKz } from './declaracaoServicoStorage';
 import type { GuiaFeriasRecord } from './guiaFeriasStorage';
 import { formatDateExtenso } from './guiaFeriasStorage';
+import type { GuiaColocacaoRecord } from './guiaColocacaoStorage';
+import { formatColocacaoDateExtenso, formatCategoriaGrauColocacao } from './guiaColocacaoStorage';
 import type { QuickServiceRequest } from '../types';
 import { formatAngolanDateExtenso } from './efectividadeStorage';
 import {
@@ -1145,6 +1147,141 @@ export async function downloadGuiaFeriasPdf(
 
   doc.save(`Guia_Ferias_${safeName}.pdf`);
 }
+
+/**
+ * Gera e descarrega a Guia de Colocação (Serviços SIGRE)
+ * em formato PDF nativo, garantido em 1 única página A4, 100% Times New Roman (14pt títulos / 12pt texto).
+ */
+export async function downloadGuiaColocacaoPdf(
+  record: GuiaColocacaoRecord
+): Promise<void> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const pageWidth = 210;
+  const marginX = 20;
+  const usableWidth = pageWidth - marginX * 2;
+  const centerX = pageWidth / 2;
+  const firstLineIndent = 12.5;
+  const lineHeightMm = 6.8;
+  const paragraphGapMm = 5.2;
+
+  let y = 18;
+
+  const emblemData = await loadEmblemPngDataUrl(emblemAngolaImg);
+  if (emblemData) {
+    const emblemHeight = 16.5;
+    const emblemWidth = emblemHeight * emblemData.ratio;
+    doc.addImage(
+      emblemData.dataUrl,
+      'PNG',
+      centerX - emblemWidth / 2,
+      y,
+      emblemWidth,
+      emblemHeight
+    );
+    y += emblemHeight + 5.5;
+  } else {
+    y += 10;
+  }
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text('REPÚBLICA DE ANGOLA', centerX, y, { align: 'center' });
+  y += 5.4;
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  const prov = record.prov?.trim() || 'Malanje';
+  const mun = record.mun?.trim() || 'Quêssua';
+  const prepMun = mun.toLowerCase().includes('quêssua') || mun.toLowerCase().includes('quessua') ? 'DO' : 'DE';
+  doc.text(`GOVERNO PROVINCIAL DE ${prov.toUpperCase()}`, centerX, y, { align: 'center' });
+  y += 5.0;
+  doc.text(`ADMINISTRAÇÃO MUNICIPAL ${prepMun} ${mun.toUpperCase()}`, centerX, y, { align: 'center' });
+  y += 5.0;
+  doc.text(`DIRECÇÃO MUNICIPAL DE EDUCAÇÃO ${prepMun} ${mun.toUpperCase()}`, centerX, y, { align: 'center' });
+  y += 11.5;
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(14);
+  const num = record.num?.trim() || '_______';
+  const ano = record.ano?.trim() || '____';
+  const titleText = `GUIA DE COLOCAÇÃO Nº ${num}/${ano}`;
+  doc.text(titleText, centerX, y, { align: 'center' });
+  const titleW = doc.getTextWidth(titleText);
+  doc.setLineWidth(0.45);
+  doc.line(centerX - titleW / 2, y + 1.2, centerX + titleW / 2, y + 1.2);
+
+  y += 12;
+
+  const isFem = record.trat === 'F';
+  const tratLabel = isFem ? 'a senhora professora' : 'o senhor professor';
+  const catGrau = formatCategoriaGrauColocacao(record.cat, record.grau) || '[categoria e grau]';
+  const dataExt = formatColocacaoDateExtenso(record.data) || '[data]';
+
+  const p1: TextSegment[] = [
+    {
+      text: 'Por esta Direcção, se faz constar às autoridades a quem o conhecimento desta competir que, segue viagem desta Direcção para ',
+    },
+    { text: record.escola?.trim() || '[escola de destino]', bold: true },
+    { text: `, ${tratLabel} ` },
+    { text: record.nome?.trim() || '[nome completo]', bold: true },
+    { text: ', com a categoria de ' },
+    { text: catGrau, bold: true },
+    { text: ', titular de agente nº ' },
+    { text: record.agente?.trim() || '[nº de agente]', bold: true },
+    { text: ', para reiniciar as suas funções de professor.' },
+  ];
+
+  const p2: TextSegment[] = [
+    {
+      text: 'Para que não lhe ponham impedimento, mandei passar a presente guia que vai por mim assinada e autenticada com o carimbo a óleo, em uso nesta Direcção.',
+    },
+  ];
+
+  y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+  y += paragraphGapMm;
+  y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+
+  y += 12;
+  const localEmi = record.local?.trim() || mun;
+  const prepDateMun = mun.toLowerCase().includes('quêssua') || mun.toLowerCase().includes('quessua') ? 'do' : 'de';
+  const dateLine = `A Direcção Municipal de Educação ${prepDateMun} ${mun}, em ${localEmi} aos ${dataExt}.`;
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  doc.text(dateLine, centerX, y, { align: 'center' });
+  y += 16;
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  doc.text('O Director Municipal', centerX, y, { align: 'center' });
+
+  y += 16;
+  doc.setLineWidth(0.35);
+  doc.line(centerX - 35, y, centerX + 35, y);
+
+  if (record.dir) {
+    y += 5.5;
+    doc.setFont('times', 'bold');
+    doc.setFontSize(12);
+    doc.text(record.dir, centerX, y, { align: 'center' });
+  }
+
+  const safeName = (record.nome || record.num || 'Professor')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  doc.save(`Guia_Colocacao_${safeName}.pdf`);
+}
+
 
 
 

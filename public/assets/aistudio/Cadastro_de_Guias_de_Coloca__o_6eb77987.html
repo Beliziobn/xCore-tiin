@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cadastro de Guias de Colocação · Mucari</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;0,700;1,400&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1ec;--panel:#fbfcfa;--ink:#16221c;--mute:#55655c;--line:#cdd6cf;--green:#1f4d3a;--onGreen:#f3f7f4;--red:#a3262a;--gold:#b98a24;--ok:#1f6b45;
+--serif:'Newsreader',Georgia,'Times New Roman',serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1713;--panel:#17211b;--ink:#e8efe9;--mute:#9aaaa0;--line:#2c3a32;--green:#7fc4a0;--onGreen:#0f1713;--red:#e0686b;--gold:#d9ac4a;--ok:#6fcf9b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1713;--panel:#17211b;--ink:#e8efe9;--mute:#9aaaa0;--line:#2c3a32;--green:#7fc4a0;--onGreen:#0f1713;--red:#e0686b;--gold:#d9ac4a;--ok:#6fcf9b;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+header.hero{padding:44px 0 28px;border-bottom:4px solid var(--green)}
+.seal{font:600 .82rem/1.5 var(--sans);color:var(--mute);margin:0 0 14px}
+h1{font:700 clamp(2rem,5vw,3.3rem)/1.08 var(--serif);margin:0 0 12px;max-width:16ch;letter-spacing:-.01em}
+.lead{max-width:60ch;color:var(--mute);margin:0;font-size:1.05rem}
+main.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:32px;padding:32px 0 56px;align-items:start}
+@media (max-width:860px){main.grid{grid-template-columns:1fr}}
+form{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 24px 24px}
+fieldset{border:0;margin:0;padding:20px 0 4px;border-bottom:1px solid var(--line)}
+fieldset:last-of-type{border-bottom:0}
+legend{font:600 1.25rem/1.2 var(--serif);padding:0;margin-bottom:12px;color:var(--green)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:560px){.row{grid-template-columns:1fr}}
+.f{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+label,.lab{font-weight:500;font-size:.92rem}
+.hint{font-size:.8rem;color:var(--mute)}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px 12px;width:100%;min-height:44px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+input[readonly]{color:var(--mute)}
+input:user-invalid{border-color:var(--red)}
+.seg{display:flex;gap:10px;flex-wrap:wrap}
+.seg label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:4px;padding:10px 14px;min-height:44px;cursor:pointer;background:var(--bg)}
+.seg input{width:auto;min-height:0;accent-color:var(--green)}
+.seg label:has(input:checked){border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+.btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+button{font:600 1rem var(--sans);min-height:46px;padding:0 22px;border-radius:4px;cursor:pointer;border:1px solid var(--green)}
+.primary{background:var(--green);color:var(--onGreen)}
+.ghost{background:transparent;color:var(--green)}
+.msg{margin-top:14px;font-weight:500;min-height:1.4em}
+.msg.ok{color:var(--ok)}.msg.err{color:var(--red)}
+aside{position:sticky;top:16px}
+@media (max-width:860px){aside{position:static}}
+.doc{background:#fffefb;color:#1a1a1a;border:1px solid var(--line);border-radius:3px;padding:26px 24px 22px;font:400 .98rem/1.6 var(--serif);box-shadow:0 1px 0 var(--line)}
+.doc .h{text-align:center;font-weight:600;line-height:1.35}
+.doc h2{font:700 1.08rem var(--serif);text-align:center;margin:16px 0 14px;text-decoration:underline}
+.doc p{margin:0 0 12px;text-align:justify;text-indent:1.6em}
+.doc b{font-weight:700}.doc .blank{color:#8a8a8a;font-style:italic}
+.doc .sig{text-align:center;margin-top:18px}
+.doc hr{border:0;border-top:2px dashed #999;margin:6px 0 12px}
+.pvlabel{font-weight:600;margin:0 0 10px;font-size:.95rem}
+.list{margin-top:28px}
+.list h2{font:600 1.4rem var(--serif);margin:0 0 10px}
+.tbl{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:640px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--mute)}
+.empty{padding:18px;color:var(--mute)}
+footer{border-top:1px solid var(--line);padding:20px 0 32px;color:var(--mute);font-size:.85rem}
+@media (prefers-reduced-motion:no-preference){.ok-flash{animation:fl .9s ease-out}@keyframes fl{from{box-shadow:0 0 0 4px var(--ok)}to{box-shadow:0 0 0 0 transparent}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <p class="seal">República de Angola · Governo Provincial de Malanje · Administração Municipal de Mucari</p>
+  <h1>Cadastro de guias de colocação</h1>
+  <p class="lead">Registe os dados do professor, a escola de destino e a data de emissão. A guia aparece ao lado, escrita como no documento oficial, enquanto preenche.</p>
+</header>
+
+<main class="grid">
+<div>
+<form id="f" novalidate>
+  <fieldset>
+    <legend>Guia</legend>
+    <div class="row">
+      <div class="f"><label for="num">Número da guia</label><input id="num" name="num" inputmode="numeric" placeholder="Ex.: 112" autocomplete="off"><span class="hint">Pode ficar em branco e ser preenchido na assinatura.</span></div>
+      <div class="f"><label for="ano">Ano</label><input id="ano" name="ano" inputmode="numeric" maxlength="4" required></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Professor</legend>
+    <div class="f"><span class="lab" id="trl">Tratamento</span>
+      <div class="seg" role="radiogroup" aria-labelledby="trl">
+        <label><input type="radio" name="trat" value="M" checked> Senhor professor</label>
+        <label><input type="radio" name="trat" value="F"> Senhora professora</label>
+      </div></div>
+    <div class="f"><label for="nome">Nome completo</label><input id="nome" name="nome" required autocomplete="name" placeholder="Ex.: Gilson José Cassengue"></div>
+    <div class="row">
+      <div class="f"><label for="cat">Categoria</label><input id="cat" name="cat" value="P.E.P.E.S." required><span class="hint">Categoria profissional.</span></div>
+      <div class="f"><label for="grau">Grau</label><input id="grau" name="grau" list="graus" required placeholder="Ex.: 13º Grau"><datalist id="graus"><option value="Auxiliar 3º Grau"><option value="5º Grau"><option value="6º Grau"><option value="10º Grau"><option value="13º Grau"></datalist></div>
+    </div>
+    <div class="f"><label for="agente">Número de agente</label><input id="agente" name="agente" inputmode="numeric" required pattern="[0-9]{6,12}" placeholder="Ex.: 88212320" autocomplete="off"><span class="hint">Apenas algarismos.</span></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Colocação</legend>
+    <div class="f"><label for="escola">Escola de destino</label><input id="escola" name="escola" list="escolas" required placeholder="Ex.: Escola Primária nº 9 – 1 de Junho"><datalist id="escolas"><option value="Escola Primária nº 9 – 1 de Junho"><option value="Escola Primária nº 12 – 28 de Agosto"><option value="Escola Primária nº 06 / Comandante Hoje-Ya-Henda"><option value="Escola Primária nº 05 / 11 de Novembro"><option value="Complexo Escolar Rei Ngola Kiluanje de Mucari nº 15"></datalist></div>
+    <div class="row">
+      <div class="f"><label for="local">Local de emissão</label><input id="local" name="local" value="Mucari" required></div>
+      <div class="f"><label for="data">Data de emissão</label><input id="data" name="data" type="date" required></div>
+    </div>
+    <div class="f"><label for="dir">Director Municipal</label><input id="dir" name="dir" value="João António José" required></div>
+  </fieldset>
+
+  <div class="btns"><button class="primary" type="submit">Cadastrar guia</button><button class="ghost" type="reset" id="rst">Limpar campos</button></div>
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+</form>
+
+<section class="list" aria-labelledby="lt">
+  <h2 id="lt">Guias cadastradas <span id="cnt" class="hint"></span></h2>
+  <div class="tbl" id="tbl"></div>
+  <div class="btns"><button class="ghost" id="csv" type="button">Descarregar lista (CSV)</button></div>
+</section>
+</div>
+
+<aside aria-label="Pré-visualização da guia">
+  <p class="pvlabel">Pré-visualização da guia</p>
+  <div class="doc" id="doc"></div>
+</aside>
+</main>
+<footer>Direcção Municipal de Educação de Mucari. Os dados ficam guardados neste dispositivo; com sessão iniciada, também ficam no registo partilhado da página.</footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),f=$('f');
+const MES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let recs=[],db=null;
+try{recs=JSON.parse(localStorage.getItem('guias')||'[]')}catch(e){}
+function save(){try{localStorage.setItem('guias',JSON.stringify(recs))}catch(e){}}
+function vals(){const d=new FormData(f),o={};d.forEach((v,k)=>o[k]=String(v).trim());return o}
+function ph(v,t){return v?`<b>${esc(v)}</b>`:`<span class="blank">${t}</span>`}
+function dataExt(v){if(!v)return null;const[a,m,d]=v.split('-');return{d:d,m:MES[+m-1],a:a}}
+function render(){
+  const v=vals(),F=v.trat==='F',dt=dataExt(v.data);
+  const cat=v.cat?(v.cat+(v.grau?(/^auxiliar/i.test(v.grau)?' ':''):'')+(v.grau?' '+v.grau:'')):'';
+  $('doc').innerHTML=`<div class="h">República de Angola<br>Governo Provincial de Malanje<br>Administração Municipal de Mucari<br>Direcção Municipal de Educação de Mucari</div>
+  <h2>GUIA DE COLOCAÇÃO Nº ${v.num?esc(v.num):'_______'}/${esc(v.ano||'____')}</h2>
+  <p>Por esta Direcção, se faz constar às autoridades a quem o conhecimento desta competir que, segue viagem desta Direcção para ${ph(v.escola,'escola de destino')}, ${F?'a senhora professora':'o senhor professor'} ${ph(v.nome,'nome completo')}, com a categoria de ${ph(cat,'categoria e grau')}, titular de agente nº ${ph(v.agente,'nº de agente')}, para reiniciar as suas funções de professor.</p>
+  <hr>
+  <p>Para que não lhe ponham impedimento, mandei passar a presente guia que vai por mim assinada e autenticada com o carimbo a óleo, em uso nesta Direcção.</p>
+  <p><b>A Direcção Municipal de Educação de Caculama, em ${ph(v.local,'local')} aos ${dt?`${dt.d} de ${dt.m} de ${dt.a}`:'<span class="blank">data</span>'}.</b></p>
+  <div class="sig"><b>O Director Municipal</b><br>________________________<br><b>${v.dir?esc(v.dir):'&nbsp;'}</b></div>`;
+}
+function fmt(r){const d=dataExt(r.data);return d?`${d.d}/${r.data.slice(5,7)}/${d.a}`:''}
+function table(){
+  $('cnt').textContent=recs.length?`(${recs.length})`:'';
+  if(!recs.length){$('tbl').innerHTML='<div class="empty">Ainda não há guias cadastradas. Preencha o formulário e escolha Cadastrar guia.</div>';return}
+  $('tbl').innerHTML='<table><thead><tr><th>Guia</th><th>Professor</th><th>Categoria</th><th>Agente</th><th>Escola</th><th>Data</th></tr></thead><tbody>'+
+  recs.slice().reverse().map(r=>`<tr><td>${esc(r.num||'—')}/${esc(r.ano)}</td><td>${esc(r.nome)}</td><td>${esc(r.cat+' '+r.grau)}</td><td>${esc(r.agente)}</td><td>${esc(r.escola)}</td><td>${fmt(r)}</td></tr>`).join('')+'</tbody></table>';
+}
+function msg(t,c){const m=$('msg');m.textContent=t;m.className='msg '+(c||'')}
+function setDefaults(){const n=new Date();$('data').value=n.toISOString().slice(0,10);$('ano').value=n.getFullYear();render()}
+f.addEventListener('input',render);
+f.addEventListener('reset',()=>setTimeout(()=>{setDefaults();msg('')}));
+f.addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!f.checkValidity()){f.reportValidity();msg('Verifique os campos assinalados.','err');return}
+  const r={...vals(),id:'g'+Date.now(),criado:new Date().toISOString()};
+  if(recs.some(x=>x.agente===r.agente&&x.escola===r.escola&&x.data===r.data)){msg('Esta guia já foi cadastrada para o mesmo agente, escola e data.','err');return}
+  recs.push(r);save();table();
+  if(db){try{await db.collection('cadastros').doc(r.id).set(r)}catch(x){}}
+  msg('Guia de '+r.nome+' cadastrada.','ok');$('doc').classList.remove('ok-flash');void $('doc').offsetWidth;$('doc').classList.add('ok-flash');
+  const keep={ano:r.ano,local:r.local,dir:r.dir,data:r.data};f.reset();setTimeout(()=>{for(const k in keep)f[k].value=keep[k];render()});
+});
+$('csv').addEventListener('click',async()=>{
+  if(!recs.length){msg('Não há guias para descarregar.','err');return}
+  const H=['num','ano','trat','nome','cat','grau','agente','escola','local','data','dir'];
+  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+  const csv='\ufeff'+H.join(';')+'\n'+recs.map(r=>H.map(h=>q(r[h])).join(';')).join('\n');
+  try{const d=await claude.use('downloads');if(!d)throw 0;await d.save({filename:'guias-colocacao.csv',data:csv});}
+  catch(e){msg('Não foi possível descarregar neste ecrã. Abra a página no navegador e tente de novo.','err')}
+});
+setDefaults();table();
+(async()=>{try{
+  const [d]=await Promise.all([window.claude?claude.use('db'):null]);
+  if(!d)return;db=d;
+  d.collection('cadastros').onSnapshot(s=>{
+    const rows=s.docs.map(x=>x.data()).filter(Boolean);
+    if(rows.length){const m=new Map(recs.map(r=>[r.id,r]));rows.forEach(r=>m.set(r.id,r));recs=[...m.values()].sort((a,b)=>(a.criado||'')<(b.criado||'')?-1:1);save();table()}
+  },()=>{});
+}catch(e){}})();
+</script>
+</body>
+</html>
