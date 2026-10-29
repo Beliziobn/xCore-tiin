@@ -377,8 +377,13 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
                 <>
                   <FileDown className="w-4 h-4" />
                   <span>
-                    Baixar {selectedPeriodo === 'FINAL' ? 'Pauta Final' : `Mini-Pauta ${selectedPeriodo}º Trim.`} (
-                    {isAllDisciplines ? 'Todas' : selectedDisciplineFilter})
+                    Baixar{' '}
+                    {selectedPeriodo === 'FINAL'
+                      ? 'Pauta Final'
+                      : isAllDisciplines
+                      ? `Pauta Final ${selectedPeriodo}º Trim.`
+                      : `Mini-Pauta ${selectedPeriodo}º Trim.`}{' '}
+                    ({isAllDisciplines ? 'Todas' : selectedDisciplineFilter})
                   </span>
                 </>
               )}
@@ -427,7 +432,11 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
                 DIRECÇÃO MUNICIPAL DA EDUCAÇÃO DO QUÉSSUA
               </p>
               <p className="text-xs sm:text-sm font-bold uppercase tracking-wide text-black pt-0.5">
-                {isFinal ? 'PAUTA FINAL' : 'MINI-PAUTA'}
+                {isFinal
+                  ? 'PAUTA FINAL'
+                  : isAllDisciplines
+                  ? `PAUTA FINAL DO ${selectedPeriodo}º TRIMESTRE`
+                  : `MINI-PAUTA DO ${selectedPeriodo}º TRIMESTRE`}
               </p>
               <p className="text-xs sm:text-sm font-bold uppercase tracking-wide text-black">
                 {resolvedSchoolName.toUpperCase()}
@@ -764,10 +773,31 @@ export const PautaPdfExportModal: React.FC<PautaPdfExportModalProps> = ({
               </table>
             </div>
 
-            {/* Rodapé Simples com Assinatura do Professor */}
-            <div className="pt-8 pb-2 text-center font-serif text-xs text-black">
-              <p className="mb-6">O Professor</p>
-              <div className="w-64 max-w-full mx-auto border-b border-black"></div>
+            {/* Rodapé Oficial de Assinaturas */}
+            <div className="pt-8 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-8 text-center font-serif text-xs text-black">
+              {!isAllDisciplines && !isFinal ? (
+                <>
+                  <div>
+                    <p className="font-bold mb-6">O(A) Professor(a)</p>
+                    <div className="w-60 max-w-full mx-auto border-b border-black"></div>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-6">O(A) Subdirector(a) Pedagógico(a)</p>
+                    <div className="w-60 max-w-full mx-auto border-b border-black"></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="font-bold mb-6">O(A) Subdirector(a) Pedagógico(a)</p>
+                    <div className="w-60 max-w-full mx-auto border-b border-black"></div>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-6">O(A) Director(a) da Escola</p>
+                    <div className="w-60 max-w-full mx-auto border-b border-black"></div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

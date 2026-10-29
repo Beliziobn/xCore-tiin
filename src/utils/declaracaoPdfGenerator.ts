@@ -668,6 +668,9 @@ export async function downloadQuickServiceDocumentPdf(
   request: QuickServiceRequest,
   genderOverride?: 'M' | 'F' | null
 ): Promise<void> {
+  const { extractStudentGradesFromPautas, verifyStudentEnrollmentInSchool } = await import(
+    './quickServicesStorage'
+  );
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -708,6 +711,12 @@ export async function downloadQuickServiceDocumentPdf(
   const interessadoInteressada = isFeminino ? 'pela interessada' : 'pelo interessado';
   const doDaFuncionario = isFeminino ? 'da funcionária' : 'do funcionário';
   const peloMesmoPelaMesma = isFeminino ? 'pela mesma' : 'pelo mesmo';
+
+  const artigoAluno = isFeminino ? 'a aluna' : 'o aluno';
+  const identificadoIdentificada = isFeminino ? 'identificada' : 'identificado';
+  const matriculadoMatriculada = isFeminino ? 'matriculada' : 'matriculado';
+  const aoAEstudante = isFeminino ? 'à estudante' : 'ao estudante';
+  const doDaAluno = isFeminino ? 'da aluna' : 'do aluno';
 
   const schoolOrDept =
     details.employeeSchoolOrDepartment || request.targetSchoolName || 'Rede Municipal do Quêssua';
@@ -782,58 +791,279 @@ export async function downloadQuickServiceDocumentPdf(
   const lineHeightMm = 6.0;
   const paragraphGapMm = 4.2;
 
-  const p1: TextSegment[] = [
-    {
-      text: `Para os devidos efeitos legais e administrativos, e por ter sido solicitada ${interessadoInteressada}, o Director Municipal da Educação do Município do Quêssua, Província de Malanje, `,
-    },
-    { text: 'DECLARA', bold: true },
-    { text: ` que ${artigoTratamento} ` },
-    { text: details.employeeName || request.requesterName, bold: true },
-    { text: `, ${portadorPortadora} do Bilhete de Identidade n.º ` },
-    { text: details.employeeBi || 'Conforme Registo', bold: true },
-    { text: ` e ${inscritoInscrita} sob o número de agente público ` },
-    { text: details.employeeAgente || 'REG-DME-2026', bold: true },
-    { text: `, é ${funcionarioFuncionaria} do Sector da Educação, onde se encontra ${colocadoColocada} ${prepEscola} ` },
-    { text: schoolOrDept, bold: true },
-    { text: `, ${enquadradoEnquadrada} na categoria e função de ` },
-    { text: `${adaptedCategory}.`, bold: true },
-  ];
+  const enrollmentCheck = verifyStudentEnrollmentInSchool({
+    schoolName: request.targetSchoolName,
+    studentName: details.studentName || request.requesterName,
+    studentBiOrProcesso: details.studentBiOrProcesso,
+    studentClasse: details.enrolledClasse || details.studentClasse,
+    studentTurma: details.enrolledTurma || details.studentTurma,
+  });
 
-  const p2: TextSegment[] = [
-    {
-      text: 'Mais se declara que se encontra no pleno exercício da sua função nesta circunscrição municipal, mantendo ',
-    },
-    { text: 'EFECTIVIDADE PLENA', bold: true },
-    { text: ' e assiduidade ininterrupta no período de referência de ' },
-    { text: details.referenceMonthYear || 'Fevereiro / 2026', bold: true },
-    {
-      text: `, sem registo de faltas injustificadas nem quaisquer sanções disciplinares averbadas no processo individual ${doDaFuncionario}.`,
-    },
-  ];
+  const resolvedClasse =
+    details.enrolledClasse || enrollmentCheck.classe || details.studentClasse || '7ª Classe';
+  const resolvedTurma =
+    details.enrolledTurma || enrollmentCheck.turma || details.studentTurma || 'Turma A';
+  const resolvedPeriodo =
+    details.enrolledTurno || enrollmentCheck.turno || details.studentPeriodo || 'Manhã';
+  const resolvedSala = details.enrolledSala || enrollmentCheck.sala || 'Sala 01';
+  const resolvedProcesso =
+    details.enrolledCodigoMatricula ||
+    enrollmentCheck.codigoMatricula ||
+    details.studentBiOrProcesso ||
+    'Confirmado';
 
-  const p3: TextSegment[] = [
-    {
-      text: `A presente declaração é emitida em conformidade com o Estatuto da Carreira Docente da República de Angola, destinando-se especificamente ${finalidadeFormatted.preposition} `,
-    },
-    { text: finalidadeFormatted.text, bold: true },
-    {
-      text: `, devendo ser utilizada exclusivamente ${peloMesmoPelaMesma} para os fins legalmente previstos.`,
-    },
-  ];
+  if (request.serviceType === 'DECLARACAO_EFECTIVIDADE') {
+    const p1: TextSegment[] = [
+      {
+        text: `Para os devidos efeitos legais e administrativos, e por ter sido solicitada ${interessadoInteressada}, o Director Municipal da Educação do Município do Quêssua, Província de Malanje, `,
+      },
+      { text: 'DECLARA', bold: true },
+      { text: ` que ${artigoTratamento} ` },
+      { text: details.employeeName || request.requesterName, bold: true },
+      { text: `, ${portadorPortadora} do Bilhete de Identidade n.º ` },
+      { text: details.employeeBi || 'Conforme Registo', bold: true },
+      { text: ` e ${inscritoInscrita} sob o número de agente público ` },
+      { text: details.employeeAgente || 'REG-DME-2026', bold: true },
+      { text: `, é ${funcionarioFuncionaria} do Sector da Educação, onde se encontra ${colocadoColocada} ${prepEscola} ` },
+      { text: schoolOrDept, bold: true },
+      { text: `, ${enquadradoEnquadrada} na categoria e função de ` },
+      { text: `${adaptedCategory}.`, bold: true },
+    ];
 
-  const p4: TextSegment[] = [
-    {
-      text: `Por corresponder à verdade e por ter sido solicitada ${interessadoInteressada}, mandei passar a presente declaração que vai por mim assinada e autenticada com o carimbo a óleo em uso nesta Direcção Municipal.`,
-    },
-  ];
+    const p2: TextSegment[] = [
+      {
+        text: 'Mais se declara que se encontra no pleno exercício da sua função nesta circunscrição municipal, mantendo ',
+      },
+      { text: 'EFECTIVIDADE PLENA', bold: true },
+      { text: ' e assiduidade ininterrupta no período de referência de ' },
+      { text: details.referenceMonthYear || 'Fevereiro / 2026', bold: true },
+      {
+        text: `, sem registo de faltas injustificadas nem quaisquer sanções disciplinares averbadas no processo individual ${doDaFuncionario}.`,
+      },
+    ];
 
-  y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-  y += paragraphGapMm;
-  y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-  y += paragraphGapMm;
-  y = renderJustifiedParagraph(doc, p3, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-  y += paragraphGapMm;
-  y = renderJustifiedParagraph(doc, p4, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+    const p3: TextSegment[] = [
+      {
+        text: `A presente declaração é emitida em conformidade com o Estatuto da Carreira Docente da República de Angola, destinando-se especificamente ${finalidadeFormatted.preposition} `,
+      },
+      { text: finalidadeFormatted.text, bold: true },
+      {
+        text: `, devendo ser utilizada exclusivamente ${peloMesmoPelaMesma} para os fins legalmente previstos.`,
+      },
+    ];
+
+    const p4: TextSegment[] = [
+      {
+        text: `Por corresponder à verdade e por ter sido solicitada ${interessadoInteressada}, mandei passar a presente declaração que vai por mim assinada e autenticada com o carimbo a óleo em uso nesta Direcção Municipal.`,
+      },
+    ];
+
+    y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+    y += paragraphGapMm;
+    y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+    y += paragraphGapMm;
+    y = renderJustifiedParagraph(doc, p3, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+    y += paragraphGapMm;
+    y = renderJustifiedParagraph(doc, p4, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+  } else if (request.serviceType === 'BOLETIM_NOTAS') {
+    const liveGrades = extractStudentGradesFromPautas({
+      schoolName: request.targetSchoolName,
+      studentName: details.studentName || request.requesterName,
+      studentBiOrProcesso: details.studentBiOrProcesso,
+      classe: resolvedClasse,
+      turma: resolvedTurma,
+      trimestre: details.trimestre || '1º Trimestre',
+    });
+    const gradeRows =
+      details.gradesSnapshot && details.gradesSnapshot.length > 0
+        ? details.gradesSnapshot
+        : liveGrades.gradesSnapshot;
+    const overallAvg = details.overallAverage || liveGrades.overallAverage;
+    const academicStatusLabel = details.academicStatus || liveGrades.academicStatus;
+    const isFinalBoletim =
+      (details.trimestre || '').toLowerCase().includes('final') ||
+      (details.trimestre || '').toLowerCase().includes('anual');
+
+    const intro: TextSegment[] = [
+      {
+        text: `A Direcção ${getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} `,
+      },
+      { text: request.targetSchoolName || 'Complexo Escolar do Quêssua', bold: true },
+      {
+        text: ` certifica que ${artigoAluno} `,
+      },
+      { text: details.studentName || request.requesterName, bold: true },
+      {
+        text: `, com o N.º de Matrícula / BI `,
+      },
+      { text: resolvedProcesso, bold: true },
+      {
+        text: `, da `,
+      },
+      { text: `${resolvedClasse} (${resolvedTurma} • ${resolvedPeriodo})`, bold: true },
+      {
+        text: `, obteve o seguinte rendimento pedagógico extraído das Mini-Pautas e Pautas Oficiais referente ao `,
+      },
+      { text: `${details.trimestre || '1º Trimestre'} (${details.academicYear || '2025/2026'}):`, bold: true },
+    ];
+    y = renderJustifiedParagraph(doc, intro, marginX, y, usableWidth, 0, lineHeightMm, 11.5);
+    y += 3;
+
+    // Draw grades table
+    const colWidths = [86, 20, 20, 20, 24];
+    const rowH = 6.2;
+    const headers = isFinalBoletim
+      ? ['Disciplina Curricular', 'MT1', 'MT2', 'MT3', 'MFD']
+      : ['Disciplina Curricular', 'MAC', 'NPP', 'NPT', 'Média (MT)'];
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(10.5);
+    let cx = marginX;
+    for (let i = 0; i < headers.length; i++) {
+      doc.rect(cx, y, colWidths[i], rowH);
+      doc.text(headers[i], i === 0 ? cx + 2 : cx + colWidths[i] / 2, y + 4.3, {
+        align: i === 0 ? 'left' : 'center',
+      });
+      cx += colWidths[i];
+    }
+    y += rowH;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10.5);
+    for (const row of gradeRows) {
+      cx = marginX;
+      const vals = isFinalBoletim
+        ? [
+            row.subject,
+            String(row.mt1 ?? row.mac),
+            String(row.mt2 ?? row.npp),
+            String(row.mt3 ?? row.npt),
+            String(row.mfd ?? row.mt),
+          ]
+        : [
+            row.subject,
+            String(row.mac),
+            String(row.npp),
+            String(row.npt),
+            String(row.mt),
+          ];
+      for (let i = 0; i < vals.length; i++) {
+        doc.rect(cx, y, colWidths[i], rowH);
+        doc.setFont('times', i === 0 || i === 4 ? 'bold' : 'normal');
+        doc.text(vals[i], i === 0 ? cx + 2 : cx + colWidths[i] / 2, y + 4.3, {
+          align: i === 0 ? 'left' : 'center',
+        });
+        cx += colWidths[i];
+      }
+      y += rowH;
+    }
+
+    // Footer row
+    doc.setFont('times', 'bold');
+    doc.rect(marginX, y, colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], rowH);
+    doc.text('MÉDIA GERAL APURADA NAS PAUTAS', marginX + 2, y + 4.3);
+    doc.rect(marginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y, colWidths[4], rowH);
+    doc.text(
+      String(overallAvg),
+      marginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] / 2,
+      y + 4.3,
+      { align: 'center' }
+    );
+    y += rowH + 4;
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(11);
+    doc.text(`Situação Académica: ${academicStatusLabel}`, marginX, y);
+    y += 4;
+  } else if (request.serviceType === 'DECLARACAO_MATRICULA') {
+    const p1: TextSegment[] = [
+      {
+        text: `Para os devidos efeitos legais e por ter sido solicitada ${interessadoInteressada}, a Direcção ${getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} `,
+      },
+      { text: request.targetSchoolName || 'Complexo Escolar do Quêssua', bold: true },
+      {
+        text: ` faz constar, após conferência nos registos oficiais de matrícula e nas listas de turmas, e `,
+      },
+      { text: 'DECLARA', bold: true },
+      { text: ` que ${artigoAluno} ` },
+      { text: details.studentName || request.requesterName, bold: true },
+      { text: `, com o N.º de Matrícula / BI ` },
+      { text: resolvedProcesso, bold: true },
+      {
+        text: `, encontra-se devidamente ${matriculadoMatriculada} e a frequentar regularmente as aulas curriculares normais na `,
+      },
+      { text: `${resolvedClasse} (${resolvedTurma} • ${resolvedSala} • Período da ${resolvedPeriodo})`, bold: true },
+      { text: ` durante o Ano Lectivo de ` },
+      { text: `${details.academicYear || '2025/2026'}.`, bold: true },
+    ];
+
+    const p2: TextSegment[] = [
+      {
+        text: `A presente declaração destina-se ${finalidadeFormatted.preposition} `,
+      },
+      { text: `${finalidadeFormatted.text}.`, bold: true },
+    ];
+
+    y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+    y += paragraphGapMm;
+    y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+  } else {
+    // GUIA_TRANSFERENCIA
+    const destSchool =
+      request.destinationSchoolName ||
+      details.destinationSchool ||
+      details.purpose ||
+      'Instituição Indicada';
+    const p1: TextSegment[] = [
+      {
+        text: `A Direcção ${getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} `,
+      },
+      { text: request.targetSchoolName || 'Complexo Escolar do Quêssua', bold: true },
+      { text: ` concede por este meio a presente ` },
+      { text: 'GUIA OFICIAL DE TRANSFERÊNCIA ESCOLAR', bold: true },
+      { text: ` ${aoAEstudante} ` },
+      { text: details.studentName || request.requesterName, bold: true },
+      { text: `, com o N.º de Matrícula / BI ` },
+      { text: resolvedProcesso, bold: true },
+      { text: `, proveniente da ` },
+      { text: `${resolvedClasse} (${resolvedTurma} • ${resolvedPeriodo})`, bold: true },
+      { text: `, para transferência com destino a ` },
+      { text: `${destSchool}.`, bold: true },
+    ];
+
+    const p2: TextSegment[] = details.reservedTurma
+      ? [
+          {
+            text: `Consta confirmada e reservada a vaga na escola receptora na `,
+          },
+          {
+            text: `${details.reservedTurma} (${details.reservedTurno || 'Manhã'}${details.reservedSala ? ` • ${details.reservedSala}` : ''})`,
+            bold: true,
+          },
+          {
+            text: details.vacancyRespondedBy
+              ? `, devidamente validada por ${details.vacancyRespondedBy}.`
+              : '.',
+          },
+        ]
+      : [
+          {
+            text: `Mais se declara que o vínculo de matrícula na escola de origem e a consulta de vaga foram devidamente verificados.`,
+          },
+        ];
+
+    const p3: TextSegment[] = [
+      {
+        text: `O processo individual ${doDaAluno} encontra-se regularizado e sem quaisquer impedimentos legais ou disciplinares, podendo a escola de destino proceder ao enquadramento definitivo.`,
+      },
+    ];
+
+    y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+    y += paragraphGapMm;
+    y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+    y += paragraphGapMm;
+    y = renderJustifiedParagraph(doc, p3, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
+  }
 
   y += 10;
   doc.setFont('times', 'normal');
@@ -845,7 +1075,12 @@ export async function downloadQuickServiceDocumentPdf(
   y += 14;
   doc.setFont('times', 'bold');
   doc.setFontSize(12);
-  doc.text('O Director Municipal', centerX, y, { align: 'center' });
+  doc.text(
+    request.serviceType === 'DECLARACAO_EFECTIVIDADE' ? 'O Director Municipal' : 'A Direcção Escolar / O Director',
+    centerX,
+    y,
+    { align: 'center' }
+  );
 
   y += 15;
   doc.setLineWidth(0.35);
@@ -854,7 +1089,14 @@ export async function downloadQuickServiceDocumentPdf(
   y += 5.5;
   doc.setFont('times', 'bold');
   doc.setFontSize(12);
-  doc.text('Belizio Miguel dos Santos António', centerX, y, { align: 'center' });
+  doc.text(
+    request.serviceType === 'DECLARACAO_EFECTIVIDADE'
+      ? 'Belizio Miguel dos Santos António'
+      : details.resolvedBy || request.targetSchoolName || 'Direcção Escolar Oficial',
+    centerX,
+    y,
+    { align: 'center' }
+  );
 
   const safeName = (targetPersonName || 'Requerente')
     .normalize('NFD')
@@ -862,7 +1104,7 @@ export async function downloadQuickServiceDocumentPdf(
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
 
-  doc.save(`Declaracao_${safeName}.pdf`);
+  doc.save(`Documento_Oficial_${safeName}.pdf`);
 }
 
 /**

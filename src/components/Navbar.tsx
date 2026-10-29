@@ -74,7 +74,20 @@ export const Navbar: React.FC<NavbarProps> = ({
     const updateQuickRequests = async () => {
       try {
         const reqs = await fetchQuickRequests();
-        const pending = reqs.filter((r) => r.status === 'PENDENTE' || r.status === 'EM_ANALISE').length;
+        const isDir = activeRole === 'diretor' || currentUser?.role === 'diretor';
+        const allowedForDirector = ['BOLETIM_NOTAS', 'DECLARACAO_MATRICULA', 'GUIA_TRANSFERENCIA'];
+        const userSchool = currentUser?.schoolName?.trim().toLowerCase();
+        const pending = reqs.filter((r) => {
+          if (r.status !== 'PENDENTE' && r.status !== 'EM_ANALISE') return false;
+          if (isDir) {
+            if (!allowedForDirector.includes(r.serviceType)) return false;
+            if (userSchool && r.targetSchoolName) {
+              const target = r.targetSchoolName.trim().toLowerCase();
+              return target.includes(userSchool) || userSchool.includes(target);
+            }
+          }
+          return true;
+        }).length;
         setPendingQuickRequestsCount(pending);
       } catch {}
     };
@@ -571,18 +584,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </>
                   )}
 
-                  {/* Serviços SIGRE Oficial (Inclui Serviços Rápidos / Pedidos dos Usuários) */}
+                  {/* Serviços SIGRE Oficial (Para Diretores de Escola apenas Serviços Rápidos) */}
                   <button
                     id="dropdown-servicos-sigre-btn"
                     onClick={() => {
-                      onSelectPage('declaracao-efectividade');
+                      onSelectPage(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'declaracao-efectividade');
                       setShowPagesDropdown(false);
                     }}
                     className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-emerald-50 hover:text-emerald-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
                   >
                     <span className="flex items-center gap-2">
-                      <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Serviços SIGRE</span>
+                      {activeRole === 'diretor' ? (
+                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      ) : (
+                        <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                      )}
+                      <span>{activeRole === 'diretor' ? 'Serviços Rápidos (SIGRE)' : 'Serviços SIGRE'}</span>
                     </span>
                     <span className="flex items-center gap-1">
                       {currentUser && (activeRole === 'admin' || activeRole === 'diretor') && pendingQuickRequestsCount > 0 && (
@@ -651,10 +668,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                         ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
                         : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
                     }`}
-                    title="Pedidos de Boletins & Serviços Rápidos dos Encarregados"
+                    title="Serviços Rápidos: Boletins de Notas, Matrículas, Frequências e Transferências"
                   >
                     <Zap className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Boletins dos Pais</span>
+                    <span>Serviços Rápidos</span>
                   </button>
                 </>
               )}
@@ -1160,14 +1177,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="mobile-menu-servicos-sigre-btn"
             onClick={() => {
-              onSelectPage('declaracao-efectividade');
+              onSelectPage(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'declaracao-efectividade');
               setMobileMenuOpen(false);
             }}
             className="text-left py-2 px-3 text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#f75142]" />
-              <span>Serviços SIGRE</span>
+              {activeRole === 'diretor' ? (
+                <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+              ) : (
+                <FileText className="w-4 h-4 text-[#f75142]" />
+              )}
+              <span>{activeRole === 'diretor' ? 'Serviços Rápidos (SIGRE)' : 'Serviços SIGRE'}</span>
             </div>
             <div className="flex items-center gap-1">
               {currentUser && (activeRole === 'admin' || activeRole === 'diretor') && pendingQuickRequestsCount > 0 && (

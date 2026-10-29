@@ -209,21 +209,37 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
         studentName: studentName.trim(),
         studentBiOrProcesso: studentBiOrProcesso.trim(),
         studentClasse,
+        studentTurma,
+        studentPeriodo,
         academicYear: '2025/2026',
         purpose: purpose || 'Abono de Família / Comprovativo',
         notes: notes.trim(),
       };
     } else if (selectedService === 'GUIA_TRANSFERENCIA') {
+      const matchedDestSchool = schools.find(
+        (s) => s.name.trim().toLowerCase() === destinationSchool.trim().toLowerCase()
+      );
       title = `Guia de Transferência - ${studentName}`;
       targetRole = 'DIRECTOR';
       details = {
         studentName: studentName.trim(),
         studentBiOrProcesso: studentBiOrProcesso.trim(),
         studentClasse,
-        purpose: `Destino: ${destinationSchool || 'A definir'}`,
+        studentTurma,
+        studentPeriodo,
+        destinationSchool: destinationSchool.trim() || 'A definir',
+        destinationSchoolId: matchedDestSchool?.id,
+        purpose: destinationSchool.trim() || 'A definir',
         notes: notes.trim(),
       };
     }
+
+    const matchedDest =
+      selectedService === 'GUIA_TRANSFERENCIA'
+        ? schools.find(
+            (s) => s.name.trim().toLowerCase() === destinationSchool.trim().toLowerCase()
+          )
+        : undefined;
 
     const payload = {
       serviceType: selectedService,
@@ -234,6 +250,9 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
       requesterRoleTitle: selectedService === 'BOLETIM_NOTAS' ? 'Encarregado de Educação' : 'Docente / Funcionário',
       targetSchoolId: selectedSchoolId,
       targetSchoolName: selectedSchoolName,
+      destinationSchoolId: matchedDest?.id,
+      destinationSchoolName:
+        selectedService === 'GUIA_TRANSFERENCIA' ? destinationSchool.trim() : undefined,
       details,
     };
 
@@ -641,17 +660,52 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
                       )}
 
                       {selectedService === 'GUIA_TRANSFERENCIA' && (
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                            Escola de Destino (se souber)
+                        <div className="sm:col-span-2 space-y-2">
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Escola de Destino Pretendida (Consulta de Vaga) *
                           </label>
-                          <input
-                            type="text"
-                            value={destinationSchool}
-                            onChange={(e) => setDestinationSchool(e.target.value)}
-                            placeholder="Ex: Complexo Escolar Samora Machel (Malanje)"
-                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
-                          />
+                          <select
+                            value={
+                              schools.some((s) => s.name === destinationSchool)
+                                ? destinationSchool
+                                : destinationSchool
+                                ? '__OUTRA__'
+                                : ''
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '__OUTRA__') {
+                                setDestinationSchool('');
+                              } else {
+                                setDestinationSchool(val);
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all cursor-pointer"
+                            required
+                          >
+                            <option value="">Selecione a escola de destino para consulta de vaga...</option>
+                            {schools
+                              .filter((s) => s.id !== selectedSchoolId && s.name !== selectedSchoolName)
+                              .map((sc) => (
+                                <option key={sc.id} value={sc.name}>
+                                  {sc.name}
+                                </option>
+                              ))}
+                            <option value="__OUTRA__">Outra instituição escolar (digitar abaixo)</option>
+                          </select>
+                          {(!destinationSchool || !schools.some((s) => s.name === destinationSchool)) && (
+                            <input
+                              type="text"
+                              value={destinationSchool}
+                              onChange={(e) => setDestinationSchool(e.target.value)}
+                              placeholder="Ou digite o nome da Escola de Destino..."
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                              required
+                            />
+                          )}
+                          <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                            Nota: Antes da emissão da Guia de Transferência, o Diretor da sua escola consultará a disponibilidade de vaga na escola de destino selecionada.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1074,6 +1128,24 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
                                 Concluído / Disponível
                               </span>
                             )}
+                            {req.status === 'VAGA_CONFIRMADA' && (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-900 px-3 py-1 rounded-full border border-emerald-300">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                Vaga Confirmada na Escola Destino ({req.details?.reservedTurma || 'Turma Reservada'})
+                              </span>
+                            )}
+                            {req.status === 'AGUARDANDO_VAGA_DESTINO' && (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-indigo-100 text-indigo-900 px-3 py-1 rounded-full border border-indigo-200">
+                                <Clock className="w-3.5 h-3.5 text-indigo-700" />
+                                Aguardando Consulta de Vaga na Escola Destino
+                              </span>
+                            )}
+                            {req.status === 'SEM_VAGA_DESTINO' && (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-rose-100 text-rose-800 px-3 py-1 rounded-full border border-rose-200">
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                                Sem Vaga na Escola Destino
+                              </span>
+                            )}
                             {req.status === 'EM_ANALISE' && (
                               <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full border border-amber-200">
                                 <Clock className="w-3.5 h-3.5 text-amber-600" />
@@ -1089,7 +1161,7 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
                             {req.status === 'REJEITADO' && (
                               <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-rose-100 text-rose-800 px-3 py-1 rounded-full border border-rose-200">
                                 <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                                Requer Correção
+                                Indeferido / Requer Correção
                               </span>
                             )}
                           </div>
@@ -1120,6 +1192,20 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
                             <div>
                               <span className="text-slate-400 font-medium block">Aluno / Classe:</span>
                               <span className="text-slate-700 font-semibold">{req.details.studentName} - {req.details.studentClasse}</span>
+                            </div>
+                          )}
+
+                          {req.serviceType === 'GUIA_TRANSFERENCIA' && (req.destinationSchoolName || req.details?.destinationSchool) && (
+                            <div className="sm:col-span-2 bg-indigo-50/70 border border-indigo-100 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <span className="text-indigo-700 font-semibold block text-[11px]">Escola de Destino Solicitada:</span>
+                                <span className="text-indigo-950 font-bold">{req.destinationSchoolName || req.details?.destinationSchool}</span>
+                              </div>
+                              {req.details?.reservedTurma && (
+                                <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-bold text-[11px]">
+                                  Lugar Reservado: {req.details.reservedTurma} ({req.details.reservedTurno || 'Manhã'})
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>

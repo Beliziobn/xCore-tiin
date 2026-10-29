@@ -374,21 +374,37 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
         studentName: studentName.trim(),
         studentBiOrProcesso: studentBiOrProcesso.trim(),
         studentClasse,
+        studentTurma,
+        studentPeriodo,
         academicYear: '2025/2026',
         purpose: purpose || 'Abono de Família / Comprovativo',
         notes: notes.trim(),
       };
     } else if (selectedService === 'GUIA_TRANSFERENCIA') {
+      const matchedDestSchool = schools.find(
+        (s) => s.name.trim().toLowerCase() === destinationSchool.trim().toLowerCase()
+      );
       title = `Guia de Transferência Escolar - ${studentName}`;
       targetRole = 'DIRECTOR';
       details = {
         studentName: studentName.trim(),
         studentBiOrProcesso: studentBiOrProcesso.trim(),
         studentClasse,
-        purpose: `Destino: ${destinationSchool.trim()}`,
+        studentTurma,
+        studentPeriodo,
+        destinationSchool: destinationSchool.trim(),
+        destinationSchoolId: matchedDestSchool?.id,
+        purpose: destinationSchool.trim(),
         notes: notes.trim(),
       };
     }
+
+    const matchedDest =
+      selectedService === 'GUIA_TRANSFERENCIA'
+        ? schools.find(
+            (s) => s.name.trim().toLowerCase() === destinationSchool.trim().toLowerCase()
+          )
+        : undefined;
 
     const payload = {
       serviceType: selectedService,
@@ -399,6 +415,9 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
       requesterRoleTitle,
       targetSchoolId: selectedSchoolId,
       targetSchoolName: selectedSchoolName,
+      destinationSchoolId: matchedDest?.id,
+      destinationSchoolName:
+        selectedService === 'GUIA_TRANSFERENCIA' ? destinationSchool.trim() : undefined,
       details,
     };
 
@@ -1139,18 +1158,52 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                         )}
 
                         {selectedService === 'GUIA_TRANSFERENCIA' && (
-                          <div className="sm:col-span-2 space-y-1.5">
+                          <div className="sm:col-span-2 space-y-2">
                             <label className="block text-xs font-bold text-slate-700">
-                              Escola de Destino Pretendida *
+                              Escola de Destino Pretendida (Consulta de Vaga) *
                             </label>
-                            <input
-                              type="text"
+                            <select
+                              value={
+                                schools.some((s) => s.name === destinationSchool)
+                                  ? destinationSchool
+                                  : destinationSchool
+                                  ? '__OUTRA__'
+                                  : ''
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '__OUTRA__') {
+                                  setDestinationSchool('');
+                                } else {
+                                  setDestinationSchool(val);
+                                }
+                              }}
+                              className="w-full h-11 px-4 rounded-full border border-slate-200 bg-slate-50 focus:bg-white text-xs sm:text-sm text-slate-900 outline-none focus:border-slate-900 transition-colors cursor-pointer"
                               required
-                              value={destinationSchool}
-                              onChange={(e) => setDestinationSchool(e.target.value)}
-                              placeholder="Indique a escola ou localidade de destino"
-                              className="w-full h-11 px-4 rounded-full border border-slate-200 bg-slate-50 focus:bg-white text-xs sm:text-sm text-slate-900 outline-none focus:border-slate-900 transition-colors"
-                            />
+                            >
+                              <option value="">Selecione a escola de destino para consulta de vaga...</option>
+                              {schools
+                                .filter((s) => s.id !== selectedSchoolId && s.name !== selectedSchoolName)
+                                .map((sc) => (
+                                  <option key={sc.id} value={sc.name}>
+                                    {sc.name}
+                                  </option>
+                                ))}
+                              <option value="__OUTRA__">Outra instituição escolar (digitar abaixo)</option>
+                            </select>
+                            {(!destinationSchool || !schools.some((s) => s.name === destinationSchool)) && (
+                              <input
+                                type="text"
+                                required
+                                value={destinationSchool}
+                                onChange={(e) => setDestinationSchool(e.target.value)}
+                                placeholder="Indique o nome oficial da escola de destino"
+                                className="w-full h-11 px-4 rounded-full border border-slate-200 bg-slate-50 focus:bg-white text-xs sm:text-sm text-slate-900 outline-none focus:border-slate-900 transition-colors"
+                              />
+                            )}
+                            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2">
+                              Antes da emissão da Guia de Transferência, o Diretor da escola atual enviará um pedido formal de confirmação de vaga à escola de destino selecionada.
+                            </p>
                           </div>
                         )}
                       </div>
@@ -1563,6 +1616,9 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                 <div className="grid grid-cols-1 gap-4">
                   {myRequests.map((req) => {
                     const isConcluido = req.status === 'CONCLUIDO';
+                    const isVagaConfirmada = req.status === 'VAGA_CONFIRMADA';
+                    const isAguardandoVaga = req.status === 'AGUARDANDO_VAGA_DESTINO';
+                    const isSemVaga = req.status === 'SEM_VAGA_DESTINO';
                     const isEmAnalise = req.status === 'EM_ANALISE';
                     const isRejeitado = req.status === 'REJEITADO';
 
@@ -1583,22 +1639,30 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                                 </span>
                                 <span
                                   className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                                    isConcluido
+                                    isConcluido || isVagaConfirmada
                                       ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                      : isAguardandoVaga
+                                      ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
                                       : isEmAnalise
                                       ? 'bg-sky-100 text-sky-800 border-sky-200'
-                                      : isRejeitado
+                                      : isRejeitado || isSemVaga
                                       ? 'bg-rose-100 text-rose-800 border-rose-200'
                                       : 'bg-amber-100 text-amber-800 border-amber-200'
                                   }`}
                                 >
                                   {isConcluido
                                     ? 'Concluído / Emitido'
+                                    : isVagaConfirmada
+                                    ? `Vaga Confirmada (${req.details?.reservedTurma || 'Turma Reservada'})`
+                                    : isAguardandoVaga
+                                    ? 'Aguardando Vaga na Escola Destino'
+                                    : isSemVaga
+                                    ? 'Sem Vaga na Escola Destino'
                                     : isEmAnalise
-                                    ? 'Em Análise pela Admin'
+                                    ? 'Em Análise pela Direção'
                                     : isRejeitado
                                     ? 'Indeferido'
-                                    : 'Pendente / Na Fila da Admin'}
+                                    : 'Pendente / Na Fila da Direção'}
                                 </span>
                               </div>
                               <h4 className="font-bold text-slate-800 text-xs sm:text-sm mt-0.5">

@@ -78,9 +78,6 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'diretor-servicos-rapidos',
     'servicos-rapidos',
     'pedidos-rapidos',
-    'declaracao-efectividade',
-    'efectividade',
-    'mapa-efectividade',
     'reunioes',
     'reunioes-salas',
     'sobre',
@@ -244,6 +241,27 @@ export function getViewTitle(view: string): string {
  * "um usuario nunca pode e nem deve mexer e nem entrar no perfil dos outros"
  */
 export function canUserAccessView(user: UserAccount | null, view: string): ViewAccessCheck {
+  const isHrServiceView =
+    view === 'declaracao-efectividade' ||
+    view === 'declaracao-servico' ||
+    view === 'declaracao-de-servico' ||
+    view === 'efectividade' ||
+    view === 'servico' ||
+    view === 'mapa-efectividade' ||
+    view === 'guia-ferias' ||
+    view === 'guia-de-ferias' ||
+    view === 'guia-colocacao';
+
+  if (user && (user.role || '').toLowerCase() === 'diretor' && isHrServiceView) {
+    return {
+      allowed: false,
+      reason:
+        'Acesso restrito: Na conta de Director de Escola o único serviço SIGRE disponível é Serviços Rápidos (Boletins de Notas, Matrículas & Frequências e Transferências).',
+      targetViewTitle: getViewTitle(view),
+      userOwnProfileView: getOwnProfileViewForUser(user),
+    };
+  }
+
   // Public views
   if (
     view === 'home' ||
@@ -274,12 +292,7 @@ export function canUserAccessView(user: UserAccount | null, view: string): ViewA
     view === 'servicos-cidadao' ||
     view === 'balcao-rapido' ||
     view === 'pedidos-rapidos' ||
-    view === 'declaracao-efectividade' ||
-    view === 'declaracao-servico' ||
-    view === 'declaracao-de-servico' ||
-    view === 'efectividade' ||
-    view === 'servico' ||
-    view === 'mapa-efectividade'
+    isHrServiceView
   ) {
     return { allowed: true, userOwnProfileView: getOwnProfileViewForUser(user) };
   }

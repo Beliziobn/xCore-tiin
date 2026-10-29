@@ -20,6 +20,10 @@ import {
   downloadQuickServiceDocumentPdf,
   printSinglePageA4Clean,
 } from '../../utils/declaracaoPdfGenerator';
+import {
+  extractStudentGradesFromPautas,
+  verifyStudentEnrollmentInSchool,
+} from '../../utils/quickServicesStorage';
 
 interface OfficialDocumentModalProps {
   isOpen: boolean;
@@ -97,17 +101,50 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
     isFeminino
   );
 
-  // Calculate sample academic subjects & grades if Boletim
-  const subjects = [
-    { name: 'Língua Portuguesa', p1: 15, p2: 16, pt: 16, mt: 16 },
-    { name: 'Matemática', p1: 14, p2: 17, pt: 16, mt: 16 },
-    { name: 'Ciências da Natureza', p1: 16, p2: 15, pt: 17, mt: 16 },
-    { name: 'História e Geografia de Angola', p1: 17, p2: 16, pt: 16, mt: 16 },
-    { name: 'Educação Moral e Cívica', p1: 18, p2: 17, pt: 18, mt: 18 },
-    { name: 'Educação Visual e Plástica', p1: 15, p2: 15, pt: 16, mt: 15 },
-    { name: 'Educação Física', p1: 17, p2: 18, pt: 17, mt: 17 },
-  ];
-  const overallAvg = (subjects.reduce((acc, s) => acc + s.mt, 0) / subjects.length).toFixed(1);
+  // Verify enrollment & pull real grades from Mini-Pautas / Pautas if Boletim
+  const enrollmentCheck = verifyStudentEnrollmentInSchool({
+    schoolName: request.targetSchoolName,
+    studentName: details.studentName || request.requesterName,
+    studentBiOrProcesso: details.studentBiOrProcesso,
+    studentClasse: details.enrolledClasse || details.studentClasse,
+    studentTurma: details.enrolledTurma || details.studentTurma,
+  });
+
+  const resolvedClasse =
+    details.enrolledClasse || enrollmentCheck.classe || details.studentClasse || '7ª Classe';
+  const resolvedTurma =
+    details.enrolledTurma || enrollmentCheck.turma || details.studentTurma || 'Turma A';
+  const resolvedPeriodo =
+    details.enrolledTurno || enrollmentCheck.turno || details.studentPeriodo || 'Manhã';
+  const resolvedSala = details.enrolledSala || enrollmentCheck.sala || 'Sala 01';
+  const resolvedProcesso =
+    details.enrolledCodigoMatricula ||
+    enrollmentCheck.codigoMatricula ||
+    details.studentBiOrProcesso ||
+    'Confirmado';
+
+  const liveGrades = extractStudentGradesFromPautas({
+    schoolName: request.targetSchoolName,
+    studentName: details.studentName || request.requesterName,
+    studentBiOrProcesso: details.studentBiOrProcesso,
+    classe: resolvedClasse,
+    turma: resolvedTurma,
+    trimestre: details.trimestre || '1º Trimestre',
+  });
+
+  const gradeRows =
+    details.gradesSnapshot && details.gradesSnapshot.length > 0
+      ? details.gradesSnapshot
+      : liveGrades.gradesSnapshot;
+  const overallAvg = details.overallAverage || liveGrades.overallAverage;
+  const academicStatusLabel =
+    details.academicStatus ||
+    (liveGrades.hasLaunchedGrades
+      ? liveGrades.academicStatus
+      : `${aprovadoAprovada} / EM AVALIAÇÃO`);
+  const isFinalBoletim =
+    (details.trimestre || '').toLowerCase().includes('final') ||
+    (details.trimestre || '').toLowerCase().includes('anual');
 
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-xs overflow-y-auto print:block print:p-0 print:bg-white print:static print:inset-auto">
@@ -379,7 +416,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {request.serviceType === 'BOLETIM_NOTAS' && (
               <div className="doc-text-12 space-y-2.5 text-black">
                 <p className="text-justify">
-                  A Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> certifica que {artigoAluno} abaixo {identificadoIdentificada} obteve o seguinte rendimento pedagógico referente ao <strong>{details.trimestre || 'Ano Lectivo 2025/2026'}</strong>:
+                  A Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> certifica que {artigoAluno} abaixo {identificadoIdentificada}, regularmente {matriculadoMatriculada} nesta instituição, obteve o seguinte rendimento pedagógico apurado nas Mini-Pautas e Pautas Oficiais referente ao <strong>{details.trimestre || '1º Trimestre'} ({details.academicYear || '2025/2026'})</strong>:
                 </p>
 
                 <div className="bg-slate-50 print:bg-white p-3 print:p-0 rounded-xl border border-slate-200 print:border-0 grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -389,49 +426,73 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-600 print:text-black block">Classe / Turma:</span>
-                    <strong className="text-black">{details.studentClasse || '8ª Classe'} - {details.studentTurma || 'Turma A'}</strong>
+                    <strong className="text-black">{resolvedClasse} - {resolvedTurma} ({resolvedSala})</strong>
                   </div>
                   <div>
                     <span className="text-slate-600 print:text-black block">Período / Turno:</span>
-                    <strong className="text-black">{details.studentPeriodo || 'Manhã'}</strong>
+                    <strong className="text-black">{resolvedPeriodo}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-600 print:text-black block">BI / N.º Processo:</span>
-                    <strong className="text-black">{details.studentBiOrProcesso || '0049281'}</strong>
+                    <span className="text-slate-600 print:text-black block">BI / N.º Matrícula:</span>
+                    <strong className="text-black">{resolvedProcesso}</strong>
                   </div>
                 </div>
 
-                {/* Grade Table */}
+                {/* Grade Table Pulled from Mini-Pautas / Pautas */}
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse border border-slate-300">
                     <thead>
                       <tr className="bg-slate-100 text-slate-900 uppercase font-bold text-[11px]">
                         <th className="p-1.5 border border-slate-300">Disciplina Curricular</th>
-                        <th className="p-1.5 border border-slate-300 text-center">MAC</th>
-                        <th className="p-1.5 border border-slate-300 text-center">NPP</th>
-                        <th className="p-1.5 border border-slate-300 text-center">NPT</th>
-                        <th className="p-1.5 border border-slate-300 text-center bg-indigo-50 text-indigo-950 font-bold">Média (MT)</th>
+                        {isFinalBoletim ? (
+                          <>
+                            <th className="p-1.5 border border-slate-300 text-center">MT1</th>
+                            <th className="p-1.5 border border-slate-300 text-center">MT2</th>
+                            <th className="p-1.5 border border-slate-300 text-center">MT3</th>
+                            <th className="p-1.5 border border-slate-300 text-center bg-indigo-50 text-indigo-950 font-bold">MFD</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="p-1.5 border border-slate-300 text-center">MAC</th>
+                            <th className="p-1.5 border border-slate-300 text-center">NPP</th>
+                            <th className="p-1.5 border border-slate-300 text-center">NPT</th>
+                            <th className="p-1.5 border border-slate-300 text-center bg-indigo-50 text-indigo-950 font-bold">Média (MT)</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
-                      {subjects.map((sub, idx) => (
+                      {gradeRows.map((sub, idx) => (
                         <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="p-1.5 border border-slate-300 font-semibold text-slate-800">{sub.name}</td>
-                          <td className="p-1.5 border border-slate-300 text-center">{sub.p1}</td>
-                          <td className="p-1.5 border border-slate-300 text-center">{sub.p2}</td>
-                          <td className="p-1.5 border border-slate-300 text-center">{sub.pt}</td>
-                          <td className="p-1.5 border border-slate-300 text-center font-bold text-slate-950 bg-indigo-50/50">
-                            {sub.mt}
-                          </td>
+                          <td className="p-1.5 border border-slate-300 font-semibold text-slate-800">{sub.subject}</td>
+                          {isFinalBoletim ? (
+                            <>
+                              <td className="p-1.5 border border-slate-300 text-center">{sub.mt1 ?? sub.mac}</td>
+                              <td className="p-1.5 border border-slate-300 text-center">{sub.mt2 ?? sub.npp}</td>
+                              <td className="p-1.5 border border-slate-300 text-center">{sub.mt3 ?? sub.npt}</td>
+                              <td className="p-1.5 border border-slate-300 text-center font-bold text-slate-950 bg-indigo-50/50">
+                                {sub.mfd ?? sub.mt}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="p-1.5 border border-slate-300 text-center">{sub.mac}</td>
+                              <td className="p-1.5 border border-slate-300 text-center">{sub.npp}</td>
+                              <td className="p-1.5 border border-slate-300 text-center">{sub.npt}</td>
+                              <td className="p-1.5 border border-slate-300 text-center font-bold text-slate-950 bg-indigo-50/50">
+                                {sub.mt}
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                       <tr className="bg-slate-200 font-bold text-slate-950">
-                        <td className="p-1.5 border border-slate-300 uppercase">Média Geral Ponderada</td>
+                        <td className="p-1.5 border border-slate-300 uppercase">Média Geral Apurada nas Pautas</td>
                         <td colSpan={3} className="p-1.5 border border-slate-300 text-center text-slate-600">
-                          Classificação Global
+                          Escala Oficial: {details.gradingScaleLabel || liveGrades.gradingScaleLabel}
                         </td>
                         <td className="p-1.5 border border-slate-300 text-center text-sm text-indigo-900 bg-indigo-100 font-bold">
-                          {overallAvg} Val.
+                          {overallAvg}
                         </td>
                       </tr>
                     </tbody>
@@ -441,9 +502,9 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                 <div className="bg-emerald-50 print:bg-white border border-emerald-300 print:border-0 p-2.5 print:p-0 rounded-xl flex items-center justify-between text-emerald-950 print:text-black">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 print:hidden" />
-                    <span>Situação Académica: <strong>{aprovadoAprovada} / TRANSITA DE ANO</strong></span>
+                    <span>Situação Académica: <strong>{academicStatusLabel}</strong></span>
                   </div>
-                  <span className="font-bold text-emerald-800 print:text-black">Resultado Oficial Homologado</span>
+                  <span className="font-bold text-emerald-800 print:text-black">Extraído das Mini-Pautas e Pautas Oficiais</span>
                 </div>
               </div>
             )}
@@ -451,26 +512,30 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {request.serviceType === 'DECLARACAO_MATRICULA' && (
               <div className="doc-text-12 space-y-2.5 text-justify text-black">
                 <p>
-                  Para os devidos efeitos legais e por ter sido solicitada {interessadoInteressada}, a Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> faz constar e <strong>DECLARA</strong> que {artigoAluno}:
+                  Para os devidos efeitos legais e por ter sido solicitada {interessadoInteressada}, a Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> faz constar, após conferência nos registos oficiais de matrícula e nas listas de turmas, e <strong>DECLARA</strong> que {artigoAluno}:
                 </p>
                 <div className="bg-slate-50 print:bg-white p-3 print:p-0 rounded-xl border border-slate-200 print:border-0 space-y-1.5">
                   <div>
                     <span className="text-slate-600 print:text-black">{isFeminino ? 'Nome da Aluna:' : 'Nome do Aluno:'}</span>{' '}
                     <strong className="text-black">{details.studentName || request.requesterName}</strong>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div>
-                      <span className="text-slate-600 print:text-black">Classe / Nível:</span>{' '}
-                      <strong className="text-black">{details.studentClasse || 'Regular'}</strong>
+                      <span className="text-slate-600 print:text-black">Classe / Turma:</span>{' '}
+                      <strong className="text-black">{resolvedClasse} • {resolvedTurma} ({resolvedSala})</strong>
                     </div>
                     <div>
-                      <span className="text-slate-600 print:text-black">BI / N.º Processo:</span>{' '}
-                      <strong className="text-black">{details.studentBiOrProcesso || 'Processo Escolar'}</strong>
+                      <span className="text-slate-600 print:text-black">Período / Turno:</span>{' '}
+                      <strong className="text-black">{resolvedPeriodo}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 print:text-black">BI / N.º Matrícula:</span>{' '}
+                      <strong className="text-black">{resolvedProcesso}</strong>
                     </div>
                   </div>
                 </div>
                 <p>
-                  Encontra-se devidamente {matriculadoMatriculada} e a frequentar as aulas curriculares normais durante o Ano Lectivo de <strong>2025/2026</strong> nesta instituição de ensino do Sistema Geral de Educação.
+                  Encontra-se devidamente {matriculadoMatriculada} e a frequentar regularmente as aulas curriculares normais na <strong>{resolvedTurma}</strong> ({resolvedPeriodo}) durante o Ano Lectivo de <strong>{details.academicYear || '2025/2026'}</strong> nesta instituição de ensino do Sistema Geral de Educação.
                 </p>
                 <p>
                   A presente declaração destina-se {finalidadeFormatted.preposition} <strong>{finalidadeFormatted.text}</strong>.
@@ -484,23 +549,39 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   A Direcção {getPreposicaoEscola(request.targetSchoolName) === 'na' ? 'da' : 'do'} <strong>{request.targetSchoolName || 'Complexo Escolar do Quêssua'}</strong> concede por este meio a presente <strong>GUIA OFICIAL DE TRANSFERÊNCIA ESCOLAR</strong> {aoAEstudante}:
                 </p>
                 <div className="bg-slate-50 print:bg-white p-3 print:p-0 rounded-xl border border-slate-200 print:border-0 space-y-1.5">
-                  <div>
-                    <span className="text-slate-600 print:text-black">{isFeminino ? 'Aluna:' : 'Aluno:'}</span>{' '}
-                    <strong className="text-black">{details.studentName || request.requesterName}</strong>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <span className="text-slate-600 print:text-black">Classe Actual:</span>{' '}
-                      <strong className="text-black">{details.studentClasse || '9ª Classe'}</strong>
+                      <span className="text-slate-600 print:text-black">{isFeminino ? 'Aluna:' : 'Aluno:'}</span>{' '}
+                      <strong className="text-black">{details.studentName || request.requesterName}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 print:text-black">N.º Matrícula / BI:</span>{' '}
+                      <strong className="text-black">{resolvedProcesso}</strong>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-slate-600 print:text-black">Classe / Turma de Origem:</span>{' '}
+                      <strong className="text-black">{resolvedClasse} ({resolvedTurma} - {resolvedPeriodo})</strong>
                     </div>
                     <div>
                       <span className="text-slate-600 print:text-black">Escola de Destino:</span>{' '}
-                      <strong className="text-black">{details.purpose || 'Instituição Indicada'}</strong>
+                      <strong className="text-black">{request.destinationSchoolName || details.destinationSchool || details.purpose || 'Instituição Indicada'}</strong>
                     </div>
                   </div>
+                  {details.reservedTurma && (
+                    <div className="pt-1 border-t border-slate-200 print:border-black/20 flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        Vaga Confirmada e Reservada na Escola de Destino: <strong>{details.reservedTurma} ({details.reservedTurno || 'Manhã'}{details.reservedSala ? ` • ${details.reservedSala}` : ''})</strong>
+                      </span>
+                      {details.vacancyRespondedBy && (
+                        <span>Homologado por: <strong>{details.vacancyRespondedBy}</strong></span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <p>
-                  Mais se declara que o processo individual {doDaAluno} se encontra regularizado, sem quaisquer impedimentos legais ou disciplinares, podendo a escola receptora proceder à respectiva integração.
+                  Mais se declara que o vínculo de matrícula na escola de origem e a disponibilidade de vaga na escola receptora foram devidamente conferidos, encontrando-se o processo individual {doDaAluno} regularizado e sem quaisquer impedimentos legais ou disciplinares, podendo a escola de destino proceder ao enquadramento definitivo na turma reservada.
                 </p>
               </div>
             )}

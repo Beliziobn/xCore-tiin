@@ -276,7 +276,9 @@ export const DirectorPautasPage: React.FC<DirectorPautasPageProps> = ({
     const perLabel =
       targetPeriodo === 'FINAL'
         ? 'Pauta Final Anual'
-        : `Mini-Pauta do ${targetPeriodo}º Trimestre`;
+        : isSingleDisciplineSelected
+        ? `Mini-Pauta do ${targetPeriodo}º Trimestre`
+        : `Pauta Final do ${targetPeriodo}º Trimestre`;
 
     showQuickNotification(
       `${perLabel} (${discLabel} • ${consolidated.classe} - ${consolidated.turma}) gerada em PDF!`
@@ -383,7 +385,9 @@ export const DirectorPautasPage: React.FC<DirectorPautasPageProps> = ({
   const activePeriodLabel =
     selectedPeriodo === 'FINAL'
       ? 'Pauta Final Anual'
-      : `Mini-Pauta do ${selectedPeriodo}º Trimestre`;
+      : isSingleDisciplineSelected
+      ? `Mini-Pauta do ${selectedPeriodo}º Trimestre`
+      : `Pauta Final do ${selectedPeriodo}º Trimestre`;
 
   const activeDisciplineLabel = isSingleDisciplineSelected
     ? selectedDisciplinaFilter
@@ -639,7 +643,13 @@ export const DirectorPautasPage: React.FC<DirectorPautasPageProps> = ({
               >
                 <FileDown className="w-4 h-4 text-[#f75142]" />
                 <span>
-                  Baixar {selectedPeriodo === 'FINAL' ? 'Pauta Final' : `Mini-Pauta (${selectedPeriodo}º Trim.)`} PDF
+                  Baixar{' '}
+                  {selectedPeriodo === 'FINAL'
+                    ? 'Pauta Final'
+                    : isSingleDisciplineSelected
+                    ? `Mini-Pauta (${selectedPeriodo}º Trim.)`
+                    : `Pauta Final (${selectedPeriodo}º Trim.)`}{' '}
+                  PDF
                 </span>
               </button>
             </div>
@@ -708,7 +718,7 @@ export const DirectorPautasPage: React.FC<DirectorPautasPageProps> = ({
                       : `MINI-PAUTA DO ${selectedPeriodo}º TRIMESTRE — DISCIPLINA: ${selectedDisciplinaFilter.toUpperCase()} — ${consolidated.classe.toUpperCase()} (${consolidated.turma.toUpperCase()})`
                     : selectedPeriodo === 'FINAL'
                     ? `PAUTA FINAL GERAL (TODAS AS DISCIPLINAS) — ${consolidated.classe.toUpperCase()} (${consolidated.turma.toUpperCase()}) — ANO LECTIVO ${consolidated.anoLectivo}`
-                    : `MINI-PAUTA GERAL DO ${selectedPeriodo}º TRIMESTRE (TODAS AS DISCIPLINAS) — ${consolidated.classe.toUpperCase()} (${consolidated.turma.toUpperCase()})`}
+                    : `PAUTA FINAL DO ${selectedPeriodo}º TRIMESTRE (TODAS AS DISCIPLINAS) — ${consolidated.classe.toUpperCase()} (${consolidated.turma.toUpperCase()})`}
                 </span>
               </div>
 
@@ -1375,40 +1385,55 @@ export const DirectorPautasPage: React.FC<DirectorPautasPageProps> = ({
             </div>
 
             {/* Rodapé Oficial de Assinaturas */}
-            <div className="p-5 bg-slate-50 border-t-2 border-slate-300 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center text-xs">
-              <div>
-                <div className="font-black uppercase text-slate-800">
-                  O CORPO DE JÚRI / PROFESSOR(ES)
-                </div>
-                <div className="text-[11px] text-slate-600 mt-1">
-                  {isSingleDisciplineSelected
-                    ? consolidated.teachersByDiscipline[selectedDisciplinaFilter] ||
-                      consolidated.contributingTeachers[0]?.teacherName
-                    : consolidated.contributingTeachers.map((t) => t.teacherName).join(' • ')}
-                </div>
-                <div className="mt-4 border-b border-slate-400 w-48 mx-auto" />
-              </div>
+            <div className="p-5 bg-slate-50 border-t-2 border-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-6 text-center text-xs">
+              {isSingleDisciplineSelected && selectedPeriodo !== 'FINAL' ? (
+                <>
+                  <div>
+                    <div className="font-black uppercase text-slate-800">
+                      O(A) PROFESSOR(A)
+                    </div>
+                    <div className="text-[11px] text-slate-600 mt-1">
+                      {consolidated.teachersByDiscipline[selectedDisciplinaFilter] ||
+                        consolidated.contributingTeachers[0]?.teacherName ||
+                        'Docente da Disciplina'}
+                    </div>
+                    <div className="mt-5 border-b border-slate-400 w-56 mx-auto" />
+                  </div>
 
-              <div>
-                <div className="font-black uppercase text-slate-800">
-                  O SUB-DIRECTOR PEDAGÓGICO(A)
-                </div>
-                <div className="text-[11px] text-slate-600 mt-1">
-                  Coordenação Pedagógica Escolar
-                </div>
-                <div className="mt-4 border-b border-slate-400 w-48 mx-auto" />
-              </div>
+                  <div>
+                    <div className="font-black uppercase text-slate-800">
+                      O(A) SUBDIRECTOR(A) PEDAGÓGICO(A)
+                    </div>
+                    <div className="text-[11px] text-slate-600 mt-1">
+                      Subdirecção Pedagógica
+                    </div>
+                    <div className="mt-5 border-b border-slate-400 w-56 mx-auto" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div className="font-black uppercase text-slate-800">
+                      O(A) SUBDIRECTOR(A) PEDAGÓGICO(A)
+                    </div>
+                    <div className="text-[11px] text-slate-600 mt-1">
+                      Subdirecção Pedagógica
+                    </div>
+                    <div className="mt-5 border-b border-slate-400 w-56 mx-auto" />
+                  </div>
 
-              <div>
-                <div className="font-black uppercase text-slate-800">
-                  O DIRECTOR DA ESCOLA
-                </div>
-                <div className="text-[11px] text-emerald-700 font-bold mt-1">
-                  {directorName}{' '}
-                  {isCurrentTurmaHomologated ? '(Homologado Digitalmente)' : ''}
-                </div>
-                <div className="mt-4 border-b border-slate-400 w-48 mx-auto" />
-              </div>
+                  <div>
+                    <div className="font-black uppercase text-slate-800">
+                      O(A) DIRECTOR(A) DA ESCOLA
+                    </div>
+                    <div className="text-[11px] text-emerald-700 font-bold mt-1">
+                      {directorName}{' '}
+                      {isCurrentTurmaHomologated ? '(Homologado Digitalmente)' : ''}
+                    </div>
+                    <div className="mt-5 border-b border-slate-400 w-56 mx-auto" />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </section>

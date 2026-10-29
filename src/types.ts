@@ -1039,7 +1039,28 @@ export type QuickServiceType =
   | 'DECLARACAO_MATRICULA' 
   | 'GUIA_TRANSFERENCIA';
 
-export type QuickServiceStatus = 'PENDENTE' | 'EM_ANALISE' | 'CONCLUIDO' | 'REJEITADO';
+export type QuickServiceStatus =
+  | 'PENDENTE'
+  | 'EM_ANALISE'
+  | 'AGUARDANDO_VAGA_DESTINO'
+  | 'VAGA_CONFIRMADA'
+  | 'SEM_VAGA_DESTINO'
+  | 'CONCLUIDO'
+  | 'REJEITADO';
+
+export interface QuickServiceGradeItem {
+  subject: string;
+  mac: number | string;
+  npp: number | string;
+  npt: number | string;
+  mt: number | string;
+  mt1?: number | string;
+  mt2?: number | string;
+  mt3?: number | string;
+  mfd?: number | string;
+  isPassing?: boolean;
+  teacherName?: string;
+}
 
 export interface QuickServiceRequest {
   id: string;
@@ -1063,9 +1084,13 @@ export interface QuickServiceRequest {
   targetDirectorEmail?: string;
   targetAdminEmail?: string;
 
+  // Inter-school transfer target (destination school)
+  destinationSchoolId?: string;
+  destinationSchoolName?: string;
+
   // Request specifics
   details: {
-    // Boletim de notas
+    // Boletim de notas / Matrícula / Transferência
     studentName?: string;
     studentBiOrProcesso?: string;
     studentClasse?: string;
@@ -1073,6 +1098,35 @@ export interface QuickServiceRequest {
     studentPeriodo?: string;
     trimestre?: string;
     academicYear?: string;
+
+    // Enrollment verification (Comprovação de Matrícula na Escola de Origem)
+    enrollmentVerified?: boolean;
+    enrolledStudentId?: string;
+    enrolledCodigoMatricula?: string;
+    enrolledClasse?: string;
+    enrolledTurma?: string;
+    enrolledTurno?: string;
+    enrolledSala?: string;
+    enrollmentVerificationNote?: string;
+
+    // Real grades pulled from Mini-Pautas / Pautas
+    gradesSnapshot?: QuickServiceGradeItem[];
+    overallAverage?: string;
+    gradingScaleType?: 'qualitativo' | 'escala_0_10' | 'escala_0_20';
+    gradingScaleLabel?: string;
+    academicStatus?: string;
+
+    // Inter-school transfer consultation & seat reservation
+    destinationSchool?: string;
+    destinationSchoolId?: string;
+    vacancyRequestedAt?: string;
+    vacancyRequestedBy?: string;
+    vacancyRespondedAt?: string;
+    vacancyRespondedBy?: string;
+    vacancyNotes?: string;
+    reservedTurma?: string;
+    reservedSala?: string;
+    reservedTurno?: string;
 
     // Declaração de efectividade
     employeeName?: string;

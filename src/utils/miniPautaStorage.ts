@@ -725,7 +725,7 @@ export function exportConsolidatedPautaToPDF(options: {
     if (resolvedPeriodo === 'FINAL') {
       docTitle = `PAUTA FINAL GERAL (TODAS AS DISCIPLINAS) — ${consolidated.classe.toUpperCase()} (${consolidated.turma.toUpperCase()}) — ${consolidated.anoLectivo}`;
     } else {
-      docTitle = `MINI-PAUTA GERAL DO ${resolvedPeriodo}º TRIMESTRE (TODAS AS DISCIPLINAS) — ${consolidated.classe.toUpperCase()} (${consolidated.turma.toUpperCase()})`;
+      docTitle = `PAUTA FINAL DO ${resolvedPeriodo}º TRIMESTRE (TODAS AS DISCIPLINAS) — ${consolidated.classe.toUpperCase()} (${consolidated.turma.toUpperCase()})`;
     }
   }
 
@@ -1177,20 +1177,33 @@ export function exportConsolidatedPautaToPDF(options: {
   }
 
   const sigY = Math.min(195, y + 13);
+  const leftSigX = pageWidth * 0.28;
+  const rightSigX = pageWidth * 0.72;
+  const isMiniPautaDisciplina = isSingleDiscipline && resolvedPeriodo !== 'FINAL';
+
   pdf.setTextColor(15, 23, 42);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(7.5);
-  pdf.text('O CORPO DE JÚRI / PROFESSOR(ES)', marginX + 35, sigY, { align: 'center' });
-  pdf.text(subDirectorName.toUpperCase(), pageWidth / 2, sigY, { align: 'center' });
-  pdf.text(directorName.toUpperCase(), pageWidth - marginX - 35, sigY, { align: 'center' });
+  pdf.setFontSize(8);
+
+  if (isMiniPautaDisciplina) {
+    pdf.text('O(A) PROFESSOR(A)', leftSigX, sigY, { align: 'center' });
+    pdf.text('O(A) SUBDIRECTOR(A) PEDAGÓGICO(A)', rightSigX, sigY, { align: 'center' });
+  } else {
+    pdf.text('O(A) SUBDIRECTOR(A) PEDAGÓGICO(A)', leftSigX, sigY, { align: 'center' });
+    pdf.text('O(A) DIRECTOR(A) DA ESCOLA', rightSigX, sigY, { align: 'center' });
+  }
 
   pdf.setFont('helvetica', 'normal');
-  pdf.text('_______________________________', marginX + 35, sigY + 7, { align: 'center' });
-  pdf.text('_______________________________', pageWidth / 2, sigY + 7, { align: 'center' });
-  pdf.text('_______________________________', pageWidth - marginX - 35, sigY + 7, { align: 'center' });
+  pdf.text('________________________________________', leftSigX, sigY + 8, { align: 'center' });
+  pdf.text('________________________________________', rightSigX, sigY + 8, { align: 'center' });
 
   const discSlug = isSingleDiscipline ? targetDisciplina : 'todas_disciplinas';
-  const perSlug = resolvedPeriodo === 'FINAL' ? 'pauta_final' : `minipauta_${resolvedPeriodo}_trimestre`;
+  const perSlug =
+    resolvedPeriodo === 'FINAL'
+      ? 'pauta_final'
+      : isSingleDiscipline
+      ? `minipauta_${resolvedPeriodo}_trimestre`
+      : `pauta_final_${resolvedPeriodo}_trimestre`;
   const fileSlug = `${perSlug}_${discSlug}_${consolidated.classe}_${consolidated.turma}`
     .replace(/\s+/g, '_')
     .toLowerCase();

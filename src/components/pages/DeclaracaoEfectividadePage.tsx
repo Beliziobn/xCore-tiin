@@ -177,13 +177,20 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   onNavigateHome,
   initialTab = 'form',
 }) => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+  const isDirector = Boolean(
+    isLoggedIn && currentUser && currentUser.role === 'diretor'
+  );
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
+    isDirector ? 'pedidos' : initialTab
+  );
 
   useEffect(() => {
-    if (initialTab) {
+    if (isDirector) {
+      setActiveTab('pedidos');
+    } else if (initialTab) {
       setActiveTab(initialTab);
     }
-  }, [initialTab]);
+  }, [initialTab, isDirector]);
 
   const [quickRequestsCount, setQuickRequestsCount] = useState<number>(0);
   const [records, setRecords] = useState<CadastramentoEfectividadeRecord[]>(() =>
@@ -214,7 +221,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   const isAdminOrDirector = Boolean(
     isLoggedIn &&
       currentUser &&
-      (currentUser.role === 'admin' || currentUser.role === 'diretor')
+      currentUser.role === 'admin'
   );
 
   const reloadRecords = () => {
@@ -225,8 +232,20 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     fetchQuickRequests()
       .then((reqs) => {
         if (Array.isArray(reqs)) {
+          const allowedForDirector = ['BOLETIM_NOTAS', 'DECLARACAO_MATRICULA', 'GUIA_TRANSFERENCIA'];
+          const dirSchool = (currentUser?.schoolName || '').trim().toLowerCase();
           setQuickRequestsCount(
-            reqs.filter((r) => r.status === 'PENDENTE' || r.status === 'EM_ANALISE').length
+            reqs.filter((r) => {
+              if (r.status !== 'PENDENTE' && r.status !== 'EM_ANALISE') return false;
+              if (isDirector) {
+                if (!allowedForDirector.includes(r.serviceType)) return false;
+                if (dirSchool && r.targetSchoolName) {
+                  const target = r.targetSchoolName.trim().toLowerCase();
+                  return target.includes(dirSchool) || dirSchool.includes(target);
+                }
+              }
+              return true;
+            }).length
           );
         }
       })
@@ -1215,68 +1234,74 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* Group 1: Tipos de Serviço */}
             <div>
               <p className="text-xs font-medium text-slate-500 px-3 mb-1.5">
-                Tipos de serviço
+                {isDirector ? 'Serviço SIGRE da Direção' : 'Tipos de serviço'}
               </p>
               <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('form')}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                    activeTab === 'form' || activeTab === 'view-ficha'
-                      ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <Building2 className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Declaração de Efectividade</span>
-                </button>
+                {!isDirector && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('form')}
+                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                        activeTab === 'form' || activeTab === 'view-ficha'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <Building2 className="w-4 h-4 text-slate-700 shrink-0" />
+                      <span className="truncate">Declaração de Efectividade</span>
+                    </button>
 
-                <button
-                  id="tab-declaracao-servico"
-                  type="button"
-                  onClick={() => setActiveTab('declaracao-servico')}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                    activeTab === 'declaracao-servico'
-                      ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <Landmark className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Declaração de Serviço</span>
-                </button>
+                    <button
+                      id="tab-declaracao-servico"
+                      type="button"
+                      onClick={() => setActiveTab('declaracao-servico')}
+                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                        activeTab === 'declaracao-servico'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <Landmark className="w-4 h-4 text-slate-700 shrink-0" />
+                      <span className="truncate">Declaração de Serviço</span>
+                    </button>
 
-                <button
-                  id="tab-guia-ferias"
-                  type="button"
-                  onClick={() => setActiveTab('guia-ferias')}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                    activeTab === 'guia-ferias'
-                      ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <CalendarRange className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Guia de Férias</span>
-                </button>
+                    <button
+                      id="tab-guia-ferias"
+                      type="button"
+                      onClick={() => setActiveTab('guia-ferias')}
+                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                        activeTab === 'guia-ferias'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <CalendarRange className="w-4 h-4 text-slate-700 shrink-0" />
+                      <span className="truncate">Guia de Férias</span>
+                    </button>
 
-                <button
-                  id="tab-guia-colocacao"
-                  type="button"
-                  onClick={() => setActiveTab('guia-colocacao')}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                    activeTab === 'guia-colocacao'
-                      ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <MapPin className="w-4 h-4 text-slate-700 shrink-0" />
-                  <span className="truncate">Guia de Colocação</span>
-                </button>
+                    <button
+                      id="tab-guia-colocacao"
+                      type="button"
+                      onClick={() => setActiveTab('guia-colocacao')}
+                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                        activeTab === 'guia-colocacao'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <MapPin className="w-4 h-4 text-slate-700 shrink-0" />
+                      <span className="truncate">Guia de Colocação</span>
+                    </button>
+                  </>
+                )}
 
-                <div className="pt-2 mt-2 border-t border-slate-100">
-                  <p className="text-[11px] font-medium text-slate-400 px-3 mb-1">
-                    Solicitações de Usuários
-                  </p>
+                <div className={isDirector ? '' : 'pt-2 mt-2 border-t border-slate-100'}>
+                  {!isDirector && (
+                    <p className="text-[11px] font-medium text-slate-400 px-3 mb-1">
+                      Solicitações de Usuários
+                    </p>
+                  )}
                   <button
                     id="tab-servicos-rapidos-pedidos"
                     type="button"
@@ -1297,10 +1322,32 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
-                        Pedidos
+                        {isDirector ? 'Ativo' : 'Pedidos'}
                       </span>
                     )}
                   </button>
+
+                  {isDirector && (
+                    <div className="mt-3 px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                      <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        Documentos da Direção
+                      </p>
+                      <ul className="text-xs text-slate-600 space-y-1 font-medium">
+                        <li className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Boletins de Notas</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Matrículas e Frequências</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Guias de Transferência</span>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2570,7 +2617,9 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       : ((currentUser?.role || 'diretor') as any)
                   }
                   schoolName={currentUser?.schoolName || ''}
-                  onNavigateToDeclaracaoEfectividade={() => setActiveTab('form')}
+                  onNavigateToDeclaracaoEfectividade={
+                    isDirector ? undefined : () => setActiveTab('form')
+                  }
                   showToast={showToast}
                 />
               </div>

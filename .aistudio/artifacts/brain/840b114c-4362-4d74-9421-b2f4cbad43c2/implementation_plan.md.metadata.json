@@ -1,6 +1,6 @@
 {
-  "summary":  "Plano de implementação para redirecionar utilizadores não cadastrados que iniciam sessão com o Google para a página de inscrição (Passo 1), com o e-mail do Google pré-preenchido e bloqueado.",
-  "updatedAt":  "2026-10-29T21:29:20.750367156Z",
+  "summary":  "Plano de implementação para validação de vínculo escolar nos Pedidos Rápidos, extração automática de notas das Mini-Pautas/Pautas para o Boletim de Notas e fluxo de consulta e reserva de vaga entre escolas para emissão de Guia de Transferência.",
+  "updatedAt":  "2026-10-29T22:16:30.837994520Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

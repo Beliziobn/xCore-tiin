@@ -1072,6 +1072,24 @@ export default function App() {
         targetView = 'professor-estatisticas';
       }
 
+      if (
+        (activeRole === 'diretor' || currentUser.role === 'diretor') &&
+        (pageId === 'declaracao-efectividade' ||
+          pageId === 'servicos-sigre' ||
+          pageId === 'sigre-servicos' ||
+          pageId === 'efectividade' ||
+          pageId === 'mapa-efectividade' ||
+          pageId === 'efectividade-branco' ||
+          pageId === 'declaracao-servico' ||
+          pageId === 'declaracao-de-servico' ||
+          pageId === 'servico' ||
+          pageId === 'guia-ferias' ||
+          pageId === 'guia-de-ferias' ||
+          pageId === 'guia-colocacao')
+      ) {
+        targetView = 'diretor-servicos-rapidos';
+      }
+
       const accessCheck = canUserAccessView(currentUser, targetView);
       if (!accessCheck.allowed) {
         showToast(
@@ -1262,11 +1280,13 @@ export default function App() {
     }
     if (
       pageId === 'declaracao-efectividade' ||
+      pageId === 'servicos-sigre' ||
+      pageId === 'sigre-servicos' ||
       pageId === 'efectividade' ||
       pageId === 'mapa-efectividade' ||
       pageId === 'efectividade-branco'
     ) {
-      setCurrentView('declaracao-efectividade');
+      setCurrentView(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'declaracao-efectividade');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -2051,16 +2071,26 @@ export default function App() {
       currentView === 'efectividade' ||
       currentView === 'mapa-efectividade'
     ) {
-      // Regra de Privacidade e Sigilo: Usuários sem sessão iniciada ou sem privilégios de Administração/Direção
-      // não têm acesso à Base de Dados dos funcionários nem à Pré-visualização ou Botões de Emissão/Download A4.
-      // Emitem o seu próprio requerimento e enviam diretamente para a Administração Municipal.
-      const isAdminOrDirector = Boolean(
-        isSessionStarted &&
-          currentUser &&
-          (currentUser.role === 'admin' || currentUser.role === 'diretor')
-      );
+      // Na conta dos directores de escola o único serviço SIGRE disponível é Serviços Rápidos
+      if (isSessionStarted && currentUser?.role === 'diretor') {
+        return (
+          <DeclaracaoEfectividadePage
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            isLoggedIn={isSessionStarted}
+            currentUser={currentUser}
+            initialTab="pedidos"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        );
+      }
 
-      if (!isAdminOrDirector) {
+      const isAdmin = Boolean(isSessionStarted && currentUser && currentUser.role === 'admin');
+
+      if (!isAdmin) {
         return (
           <QuickServicesPage
             initialServiceType="DECLARACAO_EFECTIVIDADE"
@@ -2094,13 +2124,25 @@ export default function App() {
       currentView === 'guia-ferias' ||
       currentView === 'guia-de-ferias'
     ) {
-      const isAdminOrDirector = Boolean(
-        isSessionStarted &&
-          currentUser &&
-          (currentUser.role === 'admin' || currentUser.role === 'diretor')
-      );
+      if (isSessionStarted && currentUser?.role === 'diretor') {
+        return (
+          <DeclaracaoEfectividadePage
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            isLoggedIn={isSessionStarted}
+            currentUser={currentUser}
+            initialTab="pedidos"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        );
+      }
 
-      if (!isAdminOrDirector) {
+      const isAdmin = Boolean(isSessionStarted && currentUser && currentUser.role === 'admin');
+
+      if (!isAdmin) {
         return (
           <QuickServicesPage
             initialServiceType="GUIA_FERIAS"
@@ -2135,13 +2177,25 @@ export default function App() {
       currentView === 'declaracao-de-servico' ||
       currentView === 'servico'
     ) {
-      const isAdminOrDirector = Boolean(
-        isSessionStarted &&
-          currentUser &&
-          (currentUser.role === 'admin' || currentUser.role === 'diretor')
-      );
+      if (isSessionStarted && currentUser?.role === 'diretor') {
+        return (
+          <DeclaracaoEfectividadePage
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            isLoggedIn={isSessionStarted}
+            currentUser={currentUser}
+            initialTab="pedidos"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        );
+      }
 
-      if (!isAdminOrDirector) {
+      const isAdmin = Boolean(isSessionStarted && currentUser && currentUser.role === 'admin');
+
+      if (!isAdmin) {
         return (
           <QuickServicesPage
             initialServiceType="DECLARACAO_SERVICO"

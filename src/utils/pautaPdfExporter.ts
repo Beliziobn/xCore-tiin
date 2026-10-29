@@ -316,7 +316,12 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
 
     pdf.setFont('times', 'bold');
     pdf.setFontSize(10);
-    pdf.text(isFinal ? 'PAUTA FINAL' : 'MINI-PAUTA', pageWidth / 2, 24.5, {
+    const headerDocTitle = isFinal
+      ? 'PAUTA FINAL'
+      : isAllDisciplines
+      ? `PAUTA FINAL DO ${periodo}º TRIMESTRE`
+      : `MINI-PAUTA DO ${periodo}º TRIMESTRE`;
+    pdf.text(headerDocTitle, pageWidth / 2, 24.5, {
       align: 'center',
     });
     pdf.text(defaultMeta.escola.toUpperCase(), pageWidth / 2, 29, { align: 'center' });
@@ -370,13 +375,25 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
 
   const renderSummaryAndSignatures = (startY: number) => {
     const sigY = startY + 8;
-    pdf.setFont('times', 'normal');
+    const leftSigX = pageWidth * 0.28;
+    const rightSigX = pageWidth * 0.72;
+    const isMiniPautaDisciplina = !isAllDisciplines && !isFinal;
+
+    pdf.setFont('times', 'bold');
     pdf.setFontSize(9);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('O Professor', pageWidth / 2, sigY, { align: 'center' });
+
+    if (isMiniPautaDisciplina) {
+      pdf.text('O(A) Professor(a)', leftSigX, sigY, { align: 'center' });
+      pdf.text('O(A) Subdirector(a) Pedagógico(a)', rightSigX, sigY, { align: 'center' });
+    } else {
+      pdf.text('O(A) Subdirector(a) Pedagógico(a)', leftSigX, sigY, { align: 'center' });
+      pdf.text('O(A) Director(a) da Escola', rightSigX, sigY, { align: 'center' });
+    }
 
     pdf.setDrawColor(0, 0, 0);
-    pdf.line(pageWidth / 2 - 35, sigY + 9, pageWidth / 2 + 35, sigY + 9);
+    pdf.line(leftSigX - 35, sigY + 9, leftSigX + 35, sigY + 9);
+    pdf.line(rightSigX - 35, sigY + 9, rightSigX + 35, sigY + 9);
   };
 
   let currentY = renderHeader(1);
@@ -674,7 +691,12 @@ export async function exportPautaToPDF(options: ExportPautaOptions): Promise<voi
 
   onProgress?.('Concluindo exportação e descarregando ficheiro...');
 
-  const periodSlug = periodo === 'FINAL' ? 'Pauta_Final' : `Mini_Pauta_${periodo}_Trimestre`;
+  const periodSlug =
+    periodo === 'FINAL'
+      ? 'Pauta_Final'
+      : isAllDisciplines
+      ? `Pauta_Final_${periodo}_Trimestre`
+      : `Mini_Pauta_${periodo}_Trimestre`;
   const discSlug = isAllDisciplines ? 'Todas_Disciplinas' : selectedDiscipline.replace(/\s+/g, '_');
   const filename = `${periodSlug}_${discSlug}_${defaultMeta.classe.replace(/\s+/g, '_')}_${defaultMeta.turma.replace(/\s+/g, '_')}.pdf`;
 
