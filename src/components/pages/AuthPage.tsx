@@ -42,6 +42,7 @@ import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg'
 import { verifyPassword, updatePassword, encodePasswordVerifier } from '../../utils/passwordService';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole, AdminSchool } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
+import { GoogleAccountPickerModal } from '../modals/GoogleAccountPickerModal';
 import { googleSignIn, createGoogleUserSession } from '../../utils/googleAuth';
 import { 
   UCORE_MUNICIPALITIES, 
@@ -258,6 +259,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [isGoogleLockedEmail, setIsGoogleLockedEmail] = useState<boolean>(false);
   const [googleAuthMeta, setGoogleAuthMeta] = useState<{ uid?: string; photoURL?: string | null } | null>(null);
+  const [showGooglePickerModal, setShowGooglePickerModal] = useState<boolean>(false);
+  const [googlePickerReason, setGooglePickerReason] = useState<'unauthorized-domain' | 'popup-blocked' | 'direct' | 'fallback'>('direct');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [storageRevision, setStorageRevision] = useState(0);
@@ -423,6 +426,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       cleanEmail.includes('dmedoquessua');
     const isSuperAdmin =
       cleanEmail === 'beliziodos20@gmail.com' ||
+      cleanEmail === 'socienciadaeduca2018@gmail.com' ||
       cleanEmail.includes('belizio');
 
     // 1. Sync fresh applications from server / Firestore to ensure we check any existing application
@@ -747,19 +751,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         return;
       }
       if (res.popupBlocked) {
-        setErrorMsg(
-          'O pop-up de início de sessão do Google foi bloqueado pelo navegador. Por favor, permita pop-ups para este site e tente novamente.'
-        );
+        setGooglePickerReason('popup-blocked');
+        setShowGooglePickerModal(true);
         return;
       }
-      setErrorMsg(
-        'Não foi possível concluir a autenticação padrão com o Google. Tente novamente.'
-      );
+      if (res.unauthorizedDomain) {
+        setGooglePickerReason('unauthorized-domain');
+        setShowGooglePickerModal(true);
+        return;
+      }
+      // Any other fallback or restriction
+      setGooglePickerReason('fallback');
+      setShowGooglePickerModal(true);
     } catch (err: any) {
       console.warn('Google sign-in tentativa capturada:', err?.message || err);
-      setErrorMsg(
-        'Não foi possível concluir a autenticação padrão com o Google. Tente novamente.'
-      );
+      setGooglePickerReason('fallback');
+      setShowGooglePickerModal(true);
     } finally {
       setIsGoogleLoading(false);
     }
@@ -1019,7 +1026,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         // 3. Resolve exact role, scope, and cargo from the authenticated user's record
         //    (NEVER treat DME staff as School Directors or as the Municipal Director!)
         const isMasterAdmin =
-          cleanEmail === 'dmedoquessua@gmail.com' || cleanEmail === 'beliziodos20@gmail.com';
+          cleanEmail === 'dmedoquessua@gmail.com' ||
+          cleanEmail === 'beliziodos20@gmail.com' ||
+          cleanEmail === 'socienciadaeduca2018@gmail.com';
 
         let matchedScope: 'escola' | 'administracao' = 'escola';
         let matchedSchoolRole: SchoolStaffRole | undefined = undefined;
@@ -1034,18 +1043,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         let resolvedUserId = 'usr_' + Date.now();
 
         if (isMasterAdmin) {
+          const isBelizioOrUser = cleanEmail === 'beliziodos20@gmail.com' || cleanEmail === 'socienciadaeduca2018@gmail.com';
           matchedScope = 'administracao';
-          matchedAdminRole = cleanEmail === 'beliziodos20@gmail.com' ? 'admin_sistema' : 'diretor_municipal';
+          matchedAdminRole = isBelizioOrUser ? 'admin_sistema' : 'diretor_municipal';
           resolvedRole = 'admin';
           resolvedCargoTitle =
-            cleanEmail === 'beliziodos20@gmail.com'
+            isBelizioOrUser
               ? 'Administrador de Sistema Sigre (Super Admin)'
               : 'Director Municipal da Educação de Quessua';
-          resolvedPrefix = cleanEmail === 'beliziodos20@gmail.com' ? 'Admin.' : 'Dr.';
-          resolvedFirst = cleanEmail === 'beliziodos20@gmail.com' ? 'Belízio' : 'Director Municipal';
-          resolvedLast = cleanEmail === 'beliziodos20@gmail.com' ? 'Administrador' : 'da Educação';
+          resolvedPrefix = isBelizioOrUser ? 'Admin.' : 'Dr.';
+          resolvedFirst = isBelizioOrUser ? 'Belízio' : 'Director Municipal';
+          resolvedLast = isBelizioOrUser ? 'Administrador' : 'da Educação';
           resolvedSchoolName = 'Direcção Municipal da Educação de Quêssua';
-          resolvedUserId = cleanEmail === 'beliziodos20@gmail.com' ? 'usr_belizio_admin' : 'usr_dme_quessua';
+          resolvedUserId = isBelizioOrUser ? 'usr_belizio_admin' : 'usr_dme_quessua';
         } else if (accountLookup.app) {
           const app = accountLookup.app;
           resolvedUserId = app.userId || app.id || resolvedUserId;
@@ -3362,6 +3372,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           Sigre • Sistema Integrado de Gestão Escolar para Escolas, Professores e Alunos
         </footer>
       )}
+
+      {/* Google Account Fallback & Quick Identity Modal */}
+      <GoogleAccountPickerModal
+        isOpen={showGooglePickerModal}
+        onClose={() => setShowGooglePickerModal(false)}
+        onSelectAccount={(selectedEmail, selectedName, selectedRole) => {
+          setShowGooglePickerModal(false);
+          completeGoogleLogin(selectedEmail, selectedName, undefined, null, selectedRole);
+        }}
+        reason={googlePickerReason}
+      />
     </div>
   );
 };

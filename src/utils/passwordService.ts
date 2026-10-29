@@ -5,6 +5,7 @@ const SECURITY_LOGS_KEY = 'ucore_security_logs';
 const DEFAULT_PASSWORDS: Record<string, string> = {
   'dmedoquessua@gmail.com': 'quessua000',
   'beliziodos20@gmail.com': 'quessua000',
+  'socienciadaeduca2018@gmail.com': 'quessua000',
 };
 
 export interface SecurityAuditLog {
@@ -97,8 +98,12 @@ export function verifyPassword(
   const candidatePassword = inputPassword;
   const stored = getStoredPasswords();
 
-  // 1. Official Master Admin (dmedoquessua@gmail.com)
-  if (normalizedEmail === 'dmedoquessua@gmail.com' || normalizedEmail === 'beliziodos20@gmail.com') {
+  // 1. Official Master Admin (dmedoquessua@gmail.com / beliziodos20@gmail.com / socienciadaeduca2018@gmail.com)
+  if (
+    normalizedEmail === 'dmedoquessua@gmail.com' ||
+    normalizedEmail === 'beliziodos20@gmail.com' ||
+    normalizedEmail === 'socienciadaeduca2018@gmail.com'
+  ) {
     if (typeof stored[normalizedEmail] === 'string' && stored[normalizedEmail].length > 0) {
       return candidatePassword === stored[normalizedEmail];
     }

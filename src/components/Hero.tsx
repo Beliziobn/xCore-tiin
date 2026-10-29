@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, GraduationCap } from 'lucide-react';
-import heroImg from '../assets/images/hero_creative_desk.png';
+import heroImg from '../assets/images/biblioteca_escolar.svg';
 import { SectionShader } from './SectionShader';
 
 export interface BreadcrumbItem {
@@ -200,7 +200,8 @@ export const Hero: React.FC<HeroProps> = ({
             <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-[24px] sm:rounded-[36px] overflow-hidden border-4 sm:border-8 border-white shadow-[0_30px_70px_-20px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/5 bg-slate-100">
               <img
                 src={heroImg}
-                alt="Profissional da educação a organizar documentos numa secretária de trabalho"
+                alt="Biblioteca escolar e centro de documentação pedagógica"
+                title="Biblioteca escolar e centro de documentação pedagógica"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-center"
               />

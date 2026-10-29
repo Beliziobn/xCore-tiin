@@ -869,7 +869,11 @@ export function checkDuplicateRegistration(
   const normEmail = (email || '').trim().toLowerCase();
   const normBi = (biNumber || '').trim().toUpperCase();
 
-  if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
+  if (
+    normEmail === OFFICIAL_DME_ADMIN_EMAIL ||
+    normEmail === 'beliziodos20@gmail.com' ||
+    normEmail === 'socienciadaeduca2018@gmail.com'
+  ) {
     return {
       duplicate: true,
       reason:
@@ -934,7 +938,11 @@ export function findRegisteredAccountByEmail(email: string): {
   const normEmail = (email || '').trim().toLowerCase();
   if (!normEmail) return { exists: false };
 
-  if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
+  if (
+    normEmail === OFFICIAL_DME_ADMIN_EMAIL ||
+    normEmail === 'beliziodos20@gmail.com' ||
+    normEmail === 'socienciadaeduca2018@gmail.com'
+  ) {
     return {
       exists: true,
       isMasterAdmin: true,

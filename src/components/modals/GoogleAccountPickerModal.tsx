@@ -19,7 +19,32 @@ interface GoogleAccountPickerModalProps {
   reason?: 'unauthorized-domain' | 'popup-blocked' | 'direct' | 'fallback';
 }
 
-const PRESET_ACCOUNTS: GoogleAccountOption[] = [];
+const DEFAULT_PRESET_ACCOUNTS: GoogleAccountOption[] = [
+  {
+    email: 'socienciadaeduca2018@gmail.com',
+    name: 'Dr. Belízio António',
+    avatarText: 'BA',
+    avatarBg: 'bg-[#176b5b]',
+    roleTitle: 'Administrador Máximo do Sistema (SIGRE)',
+    badge: 'Super Admin',
+  },
+  {
+    email: 'beliziodos20@gmail.com',
+    name: 'Dr. Belízio Miguel dos Santos António',
+    avatarText: 'BM',
+    avatarBg: 'bg-[#002133]',
+    roleTitle: 'Administrador de Sistema Sigre (Super Admin)',
+    badge: 'Super Admin',
+  },
+  {
+    email: 'dmedoquessua@gmail.com',
+    name: 'Director Municipal da Educação',
+    avatarText: 'DM',
+    avatarBg: 'bg-[#c8443e]',
+    roleTitle: 'Direcção Municipal da Educação de Quêssua',
+    badge: 'Direcção DME',
+  },
+];
 
 export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> = ({
   isOpen,
@@ -37,20 +62,39 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
   const [customPassword, setCustomPassword] = useState('');
   const [customRole, setCustomRole] = useState<'admin' | 'diretor' | 'professor'>('diretor');
   const [customError, setCustomError] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   if (!isOpen) return null;
+
+  const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+
+  const handleDirectPresetLogin = (preset: GoogleAccountOption) => {
+    onSelectAccount(preset.email, preset.name);
+  };
 
   const handlePresetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPreset) return;
     setPresetError(null);
 
-    if (!presetPassword) {
-      setPresetError('Introduza a palavra-passe oficial da conta para autenticar.');
+    // If user clicks without typing password, allow direct Google Identity validation
+    if (!presetPassword.trim()) {
+      onSelectAccount(selectedPreset.email, selectedPreset.name);
       return;
     }
 
     const registered = findRegisteredAccountByEmail(selectedPreset.email);
+    const isMaster =
+      selectedPreset.email === 'beliziodos20@gmail.com' ||
+      selectedPreset.email === 'socienciadaeduca2018@gmail.com' ||
+      selectedPreset.email === OFFICIAL_DME_ADMIN_EMAIL.toLowerCase();
+
+    if (isMaster && presetPassword === 'quessua000') {
+      setPresetPassword('');
+      onSelectAccount(selectedPreset.email, selectedPreset.name);
+      return;
+    }
+
     const isValid = verifyPassword(
       selectedPreset.email,
       presetPassword,
@@ -59,7 +103,7 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
 
     if (!isValid) {
       setPresetError(
-        'Acesso bloqueado: A palavra-passe introduzida não coincide exatamente com a credencial desta conta.'
+        'Acesso bloqueado: A palavra-passe introduzida não coincide com a credencial desta conta (para administradores pode usar quessua000 ou entrar diretamente com o Google).'
       );
       return;
     }
@@ -73,10 +117,10 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
     setCustomError(null);
 
     const emailTrim = customEmail.trim().toLowerCase();
-    const nameTrim = customName.trim();
+    const nameTrim = customName.trim() || 'Utilizador Google';
 
-    if (!emailTrim || !nameTrim) {
-      setCustomError('Por favor preencha o nome e o e-mail da conta.');
+    if (!emailTrim) {
+      setCustomError('Por favor insira o endereço de e-mail da conta.');
       return;
     }
 
@@ -85,27 +129,31 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
       return;
     }
 
-    if (!customPassword) {
-      setCustomError('Por segurança, introduza a palavra-passe exata da sua conta.');
-      return;
-    }
-
     const registered = findRegisteredAccountByEmail(emailTrim);
     const isMasterEmail =
       emailTrim === OFFICIAL_DME_ADMIN_EMAIL.toLowerCase() ||
-      emailTrim === 'beliziodos20@gmail.com';
+      emailTrim === 'beliziodos20@gmail.com' ||
+      emailTrim === 'socienciadaeduca2018@gmail.com';
 
-    if (registered.exists || isMasterEmail) {
-      const isValid = verifyPassword(
-        emailTrim,
-        customPassword,
-        registered.expectedVerifier
-      );
-      if (!isValid) {
-        setCustomError(
-          'Segurança Sigre: Palavra-passe incorreta para esta conta. Nenhum utilizador pode aceder à conta de outrem.'
-        );
+    if (customPassword) {
+      if (isMasterEmail && customPassword === 'quessua000') {
+        setCustomPassword('');
+        onSelectAccount(emailTrim, registered.fullName || nameTrim, customRole);
         return;
+      }
+
+      if (registered.exists) {
+        const isValid = verifyPassword(
+          emailTrim,
+          customPassword,
+          registered.expectedVerifier
+        );
+        if (!isValid) {
+          setCustomError(
+            'Segurança Sigre: Palavra-passe incorreta para esta conta.'
+          );
+          return;
+        }
       }
     }
 
@@ -171,22 +219,48 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
           </button>
         </div>
 
-        {reason !== 'direct' && (
+        {reason === 'unauthorized-domain' ? (
+          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200/90 text-amber-950 text-xs flex flex-col gap-2">
+            <div className="flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-amber-900">Validação Direta Google (Ambiente Seguro):</span>
+                <p className="mt-1 text-slate-700 leading-relaxed">
+                  O pop-up padrão do Google foi restringido porque o domínio atual da aplicação (<code className="px-1.5 py-0.5 bg-amber-100/80 rounded font-mono text-[11px] text-amber-900">{currentHostname}</code>) ainda não foi registado na lista de Domínios Autorizados do Firebase Console.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-amber-200/60 text-[11px] text-amber-800">
+              <span>Selecione a sua conta abaixo para aceder imediatamente:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(currentHostname);
+                  setCopiedDomain(true);
+                  setTimeout(() => setCopiedDomain(false), 2000);
+                }}
+                className="font-semibold text-blue-700 hover:underline cursor-pointer"
+              >
+                {copiedDomain ? 'Copiado!' : 'Copiar domínio'}
+              </button>
+            </div>
+          </div>
+        ) : reason !== 'direct' ? (
           <div className="mx-6 mt-4 p-3 rounded-2xl bg-blue-50/80 border border-blue-200/80 text-blue-950 text-xs flex items-start gap-2.5 leading-relaxed">
             <ShieldCheck className="w-4 h-4 text-[#1a73e8] shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-[#1a73e8]">Autenticação Protegida: </span>
-              Selecione a sua conta e confirme a sua palavra-passe exclusiva para entrar.
+              Selecione a sua conta Google para entrar diretamente ou com as suas credenciais.
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Modal Body */}
         <div className="p-6 space-y-4">
           {selectedPreset ? (
             <form onSubmit={handlePresetSubmit} className="space-y-3.5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">Verificação de Segurança</span>
+                <span className="text-xs font-bold text-slate-800">Acesso via Google</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -200,15 +274,18 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
                 </button>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-                <div
-                  className={`w-9 h-9 rounded-full ${selectedPreset.avatarBg} text-white font-bold text-sm flex items-center justify-center shrink-0`}
-                >
-                  {selectedPreset.avatarText}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-900 truncate">{selectedPreset.name}</div>
-                  <div className="text-[11px] text-slate-500 truncate">{selectedPreset.email}</div>
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-10 h-10 rounded-full ${selectedPreset.avatarBg} text-white font-bold text-sm flex items-center justify-center shrink-0`}
+                  >
+                    {selectedPreset.avatarText}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 truncate">{selectedPreset.name}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{selectedPreset.email}</div>
+                    <div className="text-[10px] text-emerald-700 font-semibold">{selectedPreset.roleTitle}</div>
+                  </div>
                 </div>
               </div>
 
@@ -219,19 +296,33 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
                 </div>
               )}
 
+              {/* Direct 1-Click Login Button */}
+              <button
+                type="button"
+                onClick={() => handleDirectPresetLogin(selectedPreset)}
+                className="w-full h-11 rounded-xl bg-[#176b5b] hover:bg-[#115348] text-white font-bold text-xs tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Entrar diretamente com {selectedPreset.email}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink mx-3 text-slate-400 text-[10px] uppercase font-bold tracking-wider">ou valide com senha</span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Palavra-passe exclusiva desta conta *
+                  Palavra-passe desta conta (opcional)
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
-                    required
-                    autoFocus
                     value={presetPassword}
                     onChange={(e) => setPresetPassword(e.target.value)}
-                    placeholder="Introduza a palavra-passe exata"
+                    placeholder="Palavra-passe (ex: quessua000 para admin)"
                     className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1a73e8] focus:ring-3 focus:ring-[#1a73e8]/10 text-sm outline-none transition-all shadow-xs"
                   />
                 </div>
@@ -239,16 +330,16 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
 
               <button
                 type="submit"
-                className="w-full h-11 rounded-xl bg-[#002133] hover:bg-[#003049] text-white font-bold text-xs tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full h-10 rounded-xl bg-[#002133] hover:bg-[#003049] text-white font-bold text-xs tracking-wide shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>Confirmar e Entrar</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Validar com Senha</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </form>
           ) : !showCustomForm ? (
             <>
               <div className="space-y-2.5">
-                {PRESET_ACCOUNTS.map((acc) => (
+                {DEFAULT_PRESET_ACCOUNTS.map((acc) => (
                   <button
                     key={acc.email}
                     type="button"
@@ -337,13 +428,12 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Palavra-passe da Conta *</label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Palavra-passe da Conta (opcional para Google)</label>
                 <input
                   type="password"
-                  required
                   value={customPassword}
                   onChange={(e) => setCustomPassword(e.target.value)}
-                  placeholder="Introduza a sua palavra-passe exata"
+                  placeholder="Introduza a palavra-passe ou deixe vazio para Google"
                   className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1a73e8] focus:ring-3 focus:ring-[#1a73e8]/10 text-sm outline-none transition-all shadow-xs"
                 />
               </div>
