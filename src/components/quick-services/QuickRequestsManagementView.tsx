@@ -287,15 +287,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             <h1 className="text-xl sm:text-2xl font-bold text-[#002133] tracking-tight">
               Serviços Rápidos & Despachos de Cidadãos
             </h1>
-            {isMasterAdmin && (
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#f4f4f6] text-[#52606d] border border-[#e8e8ea]">
-                Gabinete Central DME • dmedoquessua@gmail.com
-              </span>
-            )}
           </div>
-          <p className="text-xs sm:text-sm text-[#52606d] mt-1">
-            Recepção, verificação e emissão de declarações de efectividade, boletins de notas e guias solicitadas pela comunidade.
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -356,7 +348,6 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         >
           <span className="kpi__label text-xs font-medium">Total de Pedidos</span>
           <span className="kpi__value numeric text-3xl font-bold tracking-tight mt-1">{counts.total}</span>
-          <span className="kpi__meta text-xs mt-1">Entradas consolidadas</span>
         </div>
 
         <div
@@ -369,7 +360,6 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
           <span className="kpi__value numeric text-3xl font-bold text-[#002133] tracking-tight mt-1">
             {counts.pendentes}
           </span>
-          <span className="kpi__meta text-xs text-[#a34a08] mt-1">Aguardam despacho</span>
         </div>
 
         <div
@@ -382,7 +372,6 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
           <span className="kpi__value numeric text-3xl font-bold text-[#002133] tracking-tight mt-1">
             {counts.emAnalise}
           </span>
-          <span className="kpi__meta text-xs text-[#52606d] mt-1">Na secretaria / repartição</span>
         </div>
 
         <div
@@ -395,7 +384,6 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
           <span className="kpi__value numeric text-3xl font-bold text-[#002133] tracking-tight mt-1">
             {counts.concluidos}
           </span>
-          <span className="kpi__meta text-xs text-[#0b7a54] mt-1">Prontos ou entregues</span>
         </div>
       </div>
 
