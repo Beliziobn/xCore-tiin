@@ -188,6 +188,9 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       emAnalise: scopedRequests.filter((r) => r.status === 'EM_ANALISE').length,
       concluidos: scopedRequests.filter((r) => r.status === 'CONCLUIDO').length,
       efectividade: scopedRequests.filter((r) => r.serviceType === 'DECLARACAO_EFECTIVIDADE').length,
+      servico: scopedRequests.filter((r) => r.serviceType === 'DECLARACAO_SERVICO').length,
+      ferias: scopedRequests.filter((r) => r.serviceType === 'GUIA_FERIAS').length,
+      colocacao: scopedRequests.filter((r) => r.serviceType === 'GUIA_COLOCACAO').length,
       boletins: scopedRequests.filter((r) => r.serviceType === 'BOLETIM_NOTAS').length,
       matriculas: scopedRequests.filter((r) => r.serviceType === 'DECLARACAO_MATRICULA').length,
       transferencias: scopedRequests.filter((r) => r.serviceType === 'GUIA_TRANSFERENCIA').length,
@@ -413,7 +416,37 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
             typeFilter === 'DECLARACAO_EFECTIVIDADE' ? 'is-active' : ''
           }`}
         >
-          Efectividade DME ({counts.efectividade})
+          Efectividade ({counts.efectividade})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTypeFilter('DECLARACAO_SERVICO')}
+          className={`filter-chip whitespace-nowrap ${
+            typeFilter === 'DECLARACAO_SERVICO' ? 'is-active' : ''
+          }`}
+        >
+          Declaração de Serviço ({counts.servico})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTypeFilter('GUIA_FERIAS')}
+          className={`filter-chip whitespace-nowrap ${
+            typeFilter === 'GUIA_FERIAS' ? 'is-active' : ''
+          }`}
+        >
+          Guia de Férias ({counts.ferias})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTypeFilter('GUIA_COLOCACAO')}
+          className={`filter-chip whitespace-nowrap ${
+            typeFilter === 'GUIA_COLOCACAO' ? 'is-active' : ''
+          }`}
+        >
+          Guia de Colocação ({counts.colocacao})
         </button>
 
         <button
@@ -663,7 +696,10 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                       Especificações & Dados Submetidos
                     </span>
 
-                    {req.serviceType === 'DECLARACAO_EFECTIVIDADE' && (
+                    {(req.serviceType === 'DECLARACAO_EFECTIVIDADE' ||
+                      req.serviceType === 'DECLARACAO_SERVICO' ||
+                      req.serviceType === 'GUIA_FERIAS' ||
+                      req.serviceType === 'GUIA_COLOCACAO') && (
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
                           <span className="text-[#52606d] block text-[11px]">Funcionário(a)</span>
@@ -685,7 +721,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#52606d] block text-[11px]">Mês de Referência</span>
+                          <span className="text-[#52606d] block text-[11px]">Mês / Ano de Ref.</span>
                           <span className="font-medium text-[#002133] text-xs numeric">
                             {details.referenceMonthYear || '2026'}
                           </span>

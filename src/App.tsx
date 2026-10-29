@@ -1596,46 +1596,24 @@ export default function App() {
       );
     }
 
-    // Quick Requests Internal Management Views for Admin and Director
+    // Quick Requests Internal Management Views for Admin and Director (Inside Serviços SIGRE tab)
     if (
       currentView === 'admin-servicos-rapidos' ||
       currentView === 'diretor-servicos-rapidos' ||
       (currentView === 'pedidos-rapidos' && Boolean(currentUser && (currentUser.role === 'admin' || currentUser.role === 'diretor')))
     ) {
       return (
-        <div className="w-full min-h-screen bg-[#f8f9fb]">
-          <Hero
-            onOpenGetStarted={() => handleOpenAuth('login')}
-            customTitle="Serviços Rápidos & Efectividade"
-            customSubtitle="Gestão e despacho centralizado de solicitações de cidadãos: Declarações de Efectividade, Boletins de Notas e Transferências."
-            badge="Pedidos dos Usuários"
-            breadcrumbs={[
-              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
-              { label: 'Serviços ao Cidadão' },
-              { label: 'Pedidos dos Usuários' },
-            ]}
-            isLoggedIn={isSessionStarted}
-          />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <QuickRequestsManagementView
-              currentUser={currentUser}
-              activeRole={
-                currentUser?.role === 'admin' || currentUser?.email === 'dmedoquessua@gmail.com'
-                  ? 'admin'
-                  : currentView === 'diretor-servicos-rapidos'
-                  ? 'diretor'
-                  : (activeRole as any)
-              }
-              schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
-              onNavigateToDeclaracaoEfectividade={() => {
-                setCurrentView('declaracao-efectividade');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onOpenNewRequestModal={() => setIsQuickServicesModalOpen(true)}
-              showToast={showToast}
-            />
-          </main>
-        </div>
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          initialTab="pedidos"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
       );
     }
 

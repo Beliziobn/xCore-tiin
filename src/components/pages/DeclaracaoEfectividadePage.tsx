@@ -27,6 +27,7 @@ import {
   Sparkles,
   CalendarRange,
   MapPin,
+  Zap,
 } from 'lucide-react';
 import { Hero } from '../Hero';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
@@ -1183,6 +1184,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               ? 'Guia de Férias'
               : activeTab === 'guia-colocacao'
               ? 'Guia de Colocação'
+              : activeTab === 'pedidos'
+              ? 'Serviços Rápidos — Pedidos dos Usuários'
               : 'Cadastramento e Declarações Oficiais'
           }
           compact="ultra"
@@ -1269,6 +1272,36 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                   <MapPin className="w-4 h-4 text-slate-700 shrink-0" />
                   <span className="truncate">Guia de Colocação</span>
                 </button>
+
+                <div className="pt-2 mt-2 border-t border-slate-100">
+                  <p className="text-[11px] font-medium text-slate-400 px-3 mb-1">
+                    Solicitações de Usuários
+                  </p>
+                  <button
+                    id="tab-servicos-rapidos-pedidos"
+                    type="button"
+                    onClick={() => setActiveTab('pedidos')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'pedidos'
+                        ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3 min-w-0">
+                      <Zap className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                      <span className="truncate">Serviços Rápidos</span>
+                    </span>
+                    {quickRequestsCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black shrink-0 animate-pulse">
+                        {quickRequestsCount}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
+                        Pedidos
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </aside>

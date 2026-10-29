@@ -228,9 +228,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           }}
           className="flex items-center gap-2.5 group cursor-pointer rounded-xl focus:outline-none"
         >
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 p-1.5 flex items-center justify-center shadow-[0_4px_12px_-2px_rgba(0,33,51,0.15)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
-            <img src="/favicon.png" alt="SIGRE" className="w-7 h-7 object-contain" />
-          </div>
           <span className="text-[11px] font-black tracking-tight text-[#002133] uppercase">
             SIGRE - Quêssua
           </span>
@@ -574,7 +571,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </>
                   )}
 
-                  {/* Serviços SIGRE Oficial */}
+                  {/* Serviços SIGRE Oficial (Inclui Serviços Rápidos / Pedidos dos Usuários) */}
                   <button
                     id="dropdown-servicos-sigre-btn"
                     onClick={() => {
@@ -587,24 +584,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <FileText className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Serviços SIGRE</span>
                     </span>
-                    <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+                    <span className="flex items-center gap-1">
+                      {currentUser && (activeRole === 'admin' || activeRole === 'diretor') && pendingQuickRequestsCount > 0 && (
+                        <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                          {pendingQuickRequestsCount}
+                        </span>
+                      )}
+                      <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+                    </span>
                   </button>
 
-                  {/* Serviços Rápidos ao Cidadão (Sem Login) */}
-                  <button
-                    id="dropdown-servicos-rapidos-btn"
-                    onClick={() => {
-                      onSelectPage('servicos-rapidos');
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-amber-50 hover:text-amber-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-black cursor-pointer flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      <span>Serviços Rápidos</span>
-                    </span>
-                    <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Sem login</span>
-                  </button>
+                  {/* Serviços Rápidos ao Cidadão (Sem Login - Apenas para usuários normais/visitantes) */}
+                  {(!currentUser || (activeRole !== 'admin' && activeRole !== 'diretor')) && (
+                    <button
+                      id="dropdown-servicos-rapidos-btn"
+                      onClick={() => {
+                        onSelectPage('servicos-rapidos');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-amber-50 hover:text-amber-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-black cursor-pointer flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        <span>Serviços Rápidos</span>
+                      </span>
+                      <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Sem login</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1163,30 +1169,33 @@ export const Navbar: React.FC<NavbarProps> = ({
               <FileText className="w-4 h-4 text-[#f75142]" />
               <span>Serviços SIGRE</span>
             </div>
-            <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+            <div className="flex items-center gap-1">
+              {currentUser && (activeRole === 'admin' || activeRole === 'diretor') && pendingQuickRequestsCount > 0 && (
+                <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                  {pendingQuickRequestsCount}
+                </span>
+              )}
+              <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+            </div>
           </button>
 
-          <button
-            onClick={() => {
-              onSelectPage(!currentUser ? 'servicos-rapidos' : (activeRole === 'admin' ? 'admin-servicos-rapidos' : (activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos')));
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 text-amber-950 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-600 fill-amber-600" />
-              <span>Serviços Rápidos {!currentUser ? '(Sem login)' : '& Efectividade (Pedidos)'}</span>
-            </div>
-            {!currentUser ? (
+          {(!currentUser || (activeRole !== 'admin' && activeRole !== 'diretor')) && (
+            <button
+              onClick={() => {
+                onSelectPage('servicos-rapidos');
+                setMobileMenuOpen(false);
+              }}
+              className="text-left py-2 px-3 text-amber-950 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-600 fill-amber-600" />
+                <span>Serviços Rápidos (Sem login)</span>
+              </div>
               <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
                 Acesso Livre
               </span>
-            ) : pendingQuickRequestsCount > 0 ? (
-              <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
-                {pendingQuickRequestsCount}
-              </span>
-            ) : null}
-          </button>
+            </button>
+          )}
           {onOpenChat && (
             <button
               onClick={() => {

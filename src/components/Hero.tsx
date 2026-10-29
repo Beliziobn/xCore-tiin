@@ -66,17 +66,6 @@ export const Hero: React.FC<HeroProps> = ({
             : 'pt-8 sm:pt-12 pb-10 sm:pb-14'
         }`}
       >
-        <SectionShader variant="coral" />
-        <div
-          className={`absolute inset-0 pointer-events-none z-[1] ${
-            compact === 'ultra' ? 'opacity-[0.02]' : compact ? 'opacity-[0.03]' : 'opacity-[0.07]'
-          }`}
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
-            backgroundSize: '56px 56px',
-          }}
-        />
         <div className="max-w-6xl mx-auto relative z-10 text-white">
           {/* Breadcrumb Trail & Optional Role Badge */}
           {(badge || (breadcrumbs && breadcrumbs.length > 0)) && (
