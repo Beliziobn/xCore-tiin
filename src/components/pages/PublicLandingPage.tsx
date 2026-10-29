@@ -45,14 +45,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   const [activeTab, setActiveTab] = useState<'direcao' | 'admin' | 'professor'>('direcao');
 
   return (
-    <div className="w-full flex flex-col items-center bg-[#fafafa] text-[#002133] selection:bg-[#f75142] selection:text-white">
+    <div className="w-full flex-1 min-h-[calc(100vh-80px)] flex flex-col items-center bg-[#fafafa] text-[#002133] selection:bg-[#f75142] selection:text-white">
       
       {/* =========================================================================
           HERO SECTION (Exact visual reproduction of user reference screenshot with interactive shaders)
           ========================================================================= */}
       <section 
         id="hero-public-landing"
-        className="w-full min-h-[580px] sm:min-h-[640px] flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-20 sm:pb-28 relative overflow-hidden border-b border-slate-200/70"
+        className="w-full flex-1 min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-20 sm:py-28 relative overflow-hidden"
         style={{
           backgroundColor: '#fafbfc',
         }}
@@ -71,7 +71,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         <div className="max-w-5xl mx-auto flex flex-col items-center text-center relative z-10">
 
           {/* Main Display Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[64px] font-black text-[#002133] tracking-tight leading-[1.12] text-center max-w-4xl mx-auto">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[64px] font-black text-[#002133] tracking-tight leading-[1.14] text-center max-w-4xl mx-auto mb-2 sm:mb-4">
             Gestão escolar inteligente:
             <br className="hidden sm:inline" />
             {' '}da secretaria à sala de aula,{' '}
@@ -86,7 +86,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           </h1>
 
           {/* Primary Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 mt-9 sm:mt-10 w-full max-w-md sm:max-w-none">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 mt-8 sm:mt-12 mb-2 w-full max-w-md sm:max-w-none">
             {/* Começa agora */}
             <button
               id="landing-btn-solicitar-demo"
@@ -114,7 +114,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           </div>
 
           {/* Live Trust Indicators */}
-          <div className="mt-12 pt-8 border-t border-slate-200/60 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-semibold text-slate-500">
+          <div className="mt-16 sm:mt-24 pt-10 sm:pt-12 border-t border-slate-200/60 flex flex-wrap items-center justify-center gap-8 sm:gap-14 text-xs font-semibold text-slate-500">
             <div 
               id="hero-quessua-logo-badge"
               className="flex items-center"
