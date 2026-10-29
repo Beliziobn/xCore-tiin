@@ -52,12 +52,6 @@ export function matchesStudent(student: AdminStudent, filters: AdvancedFilterCri
     if (!sTurno.includes(fTurno)) return false;
   }
 
-  // 5. Modalidade
-  if (filters.modality !== 'all') {
-    const isEad = (student.registrationData?.tipoEscolaNome || '').toLowerCase().includes('ead') || (student.registrationData?.tipoEscolaModalidade || '').includes('adultos');
-    if (filters.modality === 'EAD' && !isEad) return false;
-    if (filters.modality === 'Presencial' && isEad) return false;
-  }
 
   // 6. Gênero
   if (filters.gender !== 'all') {
@@ -245,9 +239,6 @@ export function applyAdvancedFilters(
     activeChips.push({ key: 'shift', label: 'Turno', value: filters.shift });
   }
 
-  if (filters.modality !== 'all') {
-    activeChips.push({ key: 'modality', label: 'Modalidade', value: filters.modality });
-  }
 
   if (filters.userType !== 'all') {
     activeChips.push({ key: 'userType', label: 'Utilizador', value: filters.userType.toUpperCase() });

@@ -92,10 +92,6 @@ export default function SchoolTeamSection({
         <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
           {title}
         </h2>
-
-        <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-          {subtitle}
-        </p>
       </motion.div>
 
       <div className="relative w-full">

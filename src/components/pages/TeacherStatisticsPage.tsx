@@ -215,7 +215,7 @@ export const TeacherStatisticsPage: React.FC<TeacherStatisticsPageProps> = ({
             ]}
             title="Frequência & Presença"
             badgeText="Presença"
-            subtitle="Monitorização contínua: Presencial vs Apoio Digital"
+            subtitle="Monitorização contínua de assiduidade escolar"
             averageRate={classStats.avgPresenca}
             onOpenDrillDown={(period) => {
               openFilter({

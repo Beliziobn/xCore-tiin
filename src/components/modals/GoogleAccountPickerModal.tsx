@@ -19,16 +19,7 @@ interface GoogleAccountPickerModalProps {
   reason?: 'unauthorized-domain' | 'popup-blocked' | 'direct' | 'fallback';
 }
 
-const PRESET_ACCOUNTS: GoogleAccountOption[] = [
-  {
-    email: 'dmedoquessua@gmail.com',
-    name: 'Dr. Belízio Miguel dos Santos António',
-    avatarText: 'D',
-    avatarBg: 'bg-[#0f9d58]',
-    roleTitle: 'Director Municipal da Educação de Quêssua (Admin Geral)',
-    badge: 'Conta Oficial DME',
-  },
-];
+const PRESET_ACCOUNTS: GoogleAccountOption[] = [];
 
 export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> = ({
   isOpen,

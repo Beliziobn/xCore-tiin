@@ -74,7 +74,6 @@ export const AttendanceAreaChart: React.FC<AttendanceAreaChartProps> = ({
   onOpenDrillDown,
 }) => {
   const [activeRange, setActiveRange] = useState<'Semanal' | 'Mensal' | 'Anual'>('Semanal');
-  const [activeSeries, setActiveSeries] = useState<'todos' | 'presencial' | 'ead'>('todos');
   const [selectedIndex, setSelectedIndex] = useState<number>(3); // Qui ou pico selecionado inicialmente
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
@@ -228,7 +227,6 @@ export const AttendanceAreaChart: React.FC<AttendanceAreaChartProps> = ({
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   const pres = payload.find((p) => p.dataKey === 'presencial')?.value;
-                  const ead = payload.find((p) => p.dataKey === 'ead')?.value;
 
                   return (
                     <div className="relative pointer-events-none">
@@ -236,11 +234,6 @@ export const AttendanceAreaChart: React.FC<AttendanceAreaChartProps> = ({
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         <span>{label}:</span>
                         <span className="text-white font-black font-mono">{pres}%</span>
-                        {ead !== undefined && (
-                          <span className="text-violet-200 text-[10px] font-medium border-l border-violet-400/50 pl-2">
-                            Apoio: {ead}%
-                          </span>
-                        )}
                       </div>
                     </div>
                   );
@@ -249,78 +242,46 @@ export const AttendanceAreaChart: React.FC<AttendanceAreaChartProps> = ({
               }}
             />
 
-            {/* Presencial Spline Wave Area (Purple/Violet) */}
-            {(activeSeries === 'todos' || activeSeries === 'presencial') && (
-              <Area
-                type="monotone"
-                dataKey="presencial"
-                name="Presencial"
-                stroke={THEME_COLORS.primary}
-                strokeWidth={3}
-                strokeLinecap="round"
-                fillOpacity={1}
-                fill="url(#violetGradient)"
-                dot={({ cx, cy, index }) => {
-                  const isSelected = selectedIndex === index;
-                  return (
-                    <circle
-                      key={`dot-p-${index}`}
-                      cx={cx}
-                      cy={cy}
-                      r={isSelected ? 6.5 : 4.5}
-                      fill={THEME_COLORS.dotFill}
-                      stroke={isSelected ? '#7c3aed' : THEME_COLORS.primary}
-                      strokeWidth={isSelected ? 3.5 : 2.5}
-                      className="cursor-pointer transition-all duration-200 hover:scale-125"
-                      onClick={() => {
-                        setSelectedIndex(index);
-                        setIsPlaying(false);
-                      }}
-                    />
-                  );
-                }}
-                activeDot={{
-                  r: 7.5,
-                  fill: THEME_COLORS.dotFill,
-                  stroke: THEME_COLORS.primary,
-                  strokeWidth: 3.5,
-                  className: 'drop-shadow-md cursor-pointer',
-                }}
-                isAnimationActive={true}
-                animationDuration={900}
-                animationEasing="ease-out"
-              />
-            )}
-
-            {/* EAD / Apoio Spline Wave Area (Cyan/Turquoise) */}
-            {(activeSeries === 'todos' || activeSeries === 'ead') && (
-              <Area
-                type="monotone"
-                dataKey="ead"
-                name="Apoio Pedagógico"
-                stroke={THEME_COLORS.secondary}
-                strokeWidth={2.5}
-                strokeDasharray="4 3"
-                strokeLinecap="round"
-                fillOpacity={1}
-                fill="url(#cyanGradient)"
-                dot={{
-                  r: 3.5,
-                  fill: THEME_COLORS.dotFill,
-                  stroke: THEME_COLORS.secondary,
-                  strokeWidth: 2,
-                }}
-                activeDot={{
-                  r: 6,
-                  fill: THEME_COLORS.dotFill,
-                  stroke: THEME_COLORS.secondary,
-                  strokeWidth: 3,
-                }}
-                isAnimationActive={true}
-                animationDuration={900}
-                animationEasing="ease-out"
-              />
-            )}
+            {/* Assiduidade Spline Wave Area (Purple/Violet) */}
+            <Area
+              type="monotone"
+              dataKey="presencial"
+              name="Assiduidade"
+              stroke={THEME_COLORS.primary}
+              strokeWidth={3}
+              strokeLinecap="round"
+              fillOpacity={1}
+              fill="url(#violetGradient)"
+              dot={({ cx, cy, index }) => {
+                const isSelected = selectedIndex === index;
+                return (
+                  <circle
+                    key={`dot-p-${index}`}
+                    cx={cx}
+                    cy={cy}
+                    r={isSelected ? 6.5 : 4.5}
+                    fill={THEME_COLORS.dotFill}
+                    stroke={isSelected ? '#7c3aed' : THEME_COLORS.primary}
+                    strokeWidth={isSelected ? 3.5 : 2.5}
+                    className="cursor-pointer transition-all duration-200 hover:scale-125"
+                    onClick={() => {
+                      setSelectedIndex(index);
+                      setIsPlaying(false);
+                    }}
+                  />
+                );
+              }}
+              activeDot={{
+                r: 7.5,
+                fill: THEME_COLORS.dotFill,
+                stroke: THEME_COLORS.primary,
+                strokeWidth: 3.5,
+                className: 'drop-shadow-md cursor-pointer',
+              }}
+              isAnimationActive={true}
+              animationDuration={900}
+              animationEasing="ease-out"
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -346,7 +307,7 @@ export const AttendanceAreaChart: React.FC<AttendanceAreaChartProps> = ({
                     Registro de {activeRange === 'Semanal' ? `Dia (${selectedItem.year})` : selectedItem.year}
                   </span>
                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.2 rounded-full">
-                    {selectedItem.presencial}% Presencial
+                    {selectedItem.presencial}% Assiduidade
                   </span>
                 </div>
                 <p className="text-slate-500 text-[11px] mt-0.5">
@@ -367,34 +328,13 @@ export const AttendanceAreaChart: React.FC<AttendanceAreaChartProps> = ({
         </AnimatePresence>
       )}
 
-      {/* Modern Interactive Legend Footer */}
+      {/* Modern Legend Footer */}
       <div className="pt-3 border-t border-slate-100/90 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveSeries(activeSeries === 'presencial' ? 'todos' : 'presencial')}
-            className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              activeSeries === 'presencial' || activeSeries === 'todos'
-                ? 'bg-violet-50 text-violet-700 border border-violet-200/60'
-                : 'text-slate-400 opacity-60'
-            }`}
-          >
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200/60">
             <span className="w-2.5 h-2.5 rounded-full bg-violet-600 ring-2 ring-violet-200 shrink-0" />
-            <span>Aulas Presenciais</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSeries(activeSeries === 'ead' ? 'todos' : 'ead')}
-            className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              activeSeries === 'ead' || activeSeries === 'todos'
-                ? 'bg-cyan-50 text-cyan-700 border border-cyan-200/60'
-                : 'text-slate-400 opacity-60'
-            }`}
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 ring-2 ring-cyan-200 shrink-0" />
-            <span>Apoio Remoto</span>
-          </button>
+            <span>Frequência Escolar</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-200/60">

@@ -1290,6 +1290,7 @@ export default function App() {
       return (
         <AuthPage
           initialMode={currentPage}
+          onModeChange={(newMode) => setCurrentPage(newMode)}
           schools={adminSchools}
           onLoginSuccess={handleLoginSuccess}
           onBackToHome={() => {
@@ -2501,16 +2502,9 @@ export default function App() {
           {/* Seção Principal: Assistente Inteligente IA & Central com AIInputWithLoading */}
           <section className="max-w-4xl mx-auto px-4 sm:px-6 mb-12">
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-[0_10px_35px_rgba(0,0,0,0.04)] text-center relative overflow-hidden">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#002133] text-white text-xs font-bold mb-3 shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-[#f75142] animate-pulse" />
-                <span>Assistente de Gestão Escolar Inteligente (IA)</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-6">
                 Central de Pareceres & Análises Rápidas
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto mb-6">
-                Utilize o novo componente com suporte a auto-redimensionamento e digitação inteligente para consultar dados ou registar despachos:
-              </p>
 
               <div className="w-full flex justify-center">
                 <AIInputWithLoading

@@ -463,17 +463,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
 
   return (
     <div id="admin-approvals-page" className="w-full min-h-screen bg-[#f8f9fb]">
-      {/* Hero Header with refined typography */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
         customTitle="Central de Homologações & Credenciação (DME)"
-        customSubtitle="Validação de despachos e homologação ministerial de todos os Quadros da Educação de Quêssua (Membros da DME, Directores, Professores e Funcionários)."
-        badge="Administrador Central (DME)"
-        breadcrumbs={[
-          { label: 'Início', onClick: () => window.location.reload() },
-          { label: 'Administração Municipal' },
-          { label: 'Homologações & Despachos' },
-        ]}
         isLoggedIn={isLoggedIn}
       />
 
@@ -484,22 +476,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           <div className="p-5 sm:p-6 bg-transparent text-slate-900">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
               <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Malanje • Quêssua • Homologação Central (DME)</span>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Nuvem Conectada • dmedoquessua@gmail.com
-                  </span>
-                </div>
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                   Homologação Municipal de Quadros & Efectividade
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  Inscrições de todos os quadros municipais (Membros da Direção Municipal, Directores Gerais de Escola, Professores e Funcionários de Quêssua) recebidas e sincronizadas em tempo real a partir de qualquer dispositivo móvel ou computador.
-                </p>
               </div>
 
               {/* Quick Actions in Header */}

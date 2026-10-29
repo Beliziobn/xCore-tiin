@@ -366,12 +366,23 @@ export function searchPreRegisteredTeacher(
 
   // 1. Check in director teachers roster
   for (const t of directorTeachersData) {
-    const matchesSchool = !normSchool || t.schoolName.toLowerCase().includes(normSchool) || normSchool.includes(t.schoolName.toLowerCase());
-    const matchesEmail = t.email && t.email.toLowerCase() === normEmail;
-    const matchesBi = t.registrationData?.biNif && t.registrationData.biNif.toUpperCase() === normBi;
-    const matchesName = t.name.toLowerCase().includes(normName) || normName.includes(t.name.toLowerCase());
+    const tSchool = (t.schoolName || '').trim().toLowerCase();
+    const tEmail = (t.email || '').trim().toLowerCase();
+    const tBi = (t.registrationData?.biNif || '').trim().toUpperCase();
+    const tName = (t.name || '').trim().toLowerCase();
 
-    if ((matchesEmail || matchesBi || (matchesName && matchesSchool))) {
+    const matchesSchool =
+      normSchool.length >= 3 &&
+      tSchool.length >= 3 &&
+      (tSchool.includes(normSchool) || normSchool.includes(tSchool));
+    const matchesEmail = normEmail.length >= 5 && tEmail.length >= 5 && tEmail === normEmail;
+    const matchesBi = normBi.length >= 5 && tBi.length >= 5 && tBi === normBi;
+    const matchesName =
+      normName.length >= 4 &&
+      tName.length >= 4 &&
+      (tName.includes(normName) || normName.includes(tName));
+
+    if (matchesEmail || matchesBi || (matchesName && matchesSchool)) {
       return {
         found: true,
         teacherName: t.name,
@@ -394,15 +405,25 @@ export function searchPreRegisteredDirector(
   schoolName: string = ''
 ): { found: boolean; directorName?: string; details?: string; schoolMatched?: string } {
   const normEmail = email.trim().toLowerCase();
-  const normBi = biNumber.trim().toUpperCase();
   const normName = fullName.trim().toLowerCase();
   const normSchool = schoolName.trim().toLowerCase();
 
   // Search in initialAdminDirectors & initialAdminSchools
   for (const s of initialAdminSchools) {
-    const matchesSchool = normSchool && (s.name.toLowerCase().includes(normSchool) || normSchool.includes(s.name.toLowerCase()));
-    const matchesDirectorName = normName && (s.directorName.toLowerCase().includes(normName) || normName.includes(s.directorName.toLowerCase()));
-    const matchesEmail = s.email && s.email.toLowerCase() === normEmail;
+    const sName = (s.name || '').trim().toLowerCase();
+    const sDirectorName = (s.directorName || '').trim().toLowerCase();
+    const sEmail = (s.email || '').trim().toLowerCase();
+
+    const matchesSchool =
+      normSchool.length >= 3 &&
+      sName.length >= 3 &&
+      sDirectorName.length >= 3 &&
+      (sName.includes(normSchool) || normSchool.includes(sName));
+    const matchesDirectorName =
+      normName.length >= 4 &&
+      sDirectorName.length >= 4 &&
+      (sDirectorName.includes(normName) || normName.includes(sDirectorName));
+    const matchesEmail = normEmail.length >= 5 && sEmail.length >= 5 && sEmail === normEmail;
 
     if (matchesSchool || matchesDirectorName || matchesEmail) {
       return {
@@ -415,7 +436,8 @@ export function searchPreRegisteredDirector(
   }
 
   for (const d of initialAdminDirectors) {
-    if (d.email && d.email.toLowerCase() === normEmail) {
+    const dEmail = (d.email || '').trim().toLowerCase();
+    if (normEmail.length >= 5 && dEmail.length >= 5 && dEmail === normEmail) {
       return {
         found: true,
         directorName: d.name,

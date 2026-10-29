@@ -31,14 +31,18 @@ import {
   Users,
   Layers,
   Clock,
-  DoorOpen
+  DoorOpen,
+  ArrowRight,
+  ChevronDown,
+  ClipboardList,
+  LayoutGrid,
+  CreditCard
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import { verifyPassword, updatePassword, encodePasswordVerifier } from '../../utils/passwordService';
 import type { UserAccount, SchoolStaffRole, AdminStaffRole, AdminSchool } from '../../types';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
-import { googleSignIn, getGoogleUser, createGoogleUserSession } from '../../utils/googleAuth';
-import { GoogleAccountPickerModal } from '../modals/GoogleAccountPickerModal';
+import { googleSignIn, createGoogleUserSession } from '../../utils/googleAuth';
 import { 
   UCORE_MUNICIPALITIES, 
   UCORE_DISCIPLINAS, 
@@ -61,6 +65,7 @@ import { saveUserToFirestore, fetchUserFromFirestore } from '../../utils/firesto
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
+  onModeChange?: (mode: 'login' | 'register') => void;
   onLoginSuccess: (user: UserAccount) => void;
   onBackToHome: () => void;
   hideHeader?: boolean;
@@ -243,6 +248,7 @@ export const ADMIN_ROLES_CONFIG: {
 
 export const AuthPage: React.FC<AuthPageProps> = ({
   initialMode = 'login',
+  onModeChange,
   onLoginSuccess,
   onBackToHome,
   hideHeader = false,
@@ -250,6 +256,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   schools: propSchools,
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [isGoogleLockedEmail, setIsGoogleLockedEmail] = useState<boolean>(false);
+  const [googleAuthMeta, setGoogleAuthMeta] = useState<{ uid?: string; photoURL?: string | null } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [storageRevision, setStorageRevision] = useState(0);
@@ -339,8 +347,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [loginPresetTab, setLoginPresetTab] = useState<'escola' | 'administracao'>('escola');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isGooglePickerOpen, setIsGooglePickerOpen] = useState(false);
-  const [googlePickerReason, setGooglePickerReason] = useState<'unauthorized-domain' | 'popup-blocked' | 'direct' | 'fallback'>('direct');
+
+  // 3-Step Registration Wizard State
+  const [regStep, setRegStep] = useState<1 | 2 | 3>(1);
+  const [hasChosenRole, setHasChosenRole] = useState<boolean>(false);
+  const [regMunicipalityValue, setRegMunicipalityValue] = useState<string>('quessua');
+  const [stepErrors, setStepErrors] = useState<{ [key: number]: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [registrationSubmitted, setRegistrationSubmitted] = useState<boolean>(false);
+  const [submittedUserAccount, setSubmittedUserAccount] = useState<UserAccount | null>(null);
 
   // Keep selectedSchoolId synced with registeredSchools and auto-fill municipality from registered school data
   useEffect(() => {
@@ -429,24 +444,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       } catch {}
     }
 
-    // 2. Check pre-registration rosters
-    const teacherPreReg = searchPreRegisteredTeacher(cleanEmail, '', targetName);
-    const directorPreReg = searchPreRegisteredDirector(cleanEmail, '', targetName);
+    // 2. Check registered accounts strictly by email
+    const existingAccountLookup = findRegisteredAccountByEmail(cleanEmail);
 
-    // 3. Check Firestore user document
+    // 3. Check Firestore user document by email
     let existingFirestoreUser: UserAccount | null = null;
     try {
       existingFirestoreUser = await fetchUserFromFirestore(cleanEmail);
     } catch {}
 
-    // Check if account already exists in the system
+    // Check if account already exists in the system for this exact email
     const hasExistingAccount = Boolean(
       isDirectorMunicipal ||
       isSuperAdmin ||
+      existingAccountLookup.exists ||
       approvalCheck.app ||
-      existingFirestoreUser ||
-      teacherPreReg.found ||
-      directorPreReg.found
+      existingFirestoreUser
     );
 
     const names = targetName.trim().split(' ');
@@ -454,40 +467,51 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     let gLast = names.slice(1).join(' ') || '';
 
     // SE NÃO TEM AINDA UMA CONTA CRIADA E CADASTRADA NO SISTEMA:
-    // Leva automaticamente o utilizador à aba de criação de conta com os dados do Google preenchidos
+    // Leva automaticamente o utilizador à página de inscrição (Passo 1) com o e-mail do Google bloqueado
     if (!hasExistingAccount) {
       setIsGoogleLoading(false);
       setLoading(false);
       onAuthLoadingChange?.(false);
-      setIsGooglePickerOpen(false);
 
-      // Preenche os dados identificados na conta Google
+      // Preenche os dados identificados na conta Google e bloqueia o e-mail
       setEmail(cleanEmail);
+      setIsGoogleLockedEmail(true);
+      setGoogleAuthMeta({ uid, photoURL });
       if (gFirst && gFirst !== 'Utilizador' && gFirst !== 'Google') {
         setFirstName(gFirst);
+      } else {
+        setFirstName('');
       }
       if (gLast && gLast !== 'Google') {
         setLastName(gLast);
+      } else {
+        setLastName('');
       }
-      setPassword('Ucore@2026');
-      setConfirmPassword('Ucore@2026');
-      setAgreeTerms(true);
 
-      // Altera automaticamente para a aba de criação de conta
-      setMode('register');
+      // Reinicia o assistente de inscrição no Passo 1 (escolher perfil e escola)
+      setRegStep(1);
+      setRegistrationSubmitted(false);
+      setHasChosenRole(false);
+      setStepErrors({});
+      setFieldErrors({});
       setErrorMsg(null);
       setSuccessMsg(null);
+
+      // Altera automaticamente para a página de inscrição
+      setMode('register');
+      onModeChange?.('register');
       setGoogleNotice(
-        `Conta Google identificada (${cleanEmail}). Complete os dados institucionais abaixo para criar a sua conta no Sigre e submeter para homologação.`
+        `O e-mail ${cleanEmail} ainda não possui conta registada no sistema. Selecione o seu perfil e escola (Passo 1 e 2) e conclua a sua inscrição com este e-mail.`
       );
 
-      // Rola suavemente até o formulário de cadastro
+      // Rola suavemente até ao início do formulário de inscrição
       setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         const cardContainer = document.getElementById('auth-card-container');
         if (cardContainer) {
           cardContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      }, 100);
+      }, 80);
       return;
     }
 
@@ -538,18 +562,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
 
     // 3. Se possui conta ativa, resolver credenciais e entrar
-    let resolvedRole: 'admin' | 'diretor' | 'professor' = 'admin';
-    let resolvedScope: 'escola' | 'administracao' = 'administracao';
+    let resolvedRole: 'admin' | 'diretor' | 'professor' = 'diretor';
+    let resolvedScope: 'escola' | 'administracao' = 'escola';
     let resolvedSchoolRole: SchoolStaffRole | undefined = undefined;
-    let resolvedAdminRole: AdminStaffRole | undefined = 'chefe_reparticao';
+    let resolvedAdminRole: AdminStaffRole | undefined = undefined;
     let resolvedCargo = isSuperAdmin
       ? 'Administrador de Sistema Sigre (Super Admin)'
       : isDirectorMunicipal
       ? 'Director Municipal da Educação de Quessua'
       : 'Quadro Institucional';
     let resolvedPrefix = isSuperAdmin ? 'Admin.' : isDirectorMunicipal ? 'Dr.' : 'Sr(a).';
-    let resolvedSchoolName: string | undefined = 'Direcção Municipal da Educação de Quessua';
-    let resolvedSchoolId: string | undefined = undefined;
+    let resolvedSchoolName: string | undefined = registeredSchools[0]?.name || 'Unidade Escolar';
+    let resolvedSchoolId: string | undefined = registeredSchools[0]?.id;
 
     if (isSuperAdmin) {
       resolvedRole = 'admin';
@@ -610,31 +634,49 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       resolvedPrefix = existingFirestoreUser.titlePrefix || resolvedPrefix;
       if (existingFirestoreUser.firstName) gFirst = existingFirestoreUser.firstName;
       if (existingFirestoreUser.lastName) gLast = existingFirestoreUser.lastName;
-    } else if (teacherPreReg.found) {
+    } else if (existingAccountLookup.dmeStaff) {
+      const staff = existingAccountLookup.dmeStaff;
+      const staffRole: AdminStaffRole = staff.role || 'chefe_reparticao';
+      const dmeCfg = ADMIN_ROLES_CONFIG.find((c) => c.id === staffRole) || ADMIN_ROLES_CONFIG[0];
+      resolvedRole = 'admin';
+      resolvedScope = 'administracao';
+      resolvedSchoolRole = undefined;
+      resolvedAdminRole = staffRole;
+      resolvedCargo = staff.cargoTitle || dmeCfg.label;
+      resolvedPrefix = dmeCfg.prefix;
+      resolvedSchoolName = staff.department || 'Direcção Municipal da Educação de Quêssua';
+      resolvedSchoolId = undefined;
+      const sNames = (staff.name || '').trim().split(' ');
+      if (sNames[0]) gFirst = sNames[0];
+      if (sNames.length > 1) gLast = sNames.slice(1).join(' ');
+    } else if (existingAccountLookup.teacher) {
+      const t = existingAccountLookup.teacher;
       resolvedRole = 'professor';
       resolvedScope = 'escola';
       resolvedSchoolRole = 'professor';
       resolvedAdminRole = undefined;
       resolvedCargo = 'Professor(a) / Docente';
       resolvedPrefix = 'Prof.';
-      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
+      resolvedSchoolName = t.schoolName || registeredSchools[0]?.name || 'Unidade Escolar';
       resolvedSchoolId = registeredSchools[0]?.id;
-      if (teacherPreReg.teacherName) {
-        const tNames = teacherPreReg.teacherName.trim().split(' ');
+      if (t.name) {
+        const tNames = t.name.trim().split(' ');
         if (tNames[0]) gFirst = tNames[0];
         if (tNames.length > 1) gLast = tNames.slice(1).join(' ');
       }
-    } else if (directorPreReg.found) {
+    } else if (existingAccountLookup.director) {
+      const d = existingAccountLookup.director;
       resolvedRole = 'diretor';
       resolvedScope = 'escola';
       resolvedSchoolRole = 'diretor_geral';
       resolvedAdminRole = undefined;
       resolvedCargo = 'Director(a) Geral';
       resolvedPrefix = 'Director';
-      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
+      resolvedSchoolName = d.schoolName || d.nomeEscola || registeredSchools[0]?.name || 'Unidade Escolar';
       resolvedSchoolId = registeredSchools[0]?.id;
-      if (directorPreReg.directorName) {
-        const dNames = directorPreReg.directorName.trim().split(' ');
+      const dirFullName = d.name || d.nomeCompleto || '';
+      if (dirFullName) {
+        const dNames = dirFullName.trim().split(' ');
         if (dNames[0]) gFirst = dNames[0];
         if (dNames.length > 1) gLast = dNames.slice(1).join(' ');
       }
@@ -704,38 +746,199 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         );
         return;
       }
-      // If popup was blocked or domain not allowed, open the graceful account selector
-      setGooglePickerReason(
-        res.unauthorizedDomain
-          ? 'unauthorized-domain'
-          : res.popupBlocked
-          ? 'popup-blocked'
-          : 'fallback'
+      if (res.popupBlocked) {
+        setErrorMsg(
+          'O pop-up de início de sessão do Google foi bloqueado pelo navegador. Por favor, permita pop-ups para este site e tente novamente.'
+        );
+        return;
+      }
+      setErrorMsg(
+        'Não foi possível concluir a autenticação padrão com o Google. Tente novamente.'
       );
-      setIsGooglePickerOpen(true);
     } catch (err: any) {
       console.warn('Google sign-in tentativa capturada:', err?.message || err);
-      setGooglePickerReason('fallback');
-      setIsGooglePickerOpen(true);
+      setErrorMsg(
+        'Não foi possível concluir a autenticação padrão com o Google. Tente novamente.'
+      );
     } finally {
       setIsGoogleLoading(false);
     }
   };
 
   useEffect(() => {
-    setMode(initialMode);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setGoogleNotice(null);
+    setMode((prevMode) => {
+      if (prevMode !== initialMode) {
+        setErrorMsg(null);
+        setSuccessMsg(null);
+        setGoogleNotice(null);
+        setIsGoogleLockedEmail(false);
+        setGoogleAuthMeta(null);
+        if (initialMode === 'register') {
+          setRegStep(1);
+        }
+      }
+      return initialMode;
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [initialMode]);
 
   const switchMode = (newMode: 'login' | 'register') => {
     setMode(newMode);
+    onModeChange?.(newMode);
     setErrorMsg(null);
     setSuccessMsg(null);
     setGoogleNotice(null);
+    setIsGoogleLockedEmail(false);
+    setGoogleAuthMeta(null);
     setForgotPasswordOpen(false);
+    setRegistrationSubmitted(false);
+    setStepErrors({});
+    setFieldErrors({});
+    if (newMode === 'register') {
+      setRegStep(1);
+    }
+  };
+
+  const clearStepValidation = (step: number) => {
+    setStepErrors((prev) => {
+      const next = { ...prev };
+      delete next[step];
+      return next;
+    });
+    setFieldErrors({});
+    setErrorMsg(null);
+  };
+
+  const clearSingleFieldError = (fieldName: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[fieldName]) return prev;
+      const next = { ...prev };
+      delete next[fieldName];
+      return next;
+    });
+  };
+
+  const validateRegistrationStep = (step: 1 | 2 | 3): boolean => {
+    clearStepValidation(step);
+
+    if (step === 1) {
+      if (!institutionalScope) {
+        setStepErrors((prev) => ({ ...prev, 1: 'Selecione o âmbito institucional.' }));
+        return false;
+      }
+      if (!hasChosenRole) {
+        setStepErrors((prev) => ({ ...prev, 1: 'Selecione a função que desempenha na instituição.' }));
+        return false;
+      }
+      if (institutionalScope === 'administracao' && occupiedDmeCargos[adminRole]?.occupied) {
+        setStepErrors((prev) => ({
+          ...prev,
+          1: `O cargo selecionado já se encontra ocupado (${occupiedDmeCargos[adminRole]?.holderName}). Selecione uma função disponível.`,
+        }));
+        return false;
+      }
+      return true;
+    }
+
+    if (step === 2) {
+      const newFieldErrors: { [key: string]: string } = {};
+      if (!regMunicipalityValue) {
+        newFieldErrors.municipality = 'Selecione o município.';
+        setFieldErrors(newFieldErrors);
+        setStepErrors((prev) => ({ ...prev, 2: 'Informe o município ou repartição.' }));
+        return false;
+      }
+      if (institutionalScope === 'escola' && !selectedSchoolId) {
+        newFieldErrors.school = 'Selecione a unidade escolar.';
+        setFieldErrors(newFieldErrors);
+        setStepErrors((prev) => ({ ...prev, 2: 'Selecione a unidade escolar associada à sua conta.' }));
+        return false;
+      }
+      return true;
+    }
+
+    if (step === 3) {
+      const newFieldErrors: { [key: string]: string } = {};
+      const requiredChecks: [string, string, string][] = [
+        ['bi', biNumber, 'Informe o número do Bilhete de Identidade.'],
+        ['phone', phone, 'Informe o seu telefone.'],
+        ['firstName', firstName, 'Informe o seu primeiro nome.'],
+        ['lastName', lastName, 'Informe o seu sobrenome.'],
+        ['email', email, 'Informe o seu e-mail institucional.'],
+        ['password', password, 'Defina uma senha.'],
+      ];
+
+      for (const [key, val, msg] of requiredChecks) {
+        if (!val.trim()) {
+          newFieldErrors[key] = msg;
+          setFieldErrors(newFieldErrors);
+          setStepErrors((prev) => ({ ...prev, 3: msg }));
+          return false;
+        }
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        newFieldErrors.email = 'Informe um e-mail válido.';
+        setFieldErrors(newFieldErrors);
+        setStepErrors((prev) => ({ ...prev, 3: 'Informe um e-mail institucional válido.' }));
+        return false;
+      }
+
+      if (password.length < 6) {
+        newFieldErrors.password = 'A senha deve ter pelo menos 6 caracteres.';
+        setFieldErrors(newFieldErrors);
+        setStepErrors((prev) => ({ ...prev, 3: 'A senha deve ter pelo menos 6 caracteres.' }));
+        return false;
+      }
+
+      if (!confirmPassword.trim()) {
+        newFieldErrors.passwordConfirm = 'Confirme a sua senha.';
+        setFieldErrors(newFieldErrors);
+        setStepErrors((prev) => ({ ...prev, 3: 'Confirme a sua senha.' }));
+        return false;
+      }
+
+      if (password !== confirmPassword) {
+        newFieldErrors.passwordConfirm = 'As senhas não coincidem.';
+        setFieldErrors(newFieldErrors);
+        setStepErrors((prev) => ({ ...prev, 3: 'As senhas informadas não coincidem.' }));
+        return false;
+      }
+
+      if (!agreeTerms) {
+        newFieldErrors.terms = 'Aceite os termos de uso e a política de privacidade.';
+        setFieldErrors(newFieldErrors);
+        setStepErrors((prev) => ({ ...prev, 3: 'Aceite os termos de uso e a política de privacidade.' }));
+        return false;
+      }
+
+      return true;
+    }
+
+    return true;
+  };
+
+  const handleNextRegStep = () => {
+    if (!validateRegistrationStep(regStep)) return;
+    if (regStep < 3) {
+      setRegStep((prev) => (prev + 1) as 1 | 2 | 3);
+      if (window.innerWidth < 1000) {
+        const panel = document.getElementById('sigre-register-form-panel');
+        panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+
+  const handlePrevRegStep = () => {
+    if (regStep > 1) {
+      clearStepValidation(regStep);
+      setRegStep((prev) => (prev - 1) as 1 | 2 | 3);
+      if (window.innerWidth < 1000) {
+        const panel = document.getElementById('sigre-register-form-panel');
+        panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   };
 
   const handleFillSchoolPreset = (roleId: SchoolStaffRole) => {
@@ -1013,38 +1216,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setErrorMsg('Erro ao verificar as credenciais na base de dados. Tente novamente.');
       }
     } else {
-      // Register validation
-      if (!firstName.trim()) {
-        setErrorMsg('Por favor, informe o seu primeiro nome.');
-        return;
-      }
-      if (!biNumber.trim()) {
-        setErrorMsg('Por favor, indique o número do Bilhete de Identidade (BI) para verificação institucional.');
-        return;
-      }
-      if (!email.trim()) {
-        setErrorMsg('Por favor, informe um endereço de e-mail institucional válido.');
-        return;
-      }
-      if (!password || password.length < 6) {
-        setErrorMsg('A senha deve possuir pelo menos 6 caracteres.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setErrorMsg('As senhas digitadas não coincidem.');
-        return;
-      }
-      if (institutionalScope === 'escola' && (!selectedSchoolId || registeredSchools.length === 0)) {
-        setErrorMsg('Por favor, selecione uma Unidade Escolar já cadastrada no sistema.');
-        return;
-      }
-      if (!agreeTerms) {
-        setErrorMsg('É necessário aceitar os Termos de Uso e a Política de Privacidade.');
+      // Register validation (3-step wizard)
+      if (!validateRegistrationStep(3)) {
         return;
       }
 
       setLoading(true);
       setErrorMsg(null);
+      setStepErrors({});
 
       try {
         // Sync fresh applications from cloud before checking duplicate accounts or occupied DME cargos
@@ -1055,7 +1234,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         if (dupCheck.duplicate) {
           setLoading(false);
           onAuthLoadingChange?.(false);
-          setErrorMsg(dupCheck.reason || 'Este e-mail ou BI já pertence a outro utilizador registado.');
+          const msg = dupCheck.reason || 'Este e-mail ou BI já pertence a outro utilizador registado.';
+          setErrorMsg(msg);
+          setStepErrors((prev) => ({ ...prev, 3: msg }));
           return;
         }
 
@@ -1065,9 +1246,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           if (existingCloudUser && existingCloudUser.email) {
             setLoading(false);
             onAuthLoadingChange?.(false);
-            setErrorMsg(
-              `O e-mail "${email.trim()}" já pertence à conta de ${existingCloudUser.firstName} ${existingCloudUser.lastName}. Por segurança, ninguém pode aceder ou recriar a conta de outro utilizador.`
-            );
+            const cloudMsg = `O e-mail "${email.trim()}" já pertence à conta de ${existingCloudUser.firstName} ${existingCloudUser.lastName}. Por segurança, ninguém pode aceder ou recriar a conta de outro utilizador.`;
+            setErrorMsg(cloudMsg);
+            setStepErrors((prev) => ({ ...prev, 3: cloudMsg }));
             return;
           }
         } catch {}
@@ -1079,9 +1260,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           if (freshOccupied[adminRole]?.occupied) {
             setLoading(false);
             onAuthLoadingChange?.(false);
-            setErrorMsg(
-              `O cargo de "${chosenDmeConfig.label}" na Direcção Municipal da Educação já se encontra ocupado (${freshOccupied[adminRole].holderName}). Através da existência da conta oficial da DME, não é permitido cadastrar outro utilizador com o mesmo cargo.`
-            );
+            const occMsg = `O cargo de "${chosenDmeConfig.label}" na Direcção Municipal da Educação já se encontra ocupado (${freshOccupied[adminRole].holderName}). Através da existência da conta oficial da DME, não é permitido cadastrar outro utilizador com o mesmo cargo.`;
+            setErrorMsg(occMsg);
+            setStepErrors((prev) => ({ ...prev, 3: occMsg }));
             return;
           }
         }
@@ -1102,10 +1283,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           ? (registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0])
           : null;
         const resolvedSchoolName = institutionalScope === 'escola'
-          ? (matchedSchool?.name || schoolOrUnitName || 'Unidade Escolar Municipal')
+          ? (matchedSchool?.name || schoolOrUnitName || 'Só Ciência da Educação')
           : 'Direcção Municipal da Educação de Quêssua';
         const resolvedSchoolId = institutionalScope === 'escola'
-          ? (matchedSchool?.id || 'esc-default')
+          ? (matchedSchool?.id || selectedSchoolId || 'sige-113013')
           : undefined;
 
         const isPending = true;
@@ -1118,7 +1299,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           ? 'professor'
           : 'funcionario';
 
-        const newUserId = 'usr_' + Date.now();
+        const newUserId = googleAuthMeta?.uid || 'usr_' + Date.now();
 
         // Save exact password and generate deterministic verifier token
         const pwdRes = updatePassword(email.trim(), password);
@@ -1176,6 +1357,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           municipalityOrDepartment: selectedMunicipality,
           titlePrefix: prefix,
           greeting: `Olá ${prefix} ${userFirst}`,
+          avatar: googleAuthMeta?.photoURL || undefined,
           rememberMe: true,
           status: 'pendente',
           biNumber: biNumber.trim(),
@@ -1196,17 +1378,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           console.warn('[AuthPage] Erro ao sincronizar usuário no Firestore:', err);
         }
 
-        setSuccessMsg(
-          `Inscrição submetida! A sua conta com o cargo de ${cargoTitle} foi enviada diretamente para a Direcção Municipal da Educação (dmedoquessua@gmail.com) para homologação.`
-        );
-
-        setTimeout(() => {
-          onAuthLoadingChange?.(false);
-          onLoginSuccess(newUser);
-        }, 850);
+        setSubmittedUserAccount(newUser);
+        setRegistrationSubmitted(true);
+        setSuccessMsg(null);
+        onAuthLoadingChange?.(false);
       } catch (err) {
         console.error('Erro ao registar utilizador:', err);
-        setErrorMsg('Ocorreu um problema ao submeter a inscrição na base de dados central. Por favor, tente novamente.');
+        const failMsg = 'Ocorreu um problema ao submeter a inscrição na base de dados central. Por favor, tente novamente.';
+        setErrorMsg(failMsg);
+        setStepErrors((prev) => ({ ...prev, 3: failMsg }));
+        onAuthLoadingChange?.(false);
       } finally {
         setLoading(false);
       }
@@ -1226,8 +1407,775 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   return (
     <div 
       id="auth-full-page" 
-      className="min-h-screen w-full bg-gradient-to-b from-[#f8f9fb] via-[#f3f5f8] to-[#edf1f5] text-slate-900 flex flex-col justify-between selection:bg-[#f75142] selection:text-white font-sans"
+      className="min-h-screen w-full bg-[#f2f5f8] text-[#173047] flex flex-col justify-between selection:bg-[#f4514a] selection:text-white font-sans"
     >
+      <style>{`
+        .sigre-register-scope {
+          --coral: #f4514a;
+          --coral-dark: #d9403b;
+          --navy: #062a3d;
+          --navy-soft: #0b3b51;
+          --ink: #173047;
+          --muted: #728297;
+          --line: #dbe4ec;
+          --line-dark: #c7d3df;
+          --surface: #ffffff;
+          --soft: #f5f8fb;
+          --soft-blue: #edf5f9;
+          --success: #168568;
+          --warning: #a86900;
+          --danger: #c43d36;
+          --shadow: 0 20px 50px rgba(17, 48, 72, 0.12);
+          --radius: 10px;
+          width: min(100% - 40px, 1240px);
+          margin: 32px auto 64px;
+          color: var(--ink);
+          line-height: 1.4;
+        }
+        .sigre-register-scope .register-shell {
+          display: grid;
+          grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
+          overflow: hidden;
+          border: 1px solid var(--line);
+          border-radius: var(--radius);
+          background: var(--surface);
+          box-shadow: var(--shadow);
+        }
+        .sigre-register-scope .visual-panel {
+          position: relative;
+          min-height: 770px;
+          overflow: hidden;
+          background: var(--navy);
+        }
+        .sigre-register-scope .visual-image {
+          width: 100%;
+          height: 100%;
+          display: block;
+          object-fit: cover;
+          object-position: center;
+          filter: saturate(0.82);
+        }
+        .sigre-register-scope .visual-cover {
+          position: absolute;
+          inset: 0;
+          background: rgba(3, 34, 49, 0.58);
+        }
+        .sigre-register-scope .visual-copy {
+          position: absolute;
+          right: 42px;
+          bottom: 42px;
+          left: 42px;
+          z-index: 1;
+          max-width: 360px;
+          color: #ffffff;
+        }
+        .sigre-register-scope .visual-label {
+          display: inline-flex;
+          margin-bottom: 16px;
+          color: #b9d2dc;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.14em;
+        }
+        .sigre-register-scope .visual-copy h2 {
+          margin: 0;
+          font-size: clamp(28px, 3vw, 42px);
+          font-weight: 800;
+          line-height: 1.08;
+          letter-spacing: 0;
+        }
+        .sigre-register-scope .visual-copy h2 span {
+          color: #ffb0aa;
+        }
+        .sigre-register-scope .visual-copy p {
+          max-width: 300px;
+          margin: 17px 0 0;
+          color: #e3edf1;
+          font-size: 14px;
+        }
+        .sigre-register-scope .form-panel {
+          min-width: 0;
+          padding: 42px clamp(26px, 4vw, 58px) 30px;
+          background: #ffffff;
+        }
+        .sigre-register-scope .form-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 24px;
+        }
+        .sigre-register-scope .eyebrow {
+          display: block;
+          margin-bottom: 9px;
+          color: var(--coral-dark);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.13em;
+        }
+        .sigre-register-scope .form-header h1 {
+          margin: 0;
+          color: var(--navy);
+          font-size: clamp(28px, 3vw, 36px);
+          font-weight: 800;
+          line-height: 1.08;
+          letter-spacing: 0;
+        }
+        .sigre-register-scope .form-subtitle {
+          max-width: 410px;
+          margin: 10px 0 0;
+          color: var(--muted);
+          font-size: 14px;
+        }
+        .sigre-register-scope .step-count {
+          flex: 0 0 auto;
+          padding-top: 7px;
+          color: var(--muted);
+          font-size: 12px;
+          white-space: nowrap;
+        }
+        .sigre-register-scope .step-count strong {
+          color: var(--navy);
+          font-weight: 800;
+        }
+        .sigre-register-scope .progress {
+          margin: 31px 0 38px;
+        }
+        .sigre-register-scope .progress-list {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          padding: 0;
+          margin: 0;
+          list-style: none;
+        }
+        .sigre-register-scope .progress-step {
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          min-width: 0;
+          padding-bottom: 14px;
+          color: var(--muted);
+        }
+        .sigre-register-scope .progress-step::after {
+          position: absolute;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          height: 3px;
+          border-radius: 20px;
+          background: var(--line);
+          content: "";
+        }
+        .sigre-register-scope .progress-step.is-active,
+        .sigre-register-scope .progress-step.is-complete {
+          color: var(--navy);
+        }
+        .sigre-register-scope .progress-step.is-active::after,
+        .sigre-register-scope .progress-step.is-complete::after {
+          background: var(--coral);
+        }
+        .sigre-register-scope .progress-dot {
+          width: 27px;
+          height: 27px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border: 1px solid var(--line-dark);
+          border-radius: 50%;
+          background: #ffffff;
+          color: var(--muted);
+          font-size: 12px;
+          font-weight: 800;
+        }
+        .sigre-register-scope .progress-step.is-active .progress-dot,
+        .sigre-register-scope .progress-step.is-complete .progress-dot {
+          border-color: var(--coral);
+          background: var(--coral);
+          color: #ffffff;
+        }
+        .sigre-register-scope .progress-copy {
+          min-width: 0;
+        }
+        .sigre-register-scope .progress-copy strong,
+        .sigre-register-scope .progress-copy small {
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .sigre-register-scope .progress-copy strong {
+          font-size: 12px;
+          font-weight: 800;
+        }
+        .sigre-register-scope .progress-copy small {
+          margin-top: 1px;
+          font-size: 11px;
+        }
+        .sigre-register-scope .step-heading {
+          display: flex;
+          align-items: flex-start;
+          gap: 13px;
+          margin-bottom: 25px;
+        }
+        .sigre-register-scope .step-number {
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border-radius: 8px;
+          background: #fff0ee;
+          color: var(--coral-dark);
+          font-size: 12px;
+          font-weight: 900;
+        }
+        .sigre-register-scope .step-heading h2 {
+          margin: 0;
+          color: var(--navy);
+          font-size: 20px;
+          font-weight: 800;
+          line-height: 1.2;
+        }
+        .sigre-register-scope .step-heading p {
+          margin: 5px 0 0;
+          color: var(--muted);
+          font-size: 13px;
+        }
+        .sigre-register-scope .field-group {
+          min-width: 0;
+          padding: 0;
+          margin: 0;
+          border: 0;
+        }
+        .sigre-register-scope .field-group + .field-group {
+          padding-top: 28px;
+          margin-top: 29px;
+          border-top: 1px solid var(--line);
+        }
+        .sigre-register-scope .field-group legend {
+          display: block;
+          padding: 0;
+          margin-bottom: 12px;
+          color: var(--navy);
+          font-size: 14px;
+          font-weight: 800;
+        }
+        .sigre-register-scope .choice-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .sigre-register-scope .choice-grid--roles {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .sigre-register-scope .choice-card {
+          position: relative;
+          min-width: 0;
+          min-height: 73px;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          padding: 12px;
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          background: #ffffff;
+          color: var(--ink);
+          text-align: left;
+          cursor: pointer;
+          transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+        }
+        .sigre-register-scope .choice-card:hover:not(:disabled) {
+          border-color: #99b4c5;
+          transform: translateY(-1px);
+        }
+        .sigre-register-scope .choice-card.is-selected {
+          border-color: var(--navy);
+          background: var(--navy);
+          color: #ffffff;
+        }
+        .sigre-register-scope .choice-card:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .sigre-register-scope .choice-icon {
+          width: 34px;
+          height: 34px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border-radius: 8px;
+          background: var(--soft-blue);
+          color: var(--navy);
+        }
+        .sigre-register-scope .choice-card.is-selected .choice-icon {
+          background: var(--coral);
+          color: #ffffff;
+        }
+        .sigre-register-scope .choice-copy {
+          min-width: 0;
+        }
+        .sigre-register-scope .choice-copy strong,
+        .sigre-register-scope .choice-copy small {
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .sigre-register-scope .choice-copy strong {
+          font-size: 13px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+        .sigre-register-scope .choice-copy small {
+          margin-top: 3px;
+          color: var(--muted);
+          font-size: 11px;
+          line-height: 1.25;
+        }
+        .sigre-register-scope .choice-card.is-selected .choice-copy small {
+          color: #d6e6ed;
+        }
+        .sigre-register-scope .choice-check {
+          width: 20px;
+          height: 20px;
+          display: grid;
+          place-items: center;
+          margin-left: auto;
+          flex: 0 0 auto;
+          border: 1px solid var(--line);
+          border-radius: 50%;
+          color: transparent;
+        }
+        .sigre-register-scope .choice-card.is-selected .choice-check {
+          border-color: #ffffff;
+          color: #ffffff;
+        }
+        .sigre-register-scope .fields-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 18px 12px;
+        }
+        .sigre-register-scope .field--full {
+          grid-column: 1 / -1;
+        }
+        .sigre-register-scope .field-label {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 7px;
+          color: var(--navy);
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .sigre-register-scope .required-mark {
+          color: var(--coral-dark);
+        }
+        .sigre-register-scope .control {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        .sigre-register-scope .control > svg {
+          position: absolute;
+          left: 14px;
+          z-index: 1;
+          width: 18px;
+          height: 18px;
+          color: #8aa0b4;
+          pointer-events: none;
+        }
+        .sigre-register-scope .control input,
+        .sigre-register-scope .control select {
+          width: 100%;
+          height: 48px;
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          outline: 0;
+          background: #ffffff;
+          color: var(--ink);
+          font-size: 13px;
+          transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+        .sigre-register-scope .control input {
+          padding: 0 14px 0 44px;
+        }
+        .sigre-register-scope .control select {
+          padding: 0 42px 0 44px;
+          appearance: none;
+          cursor: pointer;
+        }
+        .sigre-register-scope .control select:disabled {
+          background: var(--soft);
+          color: var(--muted);
+          cursor: not-allowed;
+        }
+        .sigre-register-scope .control input::placeholder {
+          color: #98aabd;
+        }
+        .sigre-register-scope .control input:focus,
+        .sigre-register-scope .control select:focus {
+          border-color: #7899ad;
+          box-shadow: 0 0 0 3px rgba(36, 113, 143, 0.11);
+        }
+        .sigre-register-scope .control input.is-invalid,
+        .sigre-register-scope .control select.is-invalid {
+          border-color: var(--danger);
+          box-shadow: 0 0 0 3px rgba(196, 61, 54, 0.09);
+        }
+        .sigre-register-scope .select-arrow {
+          right: 14px;
+          left: auto !important;
+          color: #8196a8 !important;
+        }
+        .sigre-register-scope .password-control input {
+          padding-right: 49px;
+        }
+        .sigre-register-scope .password-toggle {
+          position: absolute;
+          right: 7px;
+          width: 34px;
+          height: 34px;
+          display: grid;
+          place-items: center;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: #7890a4;
+          cursor: pointer;
+        }
+        .sigre-register-scope .password-toggle:hover {
+          background: var(--soft);
+          color: var(--navy);
+        }
+        .sigre-register-scope .field-message {
+          display: none;
+          margin: 6px 0 0;
+          color: var(--danger);
+          font-size: 11px;
+        }
+        .sigre-register-scope .field.has-error .field-message {
+          display: block;
+        }
+        .sigre-register-scope .school-summary {
+          padding: 17px;
+          margin-top: 18px;
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          background: var(--soft);
+        }
+        .sigre-register-scope .school-summary__head,
+        .sigre-register-scope .school-summary__meta {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .sigre-register-scope .school-summary__head {
+          justify-content: space-between;
+          gap: 18px;
+        }
+        .sigre-register-scope .summary-code,
+        .sigre-register-scope .summary-tag {
+          display: inline-flex;
+          align-items: center;
+          min-height: 22px;
+          padding: 0 8px;
+          border-radius: 5px;
+          font-size: 10px;
+          font-weight: 800;
+        }
+        .sigre-register-scope .summary-code {
+          background: var(--navy);
+          color: #ffffff;
+        }
+        .sigre-register-scope .summary-tag {
+          margin-left: 4px;
+          background: #daf4e9;
+          color: var(--success);
+        }
+        .sigre-register-scope .summary-status {
+          color: var(--success);
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .sigre-register-scope .school-summary__name {
+          margin-top: 12px;
+          color: var(--navy);
+          font-size: 14px;
+          font-weight: 800;
+        }
+        .sigre-register-scope .school-summary__meta {
+          flex-wrap: wrap;
+          margin-top: 12px;
+          color: var(--muted);
+          font-size: 11px;
+          gap: 14px;
+        }
+        .sigre-register-scope .school-summary__meta span {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+        }
+        .sigre-register-scope .school-summary__meta svg {
+          width: 14px;
+          height: 14px;
+          color: var(--coral-dark);
+        }
+        .sigre-register-scope .notice {
+          display: flex;
+          align-items: flex-start;
+          gap: 11px;
+          padding: 14px;
+          margin-top: 19px;
+          border: 1px solid #f1d38b;
+          border-radius: 8px;
+          background: #fffaf0;
+        }
+        .sigre-register-scope .notice > svg {
+          width: 18px;
+          height: 18px;
+          flex: 0 0 auto;
+          margin-top: 1px;
+          color: var(--warning);
+        }
+        .sigre-register-scope .notice strong,
+        .sigre-register-scope .notice span {
+          display: block;
+        }
+        .sigre-register-scope .notice strong {
+          color: #754d05;
+          font-size: 12px;
+          font-weight: 800;
+        }
+        .sigre-register-scope .notice span {
+          margin-top: 3px;
+          color: #8b6c2d;
+          font-size: 11px;
+        }
+        .sigre-register-scope .terms-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          margin-top: 21px;
+          color: var(--muted);
+          font-size: 12px;
+          cursor: pointer;
+        }
+        .sigre-register-scope .terms-row input {
+          width: 17px;
+          height: 17px;
+          flex: 0 0 auto;
+          margin: 1px 0 0;
+          accent-color: var(--coral);
+          cursor: pointer;
+        }
+        .sigre-register-scope .terms-row a {
+          color: var(--coral-dark);
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+        .sigre-register-scope .terms-row.has-error {
+          color: var(--danger);
+        }
+        .sigre-register-scope .step-error {
+          padding: 12px 14px;
+          margin-top: 20px;
+          border: 1px solid #efb7b2;
+          border-radius: 8px;
+          background: #fff3f2;
+          color: var(--danger);
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .sigre-register-scope .form-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          padding-top: 25px;
+          margin-top: 30px;
+          border-top: 1px solid var(--line);
+        }
+        .sigre-register-scope .button {
+          min-height: 46px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 0 18px;
+          border: 1px solid transparent;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+        }
+        .sigre-register-scope .button svg {
+          width: 18px;
+          height: 18px;
+        }
+        .sigre-register-scope .button:hover:not(:disabled) {
+          transform: translateY(-1px);
+        }
+        .sigre-register-scope .button:disabled {
+          cursor: wait;
+          opacity: 0.7;
+          transform: none;
+        }
+        .sigre-register-scope .button-primary {
+          background: var(--coral);
+          color: #ffffff;
+          box-shadow: 0 9px 18px rgba(244, 81, 74, 0.19);
+        }
+        .sigre-register-scope .button-primary:hover:not(:disabled) {
+          background: var(--coral-dark);
+        }
+        .sigre-register-scope .button-secondary {
+          border-color: var(--line-dark);
+          background: #ffffff;
+          color: var(--navy);
+        }
+        .sigre-register-scope .button-secondary:hover:not(:disabled) {
+          border-color: #91a9b9;
+          background: var(--soft);
+        }
+        .sigre-register-scope .login-footer {
+          margin: 24px 0 0;
+          color: var(--muted);
+          font-size: 12px;
+          text-align: center;
+        }
+        .sigre-register-scope .login-footer button,
+        .sigre-register-scope .login-footer a {
+          color: var(--coral-dark);
+          font-weight: 800;
+          background: none;
+          border: 0;
+          padding: 0;
+          margin-left: 4px;
+          cursor: pointer;
+        }
+        .sigre-register-scope .success-state {
+          padding: 48px 10px 24px;
+          text-align: center;
+        }
+        .sigre-register-scope .success-icon {
+          width: 62px;
+          height: 62px;
+          display: grid;
+          place-items: center;
+          margin: 0 auto 20px;
+          border-radius: 50%;
+          background: #daf4e9;
+          color: var(--success);
+        }
+        .sigre-register-scope .success-icon svg {
+          width: 29px;
+          height: 29px;
+        }
+        .sigre-register-scope .success-state h2 {
+          margin: 0;
+          color: var(--navy);
+          font-size: 25px;
+          font-weight: 800;
+        }
+        .sigre-register-scope .success-state p {
+          max-width: 390px;
+          margin: 10px auto 24px;
+          color: var(--muted);
+          font-size: 14px;
+        }
+        @media (max-width: 1000px) {
+          .sigre-register-scope .register-shell {
+            grid-template-columns: 1fr;
+          }
+          .sigre-register-scope .visual-panel {
+            min-height: 300px;
+            max-height: 360px;
+          }
+          .sigre-register-scope .visual-copy {
+            right: 28px;
+            bottom: 28px;
+            left: 28px;
+          }
+          .sigre-register-scope .visual-copy h2 {
+            font-size: 32px;
+          }
+          .sigre-register-scope .form-panel {
+            padding: 38px clamp(24px, 5vw, 54px) 30px;
+          }
+        }
+        @media (max-width: 640px) {
+          .sigre-register-scope {
+            width: min(100% - 28px, 1240px);
+            margin-top: 15px;
+            margin-bottom: 32px;
+          }
+          .sigre-register-scope .visual-panel {
+            min-height: 245px;
+          }
+          .sigre-register-scope .visual-copy {
+            right: 21px;
+            bottom: 22px;
+            left: 21px;
+          }
+          .sigre-register-scope .visual-label {
+            margin-bottom: 10px;
+            font-size: 10px;
+          }
+          .sigre-register-scope .visual-copy h2 {
+            font-size: 28px;
+          }
+          .sigre-register-scope .visual-copy p {
+            display: none;
+          }
+          .sigre-register-scope .form-panel {
+            padding: 30px 18px 24px;
+          }
+          .sigre-register-scope .form-header {
+            display: block;
+          }
+          .sigre-register-scope .step-count {
+            padding-top: 12px;
+          }
+          .sigre-register-scope .progress {
+            margin: 25px 0 31px;
+          }
+          .sigre-register-scope .progress-list {
+            gap: 7px;
+          }
+          .sigre-register-scope .progress-step {
+            justify-content: center;
+          }
+          .sigre-register-scope .progress-copy small {
+            display: none;
+          }
+          .sigre-register-scope .progress-copy strong {
+            font-size: 11px;
+          }
+          .sigre-register-scope .choice-grid,
+          .sigre-register-scope .choice-grid--roles,
+          .sigre-register-scope .fields-grid {
+            grid-template-columns: 1fr;
+          }
+          .sigre-register-scope .field--full {
+            grid-column: auto;
+          }
+          .sigre-register-scope .choice-card {
+            min-height: 65px;
+          }
+          .sigre-register-scope .form-actions {
+            flex-direction: column-reverse;
+          }
+          .sigre-register-scope .form-actions .button {
+            width: 100%;
+          }
+          .sigre-register-scope .school-summary__head {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 9px;
+          }
+        }
+      `}</style>
+
       {/* Top Header Bar (when standalone) */}
       {!hideHeader && (
         <header className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
@@ -1287,1090 +2235,1126 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </header>
       )}
 
-      {/* Main Content Area: Balanced 1120px Card */}
-      <main className="flex-1 w-full max-w-[1120px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 md:py-10 flex items-center justify-center">
-        <div 
-          id="auth-card-container"
-          className="w-full bg-white rounded-3xl shadow-[0_12px_40px_-8px_rgba(0,33,51,0.08),0_2px_6px_rgba(0,33,51,0.04)] border border-slate-200/90 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[560px] lg:min-h-[600px] transition-all"
-        >
-          
-          {/* Left Column: Visual Photography with Navy Degradé & Context */}
-          <div className="hidden md:block md:col-span-5 lg:col-span-5 relative overflow-hidden bg-[#002133] select-none">
-            <img
-              src={teacherImg}
-              alt="Professora e ambiente escolar Sigre"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-top filter brightness-[0.98] contrast-[1.02] transition-transform duration-700 hover:scale-105"
-            />
-            
-            {/* Navy Degradé on bottom third - doesn't cover face */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#002133] via-[#002133]/65 via-35% to-transparent pointer-events-none" />
+      {mode === 'register' ? (
+        /* REORGANIZED 3-STEP REGISTRATION VIEW */
+        <main className="sigre-register-scope" id="auth-card-container">
+          <section className="register-shell" aria-label="Criação de conta SIGRE">
+            <aside className="visual-panel">
+              <img
+                className="visual-image"
+                src={teacherImg}
+                alt="Profissional de educação"
+                referrerPolicy="no-referrer"
+              />
+              <div className="visual-cover" />
+              <div className="visual-copy">
+                <span className="visual-label">GESTÃO ESCOLAR</span>
+                <h2>
+                  A sua escola,
+                  <br />
+                  <span>mais conectada.</span>
+                </h2>
+                <p>Uma única conta para gerir o seu acesso institucional.</p>
+              </div>
+            </aside>
 
-            {/* Context Message */}
-            <div className="absolute bottom-0 inset-x-0 p-6 lg:p-8 text-white z-10 space-y-2">
-              <h3 className="text-2xl lg:text-3xl font-bold tracking-tight text-white leading-tight">
-                A sua escola, mais conectada.
-              </h3>
-            </div>
-          </div>
-
-          {/* Right Column: High-Comfort Form */}
-          <div className="col-span-1 md:col-span-7 lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-center bg-white">
-            
-            {/* Forgot Password Sub-view */}
-            {forgotPasswordOpen ? (
-              <div className="max-w-[420px] mx-auto w-full space-y-5">
+            <section className="form-panel" id="sigre-register-form-panel">
+              <div className="form-header">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-[#002133] tracking-tight">
-                    Recuperar senha
-                  </h2>
+                  <span className="eyebrow">REGISTO INSTITUCIONAL</span>
+                  <h1>Crie a sua conta</h1>
+                  <p className="form-subtitle">
+                    Preencha apenas os dados necessários para solicitar o acesso.
+                  </p>
                 </div>
 
-                {forgotSuccess ? (
-                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <p className="text-xs font-semibold">
-                      Link de recuperação enviado com sucesso para <span className="font-bold">{forgotEmail}</span>!
-                    </p>
+                <div className="step-count">
+                  Passo <strong id="currentStep">{regStep}</strong> de 3
+                </div>
+              </div>
+
+              <nav className="progress" aria-label="Progresso do registo">
+                <ol className="progress-list">
+                  <li
+                    className={`progress-step ${regStep === 1 ? 'is-active' : ''} ${regStep > 1 ? 'is-complete' : ''}`}
+                    data-progress="1"
+                    aria-current={regStep === 1 ? 'step' : undefined}
+                  >
+                    <span className="progress-dot">1</span>
+                    <span className="progress-copy">
+                      <strong>Perfil</strong>
+                      <small>Função</small>
+                    </span>
+                  </li>
+
+                  <li
+                    className={`progress-step ${regStep === 2 ? 'is-active' : ''} ${regStep > 2 ? 'is-complete' : ''}`}
+                    data-progress="2"
+                    aria-current={regStep === 2 ? 'step' : undefined}
+                  >
+                    <span className="progress-dot">2</span>
+                    <span className="progress-copy">
+                      <strong>Instituição</strong>
+                      <small>Escola</small>
+                    </span>
+                  </li>
+
+                  <li
+                    className={`progress-step ${regStep === 3 ? 'is-active' : ''}`}
+                    data-progress="3"
+                    aria-current={regStep === 3 ? 'step' : undefined}
+                  >
+                    <span className="progress-dot">3</span>
+                    <span className="progress-copy">
+                      <strong>Conta</strong>
+                      <small>Dados pessoais</small>
+                    </span>
+                  </li>
+                </ol>
+              </nav>
+
+              {googleNotice && !registrationSubmitted && (
+                <div className="notice" style={{ marginBottom: 20, marginTop: 0 }}>
+                  <Sparkles />
+                  <div>
+                    <strong>Conta Google verificada ({email})</strong>
+                    <span>{googleNotice}</span>
                   </div>
-                ) : (
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                </div>
+              )}
+
+              {!registrationSubmitted ? (
+                <form id="signupForm" onSubmit={handleSubmit} noValidate>
+                  {/* ETAPA 1 */}
+                  {regStep === 1 && (
+                    <section className="form-step" data-step="1" aria-labelledby="step1-title">
+                      <div className="step-heading">
+                        <span className="step-number">01</span>
+                        <div>
+                          <h2 id="step1-title">Defina o seu perfil</h2>
+                          <p>Escolha o contexto e a função que desempenha.</p>
+                        </div>
+                      </div>
+
+                      <fieldset className="field-group">
+                        <legend>Âmbito institucional</legend>
+
+                        <div className="choice-grid">
+                          <button
+                            type="button"
+                            className={`choice-card ${institutionalScope === 'escola' ? 'is-selected' : ''}`}
+                            data-choice-group="scope"
+                            data-value="escolar"
+                            aria-pressed={institutionalScope === 'escola'}
+                            onClick={() => {
+                              setInstitutionalScope('escola');
+                              clearStepValidation(1);
+                            }}
+                          >
+                            <span className="choice-icon">
+                              <School className="w-[18px] h-[18px]" />
+                            </span>
+
+                            <span className="choice-copy">
+                              <strong>Âmbito escolar</strong>
+                              <small>Direção, coordenação e docência</small>
+                            </span>
+
+                            <span className="choice-check">
+                              <Check className="w-[13px] h-[13px]" />
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`choice-card ${institutionalScope === 'administracao' ? 'is-selected' : ''}`}
+                            data-choice-group="scope"
+                            data-value="administracao"
+                            aria-pressed={institutionalScope === 'administracao'}
+                            onClick={() => {
+                              setInstitutionalScope('administracao');
+                              clearStepValidation(1);
+                            }}
+                          >
+                            <span className="choice-icon">
+                              <Landmark className="w-[18px] h-[18px]" />
+                            </span>
+
+                            <span className="choice-copy">
+                              <strong>Administração</strong>
+                              <small>Gestão municipal e inspeção</small>
+                            </span>
+
+                            <span className="choice-check">
+                              <Check className="w-[13px] h-[13px]" />
+                            </span>
+                          </button>
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="field-group">
+                        <legend>Função na instituição</legend>
+
+                        {institutionalScope === 'escola' ? (
+                          <div className="choice-grid choice-grid--roles">
+                            {[
+                              {
+                                id: 'diretor_geral' as SchoolStaffRole,
+                                dataValue: 'direcao',
+                                title: 'Direção',
+                                subtitle: 'Gestão escolar',
+                                Icon: Briefcase,
+                              },
+                              {
+                                id: 'subdiretor_pedagogico' as SchoolStaffRole,
+                                dataValue: 'coordenacao',
+                                title: 'Coordenação',
+                                subtitle: 'Área pedagógica',
+                                Icon: Users,
+                              },
+                              {
+                                id: 'subdiretor_administrativo' as SchoolStaffRole,
+                                dataValue: 'administracao',
+                                title: 'Administração',
+                                subtitle: 'Gestão administrativa',
+                                Icon: ShieldCheck,
+                              },
+                              {
+                                id: 'professor' as SchoolStaffRole,
+                                dataValue: 'docencia',
+                                title: 'Docência',
+                                subtitle: 'Professor ou professora',
+                                Icon: BookOpen,
+                              },
+                              {
+                                id: 'secretario_escolar' as SchoolStaffRole,
+                                dataValue: 'secretaria',
+                                title: 'Secretaria',
+                                subtitle: 'Atendimento escolar',
+                                Icon: ClipboardList,
+                              },
+                            ].map((item) => {
+                              const isSelected = hasChosenRole && schoolRole === item.id;
+                              const RoleIcon = item.Icon;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className={`choice-card ${isSelected ? 'is-selected' : ''}`}
+                                  data-choice-group="role"
+                                  data-value={item.dataValue}
+                                  aria-pressed={isSelected}
+                                  onClick={() => {
+                                    setSchoolRole(item.id);
+                                    setHasChosenRole(true);
+                                    clearStepValidation(1);
+                                  }}
+                                >
+                                  <span className="choice-icon">
+                                    <RoleIcon className="w-[18px] h-[18px]" />
+                                  </span>
+
+                                  <span className="choice-copy">
+                                    <strong>{item.title}</strong>
+                                    <small>{item.subtitle}</small>
+                                  </span>
+
+                                  <span className="choice-check">
+                                    <Check className="w-[13px] h-[13px]" />
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="choice-grid choice-grid--roles">
+                            {ADMIN_ROLES_CONFIG.map((roleItem) => {
+                              const occInfo = occupiedDmeCargos[roleItem.id];
+                              const isOccupied = Boolean(occInfo?.occupied);
+                              const isSelected = hasChosenRole && adminRole === roleItem.id && !isOccupied;
+                              const RoleIcon = roleItem.icon;
+                              return (
+                                <button
+                                  key={roleItem.id}
+                                  type="button"
+                                  disabled={isOccupied}
+                                  className={`choice-card ${isSelected ? 'is-selected' : ''}`}
+                                  data-choice-group="role"
+                                  data-value={roleItem.id}
+                                  aria-pressed={isSelected}
+                                  onClick={() => {
+                                    if (isOccupied) return;
+                                    setAdminRole(roleItem.id);
+                                    setHasChosenRole(true);
+                                    clearStepValidation(1);
+                                  }}
+                                >
+                                  <span className="choice-icon">
+                                    <RoleIcon className="w-[18px] h-[18px]" />
+                                  </span>
+
+                                  <span className="choice-copy">
+                                    <strong>{roleItem.badge}</strong>
+                                    <small>{isOccupied ? 'Cargo ocupado' : roleItem.label}</small>
+                                  </span>
+
+                                  <span className="choice-check">
+                                    <Check className="w-[13px] h-[13px]" />
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </fieldset>
+
+                      {stepErrors[1] && (
+                        <p className="step-error" data-step-error="1" role="alert">
+                          {stepErrors[1]}
+                        </p>
+                      )}
+
+                      <div className="form-actions">
+                        <button
+                          className="button button-primary"
+                          type="button"
+                          data-next
+                          onClick={handleNextRegStep}
+                        >
+                          Continuar
+                          <ArrowRight />
+                        </button>
+                      </div>
+                    </section>
+                  )}
+
+                  {/* ETAPA 2 */}
+                  {regStep === 2 && (
+                    <section className="form-step" data-step="2" aria-labelledby="step2-title">
+                      <div className="step-heading">
+                        <span className="step-number">02</span>
+                        <div>
+                          <h2 id="step2-title">Associe a sua instituição</h2>
+                          <p>Escolha a escola onde exerce a sua função.</p>
+                        </div>
+                      </div>
+
+                      <div className="fields-grid">
+                        <div className={`field field--full ${fieldErrors.municipality ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="municipality">
+                            Município / repartição
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control">
+                            <MapPin />
+                            <select
+                              id="municipality"
+                              name="municipality"
+                              className={fieldErrors.municipality ? 'is-invalid' : ''}
+                              value={regMunicipalityValue}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setRegMunicipalityValue(val);
+                                clearSingleFieldError('municipality');
+                                if (val) {
+                                  const matched = UCORE_MUNICIPALITIES.find((m) =>
+                                    m.toLowerCase().includes(val.toLowerCase())
+                                  );
+                                  setSelectedMunicipality(matched || 'Quêssua (Malanje)');
+                                }
+                              }}
+                            >
+                              <option value="">Selecione o município</option>
+                              <option value="quessua">Quêssua (Malanje)</option>
+                              {UCORE_MUNICIPALITIES.filter((m) => !m.toLowerCase().includes('quêssua')).map((mun) => (
+                                <option key={mun} value={mun}>
+                                  {mun}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="select-arrow" />
+                          </div>
+
+                          <small className="field-message">{fieldErrors.municipality}</small>
+                        </div>
+
+                        <div className={`field field--full ${fieldErrors.school ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="school">
+                            Unidade escolar
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control">
+                            <Building2 />
+                            {institutionalScope === 'escola' ? (
+                              <select
+                                id="school"
+                                name="school"
+                                disabled={!regMunicipalityValue}
+                                className={fieldErrors.school ? 'is-invalid' : ''}
+                                value={regMunicipalityValue ? selectedSchoolId : ''}
+                                onChange={(e) => {
+                                  const nextId = e.target.value;
+                                  setSelectedSchoolId(nextId);
+                                  clearSingleFieldError('school');
+                                  const sc = registeredSchools.find((s) => s.id === nextId);
+                                  if (sc) setSchoolOrUnitName(sc.name);
+                                }}
+                              >
+                                {!regMunicipalityValue ? (
+                                  <option value="">Selecione primeiro o município</option>
+                                ) : (
+                                  <>
+                                    <option value="">Selecione a unidade escolar</option>
+                                    {registeredSchools.length > 0 ? (
+                                      registeredSchools.map((s) => {
+                                        const reg = getSchoolRegistrationData(s);
+                                        const code = reg.codigoSIGE || s.codigoSIGE || 'SIGE-113013';
+                                        return (
+                                          <option key={s.id} value={s.id}>
+                                            {s.name} ({code})
+                                          </option>
+                                        );
+                                      })
+                                    ) : (
+                                      <option value="sige-113013">
+                                        Só Ciência da Educação (SIGE-113013)
+                                      </option>
+                                    )}
+                                  </>
+                                )}
+                              </select>
+                            ) : (
+                              <select
+                                id="school"
+                                name="school"
+                                disabled={!regMunicipalityValue}
+                                value={regMunicipalityValue ? 'dme-quessua' : ''}
+                                onChange={() => clearSingleFieldError('school')}
+                              >
+                                {!regMunicipalityValue ? (
+                                  <option value="">Selecione primeiro o município</option>
+                                ) : (
+                                  <option value="dme-quessua">
+                                    Direcção Municipal da Educação de Quêssua (DME)
+                                  </option>
+                                )}
+                              </select>
+                            )}
+                            <ChevronDown className="select-arrow" />
+                          </div>
+
+                          <small className="field-message">{fieldErrors.school}</small>
+                        </div>
+                      </div>
+
+                      {institutionalScope === 'escola' && regMunicipalityValue && selectedSchoolId && (() => {
+                        const currentSc = registeredSchools.find((s) => s.id === selectedSchoolId);
+                        const regData = currentSc ? getSchoolRegistrationData(currentSc) : null;
+                        const code = regData?.codigoSIGE || currentSc?.codigoSIGE || 'SIGE-113013';
+                        const typeLabel = (regData?.natureza || currentSc?.natureza || 'PÚBLICA').toUpperCase();
+                        const nameLabel = currentSc?.name || 'Só Ciência da Educação';
+                        const locationLabel = `${regData?.endereco?.municipio || 'Quêssua'} · ${regData?.endereco?.provincia || 'Malanje'}`;
+                        const stageLabel = currentSc?.category || 'Ensino primário';
+                        const totalRooms = currentSc?.roomsCount || regData?.infraestrutura?.totalSalas || 10;
+                        const totalStaff = currentSc?.teachersCount || regData?.pessoal?.totalDocentesProfessores || 32;
+
+                        return (
+                          <div className="school-summary" id="schoolSummary">
+                            <div className="school-summary__head">
+                              <div>
+                                <span className="summary-code" id="summaryCode">
+                                  {code}
+                                </span>
+                                <span className="summary-tag" id="summaryType">
+                                  {typeLabel}
+                                </span>
+                              </div>
+
+                              <span className="summary-status">Dados encontrados</span>
+                            </div>
+
+                            <div className="school-summary__name" id="summaryName">
+                              {nameLabel}
+                            </div>
+
+                            <div className="school-summary__meta">
+                              <span>
+                                <MapPin />
+                                <span id="summaryLocation">{locationLabel}</span>
+                              </span>
+
+                              <span>
+                                <GraduationCap />
+                                <span id="summaryStage">{stageLabel}</span>
+                              </span>
+
+                              <span>
+                                <LayoutGrid />
+                                <span id="summaryRooms">{totalRooms} salas</span>
+                              </span>
+
+                              <span>
+                                <Users />
+                                <span id="summaryStaff">{totalStaff} docentes</span>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="notice">
+                        <ShieldCheck />
+                        <div>
+                          <strong>Aprovação institucional</strong>
+                          <span>
+                            O administrador da rede valida o pedido antes do primeiro acesso.
+                          </span>
+                        </div>
+                      </div>
+
+                      {stepErrors[2] && (
+                        <p className="step-error" data-step-error="2" role="alert">
+                          {stepErrors[2]}
+                        </p>
+                      )}
+
+                      <div className="form-actions">
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          data-prev
+                          onClick={handlePrevRegStep}
+                        >
+                          <ArrowLeft />
+                          Voltar
+                        </button>
+
+                        <button
+                          className="button button-primary"
+                          type="button"
+                          data-next
+                          onClick={handleNextRegStep}
+                        >
+                          Continuar
+                          <ArrowRight />
+                        </button>
+                      </div>
+                    </section>
+                  )}
+
+                  {/* ETAPA 3 */}
+                  {regStep === 3 && (
+                    <section className="form-step" data-step="3" aria-labelledby="step3-title">
+                      <div className="step-heading">
+                        <span className="step-number">03</span>
+                        <div>
+                          <h2 id="step3-title">Finalize os seus dados</h2>
+                          <p>Utilize dados válidos para recuperar o acesso.</p>
+                        </div>
+                      </div>
+
+                      <div className="fields-grid">
+                        <div className={`field ${fieldErrors.bi ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="bi">
+                            N.º do Bilhete de Identidade
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control">
+                            <CreditCard />
+                            <input
+                              id="bi"
+                              name="bi"
+                              type="text"
+                              maxLength={20}
+                              autoComplete="off"
+                              placeholder="Ex.: 008892144AL012"
+                              className={fieldErrors.bi ? 'is-invalid' : ''}
+                              value={biNumber}
+                              onChange={(e) => {
+                                setBiNumber(e.target.value);
+                                clearSingleFieldError('bi');
+                              }}
+                            />
+                          </div>
+
+                          <small className="field-message">{fieldErrors.bi}</small>
+                        </div>
+
+                        <div className={`field ${fieldErrors.phone ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="phone">
+                            Telefone / telemóvel
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control">
+                            <Phone />
+                            <input
+                              id="phone"
+                              name="phone"
+                              type="tel"
+                              inputMode="tel"
+                              autoComplete="tel"
+                              placeholder="+244 923 000 000"
+                              className={fieldErrors.phone ? 'is-invalid' : ''}
+                              value={phone}
+                              onChange={(e) => {
+                                setPhone(e.target.value);
+                                clearSingleFieldError('phone');
+                              }}
+                            />
+                          </div>
+
+                          <small className="field-message">{fieldErrors.phone}</small>
+                        </div>
+
+                        <div className={`field ${fieldErrors.firstName ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="firstName">
+                            Primeiro nome
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control">
+                            <User />
+                            <input
+                              id="firstName"
+                              name="firstName"
+                              type="text"
+                              autoComplete="given-name"
+                              placeholder="Ex.: Carlos"
+                              className={fieldErrors.firstName ? 'is-invalid' : ''}
+                              value={firstName}
+                              onChange={(e) => {
+                                setFirstName(e.target.value);
+                                clearSingleFieldError('firstName');
+                              }}
+                            />
+                          </div>
+
+                          <small className="field-message">{fieldErrors.firstName}</small>
+                        </div>
+
+                        <div className={`field ${fieldErrors.lastName ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="lastName">
+                            Sobrenome
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control">
+                            <User />
+                            <input
+                              id="lastName"
+                              name="lastName"
+                              type="text"
+                              autoComplete="family-name"
+                              placeholder="Ex.: Silva"
+                              className={fieldErrors.lastName ? 'is-invalid' : ''}
+                              value={lastName}
+                              onChange={(e) => {
+                                setLastName(e.target.value);
+                                clearSingleFieldError('lastName');
+                              }}
+                            />
+                          </div>
+
+                          <small className="field-message">{fieldErrors.lastName}</small>
+                        </div>
+
+                        <div className={`field field--full ${fieldErrors.email ? 'has-error' : ''}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <label className="field-label" htmlFor="email">
+                              E-mail institucional
+                              <span className="required-mark">*</span>
+                            </label>
+                            {isGoogleLockedEmail && (
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#168568] bg-[#eaf6f2] border border-[#b9e2d4] px-2.5 py-0.5 rounded">
+                                <Lock className="w-3 h-3" />
+                                Vinculado ao Google
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="control">
+                            <Mail />
+                            <input
+                              id="email"
+                              name="email"
+                              type="email"
+                              autoComplete="email"
+                              placeholder="seu.nome@sigre.edu.ao"
+                              readOnly={isGoogleLockedEmail}
+                              aria-readonly={isGoogleLockedEmail}
+                              className={`${fieldErrors.email ? 'is-invalid' : ''} ${
+                                isGoogleLockedEmail ? 'bg-[#f1f5f9] text-[#334155] font-semibold cursor-not-allowed select-none' : ''
+                              }`}
+                              value={email}
+                              onChange={(e) => {
+                                if (isGoogleLockedEmail) return;
+                                setEmail(e.target.value);
+                                clearSingleFieldError('email');
+                              }}
+                            />
+                            {isGoogleLockedEmail && (
+                              <Lock
+                                className="w-4 h-4 text-[#168568]"
+                                style={{ left: 'auto', right: 14 }}
+                              />
+                            )}
+                          </div>
+
+                          <small className="field-message">
+                            {fieldErrors.email ||
+                              (isGoogleLockedEmail
+                                ? 'Este endereço de e-mail foi autenticado pela sua conta Google e está bloqueado para esta inscrição.'
+                                : '')}
+                          </small>
+                        </div>
+
+                        <div className={`field ${fieldErrors.password ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="password">
+                            Senha
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control password-control">
+                            <Lock />
+                            <input
+                              id="password"
+                              name="password"
+                              type={showPassword ? 'text' : 'password'}
+                              minLength={6}
+                              autoComplete="new-password"
+                              placeholder="Mínimo de 6 caracteres"
+                              className={fieldErrors.password ? 'is-invalid' : ''}
+                              value={password}
+                              onChange={(e) => {
+                                setPassword(e.target.value);
+                                clearSingleFieldError('password');
+                              }}
+                            />
+
+                            <button
+                              className="password-toggle"
+                              type="button"
+                              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                              title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                              onClick={() => setShowPassword((prev) => !prev)}
+                            >
+                              {showPassword ? <EyeOff className="w-[17px] h-[17px]" /> : <Eye className="w-[17px] h-[17px]" />}
+                            </button>
+                          </div>
+
+                          <small className="field-message">{fieldErrors.password}</small>
+                        </div>
+
+                        <div className={`field ${fieldErrors.passwordConfirm ? 'has-error' : ''}`}>
+                          <label className="field-label" htmlFor="passwordConfirm">
+                            Confirmar senha
+                            <span className="required-mark">*</span>
+                          </label>
+
+                          <div className="control password-control">
+                            <Lock />
+                            <input
+                              id="passwordConfirm"
+                              name="passwordConfirm"
+                              type={showConfirmPassword ? 'text' : 'password'}
+                              minLength={6}
+                              autoComplete="new-password"
+                              placeholder="Repita a senha"
+                              className={fieldErrors.passwordConfirm ? 'is-invalid' : ''}
+                              value={confirmPassword}
+                              onChange={(e) => {
+                                setConfirmPassword(e.target.value);
+                                clearSingleFieldError('passwordConfirm');
+                              }}
+                            />
+
+                            <button
+                              className="password-toggle"
+                              type="button"
+                              aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                              title={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                              onClick={() => setShowConfirmPassword((prev) => !prev)}
+                            >
+                              {showConfirmPassword ? <EyeOff className="w-[17px] h-[17px]" /> : <Eye className="w-[17px] h-[17px]" />}
+                            </button>
+                          </div>
+
+                          <small className="field-message">{fieldErrors.passwordConfirm}</small>
+                        </div>
+                      </div>
+
+                      <label
+                        className={`terms-row ${fieldErrors.terms ? 'has-error' : ''}`}
+                        id="termsRow"
+                      >
+                        <input
+                          id="terms"
+                          name="terms"
+                          type="checkbox"
+                          checked={agreeTerms}
+                          onChange={(e) => {
+                            setAgreeTerms(e.target.checked);
+                            clearSingleFieldError('terms');
+                          }}
+                        />
+
+                        <span>
+                          Li e aceito os{' '}
+                          <a href="#termos" onClick={(e) => e.preventDefault()}>
+                            Termos de Uso
+                          </a>{' '}
+                          e a{' '}
+                          <a href="#privacidade" onClick={(e) => e.preventDefault()}>
+                            Política de Privacidade
+                          </a>
+                          .
+                        </span>
+                      </label>
+
+                      {(stepErrors[3] || errorMsg) && (
+                        <p className="step-error" data-step-error="3" role="alert">
+                          {stepErrors[3] || errorMsg}
+                        </p>
+                      )}
+
+                      <div className="form-actions">
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          data-prev
+                          onClick={handlePrevRegStep}
+                        >
+                          <ArrowLeft />
+                          Voltar
+                        </button>
+
+                        <button
+                          className="button button-primary"
+                          type="submit"
+                          id="submitButton"
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <>
+                              <Loader2 className="animate-spin" />
+                              A enviar...
+                            </>
+                          ) : (
+                            <>
+                              Criar minha conta
+                              <ArrowRight />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </section>
+                  )}
+                </form>
+              ) : (
+                <div className="success-state" id="successState" role="status" aria-live="polite">
+                  <div className="success-icon">
+                    <Check />
+                  </div>
+
+                  <h2>Pedido enviado</h2>
+
+                  <p>
+                    Os seus dados foram registados. Aguarde a validação do administrador
+                    da rede escolar.
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      id="editRegistration"
+                      onClick={() => {
+                        setRegistrationSubmitted(false);
+                        setRegStep(3);
+                      }}
+                    >
+                      Voltar ao formulário
+                    </button>
+
+                    {submittedUserAccount && (
+                      <button
+                        className="button button-primary"
+                        type="button"
+                        onClick={() => onLoginSuccess(submittedUserAccount)}
+                      >
+                        Acompanhar pedido
+                        <ArrowRight />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <p className="login-footer">
+                Já possui cadastro?
+                <button
+                  type="button"
+                  id="switch-to-login-btn"
+                  onClick={() => switchMode('login')}
+                >
+                  Entrar na Central
+                </button>
+              </p>
+            </section>
+          </section>
+        </main>
+      ) : (
+        /* Main Content Area: Balanced 1120px Card (LOGIN & FORGOT PASSWORD) */
+        <main className="flex-1 w-full max-w-[1120px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 md:py-10 flex items-center justify-center">
+          <div 
+            id="auth-card-container"
+            className="w-full bg-white rounded-3xl shadow-[0_12px_40px_-8px_rgba(0,33,51,0.08),0_2px_6px_rgba(0,33,51,0.04)] border border-slate-200/90 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[560px] lg:min-h-[600px] transition-all"
+          >
+            
+            {/* Left Column: Visual Photography with Navy Degradé & Context */}
+            <div className="hidden md:block md:col-span-5 lg:col-span-5 relative overflow-hidden bg-[#002133] select-none">
+              <img
+                src={teacherImg}
+                alt="Professora e ambiente escolar Sigre"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover object-top filter brightness-[0.98] contrast-[1.02] transition-transform duration-700 hover:scale-105"
+              />
+              
+              {/* Navy Degradé on bottom third - doesn't cover face */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#002133] via-[#002133]/65 via-35% to-transparent pointer-events-none" />
+
+              {/* Context Message */}
+              <div className="absolute bottom-0 inset-x-0 p-6 lg:p-8 text-white z-10 space-y-2">
+                <h3 className="text-2xl lg:text-3xl font-bold tracking-tight text-white leading-tight">
+                  A sua escola, mais conectada.
+                </h3>
+              </div>
+            </div>
+
+            {/* Right Column: High-Comfort Form */}
+            <div className="col-span-1 md:col-span-7 lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-center bg-white">
+              
+              {/* Forgot Password Sub-view */}
+              {forgotPasswordOpen ? (
+                <div className="max-w-[420px] mx-auto w-full space-y-5">
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-[#002133] tracking-tight">
+                      Recuperar senha
+                    </h2>
+                  </div>
+
+                  {forgotSuccess ? (
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <p className="text-xs font-semibold">
+                        Link de recuperação enviado com sucesso para <span className="font-bold">{forgotEmail}</span>!
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleForgotPassword} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          E-mail de cadastro
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <Mail className="w-4 h-4" />
+                          </div>
+                          <input
+                            type="email"
+                            required
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            placeholder="seu.email@ucore.edu.br"
+                            className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm outline-none transition-all shadow-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <span>Enviar link de recuperação</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+
+                      <div className="text-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setForgotPasswordOpen(false)}
+                          className="text-xs font-semibold text-slate-600 hover:text-[#f75142] transition-colors cursor-pointer"
+                        >
+                          ← Voltar ao login
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              ) : (
+                /* LOGIN VIEW */
+                <div className="max-w-[420px] mx-auto w-full space-y-5">
+                  
+                  {/* Header with refined typography */}
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[#002133] tracking-tight">
+                      Bem-vindo à Central
+                    </h1>
+                  </div>
+
+                  {/* Feedback Alerts */}
+                  {errorMsg && (
+                    <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2.5 animate-in fade-in">
+                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+                  {successMsg && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-2.5 animate-in fade-in">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>{successMsg}</span>
+                    </div>
+                  )}
+
+                  {/* Login Form */}
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    
+                    {/* Email Input: Comfortable 48-52px height */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        E-mail de cadastro
+                        E-mail Institucional
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                           <Mail className="w-4 h-4" />
                         </div>
                         <input
+                          id="login-email-input"
                           type="email"
                           required
-                          value={forgotEmail}
-                          onChange={(e) => setForgotEmail(e.target.value)}
-                          placeholder="seu.email@ucore.edu.br"
-                          className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm outline-none transition-all shadow-xs"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="seu.email@gmail.com"
+                          className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                         />
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <span>Enviar link de recuperação</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-
-                    <div className="text-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setForgotPasswordOpen(false)}
-                        className="text-xs font-semibold text-slate-600 hover:text-[#f75142] transition-colors cursor-pointer"
-                      >
-                        ← Voltar ao login
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            ) : mode === 'login' ? (
-              /* LOGIN VIEW */
-              <div className="max-w-[420px] mx-auto w-full space-y-5">
-                
-                {/* Header with refined typography */}
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#002133] tracking-tight">
-                    Bem-vindo à Central
-                  </h1>
-                </div>
-
-                {/* Feedback Alerts */}
-                {errorMsg && (
-                  <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2.5 animate-in fade-in">
-                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-                {successMsg && (
-                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-2.5 animate-in fade-in">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>{successMsg}</span>
-                  </div>
-                )}
-
-                {/* Login Form */}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  
-                  {/* Email Input: Comfortable 48-52px height */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      E-mail Institucional
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        id="login-email-input"
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="seu.email@gmail.com"
-                        className="w-full h-[48px] sm:h-[50px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Password Input: Comfortable 48-52px height */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Senha de Acesso
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setForgotPasswordOpen(true)}
-                        className="text-xs font-semibold text-[#f75142] hover:underline cursor-pointer"
-                      >
-                        Esqueceu a senha?
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        id="login-password-input"
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full h-[48px] sm:h-[50px] pl-10 pr-11 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-400" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Remember me Checkbox */}
-                  <div className="flex items-center pt-0.5">
-                    <label className="flex items-center gap-2.5 cursor-pointer text-xs text-slate-600 select-none">
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="w-4 h-4 rounded text-[#f75142] focus:ring-[#f75142] border-slate-300 cursor-pointer"
-                      >
-                      </input>
-                      <span>Manter sessão iniciada neste dispositivo</span>
-                    </label>
-                  </div>
-
-                  {/* Primary Submit Button: High contrast, coral Sigre, prominent focus */}
-                  <button
-                    id="submit-login-btn"
-                    type="submit"
-                    disabled={loading}
-                    className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-[0_6px_20px_rgba(247,81,66,0.25)] hover:shadow-[0_8px_24px_rgba(247,81,66,0.35)] transition-all duration-200 cursor-pointer active:scale-[0.99] disabled:opacity-70 mt-1 flex items-center justify-center gap-2"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                        <span>A autenticar credenciais...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Entrar na Central</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-
-                  {/* Separador Oficial Google */}
-                  <div className="relative my-3">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200" />
-                    </div>
-                    <div className="relative flex justify-center text-[10px] uppercase">
-                      <span className="bg-white px-2.5 text-slate-400 font-bold tracking-wider">
-                        ou continue com
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="w-full flex flex-col items-center gap-1.5">
-                    <GoogleSignInButton
-                      onClick={handleGoogleSignInFlow}
-                      isLoading={isGoogleLoading}
-                      label="Continuar com o Google"
-                      className="w-full justify-center"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGooglePickerReason('direct');
-                        setIsGooglePickerOpen(true);
-                      }}
-                      className="text-[11px] font-semibold text-[#1a73e8] hover:underline cursor-pointer flex items-center gap-1 transition-colors mt-0.5"
-                    >
-                      <span>Problemas com o pop-up? Selecionar conta Google diretamente</span>
-                    </button>
-                  </div>
-
-                  {/* Switch to Register */}
-                  <div className="text-center pt-2 text-xs text-slate-600">
-                    Ainda não possui uma conta?{' '}
-                    <button
-                      type="button"
-                      id="switch-to-register-btn"
-                      onClick={() => switchMode('register')}
-                      className="font-bold text-[#f75142] hover:underline cursor-pointer"
-                    >
-                      Crie a sua conta
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              /* REGISTER VIEW */
-              <div className="max-w-[440px] mx-auto w-full space-y-4">
-                
-                {/* Header */}
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#002133] tracking-tight">
-                    Crie a sua conta
-                  </h1>
-                </div>
-
-                {/* Feedback Alerts */}
-                {errorMsg && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2 animate-in fade-in">
-                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-                {successMsg && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-2 animate-in fade-in">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>{successMsg}</span>
-                  </div>
-                )}
-                {googleNotice && (
-                  <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 text-xs font-medium flex items-start gap-2.5 animate-in fade-in shadow-xs">
-                    <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                    <div className="flex-1 space-y-0.5">
-                      <div className="font-bold text-blue-900 flex items-center gap-1.5">
-                        <span>Conta Google Verificada</span>
-                        {email && (
-                          <span className="px-1.5 py-0.2 rounded-full bg-blue-200/80 text-blue-900 text-[10px] font-black">
-                            {email}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-blue-800 leading-relaxed">
-                        {googleNotice}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-3.5">
-                  
-                  {/* 1. Âmbito Institucional de Atuação */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                      <span>1. Âmbito Institucional de Atuação</span>
-                      <span className="text-[10px] font-normal text-slate-500">Selecione o seu setor</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setInstitutionalScope('escola')}
-                        className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center gap-2.5 ${
-                          institutionalScope === 'escola'
-                            ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          institutionalScope === 'escola' ? 'bg-[#f75142] text-white' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          <Building2 className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold leading-tight">Âmbito Escolar</div>
-                          <div className="text-[10px] opacity-75">Direção, coordenação e docentes</div>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setInstitutionalScope('administracao')}
-                        className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center gap-2.5 ${
-                          institutionalScope === 'administracao'
-                            ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          institutionalScope === 'administracao' ? 'bg-[#f75142] text-white' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          <Landmark className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold leading-tight">Administração (DME)</div>
-                          <div className="text-[10px] opacity-75">Direção municipal e inspecção</div>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 2. Flexão da Função / Cargo Específico */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                      <span>2. Função / Cargo a Desempenhar</span>
-                      <span className="text-[10px] font-semibold text-[#f75142]">Flexão Hierárquica</span>
-                    </label>
-
-                    {institutionalScope === 'escola' ? (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                          {SCHOOL_ROLES_CONFIG.map((roleItem) => {
-                            const isSelected = schoolRole === roleItem.id;
-                            const RoleIcon = roleItem.icon;
-                            return (
-                              <button
-                                key={roleItem.id}
-                                type="button"
-                                onClick={() => setSchoolRole(roleItem.id)}
-                                className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col gap-1 ${
-                                  isSelected
-                                    ? 'bg-[#002133] text-white border-[#002133] shadow-xs'
-                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <RoleIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-[#f75142]' : 'text-slate-500'}`} />
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                                  }`}>
-                                    {roleItem.badge}
-                                  </span>
-                                </div>
-                                <span className="text-xs font-bold leading-tight">{roleItem.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {/* Selected Role Info Pill */}
-                        {(() => {
-                          const active = SCHOOL_ROLES_CONFIG.find(r => r.id === schoolRole);
-                          return active ? (
-                            <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-                              <Info className="w-3.5 h-3.5 text-[#f75142] shrink-0" />
-                              <span>{active.desc}</span>
-                            </div>
-                          ) : null;
-                        })()}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                          {ADMIN_ROLES_CONFIG.map((roleItem) => {
-                            const isSelected = adminRole === roleItem.id;
-                            const RoleIcon = roleItem.icon;
-                            const occInfo = occupiedDmeCargos[roleItem.id];
-                            const isOccupied = Boolean(occInfo?.occupied);
-                            return (
-                              <button
-                                key={roleItem.id}
-                                type="button"
-                                onClick={() => {
-                                  if (isOccupied) {
-                                    setErrorMsg(
-                                      `O cargo "${roleItem.label}" já se encontra ocupado (${occInfo.holderName}). Selecione um cargo disponível na Direcção Municipal.`
-                                    );
-                                    return;
-                                  }
-                                  setErrorMsg(null);
-                                  setAdminRole(roleItem.id);
-                                }}
-                                className={`p-2 rounded-xl text-left border transition-all flex flex-col gap-1 ${
-                                  isOccupied
-                                    ? 'bg-slate-100/90 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
-                                    : isSelected
-                                    ? 'bg-[#002133] text-white border-[#002133] shadow-xs cursor-pointer'
-                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-1">
-                                  {isOccupied ? (
-                                    <Lock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                                  ) : (
-                                    <RoleIcon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#f75142]' : 'text-slate-500'}`} />
-                                  )}
-                                  <span
-                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate ${
-                                      isOccupied
-                                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                        : isSelected
-                                        ? 'bg-white/20 text-white'
-                                        : 'bg-slate-100 text-slate-600'
-                                    }`}
-                                  >
-                                    {isOccupied ? 'Cargo Ocupado' : roleItem.badge}
-                                  </span>
-                                </div>
-                                <span className="text-xs font-bold leading-tight">{roleItem.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {/* Selected Role Info Pill */}
-                        {(() => {
-                          const active = ADMIN_ROLES_CONFIG.find((r) => r.id === adminRole);
-                          const occ = active ? occupiedDmeCargos[active.id] : undefined;
-                          return active ? (
-                            <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-start gap-2">
-                              <Info className="w-3.5 h-3.5 text-[#f75142] shrink-0 mt-0.5" />
-                              <div>
-                                <span className="font-bold text-slate-800 block">
-                                  Cargo na Direcção Municipal: {active.label}
-                                </span>
-                                <span>{active.desc}</span>
-                                {occ?.occupied && (
-                                  <span className="block text-rose-700 font-semibold mt-0.5">
-                                    Indisponível: já titularizado por {occ.holderName}.
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ) : null;
-                        })()}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. Lotação Institucional Pré-Definida no Sigre */}
-                  <div className="space-y-3 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Building2 className="w-4 h-4 text-[#002133]" />
-                        3. Lotação Institucional Sigre
-                      </span>
-                      <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                        Opções Cadastradas na Rede
-                      </span>
-                    </div>
-
-                    {/* Município Dropdown */}
+                    {/* Password Input: Comfortable 48-52px height */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                        Município / Repartição da Educação
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                          <Landmark className="w-4 h-4" />
-                        </div>
-                        <select
-                          id="register-municipality-select"
-                          value={selectedMunicipality}
-                          onChange={(e) => setSelectedMunicipality(e.target.value)}
-                          className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer"
-                        >
-                          {UCORE_MUNICIPALITIES.map((mun) => (
-                            <option key={mun} value={mun}>
-                              {mun}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Escola Dropdown (only for school scope) */}
-                    {institutionalScope === 'escola' && (
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
-                          <span>Unidade Escolar de Lotação (Cadastrada no Sistema) *</span>
-                          <span className="text-[10px] text-emerald-700 font-semibold">
-                            {registeredSchools.length > 0
-                              ? `${registeredSchools.length} escola(s) cadastrada(s)`
-                              : 'Aguardando cadastro de escolas'}
-                          </span>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Senha de Acesso
                         </label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                            <School className="w-4 h-4" />
-                          </div>
-                          <select
-                            id="register-school-input"
-                            value={selectedSchoolId}
-                            onChange={(e) => {
-                              const nextId = e.target.value;
-                              setSelectedSchoolId(nextId);
-                              const sc = registeredSchools.find((s) => s.id === nextId);
-                              if (sc) setSchoolOrUnitName(sc.name);
-                            }}
-                            className="w-full h-[44px] pl-9 pr-8 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer truncate"
-                          >
-                            {registeredSchools.length > 0 ? (
-                              registeredSchools.map((s) => {
-                                const dirName = resolveSchoolDirectorName(s, s.name);
-                                const reg = getSchoolRegistrationData(s);
-                                return (
-                                  <option key={s.id} value={s.id}>
-                                    {s.name} [{reg.codigoSIGE}] ({reg.natureza} • {s.category}) — Diretor(a): {dirName}
-                                  </option>
-                                );
-                              })
-                            ) : (
-                              <option value="">
-                                Nenhuma escola cadastrada no sistema — solicite o cadastro à DME
-                              </option>
-                            )}
-                          </select>
-                        </div>
-
-                        {/* Quick-select pills when multiple schools are registered */}
-                        {registeredSchools.length > 1 && (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {registeredSchools.map((sc) => {
-                              const isSelected = sc.id === selectedSchoolId;
-                              return (
-                                <button
-                                  key={sc.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedSchoolId(sc.id);
-                                    setSchoolOrUnitName(sc.name);
-                                  }}
-                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
-                                    isSelected
-                                      ? 'bg-[#002133] text-white border-[#002133] shadow-2xs'
-                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  <School className={`w-3 h-3 ${isSelected ? 'text-[#f75142]' : 'text-slate-400'}`} />
-                                  <span className="truncate max-w-[180px]">{sc.name}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Complete Registered School Data Card */}
-                        {(() => {
-                          const currentSc = registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0];
-                          if (!currentSc) {
-                            return (
-                              <p className="text-[10px] text-slate-500 mt-1.5">
-                                Selecione exclusivamente uma escola já cadastrada no sistema para visualizar os dados institucionais da unidade.
-                              </p>
-                            );
-                          }
-                          const dirName = resolveSchoolDirectorName(currentSc, currentSc.name);
-                          const regData = getSchoolRegistrationData(currentSc);
-                          const offeredBadges = getOfferedLevelsBadges(regData.oferta);
-                          const totalRooms = currentSc.roomsCount || regData.infraestrutura.totalSalas || 0;
-                          const totalTurmas = currentSc.turmasCount || regData.infraestrutura.turmasFuncionamento || 0;
-                          const totalTeachers = currentSc.teachersCount || regData.pessoal.totalDocentesProfessores || 0;
-                          const turnosText = (regData.infraestrutura.turnos && regData.infraestrutura.turnos.length > 0)
-                            ? regData.infraestrutura.turnos.join(' / ')
-                            : 'Manhã / Tarde';
-                          const fullAddress = [
-                            regData.endereco?.rua,
-                            regData.endereco?.bairro,
-                            regData.endereco?.comuna,
-                            `${regData.endereco?.municipio || 'Quêssua'} (${regData.endereco?.provincia || 'Malanje'})`
-                          ]
-                            .filter(Boolean)
-                            .join(', ');
-
-                          return (
-                            <div
-                              id="registered-school-details-card"
-                              className="mt-2.5 p-3 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-2.5 text-[11px] text-slate-600 animate-in fade-in duration-150"
-                            >
-                              {/* School Title + SIGE Code + Natureza Badges */}
-                              <div className="flex flex-wrap items-start justify-between gap-2 pb-2 border-b border-slate-100">
-                                <div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#002133] text-white">
-                                      {regData.codigoSIGE || currentSc.codigoSIGE || 'SIGE'}
-                                    </span>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                      {regData.natureza || currentSc.natureza || 'Pública'}
-                                    </span>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                                      {currentSc.category}
-                                    </span>
-                                  </div>
-                                  <h4 className="font-black text-slate-900 text-xs mt-1 leading-snug">
-                                    {currentSc.name}
-                                  </h4>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-[9px] uppercase font-bold text-slate-400 block">
-                                    Direção Escolar
-                                  </span>
-                                  <span className="text-emerald-700 font-black text-[11px]">
-                                    {dirName}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Key Institutional Metrics Grid */}
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
-                                    <DoorOpen className="w-2.5 h-2.5 text-slate-400" />
-                                    Salas
-                                  </span>
-                                  <span className="font-black text-slate-900 text-xs">{totalRooms} salas</span>
-                                </div>
-                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
-                                    <Layers className="w-2.5 h-2.5 text-slate-400" />
-                                    Turmas
-                                  </span>
-                                  <span className="font-black text-slate-900 text-xs">{totalTurmas} turmas</span>
-                                </div>
-                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
-                                    <Clock className="w-2.5 h-2.5 text-slate-400" />
-                                    Turnos
-                                  </span>
-                                  <span className="font-bold text-slate-900 text-[10px] truncate block" title={turnosText}>
-                                    {turnosText}
-                                  </span>
-                                </div>
-                                <div className="bg-slate-50/90 rounded-lg px-2 py-1.5 border border-slate-100">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase block flex items-center gap-1">
-                                    <Users className="w-2.5 h-2.5 text-slate-400" />
-                                    Docentes
-                                  </span>
-                                  <span className="font-black text-slate-900 text-xs">{totalTeachers} prof.</span>
-                                </div>
-                              </div>
-
-                              {/* Location & Contacts */}
-                              <div className="space-y-1 text-[10px] text-slate-600">
-                                <div className="flex items-start gap-1.5">
-                                  <MapPin className="w-3 h-3 text-[#f75142] shrink-0 mt-0.5" />
-                                  <span>
-                                    <strong className="text-slate-800">Localização:</strong> {fullAddress}
-                                  </span>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                  <span className="flex items-center gap-1">
-                                    <Phone className="w-3 h-3 text-slate-400" />
-                                    <span>{currentSc.phone || regData.contactoTelefonico}</span>
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Mail className="w-3 h-3 text-slate-400" />
-                                    <span>{currentSc.email || regData.emailDireccao}</span>
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Educational Offer Badges */}
-                              {offeredBadges.length > 0 && (
-                                <div className="pt-1.5 border-t border-slate-100">
-                                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                                    Oferta Educativa Cadastrada na Escola:
-                                  </span>
-                                  <div className="flex flex-wrap gap-1">
-                                    {offeredBadges.map((badge, bIdx) => (
-                                      <span
-                                        key={bIdx}
-                                        className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200/80 text-[9px] font-bold"
-                                      >
-                                        {badge}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
+                        <button
+                          type="button"
+                          onClick={() => setForgotPasswordOpen(true)}
+                          className="text-xs font-semibold text-[#f75142] hover:underline cursor-pointer"
+                        >
+                          Esqueceu a senha?
+                        </button>
                       </div>
-                    )}
-
-                    {/* Se Professor: Disciplina & Classe */}
-                    {institutionalScope === 'escola' && schoolRole === 'professor' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                            Disciplina / Cadeira
-                          </label>
-                          <select
-                            id="register-subject-select"
-                            value={selectedSubject}
-                            onChange={(e) => setSelectedSubject(e.target.value)}
-                            className="w-full h-[42px] px-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer"
-                          >
-                            {UCORE_DISCIPLINAS.map((disc) => (
-                              <option key={disc} value={disc}>
-                                {disc}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                            Nível / Grau
-                          </label>
-                          <select
-                            id="register-grade-select"
-                            value={selectedGradeClass}
-                            onChange={(e) => setSelectedGradeClass(e.target.value)}
-                            className="w-full h-[42px] px-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-2 focus:ring-[#f75142]/10 text-xs font-semibold text-slate-900 outline-none transition-all shadow-xs cursor-pointer"
-                          >
-                            {UCORE_GRAUS_CLASSES.map((grau) => (
-                              <option key={grau} value={grau}>
-                                {grau}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 4. Documento de Identificação (BI) e Contacto */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Nº Bilhete de Identidade (BI) *
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <FileText className="w-4 h-4" />
-                        </div>
-                        <input
-                          id="register-bi-input"
-                          type="text"
-                          required
-                          value={biNumber}
-                          onChange={(e) => setBiNumber(e.target.value)}
-                          placeholder="Ex: 008892144LA012"
-                          className="w-full h-[46px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-xs text-slate-900 uppercase font-semibold placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Telefone / Telemóvel
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <Phone className="w-4 h-4" />
-                        </div>
-                        <input
-                          id="register-phone-input"
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="+244 923 000 000"
-                          className="w-full h-[46px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Real-time Pre-Registration Detection Banner */}
-                  {preRegResult?.found ? (
-                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 animate-in fade-in">
-                      <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                      <div className="text-xs">
-                        <p className="font-bold text-emerald-900">
-                          Registro Pré-Existente Localizado no Sistema Sigre!
-                        </p>
-                        <p className="text-emerald-700 mt-0.5">
-                          {preRegResult.details}
-                        </p>
-                        <span className="inline-block mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                          Homologação simplificada ativada
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    (() => {
-                      const currentSc = registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0];
-                      const currentScName = currentSc?.name || 'escola selecionada';
-                      const currentDirName = resolveSchoolDirectorName(currentSc, currentScName);
-                      const activeSchoolRoleLabel = SCHOOL_ROLES_CONFIG.find((r) => r.id === schoolRole)?.label || 'Pessoal Escolar';
-                      const activeAdminRoleLabel = ADMIN_ROLES_CONFIG.find((r) => r.id === adminRole)?.label || 'Membro da Direção Municipal';
-
-                      if (institutionalScope === 'administracao') {
-                        return (
-                          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start gap-2.5 text-[11px] text-amber-900">
-                            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold block text-amber-950">
-                                Homologação pela Direção Municipal (DME)
-                              </span>
-                              <span>
-                                A inscrição de <strong>{activeAdminRoleLabel}</strong> será enviada ao <strong>Administrador Central (DME)</strong> para homologação.
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      if (schoolRole === 'diretor_geral') {
-                        return (
-                          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start gap-2.5 text-[11px] text-amber-900">
-                            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold block text-amber-950">
-                                Homologação Central (DME)
-                              </span>
-                              <span>
-                                A candidatura de <strong>Diretor(a) Geral</strong> para a escola <strong>{currentScName}</strong> será enviada ao <strong>Administrador Central (DME)</strong> para homologação.
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-start gap-2.5 text-[11px] text-blue-900">
-                          <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-bold block text-blue-950">
-                              Aprovação pela Direção da Escola Selecionada
-                            </span>
-                            <span>
-                              A inscrição de <strong>{activeSchoolRoleLabel}</strong> será enviada à <strong>Direção da escola selecionada ({currentScName})</strong> — Diretor(a): <strong>{currentDirName}</strong> — para aprovação e homologação.
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()
-                  )}
-
-                  {/* Nome e Sobrenome lado a lado no desktop */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Primeiro Nome
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <input
-                          id="register-firstname-input"
-                          type="text"
-                          required
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          placeholder="Ex: Carlos"
-                          className="w-full h-[48px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Sobrenome
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <input
-                          id="register-lastname-input"
-                          type="text"
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          placeholder="Ex: Silva"
-                          className="w-full h-[48px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* E-mail Institucional */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      E-mail Institucional
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        id="register-email-input"
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="seu.nome@sigre.edu.ao"
-                        className="w-full h-[48px] pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Senha e Confirmação lado a lado com orientação */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Senha
-                      </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                           <Lock className="w-4 h-4" />
                         </div>
                         <input
-                          id="register-password-input"
+                          id="login-password-input"
                           type={showPassword ? 'text' : 'password'}
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Mínimo 6 caracteres"
-                          className="w-full h-[48px] pl-10 pr-9 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
+                          placeholder="••••••••"
+                          className="w-full h-[48px] sm:h-[50px] pl-10 pr-11 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword((prev) => !prev)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
                         >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-400" />}
                         </button>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Confirmar Senha
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <Lock className="w-4 h-4" />
-                        </div>
+                    {/* Remember me Checkbox */}
+                    <div className="flex items-center pt-0.5">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-xs text-slate-600 select-none">
                         <input
-                          id="register-confirm-password-input"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          required
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="Repita a senha"
-                          className="w-full h-[48px] pl-10 pr-9 rounded-xl border border-slate-200 bg-white focus:border-[#f75142] focus:ring-4 focus:ring-[#f75142]/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword((prev) => !prev)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          className="w-4 h-4 rounded text-[#f75142] focus:ring-[#f75142] border-slate-300 cursor-pointer"
                         >
-                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                        </input>
+                        <span>Manter sessão iniciada neste dispositivo</span>
+                      </label>
+                    </div>
+
+                    {/* Primary Submit Button: High contrast, coral Sigre, prominent focus */}
+                    <button
+                      id="submit-login-btn"
+                      type="submit"
+                      disabled={loading}
+                      className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-[0_6px_20px_rgba(247,81,66,0.25)] hover:shadow-[0_8px_24px_rgba(247,81,66,0.35)] transition-all duration-200 cursor-pointer active:scale-[0.99] disabled:opacity-70 mt-1 flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                          <span>A autenticar credenciais...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Entrar na Central</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+
+                    {/* Separador Oficial Google */}
+                    <div className="relative my-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-200" />
+                      </div>
+                      <div className="relative flex justify-center text-[10px] uppercase">
+                        <span className="bg-white px-2.5 text-slate-400 font-bold tracking-wider">
+                          ou continue com
+                        </span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Orientação de senha próxima ao campo */}
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>A senha deve possuir no mínimo 6 caracteres para assegurar o acesso.</span>
-                  </div>
-
-                  {/* Termos de uso */}
-                  <div className="pt-1">
-                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 select-none">
-                      <input
-                        type="checkbox"
-                        checked={agreeTerms}
-                        onChange={(e) => setAgreeTerms(e.target.checked)}
-                        className="w-4 h-4 mt-0.5 rounded text-[#f75142] focus:ring-[#f75142] border-slate-300 cursor-pointer"
+                    <div className="w-full flex flex-col items-center">
+                      <GoogleSignInButton
+                        onClick={handleGoogleSignInFlow}
+                        isLoading={isGoogleLoading}
+                        label="Continuar com o Google"
+                        className="w-full justify-center"
                       />
-                      <span className="leading-tight">
-                        Concordo com os <span className="text-[#f75142] font-semibold underline">Termos de Uso</span> e a <span className="text-[#f75142] font-semibold underline">Política de Privacidade</span> do Sigre.
-                      </span>
-                    </label>
-                  </div>
-
-                  {/* Create Account Button */}
-                  <button
-                    id="submit-register-btn"
-                    type="submit"
-                    disabled={loading}
-                    className="w-full h-[48px] sm:h-[50px] rounded-xl bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-sm tracking-wide shadow-[0_6px_20px_rgba(247,81,66,0.25)] hover:shadow-[0_8px_24px_rgba(247,81,66,0.35)] transition-all duration-200 cursor-pointer active:scale-[0.99] disabled:opacity-70 mt-1 flex items-center justify-center gap-2"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                        <span>A criar conta institucional...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Criar Minha Conta</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-
-                  {/* Separador Oficial Google para Cadastro */}
-                  <div className="relative my-2.5">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200" />
                     </div>
-                    <div className="relative flex justify-center text-[10px] uppercase">
-                      <span className="bg-white px-2.5 text-slate-400 font-bold tracking-wider">
-                        ou registe-se com
-                      </span>
+
+                    {/* Switch to Register */}
+                    <div className="text-center pt-2 text-xs text-slate-600">
+                      Ainda não possui uma conta?{' '}
+                      <button
+                        type="button"
+                        id="switch-to-register-btn"
+                        onClick={() => switchMode('register')}
+                        className="font-bold text-[#f75142] hover:underline cursor-pointer"
+                      >
+                        Crie a sua conta
+                      </button>
                     </div>
-                  </div>
-
-                  <div className="w-full flex justify-center">
-                    <GoogleSignInButton
-                      onClick={handleGoogleSignInFlow}
-                      isLoading={isGoogleLoading}
-                      label="Criar conta com o Google"
-                      className="w-full justify-center"
-                    />
-                  </div>
-
-                  {/* Switch to Login */}
-                  <div className="text-center pt-2 text-xs text-slate-600">
-                    Já possui cadastro na plataforma?{' '}
-                    <button
-                      type="button"
-                      id="switch-to-login-btn"
-                      onClick={() => switchMode('login')}
-                      className="font-bold text-[#f75142] hover:underline cursor-pointer"
-                    >
-                      Entrar na Central
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
+                  </form>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </main>
-
-      {/* Google Account Picker Modal for Direct Account Selection or Popup Block Fallback */}
-      <GoogleAccountPickerModal
-        isOpen={isGooglePickerOpen}
-        onClose={() => setIsGooglePickerOpen(false)}
-        onSelectAccount={(selectedEmail, selectedName, selectedRole) => {
-          completeGoogleLogin(selectedEmail, selectedName, undefined, null, selectedRole);
-        }}
-        reason={googlePickerReason}
-      />
+        </main>
+      )}
 
       {/* Footer Note (when standalone) */}
       {!hideHeader && (

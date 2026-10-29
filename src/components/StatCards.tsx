@@ -90,46 +90,6 @@ export const StatCards: React.FC<StatCardsProps> = ({
             Estatísticas ({nonClickableCount})
           </button>
         </div>
-
-        {/* Applied Settings Indicators & Direct Settings Trigger Button */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {session.settings?.autoSync && (
-            <span
-              title="Sincronização em tempo real ativa nas configurações"
-              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
-            >
-              Sincronização Ativa
-            </span>
-          )}
-          {session.settings?.showPercentages && (
-            <span
-              title="Exibição de percentuais ativa nas configurações"
-              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
-            >
-              Métricas em %
-            </span>
-          )}
-          {session.settings?.emailAlerts && (
-            <span
-              title="Alertas críticos ativos nas configurações"
-              className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#f4f4f6] text-[#52606d] text-xs font-medium"
-            >
-              Alertas Ativos
-            </span>
-          )}
-          {onOpenSettings && (
-            <button
-              id="statcards-open-settings-btn"
-              type="button"
-              onClick={onOpenSettings}
-              className="btn--secondary inline-flex items-center gap-1.5"
-              title="Abrir Configurações da Sessão"
-            >
-              <Settings className="w-3.5 h-3.5 text-[#52606d]" />
-              <span>Configurações</span>
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Harmonized Cards Grid: 1 Featured Anchor Card + Clean Surface Cards */}

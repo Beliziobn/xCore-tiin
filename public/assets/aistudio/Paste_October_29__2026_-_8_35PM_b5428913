@@ -1,0 +1,2131 @@
+Abaixo está uma versão completa, responsiva e reorganizada. A interface foi dividida em 3 etapas para reduzir a sobrecarga visual, removendo textos repetidos, o botão Google e o cartão escolar excessivamente longo. O código inclui validação, seleção de perfil, seleção de escola, confirmação de senha e estado de sucesso.
+
+```html
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Criação de conta institucional SIGRE">
+  <title>SIGRE — Criar conta</title>
+
+  <style>
+    :root {
+      --coral: #f4514a;
+      --coral-dark: #d9403b;
+      --navy: #062a3d;
+      --navy-soft: #0b3b51;
+      --ink: #173047;
+      --muted: #728297;
+      --line: #dbe4ec;
+      --line-dark: #c7d3df;
+      --surface: #ffffff;
+      --soft: #f5f8fb;
+      --soft-blue: #edf5f9;
+      --success: #168568;
+      --warning: #a86900;
+      --danger: #c43d36;
+      --shadow: 0 20px 50px rgba(17, 48, 72, 0.12);
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      background: #f2f5f8;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.4;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button,
+    a,
+    select {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 1.9;
+      flex: 0 0 auto;
+    }
+
+    .topbar {
+      min-height: 72px;
+      background: var(--coral);
+    }
+
+    .topbar-inner {
+      width: min(100% - 40px, 1240px);
+      min-height: 72px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: #ffffff;
+      color: var(--navy);
+      box-shadow: 0 5px 12px rgba(58, 31, 29, 0.13);
+    }
+
+    .brand-mark svg {
+      width: 23px;
+      height: 23px;
+    }
+
+    .brand-name strong {
+      font-weight: 900;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--navy);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .login-link {
+      min-height: 42px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      background: var(--navy);
+      color: #ffffff;
+      transition: transform 160ms ease, background 160ms ease;
+    }
+
+    .login-link:hover {
+      background: var(--navy-soft);
+      transform: translateY(-1px);
+    }
+
+    .page {
+      width: min(100% - 40px, 1240px);
+      margin: 32px auto 64px;
+    }
+
+    .register-shell {
+      display: grid;
+      grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .visual-panel {
+      position: relative;
+      min-height: 770px;
+      overflow: hidden;
+      background: var(--navy);
+    }
+
+    .visual-image {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      object-position: center;
+      filter: saturate(0.82);
+    }
+
+    .visual-cover {
+      position: absolute;
+      inset: 0;
+      background: rgba(3, 34, 49, 0.58);
+    }
+
+    .visual-copy {
+      position: absolute;
+      right: 42px;
+      bottom: 42px;
+      left: 42px;
+      z-index: 1;
+      max-width: 360px;
+      color: #ffffff;
+    }
+
+    .visual-label {
+      display: inline-flex;
+      margin-bottom: 16px;
+      color: #b9d2dc;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+    }
+
+    .visual-copy h2 {
+      margin: 0;
+      font-size: clamp(28px, 3vw, 42px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .visual-copy h2 span {
+      color: #ffb0aa;
+    }
+
+    .visual-copy p {
+      max-width: 300px;
+      margin: 17px 0 0;
+      color: #e3edf1;
+      font-size: 14px;
+    }
+
+    .form-panel {
+      min-width: 0;
+      padding: 42px clamp(26px, 4vw, 58px) 30px;
+    }
+
+    .form-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .eyebrow {
+      display: block;
+      margin-bottom: 9px;
+      color: var(--coral-dark);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+    }
+
+    .form-header h1 {
+      margin: 0;
+      color: var(--navy);
+      font-size: clamp(28px, 3vw, 36px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .form-subtitle {
+      max-width: 410px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .step-count {
+      flex: 0 0 auto;
+      padding-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .step-count strong {
+      color: var(--navy);
+    }
+
+    .progress {
+      margin: 31px 0 38px;
+    }
+
+    .progress-list {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .progress-step {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      padding-bottom: 14px;
+      color: var(--muted);
+    }
+
+    .progress-step::after {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      border-radius: 20px;
+      background: var(--line);
+      content: "";
+    }
+
+    .progress-step.is-active,
+    .progress-step.is-complete {
+      color: var(--navy);
+    }
+
+    .progress-step.is-active::after,
+    .progress-step.is-complete::after {
+      background: var(--coral);
+    }
+
+    .progress-dot {
+      width: 27px;
+      height: 27px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 1px solid var(--line-dark);
+      border-radius: 50%;
+      background: #ffffff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .progress-step.is-active .progress-dot,
+    .progress-step.is-complete .progress-dot {
+      border-color: var(--coral);
+      background: var(--coral);
+      color: #ffffff;
+    }
+
+    .progress-copy {
+      min-width: 0;
+    }
+
+    .progress-copy strong,
+    .progress-copy small {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .progress-copy strong {
+      font-size: 12px;
+    }
+
+    .progress-copy small {
+      margin-top: 1px;
+      font-size: 11px;
+    }
+
+    .step-heading {
+      display: flex;
+      align-items: flex-start;
+      gap: 13px;
+      margin-bottom: 25px;
+    }
+
+    .step-number {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 8px;
+      background: #fff0ee;
+      color: var(--coral-dark);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .step-heading h2 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .step-heading p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .field-group {
+      min-width: 0;
+      padding: 0;
+      margin: 0;
+      border: 0;
+    }
+
+    .field-group + .field-group {
+      padding-top: 28px;
+      margin-top: 29px;
+      border-top: 1px solid var(--line);
+    }
+
+    .field-group legend {
+      display: block;
+      padding: 0;
+      margin-bottom: 12px;
+      color: var(--navy);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .choice-grid--roles {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .choice-card {
+      position: relative;
+      min-width: 0;
+      min-height: 73px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--ink);
+      text-align: left;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .choice-card:hover {
+      border-color: #99b4c5;
+      transform: translateY(-1px);
+    }
+
+    .choice-card.is-selected {
+      border-color: var(--navy);
+      background: var(--navy);
+      color: #ffffff;
+    }
+
+    .choice-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 8px;
+      background: var(--soft-blue);
+      color: var(--navy);
+    }
+
+    .choice-card.is-selected .choice-icon {
+      background: var(--coral);
+      color: #ffffff;
+    }
+
+    .choice-copy {
+      min-width: 0;
+    }
+
+    .choice-copy strong,
+    .choice-copy small {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .choice-copy strong {
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .choice-copy small {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .choice-card.is-selected .choice-copy small {
+      color: #d6e6ed;
+    }
+
+    .choice-check {
+      width: 20px;
+      height: 20px;
+      display: grid;
+      place-items: center;
+      margin-left: auto;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      color: transparent;
+    }
+
+    .choice-card.is-selected .choice-check {
+      border-color: #ffffff;
+      color: #ffffff;
+    }
+
+    .choice-check svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .fields-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px 12px;
+    }
+
+    .field--full {
+      grid-column: 1 / -1;
+    }
+
+    .field-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 7px;
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .required-mark {
+      color: var(--coral-dark);
+    }
+
+    .control {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .control > svg {
+      position: absolute;
+      left: 14px;
+      z-index: 1;
+      color: #8aa0b4;
+      pointer-events: none;
+    }
+
+    input,
+    select {
+      width: 100%;
+      height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: 0;
+      background: #ffffff;
+      color: var(--ink);
+      font-size: 13px;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    input {
+      padding: 0 14px 0 44px;
+    }
+
+    select {
+      padding: 0 42px 0 44px;
+      appearance: none;
+    }
+
+    input::placeholder {
+      color: #98aabd;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: #7899ad;
+      box-shadow: 0 0 0 3px rgba(36, 113, 143, 0.11);
+    }
+
+    input.is-invalid,
+    select.is-invalid {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(196, 61, 54, 0.09);
+    }
+
+    .select-arrow {
+      right: 14px;
+      left: auto !important;
+      color: #8196a8 !important;
+    }
+
+    .password-control input {
+      padding-right: 49px;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 7px;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #7890a4;
+    }
+
+    .password-toggle:hover {
+      background: var(--soft);
+      color: var(--navy);
+    }
+
+    .password-toggle svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .field-message {
+      display: none;
+      margin: 6px 0 0;
+      color: var(--danger);
+      font-size: 11px;
+    }
+
+    .field.has-error .field-message {
+      display: block;
+    }
+
+    .school-summary {
+      padding: 17px;
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+    }
+
+    .school-summary__head,
+    .school-summary__meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .school-summary__head {
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .summary-code,
+    .summary-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .summary-code {
+      background: var(--navy);
+      color: #ffffff;
+    }
+
+    .summary-tag {
+      margin-left: 4px;
+      background: #daf4e9;
+      color: var(--success);
+    }
+
+    .summary-status {
+      color: var(--success);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .school-summary__name {
+      margin-top: 12px;
+      color: var(--navy);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .school-summary__meta {
+      flex-wrap: wrap;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .school-summary__meta span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .school-summary__meta svg {
+      width: 14px;
+      height: 14px;
+      color: var(--coral-dark);
+    }
+
+    .notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      padding: 14px;
+      margin-top: 19px;
+      border: 1px solid #f1d38b;
+      border-radius: 8px;
+      background: #fffaf0;
+    }
+
+    .notice > svg {
+      margin-top: 1px;
+      color: var(--warning);
+    }
+
+    .notice strong,
+    .notice span {
+      display: block;
+    }
+
+    .notice strong {
+      color: #754d05;
+      font-size: 12px;
+    }
+
+    .notice span {
+      margin-top: 3px;
+      color: #8b6c2d;
+      font-size: 11px;
+    }
+
+    .terms-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 21px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .terms-row input {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+      margin: 1px 0 0;
+      accent-color: var(--coral);
+    }
+
+    .terms-row a {
+      color: var(--coral-dark);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .terms-row.has-error {
+      color: var(--danger);
+    }
+
+    .step-error {
+      padding: 12px 14px;
+      margin-top: 20px;
+      border: 1px solid #efb7b2;
+      border-radius: 8px;
+      background: #fff3f2;
+      color: var(--danger);
+      font-size: 12px;
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 25px;
+      margin-top: 30px;
+      border-top: 1px solid var(--line);
+    }
+
+    .button {
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 18px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button:disabled {
+      cursor: wait;
+      opacity: 0.7;
+      transform: none;
+    }
+
+    .button-primary {
+      background: var(--coral);
+      color: #ffffff;
+      box-shadow: 0 9px 18px rgba(244, 81, 74, 0.19);
+    }
+
+    .button-primary:hover {
+      background: var(--coral-dark);
+    }
+
+    .button-secondary {
+      border-color: var(--line-dark);
+      background: #ffffff;
+      color: var(--navy);
+    }
+
+    .button-secondary:hover {
+      border-color: #91a9b9;
+      background: var(--soft);
+    }
+
+    .login-footer {
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .login-footer a {
+      color: var(--coral-dark);
+      font-weight: 800;
+    }
+
+    .success-state {
+      padding: 48px 10px 24px;
+      text-align: center;
+    }
+
+    .success-icon {
+      width: 62px;
+      height: 62px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      background: #daf4e9;
+      color: var(--success);
+    }
+
+    .success-icon svg {
+      width: 29px;
+      height: 29px;
+    }
+
+    .success-state h2 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 25px;
+    }
+
+    .success-state p {
+      max-width: 390px;
+      margin: 10px auto 24px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 1000px) {
+      .register-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .visual-panel {
+        min-height: 300px;
+        max-height: 360px;
+      }
+
+      .visual-copy {
+        right: 28px;
+        bottom: 28px;
+        left: 28px;
+      }
+
+      .visual-copy h2 {
+        font-size: 32px;
+      }
+
+      .form-panel {
+        padding: 38px clamp(24px, 5vw, 54px) 30px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar-inner,
+      .page {
+        width: min(100% - 28px, 1240px);
+      }
+
+      .topbar-inner {
+        min-height: 64px;
+      }
+
+      .topbar-actions > span {
+        display: none;
+      }
+
+      .brand {
+        font-size: 11px;
+      }
+
+      .brand-mark {
+        width: 36px;
+        height: 36px;
+      }
+
+      .login-link {
+        min-height: 38px;
+        padding: 0 13px;
+        font-size: 12px;
+      }
+
+      .page {
+        margin-top: 15px;
+        margin-bottom: 32px;
+      }
+
+      .visual-panel {
+        min-height: 245px;
+      }
+
+      .visual-copy {
+        right: 21px;
+        bottom: 22px;
+        left: 21px;
+      }
+
+      .visual-label {
+        margin-bottom: 10px;
+        font-size: 10px;
+      }
+
+      .visual-copy h2 {
+        font-size: 28px;
+      }
+
+      .visual-copy p {
+        display: none;
+      }
+
+      .form-panel {
+        padding: 30px 18px 24px;
+      }
+
+      .form-header {
+        display: block;
+      }
+
+      .step-count {
+        padding-top: 12px;
+      }
+
+      .progress {
+        margin: 25px 0 31px;
+      }
+
+      .progress-list {
+        gap: 7px;
+      }
+
+      .progress-step {
+        justify-content: center;
+      }
+
+      .progress-copy small {
+        display: none;
+      }
+
+      .progress-copy strong {
+        font-size: 11px;
+      }
+
+      .choice-grid,
+      .choice-grid--roles,
+      .fields-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .field--full {
+        grid-column: auto;
+      }
+
+      .choice-card {
+        min-height: 65px;
+      }
+
+      .form-actions {
+        flex-direction: column-reverse;
+      }
+
+      .form-actions .button {
+        width: 100%;
+      }
+
+      .school-summary__head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 9px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="SIGRE — página inicial">
+        <span class="brand-mark">
+          <i data-lucide="graduation-cap"></i>
+        </span>
+        <span class="brand-name">
+          SIGRE <strong>QUÊSSUA</strong>
+        </span>
+      </a>
+
+      <div class="topbar-actions">
+        <span>Já possui uma conta?</span>
+        <a class="login-link" href="/login">
+          Entrar
+          <i data-lucide="arrow-right"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="register-shell" aria-label="Criação de conta SIGRE">
+      <aside class="visual-panel">
+        <!-- Substitua esta imagem pela imagem oficial da sua instituição -->
+        <img
+          class="visual-image"
+          src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1100&q=85"
+          alt="Profissional de educação"
+        >
+
+        <div class="visual-cover"></div>
+
+        <div class="visual-copy">
+          <span class="visual-label">GESTÃO ESCOLAR</span>
+          <h2>
+            A sua escola,<br>
+            <span>mais conectada.</span>
+          </h2>
+          <p>Uma única conta para gerir o seu acesso institucional.</p>
+        </div>
+      </aside>
+
+      <section class="form-panel">
+        <div class="form-header">
+          <div>
+            <span class="eyebrow">REGISTO INSTITUCIONAL</span>
+            <h1>Crie a sua conta</h1>
+            <p class="form-subtitle">
+              Preencha apenas os dados necessários para solicitar o acesso.
+            </p>
+          </div>
+
+          <div class="step-count">
+            Passo <strong id="currentStep">1</strong> de 3
+          </div>
+        </div>
+
+        <nav class="progress" aria-label="Progresso do registo">
+          <ol class="progress-list">
+            <li class="progress-step is-active" data-progress="1" aria-current="step">
+              <span class="progress-dot">1</span>
+              <span class="progress-copy">
+                <strong>Perfil</strong>
+                <small>Função</small>
+              </span>
+            </li>
+
+            <li class="progress-step" data-progress="2">
+              <span class="progress-dot">2</span>
+              <span class="progress-copy">
+                <strong>Instituição</strong>
+                <small>Escola</small>
+              </span>
+            </li>
+
+            <li class="progress-step" data-progress="3">
+              <span class="progress-dot">3</span>
+              <span class="progress-copy">
+                <strong>Conta</strong>
+                <small>Dados pessoais</small>
+              </span>
+            </li>
+          </ol>
+        </nav>
+
+        <form id="signupForm" method="post" action="/api/register" novalidate>
+          <!-- ETAPA 1 -->
+          <section
+            class="form-step"
+            data-step="1"
+            aria-labelledby="step1-title"
+          >
+            <div class="step-heading">
+              <span class="step-number">01</span>
+              <div>
+                <h2 id="step1-title">Defina o seu perfil</h2>
+                <p>Escolha o contexto e a função que desempenha.</p>
+              </div>
+            </div>
+
+            <fieldset class="field-group">
+              <legend>Âmbito institucional</legend>
+
+              <div class="choice-grid">
+                <button
+                  type="button"
+                  class="choice-card is-selected"
+                  data-choice-group="scope"
+                  data-value="escolar"
+                  aria-pressed="true"
+                >
+                  <span class="choice-icon">
+                    <i data-lucide="school"></i>
+                  </span>
+
+                  <span class="choice-copy">
+                    <strong>Âmbito escolar</strong>
+                    <small>Direção, coordenação e docência</small>
+                  </span>
+
+                  <span class="choice-check">
+                    <i data-lucide="check"></i>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="choice-card"
+                  data-choice-group="scope"
+                  data-value="administracao"
+                  aria-pressed="false"
+                >
+                  <span class="choice-icon">
+                    <i data-lucide="landmark"></i>
+                  </span>
+
+                  <span class="choice-copy">
+                    <strong>Administração</strong>
+                    <small>Gestão municipal e inspeção</small>
+                  </span>
+
+                  <span class="choice-check">
+                    <i data-lucide="check"></i>
+                  </span>
+                </button>
+              </div>
+
+              <input type="hidden" id="scope" name="scope" value="escolar">
+            </fieldset>
+
+            <fieldset class="field-group">
+              <legend>Função na instituição</legend>
+
+              <div class="choice-grid choice-grid--roles">
+                <button
+                  type="button"
+                  class="choice-card"
+                  data-choice-group="role"
+                  data-value="direcao"
+                  aria-pressed="false"
+                >
+                  <span class="choice-icon">
+                    <i data-lucide="briefcase"></i>
+                  </span>
+
+                  <span class="choice-copy">
+                    <strong>Direção</strong>
+                    <small>Gestão escolar</small>
+                  </span>
+
+                  <span class="choice-check">
+                    <i data-lucide="check"></i>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="choice-card"
+                  data-choice-group="role"
+                  data-value="coordenacao"
+                  aria-pressed="false"
+                >
+                  <span class="choice-icon">
+                    <i data-lucide="users-round"></i>
+                  </span>
+
+                  <span class="choice-copy">
+                    <strong>Coordenação</strong>
+                    <small>Área pedagógica</small>
+                  </span>
+
+                  <span class="choice-check">
+                    <i data-lucide="check"></i>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="choice-card"
+                  data-choice-group="role"
+                  data-value="administracao"
+                  aria-pressed="false"
+                >
+                  <span class="choice-icon">
+                    <i data-lucide="shield-check"></i>
+                  </span>
+
+                  <span class="choice-copy">
+                    <strong>Administração</strong>
+                    <small>Gestão administrativa</small>
+                  </span>
+
+                  <span class="choice-check">
+                    <i data-lucide="check"></i>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="choice-card"
+                  data-choice-group="role"
+                  data-value="docencia"
+                  aria-pressed="false"
+                >
+                  <span class="choice-icon">
+                    <i data-lucide="book-open"></i>
+                  </span>
+
+                  <span class="choice-copy">
+                    <strong>Docência</strong>
+                    <small>Professor ou professora</small>
+                  </span>
+
+                  <span class="choice-check">
+                    <i data-lucide="check"></i>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="choice-card"
+                  data-choice-group="role"
+                  data-value="secretaria"
+                  aria-pressed="false"
+                >
+                  <span class="choice-icon">
+                    <i data-lucide="clipboard-list"></i>
+                  </span>
+
+                  <span class="choice-copy">
+                    <strong>Secretaria</strong>
+                    <small>Atendimento escolar</small>
+                  </span>
+
+                  <span class="choice-check">
+                    <i data-lucide="check"></i>
+                  </span>
+                </button>
+              </div>
+
+              <input type="hidden" id="role" name="role" value="">
+            </fieldset>
+
+            <p class="step-error" data-step-error="1" role="alert" hidden></p>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="button" data-next>
+                Continuar
+                <i data-lucide="arrow-right"></i>
+              </button>
+            </div>
+          </section>
+
+          <!-- ETAPA 2 -->
+          <section
+            class="form-step"
+            data-step="2"
+            aria-labelledby="step2-title"
+            hidden
+          >
+            <div class="step-heading">
+              <span class="step-number">02</span>
+              <div>
+                <h2 id="step2-title">Associe a sua instituição</h2>
+                <p>Escolha a escola onde exerce a sua função.</p>
+              </div>
+            </div>
+
+            <div class="fields-grid">
+              <div class="field field--full">
+                <label class="field-label" for="municipality">
+                  Município / repartição
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control">
+                  <i data-lucide="map-pin"></i>
+
+                  <select id="municipality" name="municipality">
+                    <option value="">Selecione o município</option>
+                    <option value="quessua">Quêssua (Malanje)</option>
+                  </select>
+
+                  <i class="select-arrow" data-lucide="chevron-down"></i>
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+
+              <div class="field field--full">
+                <label class="field-label" for="school">
+                  Unidade escolar
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control">
+                  <i data-lucide="building-2"></i>
+
+                  <select id="school" name="school" disabled>
+                    <option value="">Selecione primeiro o município</option>
+                  </select>
+
+                  <i class="select-arrow" data-lucide="chevron-down"></i>
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+            </div>
+
+            <div class="school-summary" id="schoolSummary" hidden>
+              <div class="school-summary__head">
+                <div>
+                  <span class="summary-code" id="summaryCode">SIGE-113013</span>
+                  <span class="summary-tag" id="summaryType">PÚBLICA</span>
+                </div>
+
+                <span class="summary-status">Dados encontrados</span>
+              </div>
+
+              <div class="school-summary__name" id="summaryName">
+                Só Ciência da Educação
+              </div>
+
+              <div class="school-summary__meta">
+                <span>
+                  <i data-lucide="map-pin"></i>
+                  <span id="summaryLocation">Quêssua · Malanje</span>
+                </span>
+
+                <span>
+                  <i data-lucide="graduation-cap"></i>
+                  <span id="summaryStage">Ensino primário</span>
+                </span>
+
+                <span>
+                  <i data-lucide="layout-grid"></i>
+                  <span id="summaryRooms">10 salas</span>
+                </span>
+
+                <span>
+                  <i data-lucide="users"></i>
+                  <span id="summaryStaff">32 docentes</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="notice">
+              <i data-lucide="shield-check"></i>
+
+              <div>
+                <strong>Aprovação institucional</strong>
+                <span>
+                  O administrador da rede valida o pedido antes do primeiro acesso.
+                </span>
+              </div>
+            </div>
+
+            <p class="step-error" data-step-error="2" role="alert" hidden></p>
+
+            <div class="form-actions">
+              <button class="button button-secondary" type="button" data-prev>
+                <i data-lucide="arrow-left"></i>
+                Voltar
+              </button>
+
+              <button class="button button-primary" type="button" data-next>
+                Continuar
+                <i data-lucide="arrow-right"></i>
+              </button>
+            </div>
+          </section>
+
+          <!-- ETAPA 3 -->
+          <section
+            class="form-step"
+            data-step="3"
+            aria-labelledby="step3-title"
+            hidden
+          >
+            <div class="step-heading">
+              <span class="step-number">03</span>
+              <div>
+                <h2 id="step3-title">Finalize os seus dados</h2>
+                <p>Utilize dados válidos para recuperar o acesso.</p>
+              </div>
+            </div>
+
+            <div class="fields-grid">
+              <div class="field">
+                <label class="field-label" for="bi">
+                  N.º do Bilhete de Identidade
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control">
+                  <i data-lucide="id-card"></i>
+                  <input
+                    id="bi"
+                    name="bi"
+                    type="text"
+                    maxlength="20"
+                    autocomplete="off"
+                    placeholder="Ex.: 008892144AL012"
+                  >
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="phone">
+                  Telefone / telemóvel
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control">
+                  <i data-lucide="phone"></i>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    inputmode="tel"
+                    autocomplete="tel"
+                    placeholder="+244 923 000 000"
+                  >
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="firstName">
+                  Primeiro nome
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control">
+                  <i data-lucide="user-round"></i>
+                  <input
+                    id="firstName"
+                    name="firstName"
+                    type="text"
+                    autocomplete="given-name"
+                    placeholder="Ex.: Carlos"
+                  >
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="lastName">
+                  Sobrenome
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control">
+                  <i data-lucide="user-round"></i>
+                  <input
+                    id="lastName"
+                    name="lastName"
+                    type="text"
+                    autocomplete="family-name"
+                    placeholder="Ex.: Silva"
+                  >
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+
+              <div class="field field--full">
+                <label class="field-label" for="email">
+                  E-mail institucional
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control">
+                  <i data-lucide="mail"></i>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    placeholder="seu.nome@sigre.edu.ao"
+                  >
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="password">
+                  Senha
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control password-control">
+                  <i data-lucide="lock-keyhole"></i>
+
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    minlength="6"
+                    autocomplete="new-password"
+                    placeholder="Mínimo de 6 caracteres"
+                  >
+
+                  <button
+                    class="password-toggle"
+                    type="button"
+                    data-password-toggle="#password"
+                    aria-label="Mostrar senha"
+                    title="Mostrar senha"
+                  >
+                    <i data-lucide="eye"></i>
+                  </button>
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="passwordConfirm">
+                  Confirmar senha
+                  <span class="required-mark">*</span>
+                </label>
+
+                <div class="control password-control">
+                  <i data-lucide="lock-keyhole"></i>
+
+                  <input
+                    id="passwordConfirm"
+                    name="passwordConfirm"
+                    type="password"
+                    minlength="6"
+                    autocomplete="new-password"
+                    placeholder="Repita a senha"
+                  >
+
+                  <button
+                    class="password-toggle"
+                    type="button"
+                    data-password-toggle="#passwordConfirm"
+                    aria-label="Mostrar senha"
+                    title="Mostrar senha"
+                  >
+                    <i data-lucide="eye"></i>
+                  </button>
+                </div>
+
+                <small class="field-message"></small>
+              </div>
+            </div>
+
+            <label class="terms-row" id="termsRow">
+              <input id="terms" name="terms" type="checkbox">
+
+              <span>
+                Li e aceito os
+                <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a>
+                e a
+                <a href="/privacidade" target="_blank" rel="noopener">
+                  Política de Privacidade
+                </a>.
+              </span>
+            </label>
+
+            <p class="step-error" data-step-error="3" role="alert" hidden></p>
+
+            <div class="form-actions">
+              <button class="button button-secondary" type="button" data-prev>
+                <i data-lucide="arrow-left"></i>
+                Voltar
+              </button>
+
+              <button class="button button-primary" type="submit" id="submitButton">
+                Criar minha conta
+                <i data-lucide="arrow-right"></i>
+              </button>
+            </div>
+          </section>
+        </form>
+
+        <div class="success-state" id="successState" hidden role="status" aria-live="polite">
+          <div class="success-icon">
+            <i data-lucide="check"></i>
+          </div>
+
+          <h2>Pedido enviado</h2>
+
+          <p>
+            Os seus dados foram registados. Aguarde a validação do administrador
+            da rede escolar.
+          </p>
+
+          <button class="button button-secondary" type="button" id="editRegistration">
+            Voltar ao formulário
+          </button>
+        </div>
+
+        <p class="login-footer">
+          Já possui cadastro?
+          <a href="/login">Entrar na Central</a>
+        </p>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    const form = document.getElementById("signupForm");
+    const formPanel = document.querySelector(".form-panel");
+    const successState = document.getElementById("successState");
+    const currentStepLabel = document.getElementById("currentStep");
+    const submitButton = document.getElementById("submitButton");
+
+    const stepPanels = [...document.querySelectorAll(".form-step")];
+    const progressItems = [...document.querySelectorAll("[data-progress]")];
+
+    const scopeInput = document.getElementById("scope");
+    const roleInput = document.getElementById("role");
+
+    const municipalityInput = document.getElementById("municipality");
+    const schoolInput = document.getElementById("school");
+    const schoolSummary = document.getElementById("schoolSummary");
+
+    const termsInput = document.getElementById("terms");
+    const termsRow = document.getElementById("termsRow");
+
+    let currentStep = 1;
+
+    const schools = {
+      quessua: [
+        {
+          value: "sige-113013",
+          code: "SIGE-113013",
+          name: "Só Ciência da Educação",
+          type: "PÚBLICA",
+          location: "Quêssua · Malanje",
+          stage: "Ensino primário",
+          rooms: "10 salas",
+          staff: "32 docentes"
+        }
+      ]
+    };
+
+    function refreshIcons() {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
+    function renderStep() {
+      stepPanels.forEach((panel) => {
+        const stepNumber = Number(panel.dataset.step);
+        panel.hidden = stepNumber !== currentStep;
+      });
+
+      progressItems.forEach((item) => {
+        const stepNumber = Number(item.dataset.progress);
+
+        item.classList.toggle("is-active", stepNumber === currentStep);
+        item.classList.toggle("is-complete", stepNumber < currentStep);
+
+        if (stepNumber === currentStep) {
+          item.setAttribute("aria-current", "step");
+        } else {
+          item.removeAttribute("aria-current");
+        }
+      });
+
+      currentStepLabel.textContent = currentStep;
+      refreshIcons();
+
+      if (window.innerWidth < 1000) {
+        formPanel.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      }
+    }
+
+    function clearStepErrors(step) {
+      const panel = document.querySelector(`.form-step[data-step="${step}"]`);
+
+      if (!panel) {
+        return;
+      }
+
+      const stepError = panel.querySelector("[data-step-error]");
+      if (stepError) {
+        stepError.hidden = true;
+        stepError.textContent = "";
+      }
+
+      panel.querySelectorAll(".field.has-error").forEach((field) => {
+        field.classList.remove("has-error");
+      });
+
+      panel.querySelectorAll(".is-invalid").forEach((element) => {
+        element.classList.remove("is-invalid");
+      });
+
+      panel.querySelectorAll(".field-message").forEach((message) => {
+        message.textContent = "";
+      });
+
+      panel.querySelectorAll(".has-error").forEach((element) => {
+        element.classList.remove("has-error");
+      });
+    }
+
+    function showStepError(step, message, focusElement = null) {
+      const errorBox = document.querySelector(
+        `.form-step[data-step="${step}"] [data-step-error]`
+      );
+
+      if (errorBox) {
+        errorBox.textContent = message;
+        errorBox.hidden = false;
+      }
+
+      if (focusElement) {
+        focusElement.focus();
+      }
+    }
+
+    function markFieldInvalid(field, message) {
+      const fieldWrapper = field.closest(".field");
+
+      if (!fieldWrapper) {
+        return;
+      }
+
+      fieldWrapper.classList.add("has-error");
+      field.classList.add("is-invalid");
+
+      const fieldMessage = fieldWrapper.querySelector(".field-message");
+
+      if (fieldMessage) {
+        fieldMessage.textContent = message;
+      }
+    }
+
+    function setSchoolSummary(school) {
+      if (!school) {
+        schoolSummary.hidden = true;
+        return;
+      }
+
+      document.getElementById("summaryCode").textContent = school.code;
+      document.getElementById("summaryType").textContent = school.type;
+      document.getElementById("summaryName").textContent = school.name;
+      document.getElementById("summaryLocation").textContent = school.location;
+      document.getElementById("summaryStage").textContent = school.stage;
+      document.getElementById("summaryRooms").textContent = school.rooms;
+      document.getElementById("summaryStaff").textContent = school.staff;
+
+      schoolSummary.hidden = false;
+      refreshIcons();
+    }
+
+    function validateStep(step) {
+      clearStepErrors(step);
+
+      if (step === 1) {
+        if (!scopeInput.value) {
+          showStepError(
+            1,
+            "Selecione o âmbito institucional.",
+            document.querySelector('[data-choice-group="scope"]')
+          );
+          return false;
+        }
+
+        if (!roleInput.value) {
+          const firstRole = document.querySelector('[data-choice-group="role"]');
+
+          showStepError(
+            1,
+            "Selecione a função que desempenha na instituição.",
+            firstRole
+          );
+
+          return false;
+        }
+
+        return true;
+      }
+
+      if (step === 2) {
+        if (!municipalityInput.value) {
+          markFieldInvalid(
+            municipalityInput,
+            "Selecione o município."
+          );
+
+          showStepError(
+            2,
+            "Informe o município ou repartição.",
+            municipalityInput
+          );
+
+          return false;
+        }
+
+        if (!schoolInput.value) {
+          markFieldInvalid(
+            schoolInput,
+            "Selecione a unidade escolar."
+          );
+
+          showStepError(
+            2,
+            "Selecione a unidade escolar associada à sua conta.",
+            schoolInput
+          );
+
+          return false;
+        }
+
+        return true;
+      }
+
+      if (step === 3) {
+        const requiredFields = [
+          [document.getElementById("bi"), "Informe o número do Bilhete de Identidade."],
+          [document.getElementById("phone"), "Informe o seu telefone."],
+          [document.getElementById("firstName"), "Informe o seu primeiro nome."],
+          [document.getElementById("lastName"), "Informe o seu sobrenome."],
+          [document.getElementById("email"), "Informe o seu e-mail institucional."],
+          [document.getElementById("password"), "Defina uma senha."]
+        ];
+
+        for (const [field, message] of requiredFields) {
+          if (!field.value.trim()) {
+            markFieldInvalid(field, message);
+            showStepError(3, message, field);
+            return false;
+          }
+        }
+
+        const email = document.getElementById("email");
+        if (!email.validity.valid) {
+          markFieldInvalid(email, "Informe um e-mail válido.");
+          showStepError(3, "Informe um e-mail institucional válido.", email);
+          return false;
+        }
+
+        const password = document.getElementById("password");
+        const passwordConfirm = document.getElementById("passwordConfirm");
+
+        if (password.value.length < 6) {
+          markFieldInvalid(password, "A senha deve ter pelo menos 6 caracteres.");
+          showStepError(
+            3,
+            "A senha deve ter pelo menos 6 caracteres.",
+            password
+          );
+          return false;
+        }
+
+        if (!passwordConfirm.value.trim()) {
+          markFieldInvalid(
+            passwordConfirm,
+            "Confirme a sua senha."
+          );
+
+          showStepError(
+            3,
+            "Confirme a sua senha.",
+            passwordConfirm
+          );
+
+          return false;
+        }
+
+        if (password.value !== passwordConfirm.value) {
+          markFieldInvalid(
+            passwordConfirm,
+            "As senhas não coincidem."
+          );
+
+          showStepError(
+            3,
+            "As senhas informadas não coincidem.",
+            passwordConfirm
+          );
+
+          return false;
+        }
+
+        if (!termsInput.checked) {
+          termsRow.classList.add("has-error");
+
+          showStepError(
+            3,
+            "Aceite os termos de uso e a política de privacidade.",
+            termsInput
+          );
+
+          return false;
+        }
+
+        return true;
+      }
+
+      return true;
+    }
+
+    document.querySelectorAll("[data-choice-group]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const group = button.dataset.choiceGroup;
+        const value = button.dataset.value;
+
+        document.querySelectorAll(`[data-choice-group="${group}"]`).forEach((item) => {
+          const selected = item === button;
+
+          item.classList.toggle("is-selected", selected);
+          item.setAttribute("aria-pressed", String(selected));
+        });
+
+        if (group === "scope") {
+          scopeInput.value = value;
+        }
+
+        if (group === "role") {
+          roleInput.value = value;
+        }
+
+        clearStepErrors(1);
+      });
+    });
+
+    municipalityInput.addEventListener("change", () => {
+      const options = schools[municipalityInput.value] || [];
+
+      schoolInput.innerHTML = "";
+
+      if (!options.length) {
+        schoolInput.disabled = true;
+        schoolInput.required = false;
+
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "Nenhuma unidade encontrada";
+        schoolInput.appendChild(option);
+
+        setSchoolSummary(null);
+        return;
+      }
+
+      const initialOption = document.createElement("option");
+      initialOption.value = "";
+      initialOption.textContent = "Selecione a unidade escolar";
+      schoolInput.appendChild(initialOption);
+
+      options.forEach((school) => {
+        const option = document.createElement("option");
+        option.value = school.value;
+        option.textContent = `${school.name} (${school.code})`;
+        schoolInput.appendChild(option);
+      });
+
+      schoolInput.disabled = false;
+      schoolInput.required = true;
+      setSchoolSummary(null);
+    });
+
+    schoolInput.addEventListener("change", () => {
+      const selectedSchool = (schools[municipalityInput.value] || []).find(
+        (school) => school.value === schoolInput.value
+      );
+
+      setSchoolSummary(selectedSchool || null);
+      schoolInput.classList.remove("is-invalid");
+      schoolInput.closest(".field")?.classList.remove("has-error");
+    });
+
+    document.querySelectorAll("input, select").forEach((field) => {
+      field.addEventListener("input", () => {
+        field.classList.remove("is-invalid");
+        field.closest(".field")?.classList.remove("has-error");
+      });
+
+      field.addEventListener("change", () => {
+        field.classList.remove("is-invalid");
+        field.closest(".field")?.classList.remove("has-error");
+      });
+    });
+
+    document.querySelectorAll("[data-next]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!validateStep(currentStep)) {
+          return;
+        }
+
+        currentStep += 1;
+        renderStep();
+      });
+    });
+
+    document.querySelectorAll("[data-prev]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (currentStep > 1) {
+          currentStep -= 1;
+          renderStep();
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = document.querySelector(button.dataset.passwordToggle);
+        const shouldShow = target.type === "password";
+
+        target.type = shouldShow ? "text" : "password";
+
+        button.setAttribute(
+          "aria-label",
+          shouldShow ? "Ocultar senha" : "Mostrar senha"
+        );
+
+        button.setAttribute(
+          "title",
+          shouldShow ? "Ocultar senha" : "Mostrar senha"
+        );
+
+        button.innerHTML = `
+          <i data-lucide="${shouldShow ? "eye-off" : "eye"}"></i>
+        `;
+
+        refreshIcons();
+      });
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      if (!validateStep(3)) {
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.innerHTML = `
+        <i data-lucide="loader-circle"></i>
+        A enviar...
+      `;
+
+      refreshIcons();
+
+      /*
+        Em produção, substitua este bloco por um fetch para a sua API.
+        Exemplo:
+        fetch(form.action, {
+          method: "POST",
+          body: new FormData(form)
+        });
+      */
+
+      window.setTimeout(() => {
+        form.hidden = true;
+        successState.hidden = false;
+        submitButton.disabled = false;
+      }, 700);
+    });
+
+    document.getElementById("editRegistration").addEventListener("click", () => {
+      successState.hidden = true;
+      form.hidden = false;
+      currentStep = 3;
+      renderStep();
+    });
+
+    refreshIcons();
+  </script>
+</body>
+</html>
+```
+
+Para integração real, substitua a imagem do painel esquerdo e ligue o formulário ao seu endpoint no trecho `form.addEventListener("submit", ...)`.

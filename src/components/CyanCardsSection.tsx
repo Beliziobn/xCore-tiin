@@ -105,9 +105,6 @@ export const CyanCardsSection: React.FC<CyanCardsSectionProps> = ({
         <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance">
           Tudo o que a sua escola precisa
         </h2>
-        <p className="text-sm text-slate-500 mt-2 max-w-xl leading-relaxed">
-          Sistemas unificados para gestão integrada de secretarias, corpo docente e comunidade escolar.
-        </p>
       </div>
 
       {/* Grid of Cards with New Card Logic: 48px Outer Radius, 16px Padding, 32px Inner, 0 20px 40px Drop Shadow */}

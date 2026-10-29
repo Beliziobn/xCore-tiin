@@ -283,8 +283,8 @@ export const AdminAdvancedFilter: React.FC<AdminAdvancedFilterProps> = ({
         </div>
       </div>
 
-      {/* Main Visible Filters Grid (Escola, Ano letivo, Período, Classe, Turma, Turno, Modalidade) */}
-      <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50/40">
+      {/* Main Visible Filters Grid (Escola, Ano letivo, Período, Classe, Turma, Turno) */}
+      <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-50/40">
         {/* 1. Escola (Multi-select Dropdown) */}
         <div className="relative" ref={schoolDropdownRef}>
           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center justify-between">
@@ -474,34 +474,6 @@ export const AdminAdvancedFilter: React.FC<AdminAdvancedFilterProps> = ({
             <option value="Tarde">Tarde</option>
             <option value="Noite">Noite</option>
           </select>
-        </div>
-
-        {/* 7. Modalidade */}
-        <div className="sm:col-span-2 lg:col-span-2">
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-slate-500" />
-            Modalidade de Ensino
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { id: 'all', label: 'Todas' },
-              { id: 'Presencial', label: 'Presencial' },
-              { id: 'EAD', label: 'EAD / Remoto' },
-            ].map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => handleUpdate('modality', m.id as any)}
-                className={`h-10 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs border ${
-                  filters.modality === m.id
-                    ? 'bg-[#002133] text-white border-[#002133]'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
