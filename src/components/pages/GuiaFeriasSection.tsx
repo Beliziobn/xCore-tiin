@@ -908,14 +908,32 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                         término a <strong>{fimExtenso}</strong>.
                       </p>
 
-                      <p className="a4-underscore-divider" style={{ lineHeight: 1.5, fontFamily: 'monospace', textAlign: 'center', wordBreak: 'break-all', margin: '12px 0', fontSize: '11px', color: '#334155' }}>
-                        ____________________________________________________________________________________________________<br />
-                        ____________________________________________________________________________________________________<br />
-                        ____________________________________________________________________________________________________<br />
-                        ____________________________________________________________________________________________________<br />
-                        ____________________________________________________________________________________________________<br />
-                        ____________________________________________________________________________________________________<br />
-                        ____________________________________________________________________________________________________
+                      <p
+                        className="a4-underscore-divider"
+                        style={{
+                          lineHeight: 1.5,
+                          textIndent: 0,
+                          textAlign: 'left',
+                          margin: '10pt 0',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6].map((idx) => (
+                          <span
+                            key={idx}
+                            className="a4-divider-line"
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              overflow: 'hidden',
+                              whiteSpace: 'nowrap',
+                              textIndent: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {'_'.repeat(140)}
+                          </span>
+                        ))}
                       </p>
 
                       <p style={{ lineHeight: 1.5 }}>

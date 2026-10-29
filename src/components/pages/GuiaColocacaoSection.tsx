@@ -874,26 +874,38 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
                         funções de professor.
                       </p>
 
-                      <p className="a4-equals-divider" style={{ lineHeight: 1.6, fontFamily: 'monospace', textAlign: 'center', letterSpacing: '2px', margin: '14px 0', fontSize: '13px', color: '#334155' }}>
-                        ========================================================================<br />
-                        ========================================================================<br />
-                        ========================================================================<br />
-                        ========================================================================<br />
-                        ========================================================================
+                      <p
+                        className="a4-equals-divider"
+                        style={{
+                          lineHeight: 1.5,
+                          textIndent: 0,
+                          textAlign: 'left',
+                          margin: '10pt 0',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {[0, 1, 2, 3, 4].map((idx) => (
+                          <span
+                            key={idx}
+                            className="a4-divider-line"
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              overflow: 'hidden',
+                              whiteSpace: 'nowrap',
+                              textIndent: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {'='.repeat(120)}
+                          </span>
+                        ))}
                       </p>
 
                       <p style={{ lineHeight: 1.5 }}>
                         Para que não lhe ponham impedimento, mandei passar a presente guia que
                         vai por mim assinada e autenticada com o carimbo a óleo, em uso nesta
                         Direcção.
-                      </p>
-
-                      <p className="a4-equals-divider" style={{ lineHeight: 1.6, fontFamily: 'monospace', textAlign: 'center', letterSpacing: '2px', margin: '14px 0', fontSize: '13px', color: '#334155' }}>
-                        ========================================================================<br />
-                        ========================================================================<br />
-                        ========================================================================<br />
-                        ========================================================================<br />
-                        ========================================================================
                       </p>
                     </div>
 

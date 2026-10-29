@@ -970,6 +970,22 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin: 0 0 10pt 0;
           color: #000000;
         }
+        #guia-ferias-a4-sheet .a4-body-copy p.a4-underscore-divider,
+        #guia-colocacao-a4-sheet .a4-body-copy p.a4-equals-divider {
+          text-indent: 0 !important;
+          text-align: left !important;
+          margin: 10pt 0 !important;
+          overflow: hidden !important;
+        }
+        #guia-ferias-a4-sheet .a4-divider-line,
+        #guia-colocacao-a4-sheet .a4-divider-line {
+          display: block !important;
+          width: 100% !important;
+          overflow: hidden !important;
+          white-space: nowrap !important;
+          text-indent: 0 !important;
+          line-height: 1.5 !important;
+        }
         #oficial-a4-sheet .a4-body-copy strong,
         #declaracao-servico-a4-sheet .a4-body-copy strong,
         #guia-ferias-a4-sheet .a4-body-copy strong,
@@ -987,7 +1003,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           border: 0;
         }
         #oficial-a4-sheet .a4-date-line,
-        #oficial-a4-sheet .a4-date-line span,
+        #oficial-a4-sheet .a4-date-line span {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          line-height: 1.35;
+          text-align: right;
+          margin-bottom: 20pt;
+          color: #000000;
+        }
         #declaracao-servico-a4-sheet .a4-date-line,
         #declaracao-servico-a4-sheet .a4-date-line span,
         #guia-ferias-a4-sheet .a4-date-line,
@@ -997,7 +1020,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           line-height: 1.35;
-          text-align: right;
+          text-align: center;
           margin-bottom: 20pt;
           color: #000000;
         }
@@ -1115,15 +1138,10 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #declaracao-servico-a4-sheet,
           #declaracao-servico-a4-sheet *,
           #guia-ferias-a4-sheet,
-          #guia-ferias-a4-sheet *:not(.a4-underscore-divider),
+          #guia-ferias-a4-sheet *,
           #guia-colocacao-a4-sheet,
-          #guia-colocacao-a4-sheet *:not(.a4-equals-divider) {
+          #guia-colocacao-a4-sheet * {
             font-family: 'Times New Roman', Times, serif !important;
-          }
-          .a4-equals-divider,
-          .a4-underscore-divider {
-            font-family: monospace !important;
-            color: #334155 !important;
           }
           #oficial-a4-sheet,
           #declaracao-servico-a4-sheet,

@@ -447,15 +447,8 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       box-sizing: border-box !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
-    }
-    body {
       font-family: 'Times New Roman', Times, serif !important;
       color: #000000 !important;
-    }
-    .a4-equals-divider,
-    .a4-underscore-divider {
-      font-family: monospace !important;
-      color: #334155 !important;
     }
     html, body {
       width: 210mm !important;
@@ -543,16 +536,31 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
     .doc-text-12 {
       margin-top: 10pt !important;
       font-size: 12pt !important;
-      line-height: ${elementId === 'declaracao-servico-a4-sheet' ? '1.5' : '1.42'} !important;
+      line-height: ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? '1.42' : '1.5'} !important;
       text-align: justify !important;
     }
     .a4-body-copy p,
     .doc-text-12 p {
       font-size: 12pt !important;
-      line-height: ${elementId === 'declaracao-servico-a4-sheet' ? '1.5' : '1.42'} !important;
+      line-height: ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? '1.42' : '1.5'} !important;
       text-align: justify !important;
       text-indent: 1.25cm !important;
-      margin: 0 0 ${elementId === 'declaracao-servico-a4-sheet' ? '10pt' : '8pt'} 0 !important;
+      margin: 0 0 ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? '8pt' : '10pt'} 0 !important;
+    }
+    .a4-body-copy p.a4-equals-divider,
+    .a4-body-copy p.a4-underscore-divider {
+      text-indent: 0 !important;
+      text-align: left !important;
+      margin: 10pt 0 !important;
+      overflow: hidden !important;
+    }
+    .a4-divider-line {
+      display: block !important;
+      width: 100% !important;
+      overflow: hidden !important;
+      white-space: nowrap !important;
+      text-indent: 0 !important;
+      line-height: 1.5 !important;
     }
     .a4-body-copy strong,
     .doc-text-12 strong {
@@ -568,7 +576,7 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
     .a4-date-line span {
       font-size: 12pt !important;
       line-height: 1.35 !important;
-      text-align: right !important;
+      text-align: ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? 'right' : 'center'} !important;
       margin-bottom: 20pt !important;
       display: block !important;
     }
@@ -1119,7 +1127,19 @@ export async function downloadGuiaFeriasPdf(
   ];
 
   y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-  y += paragraphGapMm;
+  y += 2;
+  doc.setFont('times', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor(0, 0, 0);
+  let underLine = '_';
+  while (doc.getTextWidth(underLine + '_') <= usableWidth) {
+    underLine += '_';
+  }
+  for (let i = 0; i < 7; i++) {
+    doc.text(underLine, marginX, y);
+    y += lineHeightMm;
+  }
+  y += 3.2;
   y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
 
   y += 12;
@@ -1252,7 +1272,19 @@ export async function downloadGuiaColocacaoPdf(
   ];
 
   y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-  y += paragraphGapMm;
+  y += 2;
+  doc.setFont('times', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor(0, 0, 0);
+  let eqLine = '=';
+  while (doc.getTextWidth(eqLine + '=') <= usableWidth) {
+    eqLine += '=';
+  }
+  for (let i = 0; i < 5; i++) {
+    doc.text(eqLine, marginX, y);
+    y += lineHeightMm;
+  }
+  y += 3.2;
   y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
 
   y += 12;
