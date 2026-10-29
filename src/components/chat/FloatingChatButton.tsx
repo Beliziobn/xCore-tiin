@@ -8,25 +8,25 @@ interface FloatingChatButtonProps {
 
 export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
   onClick,
-  unreadCount = 0,
+  unreadCount = 2,
 }) => {
   return (
     <button
       id="btn-floating-support-chat"
       onClick={onClick}
-      className="no-print print:hidden fixed bottom-5 right-5 z-40 flex items-center gap-2 px-3.5 h-10 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-full shadow-sm border border-slate-200/90 hover:border-slate-300 transition-colors cursor-pointer select-none text-xs font-medium"
+      className="no-print print:hidden fixed bottom-5 right-5 z-40 group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-[#e04436] via-[#f75142] to-[#f86f63] text-white rounded-full shadow-[0_8px_25px_rgba(247,81,66,0.45)] hover:shadow-[0_12px_32px_rgba(247,81,66,0.6)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border border-white/40 select-none"
       title="Abrir Chat de Apoio Escolar"
       aria-label="Abrir Chat de Apoio Escolar"
     >
-      <MessageCircle className="w-4 h-4 text-slate-500" />
-      <span className="hidden sm:inline">Apoio</span>
-      {unreadCount > 0 && (
-        <span className="text-[11px] font-semibold text-[#e11d48] tabular-nums">
-          · {unreadCount}
-        </span>
-      )}
+      <div className="relative flex items-center justify-center">
+        <MessageCircle className="w-6 h-6 fill-white text-white group-hover:scale-110 transition-transform duration-200" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-2.5 -right-2.5 min-w-[1.25rem] h-5 px-1 bg-[#002133] text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white animate-pulse shadow-sm">
+            {unreadCount}
+          </span>
+        )}
+      </div>
     </button>
   );
 };
-
 

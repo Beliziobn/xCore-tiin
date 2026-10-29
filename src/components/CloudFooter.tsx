@@ -1,19 +1,5 @@
 import React from 'react';
-import {
-  ShieldCheck,
-  FileText,
-  HelpCircle,
-  MapPin,
-  Lock,
-  Cookie,
-  Info,
-  Award,
-  HeadphonesIcon,
-  Mail,
-  Phone,
-  Building2,
-} from 'lucide-react';
-import { QuessuaMunicipalLogo } from './common/QuessuaMunicipalLogo';
+import { ArrowUp, GraduationCap, Shield, HelpCircle, FileText, Heart, Cookie, Lock } from 'lucide-react';
 
 interface CloudFooterProps {
   onOpenAbout: () => void;
@@ -37,16 +23,15 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
   onOpenCases,
   onOpenFAQ,
   onOpenMaps,
-  onOpenSupport,
   onSupport,
+  onOpenSupport,
 }) => {
   const handleSupport = onOpenSupport || onSupport;
   const handlePrivacy = onOpenPrivacy || onOpenTerms;
   const handleSecurity = onOpenSecurity || onOpenAbout;
   const handleCases = onOpenCases || onOpenAbout;
-  const handleFAQ = onOpenFAQ || handleSupport;
+  const handleFAQ = onOpenFAQ || onOpenAbout;
   const handleMaps = onOpenMaps || onOpenAbout;
-
   const handleCookies = () => {
     if (onOpenCookieSettings) {
       onOpenCookieSettings();
@@ -55,209 +40,150 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
     }
   };
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <footer
-      id="ucore-cloud-footer"
-      className="no-print print:hidden relative w-full mt-16 select-none overflow-hidden"
-    >
-      {/* Multi-Layered Organic Cloud Wave Top Transition */}
-      <div className="w-full overflow-hidden leading-none bg-transparent">
+    <footer id="ucore-cloud-footer" className="relative w-full mt-12 sm:mt-16 bg-white">
+      {/* 
+        Top curved transition matching Design sem nome (1).png:
+        - CSS selector 1 targets: div:nth-of-type(1) > svg:nth-of-type(1)
+        - Distinctive curved left shoulder, gently sloping top crest, and curved right shoulder
+        - Floating circular scroll-to-top button at ~77% width overlapping the top edge
+      */}
+      <div className="relative w-full leading-none select-none -mb-1">
+        {/* Floating Back-to-Top Button overlapping the top curve */}
+        <button
+          id="footer-back-to-top"
+          onClick={scrollToTop}
+          aria-label="Voltar ao início da página"
+          title="Voltar ao topo"
+          className="absolute z-20 left-[76%] sm:left-[77%] md:left-[78%] top-0 sm:top-1 md:top-2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 md:w-13 md:h-13 rounded-full bg-[#002133] hover:bg-[#001726] active:scale-90 transition-all duration-300 flex items-center justify-center shadow-[0_8px_20px_rgba(0,33,51,0.45)] hover:shadow-[0_12px_28px_rgba(0,33,51,0.6)] cursor-pointer group hover:-translate-y-2/3"
+        >
+          <ArrowUp
+            className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:-translate-y-0.5 transition-transform stroke-[2.6]"
+          />
+        </button>
+
         <svg
-          viewBox="0 0 1440 120"
+          id="ucore-footer-curve-svg"
+          viewBox="0 0 1440 90"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-14 sm:h-20 md:h-24 block"
+          className="w-full h-9 sm:h-12 md:h-14 block"
           preserveAspectRatio="none"
+          aria-hidden="true"
         >
+          {/* Curved silhouette filled with #f75142 */}
           <path
-            d="M0 64C180 18 360 98 560 58C760 18 960 92 1160 48C1300 18 1390 44 1440 60V120H0V64Z"
+            d="M 0,90 L 0,68 C 0,38 32,18 78,16 L 1080,4 C 1115,3 1360,10 1400,28 C 1426,38 1440,54 1440,78 L 1440,90 Z"
             fill="#f75142"
-            fillOpacity="0.22"
-          />
-          <path
-            d="M0 82C220 34 420 106 660 66C900 26 1120 96 1320 56C1380 44 1415 52 1440 62V120H0V82Z"
-            fill="#f75142"
-            fillOpacity="0.55"
-          />
-          <path
-            d="M0 96C260 54 480 114 740 78C1000 42 1210 102 1440 70V120H0V96Z"
-            fill="#002133"
           />
         </svg>
       </div>
 
-      {/* Main Institutional Dark Navy & Coral Accent Footer Body */}
-      <div className="bg-[#002133] text-white pt-6 pb-12 px-4 sm:px-6 lg:px-8 relative">
-        {/* Subtle top coral glow */}
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-32 opacity-20"
-          style={{
-            background:
-              'radial-gradient(ellipse at 50% 0%, #f75142 0%, transparent 70%)',
-          }}
-        />
-
-        <div className="relative z-10 max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-10 border-b border-white/10">
-            {/* Brand & Municipal Identity Column */}
-            <div className="lg:col-span-4 space-y-4">
+      {/* Main Footer Container with #f75142 background */}
+      <div className="bg-[#f75142] text-white px-6 sm:px-12 pt-8 sm:pt-10 pb-10 border-t border-[#f75142]">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 pb-10 border-b border-white/20">
+            {/* Brand & Overview column */}
+            <div className="md:col-span-5 space-y-4">
               <div className="flex items-center gap-3">
-                <QuessuaMunicipalLogo size={42} />
+                <div className="w-11 h-11 rounded-xl bg-[#002133] border border-white/10 flex items-center justify-center shadow-md shrink-0">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
                 <div>
-                  <span className="text-lg font-extrabold tracking-tight text-white block leading-none">
-                    SIGRE Angola
-                  </span>
-                  <span className="text-xs font-semibold text-[#ff6a4a] tracking-wide uppercase mt-1 block">
-                    Direcção Municipal da Educação · Quêssua
+                  <div className="text-2xl font-black tracking-tight font-display text-white leading-none">
+                    Sig<span className="text-[#002133]">re</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-white/85 tracking-wider uppercase mt-1 block">
+                    Sistema Integrado de Gestão Escolar
                   </span>
                 </div>
               </div>
-
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-sm">
-                Plataforma Oficial de Gestão Escolar, Controlo de Efectividade, Cadastramento de Pessoal Docente e Estatísticas Educacionais do Município de Quêssua, Província de Malanje.
-              </p>
-
-              <div className="pt-1 flex flex-col gap-1.5 text-xs text-slate-300">
-                <span className="inline-flex items-center gap-2">
-                  <Building2 className="w-3.5 h-3.5 text-[#ff6a4a] shrink-0" />
-                  Administração Municipal de Quêssua — Malanje, Angola
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-[#ff6a4a] shrink-0" />
-                  dme.quessua@med.gov.ao
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <Phone className="w-3.5 h-3.5 text-[#ff6a4a] shrink-0" />
-                  Linha Institucional de Apoio às Escolas
-                </span>
-              </div>
             </div>
 
-            {/* Institutional Navigation */}
-            <div className="lg:col-span-3 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#ff6a4a]">
-                Plataforma & Rede Escolar
-              </h3>
-              <ul className="space-y-2.5 text-xs sm:text-sm text-slate-300">
+            {/* Institucional column */}
+            <div className="md:col-span-3 space-y-3.5">
+              <h4 className="text-xs font-black tracking-widest uppercase text-white/95 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                Institucional
+              </h4>
+              <ul className="space-y-2 text-sm">
                 <li>
                   <button
-                    type="button"
-                    onClick={onOpenAbout}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Info className="w-3.5 h-3.5 text-white/60" />
-                    Sobre a Plataforma SIGRE
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
+                    id="footer-link-casos-sucesso"
                     onClick={handleCases}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
+                    className="text-white/85 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-2 group py-0.5"
                   >
-                    <Award className="w-3.5 h-3.5 text-white/60" />
-                    Casos de Impacto Municipal
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={handleMaps}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <MapPin className="w-3.5 h-3.5 text-white/60" />
-                    Mapeamento das 28 Escolas
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={handleFAQ}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <HelpCircle className="w-3.5 h-3.5 text-white/60" />
-                    Perguntas Frequentes (FAQ)
+                    <span className="w-1 h-1 rounded-full bg-[#002133] group-hover:bg-white transition-colors"></span>
+                    <span className="font-medium text-white">Casos de Sucesso Escolar</span>
                   </button>
                 </li>
               </ul>
             </div>
 
-            {/* Governance, Privacy & Compliance */}
-            <div className="lg:col-span-3 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#ff6a4a]">
-                Governança & Conformidade
-              </h3>
-              <ul className="space-y-2.5 text-xs sm:text-sm text-slate-300">
-                <li>
-                  <button
-                    type="button"
-                    onClick={onOpenTerms}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-white/60" />
-                    Termos de Utilização
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={handlePrivacy}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-white/60" />
-                    Política de Privacidade (APD)
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={handleSecurity}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 text-white/60" />
-                    Segurança & Protecção de Dados
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={handleCookies}
-                    className="inline-flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Cookie className="w-3.5 h-3.5 text-white/60" />
-                    Preferências de Cookies
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            {/* Technical Support & Direct Assistance */}
-            <div className="lg:col-span-2 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#ff6a4a]">
-                Suporte Técnico
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Precisa de assistência com emissão de documentos A4, mapas de efectividade ou registo escolar?
-              </p>
-              <button
-                id="footer-link-contact"
-                type="button"
-                onClick={handleSupport}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#f75142] hover:bg-[#ff6a4a] text-white text-xs font-bold shadow-md transition-all cursor-pointer"
-              >
-                <HeadphonesIcon className="w-4 h-4" />
-                Central de Apoio
-              </button>
+            {/* Suporte & Contacto column */}
+            <div className="md:col-span-4 space-y-3.5">
+              <h4 className="text-xs font-black tracking-widest uppercase text-white/95 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                Suporte & Apoio
+              </h4>
+              
+              <div className="space-y-3">
+                <button
+                  id="footer-link-contact"
+                  onClick={handleSupport}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold uppercase tracking-wider text-white transition-all cursor-pointer flex items-center justify-center sm:justify-start gap-2.5 shadow-xs"
+                >
+                  <HelpCircle className="w-4 h-4 text-white" />
+                  <span>Central de Apoio Sigre</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Bottom Copyright Bar */}
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-            <p>
-              © {new Date().getFullYear()} SIGRE Angola · Direcção Municipal da Educação de Quêssua. Todos os direitos reservados.
-            </p>
-            <div className="flex items-center gap-4 text-[11px] text-slate-400">
-              <span>República de Angola · Ministério da Educação</span>
+          {/* Bottom Bar: aligned, scannable & balanced */}
+          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/85">
+            <div className="text-center sm:text-left space-y-0.5">
+              <p className="tracking-normal font-normal">
+                © 2026 <strong className="text-white font-bold">Sigre Angola</strong>. Todos os direitos reservados.
+              </p>
+              <p className="text-[11px] text-white/70">
+                Ministério da Educação • Direcções Municipais e Gabinetes Provinciais
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 font-medium">
+              <button
+                onClick={onOpenTerms}
+                className="hover:text-white transition-colors cursor-pointer text-white/85"
+              >
+                Termos
+              </button>
+              <span className="text-white/30 hidden sm:inline">•</span>
+              <button
+                onClick={handlePrivacy}
+                className="hover:text-white transition-colors cursor-pointer text-white/85"
+              >
+                Privacidade
+              </button>
+              <span className="text-white/30 hidden sm:inline">•</span>
+              <button
+                onClick={handleSecurity}
+                className="hover:text-white transition-colors cursor-pointer text-white/85"
+              >
+                Segurança
+              </button>
+              <span className="text-white/30 hidden sm:inline">•</span>
+              <button
+                onClick={handleCookies}
+                className="hover:text-white transition-colors cursor-pointer text-white/85 flex items-center gap-1"
+              >
+                <Cookie className="w-3 h-3 text-white/70" />
+                <span>Cookies</span>
+              </button>
             </div>
           </div>
         </div>

@@ -164,88 +164,117 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
   };
 
   return (
-    <div id="admin-teachers-page" className="w-full min-h-screen bg-[#FAFAFA]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {/* Cabeçalho Minimalista */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/70 pb-5">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Corpo Docente & Quotas</h1>
-            <p className="text-sm text-slate-500">
-              Cadastro Oficial de Docentes e Matriz de Homologação Municipal (2026/2027).
-            </p>
+    <div id="admin-teachers-page" className="w-full min-h-screen bg-[#f7f3f3]">
+      {/* Hero Header */}
+      <Hero
+        onOpenGetStarted={onOpenGetStarted}
+        isLoggedIn={isLoggedIn}
+        customTitle="Meus Professores"
+        customSubtitle="Cadastro Oficial de Docentes e Matriz de Homologação Municipal"
+      />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Security Hierarchy Banner */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-[#fef2f1] to-white border border-[#fee4e2] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#f75142] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-slate-900 text-xs sm:text-sm">
+                  Novo Modelo Oficial de Cadastro de Professores
+                </span>
+              </div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingTeacherData(null);
-              setPreselectedSchoolName(schoolFilter !== 'all' ? schoolFilter : (availableSchools[0] || ''));
-              setIsRegisterModalOpen(true);
-            }}
-            className="px-4 py-2 rounded-lg bg-[#e11d48] text-white text-xs font-medium hover:bg-[#be123c] transition self-start sm:self-auto cursor-pointer"
-          >
-            + Novo Cadastro Docente
-          </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setEditingTeacherData(null);
+                setPreselectedSchoolName(schoolFilter !== 'all' ? schoolFilter : (availableSchools[0] || ''));
+                setIsRegisterModalOpen(true);
+              }}
+              className="px-4 py-1.5 bg-[#f75142] hover:bg-[#e04436] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Cadastro</span>
+            </button>
+          </div>
         </div>
 
-        {/* Resumo de Quotas num único bloco elegante em vez de vários cards aninhados */}
-        <div className="bg-white rounded-xl border border-slate-200/80 divide-y divide-slate-100">
-          <div className="p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div className="space-y-1 max-w-xl">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Controlo de Quotas Docentes por Escola
+        {/* Painel de Reconciliação de Pessoal Docente por Escola (Instrumento Complementar 2026/2027) */}
+        <div className="mb-6 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600" />
+                <span>Controlo de Quotas Docentes por Escola — Instrumento Complementar 2026/2027</span>
               </h3>
-              <p className="text-xs text-slate-500">
-                À medida que cada docente é cadastrado, o saldo pendente diminui automaticamente na planilha oficial da escola.
+              <p className="text-xs text-slate-500 mt-0.5">
+                O nº de docentes informado no cadastro da escola permanece como <strong>Pendente</strong>. À medida que cada docente é cadastrado, o saldo pendente diminui (ex: 32 → 31 → 30) e o docente entra na planilha oficial.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-8 border-t lg:border-t-0 pt-4 lg:pt-0 border-slate-100 w-full lg:w-auto justify-between lg:justify-end">
-              <div>
-                <span className="text-xs text-slate-400 block">Declarados</span>
-                <span className="text-xl font-semibold text-slate-900 tabular-nums">
-                  {totalDeclaredAllSchools}
-                </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-slate-500">Declarados</span>
+                <span className="text-sm font-black text-slate-900">{totalDeclaredAllSchools}</span>
               </div>
-              <div>
-                <span className="text-xs text-slate-400 block">Na Planilha</span>
-                <span className="text-xl font-semibold text-emerald-600 tabular-nums">
-                  {totalRegisteredAllSchools}
-                </span>
+              <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-emerald-700">Cadastrados (Planilha)</span>
+                <span className="text-sm font-black text-emerald-800">{totalRegisteredAllSchools}</span>
               </div>
-              <div>
-                <span className="text-xs text-slate-400 block">Pendentes (Faltam)</span>
-                <span className="text-xl font-semibold text-amber-600 tabular-nums">
-                  {totalPendingAllSchools}
-                </span>
+              <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                <span className="block text-[9px] font-bold uppercase text-amber-800">Pendentes</span>
+                <span className="text-sm font-black text-amber-900">{totalPendingAllSchools}</span>
               </div>
-              {schoolQuotaList[0] && (
-                <div className="pl-4 border-l border-slate-100">
-                  <div className="text-xs font-medium text-slate-800">
-                    {schoolQuotaList[0].school.name}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingTeacherData(null);
-                      setPreselectedSchoolName(schoolQuotaList[0].school.name);
-                      setIsRegisterModalOpen(true);
-                    }}
-                    className="text-xs text-[#e11d48] hover:underline mt-0.5 cursor-pointer"
-                  >
-                    + Cadastrar nesta escola
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
-          {schoolQuotaList.length > 1 && (
-            <div className="px-6 py-3 bg-slate-50/50 flex flex-wrap items-center gap-4 text-xs">
-              {schoolQuotaList.map(({ school, quota }) => (
-                <div key={school.id} className="flex items-center gap-2 text-slate-600">
-                  <span className="font-medium text-slate-800">{school.name}:</span>
-                  <span className="tabular-nums">
-                    {quota.registeredCount}/{quota.declaredTotal} ({quota.pendingCount} pend.)
-                  </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {schoolQuotaList.map(({ school, quota }) => (
+              <div
+                key={school.id}
+                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white transition flex flex-col justify-between gap-2.5"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-900 leading-snug line-clamp-1">
+                      {school.name}
+                    </h4>
+                    <span
+                      className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                        quota.pendingCount > 0
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      }`}
+                    >
+                      {quota.pendingCount > 0 ? `${quota.pendingCount} Pendentes` : 'Concluído'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 mt-2.5 text-center">
+                    <div className="bg-white rounded-lg py-1 px-1.5 border border-slate-200/80">
+                      <span className="block text-[9px] uppercase text-slate-400 font-bold">Declarados</span>
+                      <span className="text-xs font-black text-slate-800">{quota.declaredTotal}</span>
+                    </div>
+                    <div className="bg-emerald-50/70 rounded-lg py-1 px-1.5 border border-emerald-200/80">
+                      <span className="block text-[9px] uppercase text-emerald-700 font-bold">Na Planilha</span>
+                      <span className="text-xs font-black text-emerald-800">{quota.registeredCount}</span>
+                    </div>
+                    <div className="bg-amber-50/80 rounded-lg py-1 px-1.5 border border-amber-200/80">
+                      <span className="block text-[9px] uppercase text-amber-800 font-bold">Faltam</span>
+                      <span className="text-xs font-black text-amber-900">{quota.pendingCount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full transition-all"
+                      style={{ width: `${quota.progressPercent}%` }}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -253,23 +282,28 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                       setPreselectedSchoolName(school.name);
                       setIsRegisterModalOpen(true);
                     }}
-                    className="text-[#e11d48] hover:underline cursor-pointer"
+                    className="text-[11px] font-bold text-[#f75142] hover:underline cursor-pointer shrink-0 flex items-center gap-0.5"
                   >
-                    + Cadastrar
+                    <Plus className="w-3 h-3" />
+                    <span>Cadastrar Docente</span>
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Barra de Filtros e Pesquisa Limpa */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        {/* Filter and Action Bar */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mb-6 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          {/* Filters */}
           <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Filtros:</span>
+            
+            {/* School Filter */}
             <select
               value={schoolFilter}
               onChange={(e) => setSchoolFilter(e.target.value)}
-              className="bg-white text-slate-700 text-xs py-2 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 cursor-pointer"
+              className="bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
             >
               <option value="all">Todas as Escolas ({availableSchools.length})</option>
               {availableSchools.map((school) => (
@@ -279,37 +313,40 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
               ))}
             </select>
 
+            {/* Natureza Filter */}
             <select
               value={naturezaFilter}
               onChange={(e) => setNaturezaFilter(e.target.value)}
-              className="bg-white text-slate-700 text-xs py-2 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 cursor-pointer"
+              className="bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer"
             >
-              <option value="all">Natureza: Todas</option>
+              <option value="all">Todas as Naturezas</option>
               <option value="Pública">Pública</option>
               <option value="Público-Privada">Público-Privada</option>
               <option value="Privada">Privada</option>
             </select>
 
+            {/* Formação Pedagógica Filter */}
             <select
               value={formacaoFilter}
               onChange={(e) => setFormacaoFilter(e.target.value)}
-              className="bg-white text-slate-700 text-xs py-2 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 cursor-pointer max-w-xs truncate"
+              className="bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer max-w-xs truncate"
             >
-              <option value="all">Classificação: Todas</option>
+              <option value="all">Todas as Classificações</option>
               <option value="Com magistério e com IMNE completo">Com magistério e com IMNE</option>
               <option value="Sem Magistério e com formação Pedagógica">Sem Magistério e com Formação</option>
               <option value="Sem Magistério e sem Formação pedagógica">Sem Magistério e sem Formação</option>
             </select>
           </div>
 
-          <div className="relative flex-1 lg:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Filtrar por nome, BI/NIF ou disciplina..."
-              className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-900"
+              placeholder="Pesquisar por nome, BI/NIF, escola ou disciplina..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f75142]"
             />
           </div>
         </div>

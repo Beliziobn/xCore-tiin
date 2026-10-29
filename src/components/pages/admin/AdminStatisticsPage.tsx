@@ -1,9 +1,29 @@
 import React, { useState, useMemo } from 'react';
+import { Hero } from '../../Hero';
 import type { AdminSchool, AdminTeacher, AdminStudent, AdminDirector } from '../../../types';
-import { exportConsolidatedExcel } from '../../../utils/excelExport';
+import { 
+  historicalSchoolPerformance, 
+  historicalAttendanceTrends 
+} from '../../../data/adminData';
+import { StatCardItem } from '../../StatCardItem';
+import { GenderDonutChart } from '../../charts/GenderDonutChart';
+import { PerformanceBarChart } from '../../charts/PerformanceBarChart';
+import { AttendanceAreaChart } from '../../charts/AttendanceAreaChart';
+import { DocumentStatusChart } from '../../charts/DocumentStatusChart';
+import {
+  exportConsolidatedExcel,
+  exportTeachersExcel,
+  exportDirectorsExcel,
+  exportStudentsExcel,
+  getUnifiedSystemDataset,
+  exportOfficialSigeExcel,
+  exportStandaloneSigeHtml,
+} from '../../../utils/excelExport';
+import { AdminAdvancedFilter } from './AdminAdvancedFilter';
 import type { AdvancedFilterCriteria } from '../../../types/filterTypes';
 import { defaultFilterCriteria } from '../../../types/filterTypes';
 import { applyAdvancedFilters } from '../../../utils/statisticsFilter';
+import { Download, FileSpreadsheet, Globe, ShieldCheck, Lock } from 'lucide-react';
 import { SigeOfficialViewerModal } from '../../sige/SigeOfficialViewerModal';
 
 interface AdminStatisticsPageProps {
@@ -23,6 +43,7 @@ interface AdminStatisticsPageProps {
 }
 
 export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
+  onOpenGetStarted,
   onNavigateToSchools,
   onNavigateToTeachers,
   onNavigateToStudents,
@@ -32,45 +53,82 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
   directors = [],
   onOpenExcelExport,
   onOpenGoogleSheets,
+  onOpenAuditLogs,
+  isLoggedIn,
 }) => {
+  // Advanced Multi-Criteria Filter State
   const [filters, setFilters] = useState<AdvancedFilterCriteria>(defaultFilterCriteria);
   const [isExporting, setIsExporting] = useState(false);
   const [isSigeViewerOpen, setIsSigeViewerOpen] = useState(false);
 
+  // Apply real-time multi-dimensional filters
   const filterStats = useMemo(() => {
     return applyAdvancedFilters(schools, teachers, students, directors, filters);
   }, [schools, teachers, students, directors, filters]);
 
+  // Remove individual chip
+  const handleRemoveChip = (key: string) => {
+    if (key === 'schools') {
+      setFilters((prev) => ({ ...prev, schools: ['all'], gradeClass: 'all', turma: 'all' }));
+    } else if (key === 'periodType') {
+      setFilters((prev) => ({ ...prev, periodType: 'anual', periodDetail: 'Ano Completo' }));
+    } else if (key in defaultFilterCriteria) {
+      setFilters((prev) => ({ ...prev, [key]: (defaultFilterCriteria as any)[key] }));
+    }
+  };
+
+  const handleResetFilters = () => {
+    setFilters(defaultFilterCriteria);
+  };
+
+  // Compute live real statistics dynamically from filtered dataset!
   const totalStudents = filterStats.totalStudents;
   const totalTeachers = filterStats.totalTeachers;
   const totalSchools = filterStats.totalSchools;
+  const totalDirectors = filterStats.totalDirectors;
   const uniqueTurmas = filterStats.uniqueTurmasCount;
 
+  // Gender counts directly from filtered students
+  const femaleStudentsCount = useMemo(() => {
+    return filterStats.filteredStudents.filter((s) => s.gender === 'F').length;
+  }, [filterStats.filteredStudents]);
+
+  const maleStudentsCount = useMemo(() => {
+    return filterStats.filteredStudents.filter((s) => s.gender === 'M').length;
+  }, [filterStats.filteredStudents]);
+
+  // Documents by gender from filtered students
   const totalStudentsWithDocs = useMemo(() => {
     return filterStats.filteredStudents.filter((s) => s.hasDocuments).length;
   }, [filterStats.filteredStudents]);
 
   const totalStudentsWithoutDocs = Math.max(0, totalStudents - totalStudentsWithDocs);
 
-  const docRegularizedPercent = useMemo(() => {
-    if (totalStudents > 0) {
-      return Math.round((totalStudentsWithDocs / totalStudents) * 100);
-    }
-    return 100;
-  }, [totalStudents, totalStudentsWithDocs]);
+  const femaleWithDocs = useMemo(() => {
+    return filterStats.filteredStudents.filter((s) => s.gender === 'F' && s.hasDocuments).length;
+  }, [filterStats.filteredStudents]);
 
+  const maleWithDocs = useMemo(() => {
+    return filterStats.filteredStudents.filter((s) => s.gender === 'M' && s.hasDocuments).length;
+  }, [filterStats.filteredStudents]);
+
+  const femaleWithoutDocs = Math.max(0, femaleStudentsCount - femaleWithDocs);
+  const maleWithoutDocs = Math.max(0, maleStudentsCount - maleWithDocs);
+
+  // Attendance rate for filtered cohort
   const averageAttendanceRate = useMemo(() => {
     if (filterStats.filteredStudents.length > 0) {
       const sum = filterStats.filteredStudents.reduce((acc, s) => acc + (s.presenceRate || 95), 0);
-      return Number((sum / filterStats.filteredStudents.length).toFixed(0));
+      return Number((sum / filterStats.filteredStudents.length).toFixed(1));
     }
     if (filterStats.filteredSchools.length > 0) {
       const sum = filterStats.filteredSchools.reduce((acc, s) => acc + s.attendanceRate, 0);
-      return Number((sum / filterStats.filteredSchools.length).toFixed(0));
+      return Number((sum / filterStats.filteredSchools.length).toFixed(1));
     }
     return 0;
   }, [filterStats.filteredStudents, filterStats.filteredSchools]);
 
+  // Overall approval rate for filtered cohort
   const overallApprovalRate = useMemo(() => {
     if (filterStats.filteredStudents.length > 0) {
       const passing = filterStats.filteredStudents.filter((s) => {
@@ -86,28 +144,49 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
     return 0;
   }, [filterStats.filteredStudents, filterStats.filteredSchools]);
 
-  const distinctionCount = useMemo(() => {
-    if (filterStats.filteredStudents.length === 0) return 20;
-    return filterStats.filteredStudents.filter((s) => (s.performanceScore || 0) >= 16).length;
-  }, [filterStats.filteredStudents]);
+  // Performance Chart Data adapted for filter period & scope
+  const performanceChartData = useMemo(() => {
+    const approval = overallApprovalRate;
+    const reproval = approval > 0 ? Math.max(0, 100 - approval) : 0;
 
-  const regularCount = useMemo(() => {
-    if (filterStats.filteredStudents.length === 0) return 21;
-    return filterStats.filteredStudents.filter(
-      (s) => (s.performanceScore || 0) >= 10 && (s.performanceScore || 0) < 16
-    ).length;
-  }, [filterStats.filteredStudents]);
-
-  const recoveryCount = useMemo(() => {
-    if (filterStats.filteredStudents.length === 0) return 5;
-    return filterStats.filteredStudents.filter((s) => (s.performanceScore || 0) < 10).length;
-  }, [filterStats.filteredStudents]);
-
-  const handleExportFilteredAll = () => {
-    if (onOpenExcelExport) {
-      onOpenExcelExport();
-      return;
+    if (filters.periodType === 'trimestre') {
+      return [
+        { period: '1º Trimestre', aprovacao: Math.min(100, Math.round(approval * 0.94)), reprovacao: approval > 0 ? Math.max(0, 100 - Math.round(approval * 0.94)) : 0 },
+        { period: '2º Trimestre', aprovacao: Math.min(100, Math.round(approval * 0.98)), reprovacao: approval > 0 ? Math.max(0, 100 - Math.round(approval * 0.98)) : 0 },
+        { period: '3º Trimestre', aprovacao: approval, reprovacao: reproval },
+      ];
     }
+    if (filters.periodType === 'semestre') {
+      return [
+        { period: '1º Semestre', aprovacao: Math.min(100, Math.round(approval * 0.95)), reprovacao: approval > 0 ? Math.max(0, 100 - Math.round(approval * 0.95)) : 0 },
+        { period: '2º Semestre', aprovacao: approval, reprovacao: reproval },
+      ];
+    }
+    // Default historical trend scaled to current filter
+    return historicalSchoolPerformance.slice(0, 6).map((item) => {
+      const blendedApproval = approval > 0 ? Math.min(100, Math.round((item.aprovacao + approval) / 2)) : 0;
+      return {
+        period: item.period,
+        aprovacao: blendedApproval,
+        reprovacao: blendedApproval > 0 ? Math.max(0, 100 - blendedApproval) : 0,
+      };
+    });
+  }, [filters.periodType, overallApprovalRate]);
+
+  // Attendance Chart Data adapted for filter scope
+  const attendanceChartData = useMemo(() => {
+    const curPresencial = averageAttendanceRate;
+    const curEad = curPresencial > 0 ? Math.min(100, Math.round(curPresencial * 0.73)) : 0;
+
+    return historicalAttendanceTrends.map((t) => ({
+      year: t.year,
+      presencial: curPresencial > 0 ? Math.min(100, Math.round((t.presencial * 5.0 + curPresencial) / 2)) : 0,
+      ead: curEad > 0 ? Math.min(100, Math.round((t.ead * 2.8 + curEad) / 2)) : 0,
+    }));
+  }, [averageAttendanceRate]);
+
+  // Export filtered datasets
+  const handleExportFilteredAll = () => {
     setIsExporting(true);
     setTimeout(() => {
       const dateTag = new Date().toISOString().substring(0, 10);
@@ -124,241 +203,152 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
         filename
       );
       setIsExporting(false);
-    }, 300);
+    }, 350);
   };
 
   return (
-    <div id="admin-statistics-page" className="w-full min-h-screen bg-[#FAFAFA]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {/* Cabeçalho Minimalista */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/70 pb-5">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Análise Estatística & Metas</h1>
-            <p className="text-sm text-slate-500">
-              Indicadores sincronizados de rendimento, assiduidade e documentação.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setIsSigeViewerOpen(true)}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition cursor-pointer"
-            >
-              Planilha SIGE
-            </button>
-            <button
-              type="button"
-              onClick={handleExportFilteredAll}
-              disabled={isExporting}
-              className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition cursor-pointer"
-            >
-              {isExporting ? 'A exportar...' : 'Exportar Planilha (.xlsx)'}
-            </button>
-          </div>
+    <div id="admin-statistics-page" className="w-full min-h-screen bg-[#f7f3f3]">
+      {/* Hero Header: "Analisa as suas estatísticas" matching 9.png */}
+      <Hero
+        onOpenGetStarted={onOpenGetStarted}
+        isLoggedIn={isLoggedIn}
+        customTitle="Analisa as suas estatísticas"
+        customSubtitle=""
+      />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Advanced Interactive Filtering System */}
+        <AdminAdvancedFilter
+          schools={schools}
+          teachers={teachers}
+          students={students}
+          filters={filters}
+          onFilterChange={setFilters}
+          onResetFilters={handleResetFilters}
+          feedbackText={filterStats.feedbackText}
+          activeFilterCount={filterStats.activeFilterCount}
+          activeChips={filterStats.activeChips}
+          onRemoveChip={handleRemoveChip}
+          onExportFilteredExcel={handleExportFilteredAll}
+          isExporting={isExporting}
+        />
+
+        {/* Metric Cards featuring harmonious equal-height cards with Filter Context */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-5xl mx-auto mb-14 items-stretch">
+          <StatCardItem
+            id="admin-stat-card-alunos"
+            card={{
+              id: 'alunos',
+              title: 'Nº Alunos',
+              value: String(totalStudents),
+              subtitle: `${totalStudents} alunos · ${filterStats.contextLabel}`,
+              icon: 'users',
+              isClickable: true,
+              actionText: 'Ver alunos',
+            }}
+            onSelect={onNavigateToStudents}
+          />
+          <StatCardItem
+            id="admin-stat-card-turmas"
+            card={{
+              id: 'turmas',
+              title: 'Nº Turmas',
+              value: String(uniqueTurmas),
+              subtitle: `${uniqueTurmas} turmas · ${filterStats.contextLabel}`,
+              icon: 'home',
+              isClickable: false,
+            }}
+          />
+          <StatCardItem
+            id="admin-stat-card-escolas"
+            card={{
+              id: 'escolas',
+              title: 'Escolas',
+              value: String(totalSchools),
+              subtitle: `${totalSchools} escola${totalSchools === 1 ? '' : 's'} · ${filterStats.contextLabel}`,
+              icon: 'home',
+              isClickable: true,
+              actionText: 'Ver escolas',
+            }}
+            onSelect={onNavigateToSchools}
+          />
+          <StatCardItem
+            id="admin-stat-card-professores"
+            card={{
+              id: 'professores',
+              title: 'Professores',
+              value: String(totalTeachers),
+              subtitle: `${totalTeachers} professores · ${filterStats.contextLabel}`,
+              icon: 'user',
+              isClickable: true,
+              actionText: 'Ver professores',
+            }}
+            onSelect={onNavigateToTeachers}
+          />
         </div>
 
-        {/* Barra de Filtros Horizontal Compacta (Substitui o bloco gigante de filtros) */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div>
-            <label className="text-[11px] font-medium text-slate-400">Escola</label>
-            <select
-              value={filters.schools[0] || 'all'}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  schools: e.target.value === 'all' ? ['all'] : [e.target.value],
-                }))
-              }
-              className="w-full mt-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900"
-            >
-              <option value="all">
-                Toda a Rede ({schools.length} {schools.length === 1 ? 'Escola' : 'Escolas'})
-              </option>
-              {schools.map((s) => (
-                <option key={s.id} value={s.name}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+        {/* Dynamic Analytics Grid with Animated Interactive Charts Updated by the Filters */}
+        <div className="space-y-8">
+          {/* Row 1: [Alunos - Donut], [Desempenho - Colunas], [Presença - Área] */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            {/* Chart 1: [Alunos] (Gênero) */}
+            <GenderDonutChart
+              femaleCount={femaleStudentsCount}
+              maleCount={maleStudentsCount}
+              totalCount={totalStudents}
+              title="Corpo Discente por Gênero"
+              badgeText="Alunos"
+              subtitle={`Total: ${totalStudents.toLocaleString('pt-PT')} estudantes (${filterStats.contextLabel})`}
+            />
+
+            {/* Chart 2: [Desempenho das escolas] (Historical Approvals vs Reprovals) */}
+            <PerformanceBarChart
+              data={performanceChartData}
+              title="Desempenho Acadêmico"
+              badgeText="Desempenho"
+              subtitle={`Taxa de aprovação e reprovação (${filterStats.contextLabel})`}
+              targetRate={80}
+            />
+
+            {/* Chart 3: [Presença] (Área Suave com Gradientes) */}
+            <AttendanceAreaChart
+              data={attendanceChartData}
+              title="Presença & Assiduidade"
+              badgeText="Presença"
+              subtitle={`Presença média: ${averageAttendanceRate}% (${filterStats.contextLabel})`}
+              averageRate={averageAttendanceRate}
+            />
           </div>
 
-          <div>
-            <label className="text-[11px] font-medium text-slate-400">Ano Letivo</label>
-            <select
-              value={filters.academicYear}
-              onChange={(e) => setFilters((prev) => ({ ...prev, academicYear: e.target.value }))}
-              className="w-full mt-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900"
-            >
-              <option value="2026">2026 / 2027 (Corrente)</option>
-              <option value="2025">2025 / 2026</option>
-              <option value="2024">2024 / 2025</option>
-            </select>
-          </div>
+          {/* Row 2: Regularização Documental Global & Diagnóstico Prioritário */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+            {/* Chart 4: [Alunos com documentos - Donut de Regularidade Civil] */}
+            <DocumentStatusChart
+              totalWithDocs={totalStudentsWithDocs}
+              totalWithoutDocs={totalStudentsWithoutDocs}
+              femaleWithDocs={femaleWithDocs}
+              maleWithDocs={maleWithDocs}
+              femaleWithoutDocs={femaleWithoutDocs}
+              maleWithoutDocs={maleWithoutDocs}
+              title="Cidadania & Registo Civil"
+              badgeText="Alunos com documentos"
+              subtitle={`Proporção regularizada (${filterStats.contextLabel})`}
+              isFocusWithoutDocs={false}
+            />
 
-          <div>
-            <label className="text-[11px] font-medium text-slate-400">Período</label>
-            <select
-              value={filters.periodType}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  periodType: e.target.value as any,
-                  periodDetail: e.target.value === 'anual' ? 'Ano Completo' : '1º Trimestre',
-                }))
-              }
-              className="w-full mt-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900"
-            >
-              <option value="anual">Anual (Completo)</option>
-              <option value="trimestre">Trimestral</option>
-              <option value="semestre">Semestral</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-medium text-slate-400">Modalidade</label>
-            <select
-              value={filters.modality}
-              onChange={(e) => setFilters((prev) => ({ ...prev, modality: e.target.value as any }))}
-              className="w-full mt-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900"
-            >
-              <option value="all">Todas (Presencial & EAD)</option>
-              <option value="presencial">Presencial</option>
-              <option value="ead">Ensino a Distância (EAD)</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Faixa de Resumo Quantitativo Contínua */}
-        <div className="bg-white rounded-xl border border-slate-200/80 grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-          <div className="p-5">
-            <span className="text-xs text-slate-400 font-medium">Escolas Filtradas</span>
-            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
-              {totalSchools}
-            </div>
-            <button
-              type="button"
-              onClick={onNavigateToSchools}
-              className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-1.5 inline-block cursor-pointer"
-            >
-              Ver escolas →
-            </button>
-          </div>
-
-          <div className="p-5">
-            <span className="text-xs text-slate-400 font-medium">Professores</span>
-            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
-              {totalTeachers}
-            </div>
-            <button
-              type="button"
-              onClick={onNavigateToTeachers}
-              className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-1.5 inline-block cursor-pointer"
-            >
-              Ver professores →
-            </button>
-          </div>
-
-          <div className="p-5">
-            <span className="text-xs text-slate-400 font-medium">Alunos Matriculados</span>
-            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
-              {totalStudents}
-            </div>
-            <button
-              type="button"
-              onClick={onNavigateToStudents}
-              className="text-[11px] text-slate-500 hover:text-[#e11d48] mt-1.5 inline-block cursor-pointer"
-            >
-              Ver alunos →
-            </button>
-          </div>
-
-          <div className="p-5">
-            <span className="text-xs text-slate-400 font-medium">Turmas Ativas</span>
-            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">
-              {uniqueTurmas}
-            </div>
-            <span className="text-[11px] text-slate-400 mt-1.5 block">
-              {filterStats.contextLabel}
-            </span>
-          </div>
-        </div>
-
-        {/* Grelha de 3 Cartões Executivos de Leitura Direta (Sem gráficos circulares vazios poluídos) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* 1. Desempenho Académico */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/80 flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-400">Desempenho Académico</span>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-semibold text-slate-900 tabular-nums">
-                  {overallApprovalRate}%
-                </span>
-                <span className="text-xs text-[#e11d48] font-medium">Meta: 80%</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Taxa de aprovação consolidada no período 2026.1.
-              </p>
-            </div>
-            <div className="pt-4 mt-6 border-t border-slate-100 flex justify-between text-xs text-slate-500 tabular-nums">
-              <span>
-                Distinção: <strong className="text-slate-800">{distinctionCount}</strong>
-              </span>
-              <span>
-                Regular: <strong className="text-slate-800">{regularCount}</strong>
-              </span>
-              <span>
-                Recuperação: <strong className="text-[#e11d48]">{recoveryCount}</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* 2. Assiduidade Semanal */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/80 flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-400">Assiduidade Semanal</span>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-semibold text-slate-900 tabular-nums">
-                  {averageAttendanceRate}%
-                </span>
-                <span className="text-xs text-emerald-600 font-medium">Meta: 95%</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Média de presença diária registada nas turmas ativas.
-              </p>
-            </div>
-            <div className="pt-4 mt-6 border-t border-slate-100 flex justify-between text-xs text-slate-400 tabular-nums">
-              <span>Seg: —</span>
-              <span>Ter: —</span>
-              <span>Qua: —</span>
-              <span className="text-slate-800 font-medium">Qui: {averageAttendanceRate}%</span>
-              <span>Sex: —</span>
-            </div>
-          </div>
-
-          {/* 3. Cidadania & Registo Civil */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/80 flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-medium text-slate-400">Cidadania & Registo Civil</span>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-semibold text-slate-900 tabular-nums">
-                  {docRegularizedPercent}%
-                </span>
-                <span className="text-xs text-amber-600 font-medium">
-                  {totalStudentsWithoutDocs > 0 ? `${totalStudentsWithoutDocs} Pendentes` : 'Pendentes'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Proporção de alunos com documentação validada na rede.
-              </p>
-            </div>
-            <div className="pt-4 mt-6 border-t border-slate-100 flex justify-between text-xs text-slate-500 tabular-nums">
-              <span>
-                Validados: <strong className="text-slate-800">{totalStudentsWithDocs}</strong>
-              </span>
-              <span>
-                Pendentes: <strong className="text-slate-800">{totalStudentsWithoutDocs}</strong>
-              </span>
-            </div>
+            {/* Chart 5: [Alunos sem documentos - Colunas de Intervenção Prioritária] */}
+            <DocumentStatusChart
+              totalWithDocs={totalStudentsWithDocs}
+              totalWithoutDocs={totalStudentsWithoutDocs}
+              femaleWithDocs={femaleWithDocs}
+              maleWithDocs={maleWithDocs}
+              femaleWithoutDocs={femaleWithoutDocs}
+              maleWithoutDocs={maleWithoutDocs}
+              title="Apoio Social & Regularização"
+              badgeText="Alunos sem documentos"
+              subtitle={`Decomposição por gênero de alunos pendentes (${filterStats.contextLabel})`}
+              isFocusWithoutDocs={true}
+            />
           </div>
         </div>
       </div>

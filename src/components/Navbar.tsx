@@ -231,8 +231,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 p-1.5 flex items-center justify-center shadow-[0_4px_12px_-2px_rgba(0,33,51,0.15)] group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
             <img src="/favicon.png" alt="SIGRE" className="w-7 h-7 object-contain" />
           </div>
-          <span className="text-2xl font-black tracking-tight text-[#002133] uppercase">
-            SIGRE
+          <span className="text-[11px] font-black tracking-tight text-[#002133] uppercase">
+            SIGRE - Quêssua
           </span>
         </button>
 
