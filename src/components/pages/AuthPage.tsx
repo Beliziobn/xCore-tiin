@@ -1308,16 +1308,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             {/* Context Message */}
             <div className="absolute bottom-0 inset-x-0 p-6 lg:p-8 text-white z-10 space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-[11px] font-bold tracking-wide uppercase text-white/90">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#f75142]" />
-                Rede de Ensino Integrada
-              </div>
               <h3 className="text-2xl lg:text-3xl font-bold tracking-tight text-white leading-tight">
                 A sua escola, mais conectada.
               </h3>
-              <p className="text-xs text-white/80 leading-relaxed font-normal pt-0.5">
-                Organização eficiente de turmas, docentes e rendimento escolar com a tecnologia Sigre.
-              </p>
             </div>
           </div>
 
@@ -1328,15 +1321,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             {forgotPasswordOpen ? (
               <div className="max-w-[420px] mx-auto w-full space-y-5">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#f75142] bg-[#fef2f1] px-3 py-1 rounded-full mb-2">
-                    Recuperação de Acesso
-                  </div>
                   <h2 className="text-2xl sm:text-3xl font-bold text-[#002133] tracking-tight">
                     Recuperar senha
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                    Indique o seu e-mail institucional para receber o link de redefinição.
-                  </p>
                 </div>
 
                 {forgotSuccess ? (
@@ -1393,15 +1380,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 
                 {/* Header with refined typography */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#f75142] bg-[#fef2f1] px-3 py-1 rounded-full mb-2">
-                    Acesso Institucional
-                  </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-[#002133] tracking-tight">
                     Bem-vindo à Central
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                    Introduza as suas credenciais para aceder à gestão escolar do Sigre.
-                  </p>
                 </div>
 
                 {/* Feedback Alerts */}
@@ -1564,15 +1545,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 
                 {/* Header */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#f75142] bg-[#fef2f1] px-3 py-1 rounded-full mb-2">
-                    Novo Cadastro
-                  </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-[#002133] tracking-tight">
                     Crie a sua conta
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                    Junte-se à plataforma Sigre para gerir turmas, notas e indicadores escolares.
-                  </p>
                 </div>
 
                 {/* Feedback Alerts */}

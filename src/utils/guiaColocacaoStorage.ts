@@ -122,7 +122,27 @@ export function getStoredGuiaColocacaoRecords(): GuiaColocacaoRecord[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      const defaultRecord: GuiaColocacaoRecord = {
+        id: 'guia-colocacao-default-1',
+        num: '045',
+        ano: '2026',
+        trat: 'M',
+        nome: 'Gilson José Cassengue',
+        cat: 'P.E.P.E.S.',
+        grau: 'Auxiliar 3º Grau',
+        agente: '88212320',
+        escola: 'Escola Primária nº 9 – 1 de Junho',
+        local: 'Quêssua',
+        data: getTodayIsoColocacao(),
+        dir: 'Belízio Miguel dos Santos António',
+        prov: 'Malanje',
+        mun: 'Quêssua',
+        criado: new Date().toISOString(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([defaultRecord]));
+      return [defaultRecord];
+    }
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {

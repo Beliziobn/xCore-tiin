@@ -1115,10 +1115,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #declaracao-servico-a4-sheet,
           #declaracao-servico-a4-sheet *,
           #guia-ferias-a4-sheet,
-          #guia-ferias-a4-sheet *,
+          #guia-ferias-a4-sheet *:not(.a4-underscore-divider),
           #guia-colocacao-a4-sheet,
-          #guia-colocacao-a4-sheet * {
+          #guia-colocacao-a4-sheet *:not(.a4-equals-divider) {
             font-family: 'Times New Roman', Times, serif !important;
+          }
+          .a4-equals-divider,
+          .a4-underscore-divider {
+            font-family: monospace !important;
+            color: #334155 !important;
           }
           #oficial-a4-sheet,
           #declaracao-servico-a4-sheet,

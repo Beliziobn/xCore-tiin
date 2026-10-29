@@ -874,10 +874,26 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
                         funções de professor.
                       </p>
 
+                      <p className="a4-equals-divider" style={{ lineHeight: 1.6, fontFamily: 'monospace', textAlign: 'center', letterSpacing: '2px', margin: '14px 0', fontSize: '13px', color: '#334155' }}>
+                        ========================================================================<br />
+                        ========================================================================<br />
+                        ========================================================================<br />
+                        ========================================================================<br />
+                        ========================================================================
+                      </p>
+
                       <p style={{ lineHeight: 1.5 }}>
                         Para que não lhe ponham impedimento, mandei passar a presente guia que
                         vai por mim assinada e autenticada com o carimbo a óleo, em uso nesta
                         Direcção.
+                      </p>
+
+                      <p className="a4-equals-divider" style={{ lineHeight: 1.6, fontFamily: 'monospace', textAlign: 'center', letterSpacing: '2px', margin: '14px 0', fontSize: '13px', color: '#334155' }}>
+                        ========================================================================<br />
+                        ========================================================================<br />
+                        ========================================================================<br />
+                        ========================================================================<br />
+                        ========================================================================
                       </p>
                     </div>
 

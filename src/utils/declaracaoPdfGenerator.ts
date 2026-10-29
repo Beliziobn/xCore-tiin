@@ -447,8 +447,15 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       box-sizing: border-box !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
+    }
+    body {
       font-family: 'Times New Roman', Times, serif !important;
       color: #000000 !important;
+    }
+    .a4-equals-divider,
+    .a4-underscore-divider {
+      font-family: monospace !important;
+      color: #334155 !important;
     }
     html, body {
       width: 210mm !important;
