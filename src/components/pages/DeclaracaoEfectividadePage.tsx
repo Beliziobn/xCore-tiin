@@ -1326,28 +1326,6 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       </span>
                     )}
                   </button>
-
-                  {isDirector && (
-                    <div className="mt-3 px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
-                      <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                        Documentos da Direção
-                      </p>
-                      <ul className="text-xs text-slate-600 space-y-1 font-medium">
-                        <li className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>Boletins de Notas</span>
-                        </li>
-                        <li className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>Matrículas e Frequências</span>
-                        </li>
-                        <li className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>Guias de Transferência</span>
-                        </li>
-                      </ul>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

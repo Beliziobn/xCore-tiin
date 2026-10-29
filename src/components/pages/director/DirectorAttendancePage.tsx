@@ -329,26 +329,7 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
       )}
 
       {/* Top Breadcrumb & Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200/80">
-        <div className="flex items-center gap-3">
-          {onBackToTeachers && (
-            <button
-              onClick={onBackToTeachers}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#f75142] bg-white hover:bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Voltar aos Professores</span>
-            </button>
-          )}
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <span>Livro de Ponto Docente</span>
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              {schoolName} • Diretor Geral: <strong>{directorName}</strong> • Gestão Escolar 2026
-            </p>
-          </div>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4 mb-6 pb-4 border-b border-slate-200/80">
 
         {/* Date Selector */}
         <div ref={calendarContainerRef} className="relative">
@@ -478,7 +459,6 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
             <Users className="w-4 h-4 text-slate-400" />
           </div>
           <p className="text-2xl font-black text-slate-900">{metrics.total}</p>
-          <span className="text-[11px] text-slate-500 font-medium">Corpo docente da escola</span>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-emerald-200/80 shadow-2xs bg-emerald-50/20">
@@ -487,9 +467,6 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="text-2xl font-black text-emerald-700">{metrics.presentes}</p>
-          <span className="text-[11px] text-emerald-600/90 font-bold">
-            {metrics.total > 0 ? Math.round((metrics.presentes / metrics.total) * 100) : 0}% em sala
-          </span>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-rose-200/80 shadow-2xs bg-rose-50/20">
@@ -498,9 +475,6 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
             <XCircle className="w-4 h-4 text-rose-600" />
           </div>
           <p className="text-2xl font-black text-rose-700">{metrics.faltas}</p>
-          <span className="text-[11px] text-rose-600/90 font-bold">
-            {metrics.total > 0 ? Math.round((metrics.faltas / metrics.total) * 100) : 0}% ausentes
-          </span>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
@@ -511,9 +485,6 @@ export const DirectorAttendancePage: React.FC<DirectorAttendancePageProps> = ({
           <p className={`text-2xl font-black ${metrics.pendentes > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
             {metrics.pendentes}
           </p>
-          <span className="text-[11px] text-slate-500 font-medium">
-            {metrics.pendentes === 0 ? 'Ponto 100% homologado' : 'Aguardando registro'}
-          </span>
         </div>
       </div>
 

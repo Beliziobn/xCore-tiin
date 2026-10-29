@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Filter, BookOpen, Layers, Users, ChevronDown, CheckCircle2, Award, Ban, AlertCircle, FileDown } from 'lucide-react';
 import { Hero } from '../../Hero';
-import { directorClassesData as initialClasses } from '../../../data/directorData';
+import { directorClassesData as initialClasses, directorTeachersData as initialTeachers } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import { TurmaStudentListPdfModal } from '../../modals/TurmaStudentListPdfModal';
-import type { DirectorClass } from '../../../types';
+import type { DirectorClass, DirectorTeacher } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
 import { getDisciplinasForClass, getGradingScaleForClass } from '../../../utils/miniPautaStorage';
 import { saveClassToFirestore } from '../../../utils/firestoreSync';
+import { assignResponsibleTeacherToClassTurma } from '../../../utils/teacherStorage';
 
 interface DirectorClassesPageProps {
   onOpenGetStarted: () => void;
@@ -39,6 +40,18 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [pdfModalClass, setPdfModalClass] = useState<string>('');
   const [pdfModalTurma, setPdfModalTurma] = useState<string>('');
+  const [redefineToast, setRedefineToast] = useState<string | null>(null);
+
+  const [schoolTeachers, setSchoolTeachers] = useState<DirectorTeacher[]>(() => {
+    try {
+      const raw = localStorage.getItem('ucore_director_teachers_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return initialTeachers;
+  });
 
   useEffect(() => {
     const handleSync = () => {
@@ -48,11 +61,59 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) setClassesList(parsed);
         }
+        const savedTeachers = localStorage.getItem('ucore_director_teachers_v1');
+        if (savedTeachers) {
+          const parsedTeachers = JSON.parse(savedTeachers);
+          if (Array.isArray(parsedTeachers) && parsedTeachers.length > 0) {
+            setSchoolTeachers(parsedTeachers);
+          }
+        }
       } catch {}
     };
     window.addEventListener('sigre-data-synced', handleSync);
-    return () => window.removeEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('ucore-teachers-updated', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('ucore-teachers-updated', handleSync);
+    };
   }, []);
+
+  const handleAssignTeacherToTurma = (params: {
+    gradeClass: string;
+    turma: string;
+    room: string;
+    shift: 'Manhã' | 'Tarde' | 'Integral';
+    newTeacherId: string;
+  }) => {
+    if (!params.newTeacherId) return;
+    const chosenTeacher = schoolTeachers.find((t) => t.id === params.newTeacherId);
+    if (!chosenTeacher) return;
+
+    const updatedTeachers = assignResponsibleTeacherToClassTurma({
+      gradeClass: params.gradeClass,
+      turma: params.turma,
+      room: params.room,
+      shift: params.shift,
+      subject: chosenTeacher.subject || 'Regente (Todas as Disciplinas)',
+      newTeacherId: params.newTeacherId,
+      allSchoolTeachers: schoolTeachers,
+      authorName: 'Diretor de Escola',
+    });
+
+    setSchoolTeachers(updatedTeachers);
+    try {
+      const saved = localStorage.getItem('ucore_director_classes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) setClassesList(parsed);
+      }
+    } catch {}
+
+    setRedefineToast(
+      `Turma ${params.gradeClass} (${params.turma}) atribuída à responsabilidade do(a) Prof. ${chosenTeacher.name}!`
+    );
+    setTimeout(() => setRedefineToast(null), 4000);
+  };
 
   // Filtered classes
   const filteredClasses = useMemo(() => {
@@ -118,6 +179,21 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {redefineToast && (
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between shadow-2xs animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold text-emerald-950">{redefineToast}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRedefineToast(null)}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
         {/* Filter Bar matching 20.png: Filtro: classes v, Search, Cadastrar button */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
           {/* Left: Filtro Dropdown */}
@@ -479,6 +555,68 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                             </span>
                           )}
                         </p>
+
+                        {/* Distribuição e Redefinição do Professor Responsável da Turma */}
+                        {(() => {
+                          const norm = (s?: string) => (s || '').trim().toLowerCase();
+                          const responsibleTeacher = schoolTeachers.find((t) => {
+                            if (turmaItem.responsibleTeacherId && t.id === turmaItem.responsibleTeacherId) {
+                              return true;
+                            }
+                            if (
+                              Array.isArray(t.assignedTurmas) &&
+                              t.assignedTurmas.some(
+                                (a) =>
+                                  norm(a.gradeClass) === norm(currentClass.name) &&
+                                  norm(a.turma) === norm(turmaItem.name)
+                              )
+                            ) {
+                              return true;
+                            }
+                            return (
+                              norm(t.gradeClass) === norm(currentClass.name) &&
+                              norm(t.turma) === norm(turmaItem.name)
+                            );
+                          });
+                          const shiftVal = (
+                            turmaItem.shift === 'Tarde' ? 'Tarde' : 'Manhã'
+                          ) as 'Manhã' | 'Tarde';
+
+                          return (
+                            <div className="mt-3 pt-2.5 border-t border-slate-200/80 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-slate-500">
+                                  Professor Responsável / Regente:
+                                </span>
+                                <span className="font-bold text-slate-900">
+                                  {responsibleTeacher
+                                    ? responsibleTeacher.name
+                                    : turmaItem.responsibleTeacherName || 'Não designado'}
+                                </span>
+                              </div>
+                              <select
+                                value={responsibleTeacher?.id || ''}
+                                onChange={(e) =>
+                                  handleAssignTeacherToTurma({
+                                    gradeClass: currentClass.name,
+                                    turma: turmaItem.name,
+                                    room: turmaItem.room || currentClass.room || 'Sala 01',
+                                    shift: shiftVal,
+                                    newTeacherId: e.target.value,
+                                  })
+                                }
+                                className="w-full p-2 rounded-lg bg-white border border-slate-200 text-[11px] font-bold text-slate-800 focus:border-[#f75142] outline-none"
+                              >
+                                <option value="">-- Distribuir / Redefinir Professor da Turma --</option>
+                                {schoolTeachers.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name} ({t.subject} • {t.gradeClass} {t.turma})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })()}
 
                         {/* Button: Baixar Lista em PDF (A-Z) & Gerar Pauta da Turma */}
                         <div className="mt-3 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">

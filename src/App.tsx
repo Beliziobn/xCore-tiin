@@ -1769,13 +1769,6 @@ export default function App() {
           <Hero
             onOpenGetStarted={() => handleOpenAuth('login')}
             customTitle="Livro de Ponto dos Professores"
-            customSubtitle="Homologação diária, assiduidade e controle de presenças da equipa docente da escola."
-            badge="Direção Escolar"
-            breadcrumbs={[
-              { label: 'Início', onClick: () => { setCurrentView('home'); setCurrentPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
-              { label: 'Professores', onClick: () => { setCurrentView('diretor-professores'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
-              { label: 'Livro de Ponto' },
-            ]}
             isLoggedIn={isSessionStarted}
           />
           <DirectorAttendancePage

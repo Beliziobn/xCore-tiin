@@ -25,9 +25,21 @@ import { directorTeachersData as initialTeachers } from '../../../data/directorD
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import { DirectorTeacherEditModal } from '../../modals/DirectorTeacherEditModal';
 import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal';
-import type { DirectorTeacher, AdminTeacher, PendingApplication, TeacherRegistrationData } from '../../../types';
+import type {
+  DirectorTeacher,
+  AdminTeacher,
+  PendingApplication,
+  TeacherRegistrationData,
+  DirectorClass,
+} from '../../../types';
 import { getPendingApplications, approveApplication, rejectApplication } from '../../../utils/authApprovalStorage';
-import { getRegistrationDataFromDirectorTeacher, saveTeacher } from '../../../utils/teacherStorage';
+import {
+  getRegistrationDataFromDirectorTeacher,
+  saveTeacher,
+  distributeTeacherTurmas,
+  assignResponsibleTeacherToClassTurma,
+} from '../../../utils/teacherStorage';
+import { directorClassesData as defaultDirectorClasses } from '../../../data/directorData';
 import { TeacherApplicationModal } from '../../modals/TeacherApplicationModal';
 import { StatCardItem } from '../../StatCardItem';
 
@@ -91,13 +103,25 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   const [dossierToEdit, setDossierToEdit] = useState<TeacherRegistrationData | null>(null);
   const [editToast, setEditToast] = useState<string | null>(null);
 
-  // Pending teacher applications workflow
-  const [activeTab, setActiveTab] = useState<'quadro' | 'candidaturas'>('quadro');
+  // Pending teacher applications & Turma distribution workflow
+  const [activeTab, setActiveTab] = useState<'quadro' | 'distribuicao' | 'candidaturas'>('quadro');
+  const [selectedDistClass, setSelectedDistClass] = useState<string>('Todas');
   const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>(() => {
     return getPendingApplications('professor').filter((a) => a.status === 'pendente');
   });
   const [selectedApplication, setSelectedApplication] = useState<PendingApplication | null>(null);
   const [approvalToast, setApprovalToast] = useState<string | null>(null);
+
+  const [schoolClasses, setSchoolClasses] = useState<DirectorClass[]>(() => {
+    try {
+      const raw = localStorage.getItem('ucore_director_classes');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return defaultDirectorClasses;
+  });
 
   const refreshPending = () => {
     setPendingApplications(getPendingApplications('professor').filter((a) => a.status === 'pendente'));
@@ -112,6 +136,13 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) setTeachers(parsed);
+        }
+        const rawClasses = localStorage.getItem('ucore_director_classes');
+        if (rawClasses) {
+          const parsedClasses = JSON.parse(rawClasses);
+          if (Array.isArray(parsedClasses) && parsedClasses.length > 0) {
+            setSchoolClasses(parsedClasses);
+          }
         }
       } catch {}
     };
@@ -259,41 +290,64 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   };
 
   const handleSaveEditedTeacher = (updatedTeacher: DirectorTeacher) => {
-    const updatedList = teachers.map((t) => (t.id === updatedTeacher.id ? updatedTeacher : t));
+    const syncedTeacher = distributeTeacherTurmas(updatedTeacher, directorName);
+    const updatedList = teachers.map((t) => (t.id === syncedTeacher.id ? syncedTeacher : t));
     persistTeachers(updatedList);
-    setSelectedTeacherId(updatedTeacher.id);
-
-    // Synchronize with ministerial teacherStorage
-    try {
-      const reg = getRegistrationDataFromDirectorTeacher(updatedTeacher, schoolName, directorName);
-      reg.nomeCompleto = updatedTeacher.name;
-      reg.telefone = updatedTeacher.phone || reg.telefone;
-      reg.email = updatedTeacher.email || reg.email;
-      reg.disciplinas = updatedTeacher.subject;
-      reg.nomeEscola = updatedTeacher.schoolName || schoolName;
-      saveTeacher(reg, directorName);
-    } catch (err) {
-      console.error('Error syncing teacher registration', err);
-    }
+    setSelectedTeacherId(syncedTeacher.id);
 
     if (onAddTeacherGlobal) {
       onAddTeacherGlobal({
-        id: updatedTeacher.id,
-        name: updatedTeacher.name,
-        phone: updatedTeacher.phone || '+244 923 000 000',
-        subject: updatedTeacher.subject,
-        gradeClass: updatedTeacher.gradeClass,
-        room: updatedTeacher.room,
-        schoolName: updatedTeacher.schoolName || schoolName,
-        location: updatedTeacher.location || 'Pavilhão 1 - Bloco B',
-        turma: updatedTeacher.turma,
+        id: syncedTeacher.id,
+        name: syncedTeacher.name,
+        phone: syncedTeacher.phone || '+244 923 000 000',
+        subject: syncedTeacher.subject,
+        gradeClass: syncedTeacher.gradeClass,
+        room: syncedTeacher.room,
+        schoolName: syncedTeacher.schoolName || schoolName,
+        location: syncedTeacher.location || 'Pavilhão 1 - Bloco B',
+        turma: syncedTeacher.turma,
         category: 'Professor Primário Efetivo',
-        presenceRate: updatedTeacher.presenceRate,
+        presenceRate: syncedTeacher.presenceRate,
+        assignedTurmas: syncedTeacher.assignedTurmas,
       });
     }
 
-    setEditToast(`Dados do(a) Professor(a) "${updatedTeacher.name}" atualizados com sucesso pela Direção!`);
-    setTimeout(() => setEditToast(null), 4000);
+    const turmasCount = syncedTeacher.assignedTurmas?.length || 1;
+    setEditToast(
+      `Turmas e alocação do(a) Professor(a) "${syncedTeacher.name}" (${turmasCount} ${
+        turmasCount === 1 ? 'turma sob responsabilidade' : 'turmas sob responsabilidade'
+      }) atualizadas com sucesso pela Direção!`
+    );
+    setTimeout(() => setEditToast(null), 4500);
+  };
+
+  const handleAssignTeacherToTurmaDirect = (params: {
+    gradeClass: string;
+    turma: string;
+    room: string;
+    shift: 'Manhã' | 'Tarde' | 'Integral';
+    newTeacherId: string;
+  }) => {
+    if (!params.newTeacherId) return;
+    const chosenTeacher = teachers.find((t) => t.id === params.newTeacherId);
+    if (!chosenTeacher) return;
+
+    const nextTeachers = assignResponsibleTeacherToClassTurma({
+      gradeClass: params.gradeClass,
+      turma: params.turma,
+      room: params.room,
+      shift: params.shift,
+      subject: chosenTeacher.subject || 'Regente (Todas as Disciplinas)',
+      newTeacherId: params.newTeacherId,
+      allSchoolTeachers: teachers,
+      authorName: directorName,
+    });
+
+    persistTeachers(nextTeachers);
+    setEditToast(
+      `Turma redefinida: ${params.gradeClass} (${params.turma}) atribuída à responsabilidade do(a) Prof. ${chosenTeacher.name}!`
+    );
+    setTimeout(() => setEditToast(null), 4500);
   };
 
   const handleFullDossierSuccess = (savedData: TeacherRegistrationData) => {
@@ -361,8 +415,8 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
           </div>
         )}
 
-        {/* Tab Switcher: Quadro Docente vs Candidaturas Pendentes */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+        {/* Tab Switcher: Quadro Docente vs Distribuição de Turmas vs Candidaturas Pendentes */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
           <button
             id="tab-quadro-docente"
             onClick={() => setActiveTab('quadro')}
@@ -376,6 +430,28 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
             <span>Quadro Docente Ativo</span>
             <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-white/20 text-white font-semibold">
               {filteredTeachers.length}
+            </span>
+          </button>
+
+          <button
+            id="tab-distribuicao-turmas"
+            onClick={() => setActiveTab('distribuicao')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'distribuicao'
+                ? 'bg-[#f75142] text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Distribuir & Redefinir Turmas</span>
+            <span
+              className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                activeTab === 'distribuicao'
+                  ? 'bg-white text-[#f75142]'
+                  : 'bg-rose-50 text-[#f75142]'
+              }`}
+            >
+              Direção
             </span>
           </button>
 
@@ -408,6 +484,259 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
             </button>
           )}
         </div>
+
+        {/* SEÇÃO DE DISTRIBUIÇÃO E REDEFINIÇÃO DE TURMAS DOS PROFESSORES */}
+        {activeTab === 'distribuicao' && (
+          <div className="space-y-6 animate-in fade-in">
+            {/* Banner Explicativo e Filtro de Classes */}
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-rose-50 text-[#f75142] border border-rose-200 mb-2">
+                    Competência Exclusiva do Diretor de Escola
+                  </span>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    Distribuição e Redefinição de Turmas por Professor
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Defina ou altere qual professor é responsável por cada turma da escola, ou atribua múltiplas turmas a um mesmo docente.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-500">Filtrar Classe:</span>
+                  <select
+                    value={selectedDistClass}
+                    onChange={(e) => setSelectedDistClass(e.target.value)}
+                    className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800"
+                  >
+                    <option value="Todas">Todas as Classes ({schoolClasses.length})</option>
+                    {schoolClasses.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Quadro Rápido por Professor (Turmas sob responsabilidade de cada Docente) */}
+              <div className="pt-3 border-t border-slate-100">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-3">
+                  Resumo de Turmas Distribuídas por Professor ({teachers.length} Docentes)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {teachers.map((t) => {
+                    const turmasList =
+                      Array.isArray(t.assignedTurmas) && t.assignedTurmas.length > 0
+                        ? t.assignedTurmas
+                        : [
+                            {
+                              id: `default-${t.id}`,
+                              gradeClass: t.gradeClass || '4ª Classe',
+                              turma: t.turma || 'Turma A',
+                              room: t.room || 'Sala 01',
+                              shift: t.shift || 'Manhã',
+                              subject: t.subject || 'Regente',
+                              isClassRegent: true,
+                            },
+                          ];
+                    return (
+                      <div
+                        key={t.id}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white hover:shadow-xs transition-all flex flex-col justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-[#002133] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                {t.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <h5 className="text-xs font-bold text-slate-900 leading-snug">
+                                  {t.name}
+                                </h5>
+                                <p className="text-[11px] text-slate-500">
+                                  {t.subject} • Turno {t.shift}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-blue-100 text-blue-900">
+                              {turmasList.length} {turmasList.length === 1 ? 'Turma' : 'Turmas'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {turmasList.map((asg, i) => (
+                              <span
+                                key={asg.id || i}
+                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border ${
+                                  i === 0
+                                    ? 'bg-[#fef2f1] text-[#f75142] border-[#fee4e2]'
+                                    : 'bg-white text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                <span>
+                                  {asg.gradeClass} • {asg.turma}
+                                </span>
+                                <span className="text-slate-400">({asg.room})</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(t, 'alocacao')}
+                          className="w-full py-2 px-3 rounded-lg bg-[#002133] hover:bg-black text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-[#f75142]" />
+                          <span>Distribuir / Redefinir Turmas</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Matriz de Turmas por Classe para Redefinição Direta pelo Diretor */}
+            <div className="space-y-4">
+              {schoolClasses
+                .filter((cls) => selectedDistClass === 'Todas' || cls.name === selectedDistClass)
+                .map((cls) => {
+                  const turmasDetails =
+                    cls.turmasDetails && cls.turmasDetails.length > 0
+                      ? cls.turmasDetails
+                      : (cls.turmas || ['Turma A', 'Turma B']).map((tName, idx) => ({
+                          name: tName,
+                          studentCount: Math.round((cls.studentCount || 40) / 2),
+                          maxCapacity: 45,
+                          shift: idx % 2 === 0 ? 'Manhã' : 'Tarde',
+                          room: cls.room || `Sala 0${idx + 1}`,
+                        }));
+
+                  return (
+                    <div
+                      key={cls.id}
+                      className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5">
+                          <span className="px-3 py-1 rounded-lg bg-[#002133] text-white text-xs font-black">
+                            {cls.name}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-500">
+                            {turmasDetails.length} {turmasDetails.length === 1 ? 'Turma ativa' : 'Turmas ativas'} • Período: {cls.period}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-400">
+                          Selecione abaixo o professor responsável por cada turma
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {turmasDetails.map((td) => {
+                          const norm = (s?: string) => (s || '').trim().toLowerCase();
+                          const responsibleTeacher = teachers.find((t) => {
+                            if (td.responsibleTeacherId && t.id === td.responsibleTeacherId) {
+                              return true;
+                            }
+                            if (
+                              Array.isArray(t.assignedTurmas) &&
+                              t.assignedTurmas.some(
+                                (a) =>
+                                  norm(a.gradeClass) === norm(cls.name) &&
+                                  norm(a.turma) === norm(td.name)
+                              )
+                            ) {
+                              return true;
+                            }
+                            return (
+                              norm(t.gradeClass) === norm(cls.name) &&
+                              norm(t.turma) === norm(td.name)
+                            );
+                          });
+
+                          const shiftVal = (
+                            td.shift === 'Tarde' ? 'Tarde' : 'Manhã'
+                          ) as 'Manhã' | 'Tarde';
+
+                          return (
+                            <div
+                              key={td.name}
+                              className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 flex flex-col justify-between gap-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-black text-slate-900">
+                                      {cls.name} — {td.name}
+                                    </span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600">
+                                      {td.room || cls.room} • {shiftVal}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 mt-1">
+                                    Professor Responsável Atual:{' '}
+                                    {responsibleTeacher ? (
+                                      <strong className="text-emerald-700">
+                                        {responsibleTeacher.name} ({responsibleTeacher.subject})
+                                      </strong>
+                                    ) : (
+                                      <strong className="text-amber-700">
+                                        Sem professor regente designado
+                                      </strong>
+                                    )}
+                                  </p>
+                                </div>
+
+                                {responsibleTeacher && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditModal(responsibleTeacher, 'alocacao')}
+                                    className="text-[10px] font-bold text-[#f75142] hover:underline cursor-pointer shrink-0"
+                                  >
+                                    Ver Turmas
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 shrink-0">
+                                  Redefinir Responsável:
+                                </label>
+                                <select
+                                  value={responsibleTeacher?.id || ''}
+                                  onChange={(e) =>
+                                    handleAssignTeacherToTurmaDirect({
+                                      gradeClass: cls.name,
+                                      turma: td.name,
+                                      room: td.room || cls.room || 'Sala 01',
+                                      shift: shiftVal,
+                                      newTeacherId: e.target.value,
+                                    })
+                                  }
+                                  className="flex-1 p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:border-[#f75142] outline-none"
+                                >
+                                  <option value="">-- Selecionar Professor da Escola --</option>
+                                  {teachers.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} ({t.subject} • Atual: {t.gradeClass} {t.turma})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
         {/* 1. SEÇÃO DE CANDIDATURAS DOCENTES PENDENTES */}
         {activeTab === 'candidaturas' && (
@@ -671,6 +1000,18 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-slate-900 block">{teacher.gradeClass}</span>
                         <span className="text-[11px] text-slate-500">{teacher.turma}</span>
+                        {teacher.assignedTurmas && teacher.assignedTurmas.length > 1 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {teacher.assignedTurmas.slice(1).map((asg, idx) => (
+                              <span
+                                key={asg.id || idx}
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200"
+                              >
+                                +{asg.gradeClass} ({asg.turma})
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className="font-semibold text-slate-800 block">{teacher.room}</span>
@@ -708,10 +1049,10 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                             type="button"
                             onClick={() => handleOpenEditModal(teacher, 'alocacao')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition-all cursor-pointer"
-                            title="Editar Alocação e Dados do Professor"
+                            title="Distribuir e Redefinir Turmas do Professor"
                           >
-                            <Edit3 className="w-3 h-3" />
-                            <span>Editar</span>
+                            <Edit3 className="w-3 h-3 text-[#f75142]" />
+                            <span>Distribuir Turmas</span>
                           </button>
                           <button
                             type="button"
@@ -788,10 +1129,10 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 type="button"
                 onClick={() => currentTeacher && handleOpenEditModal(currentTeacher, 'alocacao')}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#002133] hover:bg-black text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                title="Editar Alocação, Sala, Turma e Horários"
+                title="Distribuir e Redefinir Turmas, Sala e Horários do Professor"
               >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Editar Professor</span>
+                <Edit3 className="w-3.5 h-3.5 text-[#f75142]" />
+                <span>Distribuir / Redefinir Turmas</span>
               </button>
               <button
                 id="btn-editar-dossie-docente-selecionado"
@@ -836,13 +1177,15 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
             {/* 3. Classe */}
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Classe
+                Classe Principal
               </span>
               <span className="text-sm font-black text-slate-900">
                 {currentTeacher.gradeClass || '---'}
               </span>
               <span className="text-xs text-slate-500 mt-0.5">
-                Ensino Primário
+                {(currentTeacher.assignedTurmas?.length || 1) > 1
+                  ? `+${(currentTeacher.assignedTurmas?.length || 1) - 1} outra(s) turma(s)`
+                  : 'Regência Principal'}
               </span>
             </div>
 
@@ -862,7 +1205,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
             {/* 5. Turma */}
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Turma
+                Turma Principal
               </span>
               <span className="text-sm font-black text-slate-900">
                 {currentTeacher.turma || '---'}
@@ -897,6 +1240,52 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 Unidade Escolar
               </span>
             </div>
+          </div>
+
+          {/* Lista de Todas as Turmas sob Responsabilidade deste Professor */}
+          <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                Turmas sob Responsabilidade:
+              </span>
+              {(currentTeacher.assignedTurmas && currentTeacher.assignedTurmas.length > 0
+                ? currentTeacher.assignedTurmas
+                : [
+                    {
+                      id: `primary-${currentTeacher.id}`,
+                      gradeClass: currentTeacher.gradeClass,
+                      turma: currentTeacher.turma,
+                      room: currentTeacher.room,
+                      shift: currentTeacher.shift,
+                      subject: currentTeacher.subject,
+                      isClassRegent: true,
+                    },
+                  ]
+              ).map((asg, idx) => (
+                <span
+                  key={asg.id || idx}
+                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-xl border ${
+                    idx === 0
+                      ? 'bg-[#fef2f1] text-[#f75142] border-[#fee4e2]'
+                      : 'bg-slate-50 text-slate-800 border-slate-200'
+                  }`}
+                >
+                  <span>
+                    {asg.gradeClass} • {asg.turma}
+                  </span>
+                  <span className="text-[10px] font-semibold opacity-80">
+                    ({asg.room} • {asg.shift} • {asg.subject})
+                  </span>
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleOpenEditModal(currentTeacher, 'alocacao')}
+              className="text-xs font-bold text-[#f75142] hover:underline cursor-pointer"
+            >
+              + Adicionar ou Redefinir Turmas
+            </button>
           </div>
         </div>
 

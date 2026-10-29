@@ -1,8 +1,10 @@
 import type {
   AdminSchool,
   AdminTeacher,
+  DirectorClass,
   DirectorTeacher,
   TeacherRegistrationData,
+  TeacherTurmaAssignment,
   TeacherFaixaEtaria,
   TeacherNaturezaEscola,
   TeacherTipoInstituicao,
@@ -17,6 +19,7 @@ import {
   saveTeacherToFirestore,
   deleteTeacherFromFirestore,
   clearAllTeachersFromFirestore,
+  saveClassToFirestore,
 } from './firestoreSync';
 
 export const STORAGE_KEY_TEACHERS = 'ucore_registered_teachers_v2';
@@ -239,28 +242,73 @@ export function saveTeacher(
       // 1) Sincronizar com ucore_admin_teachers
       const rawAdminTeachers = localStorage.getItem('ucore_admin_teachers');
       const adminTeachers: AdminTeacher[] = rawAdminTeachers ? JSON.parse(rawAdminTeachers) : [];
-      const adminEntry: AdminTeacher = {
-        id: savedRecord.id,
-        name: savedRecord.nomeCompleto,
-        phone: savedRecord.telefone || '+244 923 000 000',
-        gradeClass: savedRecord.niveisLecciona?.[0]?.nome || 'Ensino Primário',
-        room: 'Sala 01',
-        turma: 'Turma A',
-        category: savedRecord.funcaoCategoria || 'Docente / Professor',
-        location: `${savedRecord.municipioEscola || 'Quêssua'} (${savedRecord.provinciaEscola || 'Malanje'})`,
-        schoolName: savedRecord.nomeEscola,
-        schoolId: savedRecord.escolaId,
-        presenceRate: 99.0,
-        subject: savedRecord.disciplinas || 'Língua Portuguesa & Matemática',
-        gender: savedRecord.sexo === 'Feminino' ? 'F' : 'M',
-        qualification: savedRecord.nivelAcademico,
-        registrationData: savedRecord,
-      };
       const existingAdminIdx = adminTeachers.findIndex(
         (at) =>
           at.id === savedRecord.id ||
           at.name.trim().toLowerCase() === savedRecord.nomeCompleto.trim().toLowerCase()
       );
+      const prevAdmin = existingAdminIdx >= 0 ? adminTeachers[existingAdminIdx] : undefined;
+
+      // 2) Ler ucore_director_teachers_v1 para preservar turmas distribuídas pelo Diretor
+      const rawDirTeachers = localStorage.getItem('ucore_director_teachers_v1');
+      const dirTeachers: DirectorTeacher[] = rawDirTeachers ? JSON.parse(rawDirTeachers) : [];
+      const existingDirIdx = dirTeachers.findIndex(
+        (dt) =>
+          dt.id === savedRecord.id ||
+          dt.name.trim().toLowerCase() === savedRecord.nomeCompleto.trim().toLowerCase()
+      );
+      const prevDir = existingDirIdx >= 0 ? dirTeachers[existingDirIdx] : undefined;
+
+      const assignedTurmas: TeacherTurmaAssignment[] =
+        savedRecord.assignedTurmas ||
+        prevDir?.assignedTurmas ||
+        prevAdmin?.assignedTurmas ||
+        [];
+      const firstAssigned = assignedTurmas[0];
+
+      const resolvedGradeClass =
+        savedRecord.primaryGradeClass ||
+        firstAssigned?.gradeClass ||
+        prevDir?.gradeClass ||
+        prevAdmin?.gradeClass ||
+        savedRecord.niveisLecciona?.[0]?.nome ||
+        'Ensino Primário';
+      const resolvedRoom =
+        savedRecord.primaryRoom ||
+        firstAssigned?.room ||
+        prevDir?.room ||
+        prevAdmin?.room ||
+        'Sala 01';
+      const resolvedTurma =
+        savedRecord.primaryTurma ||
+        firstAssigned?.turma ||
+        prevDir?.turma ||
+        prevAdmin?.turma ||
+        'Turma A';
+      const resolvedShift: 'Manhã' | 'Tarde' | 'Integral' =
+        savedRecord.primaryShift ||
+        firstAssigned?.shift ||
+        prevDir?.shift ||
+        (savedRecord.turnos?.[0] === 'Tarde' ? 'Tarde' : 'Manhã');
+
+      const adminEntry: AdminTeacher = {
+        id: savedRecord.id,
+        name: savedRecord.nomeCompleto,
+        phone: savedRecord.telefone || '+244 923 000 000',
+        gradeClass: resolvedGradeClass,
+        room: resolvedRoom,
+        turma: resolvedTurma,
+        category: savedRecord.funcaoCategoria || 'Docente / Professor',
+        location: `${savedRecord.municipioEscola || 'Quêssua'} (${savedRecord.provinciaEscola || 'Malanje'})`,
+        schoolName: savedRecord.nomeEscola,
+        schoolId: savedRecord.escolaId,
+        presenceRate: prevAdmin?.presenceRate ?? 99.0,
+        subject: savedRecord.disciplinas || firstAssigned?.subject || 'Língua Portuguesa & Matemática',
+        gender: savedRecord.sexo === 'Feminino' ? 'F' : 'M',
+        qualification: savedRecord.nivelAcademico,
+        assignedTurmas: assignedTurmas.length > 0 ? assignedTurmas : undefined,
+        registrationData: savedRecord,
+      };
       if (existingAdminIdx >= 0) {
         adminTeachers[existingAdminIdx] = {
           ...adminTeachers[existingAdminIdx],
@@ -271,39 +319,31 @@ export function saveTeacher(
       }
       localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
 
-      // 2) Sincronizar com ucore_director_teachers_v1
-      const rawDirTeachers = localStorage.getItem('ucore_director_teachers_v1');
-      const dirTeachers: DirectorTeacher[] = rawDirTeachers ? JSON.parse(rawDirTeachers) : [];
-      const shiftVal = savedRecord.turnos?.[0] === 'Tarde' ? 'Tarde' : 'Manhã';
       const dirEntry: DirectorTeacher = {
         id: savedRecord.id,
         name: savedRecord.nomeCompleto,
         schoolName: savedRecord.nomeEscola,
-        gradeClass: savedRecord.niveisLecciona?.[0]?.nome || 'Ensino Primário',
-        room: 'Sala 01',
-        turma: 'Turma A',
-        directorName: authorName,
+        gradeClass: resolvedGradeClass,
+        room: resolvedRoom,
+        turma: resolvedTurma,
+        directorName: prevDir?.directorName || authorName,
         location: `${savedRecord.municipioEscola || 'Quêssua'}`,
-        subject: savedRecord.disciplinas || 'Língua Portuguesa & Matemática',
-        presenceRate: 100,
-        shift: shiftVal,
+        subject: savedRecord.disciplinas || firstAssigned?.subject || 'Língua Portuguesa & Matemática',
+        presenceRate: prevDir?.presenceRate ?? 100,
+        shift: resolvedShift,
         phone: savedRecord.telefone,
         email: savedRecord.email,
+        assignedTurmas: assignedTurmas.length > 0 ? assignedTurmas : undefined,
         registrationData: savedRecord,
-        schedule: [
+        schedule: prevDir?.schedule || [
           {
             day: 'Segunda',
-            period: shiftVal === 'Tarde' ? '13h00 - 17h15' : '07h30 - 12h00',
+            period: resolvedShift === 'Tarde' ? '13h00 - 17h15' : '07h30 - 12h00',
             subject: savedRecord.disciplinas || 'Língua Portuguesa & Matemática',
-            room: 'Sala 01',
+            room: resolvedRoom,
           },
         ],
       };
-      const existingDirIdx = dirTeachers.findIndex(
-        (dt) =>
-          dt.id === savedRecord.id ||
-          dt.name.trim().toLowerCase() === savedRecord.nomeCompleto.trim().toLowerCase()
-      );
       if (existingDirIdx >= 0) {
         dirTeachers[existingDirIdx] = {
           ...dirTeachers[existingDirIdx],
@@ -827,4 +867,290 @@ export function getRegistrationDataFromDirectorTeacher(
     atualizadoEm: new Date().toISOString(),
   };
 }
+
+/**
+ * Sincroniza a distribuição/redefinição de turmas de um professor com todas as coleções:
+ * - ucore_director_teachers_v1
+ * - ucore_registered_teachers_v2
+ * - ucore_admin_teachers
+ * - ucore_director_classes (lista de professores da classe + responsável em turmasDetails)
+ * - Firestore (teachers & classes)
+ */
+export function distributeTeacherTurmas(
+  updatedTeacher: DirectorTeacher,
+  authorName: string = 'Diretor de Escola'
+): DirectorTeacher {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return updatedTeacher;
+  }
+
+  const norm = (s?: string) => (s || '').trim().toLowerCase();
+
+  // Garantir que assignedTurmas contenha pelo menos a turma principal caso esteja vazio
+  const normalizedAssignments: TeacherTurmaAssignment[] =
+    Array.isArray(updatedTeacher.assignedTurmas) && updatedTeacher.assignedTurmas.length > 0
+      ? updatedTeacher.assignedTurmas
+      : [
+          {
+            id: `asg-${updatedTeacher.id}-primary`,
+            gradeClass: updatedTeacher.gradeClass || '4ª Classe',
+            turma: updatedTeacher.turma || 'Turma A',
+            room: updatedTeacher.room || 'Sala 01',
+            shift: updatedTeacher.shift || 'Manhã',
+            subject: updatedTeacher.subject || 'Regente (Todas as Disciplinas)',
+            isClassRegent: true,
+          },
+        ];
+
+  const primaryAssignment = normalizedAssignments[0];
+  const finalTeacher: DirectorTeacher = {
+    ...updatedTeacher,
+    gradeClass: primaryAssignment.gradeClass || updatedTeacher.gradeClass,
+    turma: primaryAssignment.turma || updatedTeacher.turma,
+    room: primaryAssignment.room || updatedTeacher.room,
+    shift: primaryAssignment.shift || updatedTeacher.shift,
+    subject: updatedTeacher.subject || primaryAssignment.subject,
+    assignedTurmas: normalizedAssignments,
+  };
+
+  try {
+    // 1. Atualizar ucore_director_teachers_v1
+    const rawDir = localStorage.getItem('ucore_director_teachers_v1');
+    const dirList: DirectorTeacher[] = rawDir ? JSON.parse(rawDir) : [];
+    const dirIdx = dirList.findIndex(
+      (dt) => dt.id === finalTeacher.id || norm(dt.name) === norm(finalTeacher.name)
+    );
+    if (dirIdx >= 0) {
+      dirList[dirIdx] = { ...dirList[dirIdx], ...finalTeacher };
+    } else {
+      dirList.unshift(finalTeacher);
+    }
+    localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(dirList));
+
+    // 2. Atualizar ucore_registered_teachers_v2 via saveTeacher
+    const baseReg = getRegistrationDataFromDirectorTeacher(
+      finalTeacher,
+      finalTeacher.schoolName,
+      authorName
+    );
+    const uniqueTurnos = Array.from(
+      new Set(
+        normalizedAssignments.map((a) => (a.shift === 'Tarde' ? 'Tarde' : 'Manhã'))
+      )
+    ) as ('Manhã' | 'Tarde' | 'Noite')[];
+    const uniqueSubjects = Array.from(
+      new Set(normalizedAssignments.map((a) => a.subject).filter(Boolean))
+    ).join(', ');
+    const turmasSummary = normalizedAssignments
+      .map(
+        (a) =>
+          `${a.gradeClass} - ${a.turma} (${a.room}, ${a.shift}${a.isClassRegent ? ', Regente' : ''})`
+      )
+      .join(' | ');
+
+    const updatedReg: TeacherRegistrationData = {
+      ...baseReg,
+      nomeCompleto: finalTeacher.name,
+      nomeEscola: finalTeacher.schoolName || baseReg.nomeEscola,
+      telefone: finalTeacher.phone || baseReg.telefone,
+      email: finalTeacher.email || baseReg.email,
+      disciplinas: uniqueSubjects || finalTeacher.subject || baseReg.disciplinas,
+      numeroTurmas: normalizedAssignments.length,
+      numeroAlunosAproximado: normalizedAssignments.length * 42,
+      turnos: uniqueTurnos.length > 0 ? uniqueTurnos : ['Manhã'],
+      assignedTurmas: normalizedAssignments,
+      primaryGradeClass: finalTeacher.gradeClass,
+      primaryTurma: finalTeacher.turma,
+      primaryRoom: finalTeacher.room,
+      primaryShift: finalTeacher.shift,
+      observacoes: `Turmas atribuídas pelo Diretor: ${turmasSummary}.`,
+    };
+
+    saveTeacher(updatedReg, authorName);
+
+    // 3. Sincronizar com ucore_director_classes (Minhas Classes)
+    const rawClasses = localStorage.getItem('ucore_director_classes');
+    if (rawClasses) {
+      const classesList: DirectorClass[] = JSON.parse(rawClasses);
+      let classesChanged = false;
+
+      const updatedClasses = classesList.map((cls) => {
+        const matchesThisTeacherClass = normalizedAssignments.filter(
+          (a) => norm(a.gradeClass) === norm(cls.name)
+        );
+        const teacherSet = new Set(
+          (cls.teachers || []).filter((tName) => norm(tName) !== norm(finalTeacher.name))
+        );
+        if (matchesThisTeacherClass.length > 0) {
+          teacherSet.add(finalTeacher.name);
+        }
+
+        const nextTurmasDetails = (cls.turmasDetails || []).map((td) => {
+          const matchedTurma = matchesThisTeacherClass.find(
+            (a) => norm(a.turma) === norm(td.name)
+          );
+          if (matchedTurma) {
+            classesChanged = true;
+            return {
+              ...td,
+              room: matchedTurma.room || td.room,
+              shift: matchedTurma.shift || td.shift,
+              responsibleTeacherId: finalTeacher.id,
+              responsibleTeacherName: finalTeacher.name,
+              responsibleSubject: matchedTurma.subject,
+            };
+          }
+          // Se o professor era responsável por esta turma mas foi removido na redefinição
+          if (
+            td.responsibleTeacherId === finalTeacher.id ||
+            norm(td.responsibleTeacherName) === norm(finalTeacher.name)
+          ) {
+            classesChanged = true;
+            return {
+              ...td,
+              responsibleTeacherId: undefined,
+              responsibleTeacherName: undefined,
+              responsibleSubject: undefined,
+            };
+          }
+          return td;
+        });
+
+        const nextTeachers = Array.from(teacherSet);
+        if (nextTeachers.length !== (cls.teachers || []).length) {
+          classesChanged = true;
+        }
+
+        const updatedCls: DirectorClass = {
+          ...cls,
+          teachers: nextTeachers,
+          turmasDetails: nextTurmasDetails,
+        };
+        if (classesChanged) {
+          saveClassToFirestore(updatedCls).catch(() => {});
+        }
+        return updatedCls;
+      });
+
+      if (classesChanged) {
+        localStorage.setItem('ucore_director_classes', JSON.stringify(updatedClasses));
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
+    window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+  } catch (err) {
+    console.warn('Erro ao distribuir turmas do professor:', err);
+  }
+
+  return finalTeacher;
+}
+
+/**
+ * Redefine diretamente qual professor é responsável por uma determinada Classe + Turma
+ * (usado na Matriz de Distribuição de Turmas e em Minhas Classes).
+ */
+export function assignResponsibleTeacherToClassTurma(params: {
+  gradeClass: string;
+  turma: string;
+  room: string;
+  shift: 'Manhã' | 'Tarde' | 'Integral';
+  subject?: string;
+  newTeacherId: string;
+  allSchoolTeachers: DirectorTeacher[];
+  authorName?: string;
+}): DirectorTeacher[] {
+  const {
+    gradeClass,
+    turma,
+    room,
+    shift,
+    subject,
+    newTeacherId,
+    allSchoolTeachers,
+    authorName = 'Diretor de Escola',
+  } = params;
+
+  const norm = (s?: string) => (s || '').trim().toLowerCase();
+  const updatedList: DirectorTeacher[] = [];
+
+  for (const teacher of allSchoolTeachers) {
+    const currentAssignments: TeacherTurmaAssignment[] =
+      Array.isArray(teacher.assignedTurmas) && teacher.assignedTurmas.length > 0
+        ? [...teacher.assignedTurmas]
+        : [
+            {
+              id: `asg-${teacher.id}-init`,
+              gradeClass: teacher.gradeClass || '4ª Classe',
+              turma: teacher.turma || 'Turma A',
+              room: teacher.room || 'Sala 01',
+              shift: teacher.shift || 'Manhã',
+              subject: teacher.subject || 'Regente (Todas as Disciplinas)',
+              isClassRegent: true,
+            },
+          ];
+
+    if (teacher.id === newTeacherId) {
+      // Adicionar ou atualizar esta Classe + Turma nas turmas atribuídas deste professor
+      const existingIdx = currentAssignments.findIndex(
+        (a) => norm(a.gradeClass) === norm(gradeClass) && norm(a.turma) === norm(turma)
+      );
+      const newAssignment: TeacherTurmaAssignment = {
+        id: existingIdx >= 0 ? currentAssignments[existingIdx].id : `asg-${teacher.id}-${Date.now()}`,
+        gradeClass,
+        turma,
+        room: room || teacher.room || 'Sala 01',
+        shift: shift || teacher.shift || 'Manhã',
+        subject: subject || teacher.subject || 'Regente (Todas as Disciplinas)',
+        isClassRegent: true,
+      };
+
+      if (existingIdx >= 0) {
+        currentAssignments[existingIdx] = newAssignment;
+      } else {
+        currentAssignments.unshift(newAssignment);
+      }
+
+      const saved = distributeTeacherTurmas(
+        {
+          ...teacher,
+          gradeClass: currentAssignments[0].gradeClass,
+          turma: currentAssignments[0].turma,
+          room: currentAssignments[0].room,
+          shift: currentAssignments[0].shift,
+          assignedTurmas: currentAssignments,
+        },
+        authorName
+      );
+      updatedList.push(saved);
+    } else {
+      // Se outro professor tinha regência exatamente desta Classe + Turma como única ou secundária
+      const hadThisTurma = currentAssignments.some(
+        (a) => norm(a.gradeClass) === norm(gradeClass) && norm(a.turma) === norm(turma) && a.isClassRegent !== false
+      );
+      if (hadThisTurma && currentAssignments.length > 1) {
+        const filtered = currentAssignments.filter(
+          (a) => !(norm(a.gradeClass) === norm(gradeClass) && norm(a.turma) === norm(turma))
+        );
+        const saved = distributeTeacherTurmas(
+          {
+            ...teacher,
+            gradeClass: filtered[0].gradeClass,
+            turma: filtered[0].turma,
+            room: filtered[0].room,
+            shift: filtered[0].shift,
+            assignedTurmas: filtered,
+          },
+          authorName
+        );
+        updatedList.push(saved);
+      } else {
+        updatedList.push(teacher);
+      }
+    }
+  }
+
+  return updatedList;
+}
+
 

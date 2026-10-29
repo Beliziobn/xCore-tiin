@@ -208,6 +208,16 @@ export type DirectorPageType =
   | 'classes' 
   | 'perfil';
 
+export interface TeacherTurmaAssignment {
+  id: string;
+  gradeClass: string; // e.g. "4ª Classe" or "7ª Classe"
+  turma: string; // e.g. "Turma A"
+  room: string; // e.g. "Sala 03"
+  shift: 'Manhã' | 'Tarde' | 'Integral';
+  subject: string; // e.g. "Matemática" or "Regente (Todas as Disciplinas)"
+  isClassRegent?: boolean; // Diretor de Turma / Professor Regente
+}
+
 export interface DirectorTeacher {
   id: string;
   name: string;
@@ -222,6 +232,7 @@ export interface DirectorTeacher {
   shift: 'Manhã' | 'Tarde' | 'Integral';
   phone?: string;
   email?: string;
+  assignedTurmas?: TeacherTurmaAssignment[];
   registrationData?: TeacherRegistrationData;
   schedule: {
     day: string;
@@ -378,6 +389,9 @@ export interface TurmaDetail {
   shift?: string;
   room?: string;
   isFull?: boolean;
+  responsibleTeacherId?: string;
+  responsibleTeacherName?: string;
+  responsibleSubject?: string;
 }
 
 export interface DirectorClass {
@@ -599,6 +613,7 @@ export interface AdminTeacher {
   subject: string;
   gender?: 'F' | 'M' | string;
   qualification?: string;
+  assignedTurmas?: TeacherTurmaAssignment[];
   registrationData?: TeacherRegistrationData;
 }
 
@@ -967,6 +982,11 @@ export interface TeacherRegistrationData {
   turnos: ('Manhã' | 'Tarde' | 'Noite')[];
   necessidadesFormacaoContinua?: string;
   disponibilidadeOutrosNiveis?: string;
+  assignedTurmas?: TeacherTurmaAssignment[];
+  primaryGradeClass?: string;
+  primaryTurma?: string;
+  primaryRoom?: string;
+  primaryShift?: 'Manhã' | 'Tarde' | 'Integral';
 
   // Auditoria
   historicoAlteracoes: TeacherAuditLog[];

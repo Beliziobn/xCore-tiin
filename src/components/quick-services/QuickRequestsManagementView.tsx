@@ -900,11 +900,6 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                 : 'Serviços Rápidos & Despachos de Cidadãos'}
             </h1>
           </div>
-          <p className="text-xs text-[#52606d] mt-1">
-            {isDirectorOnly
-              ? 'Verificação automática de matrícula nas turmas, extração de notas das Mini-Pautas/Pautas e consulta inter-escolar de vagas para transferência.'
-              : 'Gestão central de solicitações, verificação de matrículas, boletins automáticos e transferências entre escolas.'}
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1772,22 +1767,6 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                     )}
                   </div>
                 </div>
-
-                {/* Despacho & Resolution History */}
-                {details.responseMessage && (
-                  <div className="pt-3 border-t border-[#e8e8ea] text-xs space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2 font-semibold text-[#0b7a54]">
-                      <span>Despacho / Histórico de Tramitação Oficial</span>
-                      {details.resolvedAt && (
-                        <span className="text-[11px] text-[#52606d] font-normal numeric">
-                          Actualizado em: {new Date(details.resolvedAt).toLocaleDateString('pt-PT')} por{' '}
-                          {details.resolvedBy}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[#52606d] leading-relaxed">"{details.responseMessage}"</p>
-                  </div>
-                )}
               </div>
             );
           })}

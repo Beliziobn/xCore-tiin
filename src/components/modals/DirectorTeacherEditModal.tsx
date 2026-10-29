@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Briefcase
 } from 'lucide-react';
-import type { DirectorTeacher, TeacherRegistrationData } from '../../types';
+import type { DirectorTeacher, TeacherRegistrationData, TeacherTurmaAssignment } from '../../types';
+import { getDisciplinasForClass } from '../../utils/miniPautaStorage';
 
 interface DirectorTeacherEditModalProps {
   isOpen: boolean;
@@ -53,6 +54,9 @@ const GRADE_PRESETS = [
   '7ª Classe',
   '8ª Classe',
   '9ª Classe',
+  '10ª Classe',
+  '11ª Classe',
+  '12ª Classe',
   'PRAEER - Etapa 1',
   'PRAEER - Etapa 2',
   'PRAEER - Etapa 3',
@@ -98,6 +102,15 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
   const [location, setLocation] = useState(teacher?.location || 'Pavilhão 1 - Bloco B');
   const [presenceRate, setPresenceRate] = useState<number>(teacher?.presenceRate ?? 98.5);
 
+  // Turmas Atribuídas (Distribuição e Redefinição de Turmas sob Responsabilidade)
+  const [assignedTurmas, setAssignedTurmas] = useState<TeacherTurmaAssignment[]>([]);
+  const [newTurmaGrade, setNewTurmaGrade] = useState('4ª Classe');
+  const [newTurmaName, setNewTurmaName] = useState('Turma B');
+  const [newTurmaRoom, setNewTurmaRoom] = useState('Sala 04');
+  const [newTurmaShift, setNewTurmaShift] = useState<'Manhã' | 'Tarde' | 'Integral'>('Manhã');
+  const [newTurmaSubject, setNewTurmaSubject] = useState('Língua Portuguesa');
+  const [newTurmaIsRegent, setNewTurmaIsRegent] = useState(true);
+
   // Schedule State
   const [schedule, setSchedule] = useState<{ day: string; period: string; subject: string; room: string }[]>(
     teacher?.schedule ? [...teacher.schedule] : []
@@ -127,11 +140,109 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
       setSchedule(teacher.schedule ? [...teacher.schedule] : []);
       setNewSubject(teacher.subject || 'Língua Portuguesa');
       setNewRoom(teacher.room || 'Sala 03');
+
+      const initialAssignments: TeacherTurmaAssignment[] =
+        Array.isArray(teacher.assignedTurmas) && teacher.assignedTurmas.length > 0
+          ? teacher.assignedTurmas.map((a) => ({ ...a }))
+          : [
+              {
+                id: `asg-${teacher.id}-primary`,
+                gradeClass: teacher.gradeClass || '4ª Classe',
+                turma: teacher.turma || 'Turma A',
+                room: teacher.room || 'Sala 03',
+                shift: teacher.shift || 'Manhã',
+                subject: teacher.subject || 'Regente (Todas as Disciplinas)',
+                isClassRegent: true,
+              },
+            ];
+      setAssignedTurmas(initialAssignments);
+      setNewTurmaGrade(teacher.gradeClass || '4ª Classe');
+      setNewTurmaSubject(teacher.subject || 'Língua Portuguesa');
+      setNewTurmaShift(teacher.shift || 'Manhã');
     }
   }, [teacher, schoolName]);
 
   // Unconditional hook declarations complete. Guard render if not open or no teacher.
   if (!isOpen || !teacher) return null;
+
+  const handleUpdateAssignedTurma = (
+    idx: number,
+    patch: Partial<TeacherTurmaAssignment>
+  ) => {
+    setAssignedTurmas((prev) => {
+      const next = prev.map((item, i) => (i === idx ? { ...item, ...patch } : item));
+      if (idx === 0 && next[0]) {
+        setGradeClass(next[0].gradeClass);
+        setTurma(next[0].turma);
+        setRoom(next[0].room);
+        setShift(next[0].shift);
+        setSubject(next[0].subject);
+      }
+      return next;
+    });
+  };
+
+  const handleSetPrimaryTurma = (idx: number) => {
+    setAssignedTurmas((prev) => {
+      if (idx <= 0 || idx >= prev.length) return prev;
+      const chosen = prev[idx];
+      const rest = prev.filter((_, i) => i !== idx);
+      const next = [chosen, ...rest];
+      setGradeClass(chosen.gradeClass);
+      setTurma(chosen.turma);
+      setRoom(chosen.room);
+      setShift(chosen.shift);
+      setSubject(chosen.subject);
+      return next;
+    });
+  };
+
+  const handleAddAssignedTurma = () => {
+    if (!newTurmaGrade.trim() || !newTurmaName.trim()) {
+      setErrorMsg('Informe a Classe e a Turma para atribuir ao professor.');
+      return;
+    }
+    setErrorMsg(null);
+    const newEntry: TeacherTurmaAssignment = {
+      id: `asg-${teacher.id}-${Date.now()}`,
+      gradeClass: newTurmaGrade.trim(),
+      turma: newTurmaName.trim(),
+      room: newTurmaRoom.trim() || 'Sala 01',
+      shift: newTurmaShift,
+      subject: newTurmaSubject.trim() || subject || 'Regente (Todas as Disciplinas)',
+      isClassRegent: newTurmaIsRegent,
+    };
+    setAssignedTurmas((prev) => {
+      const next = [...prev, newEntry];
+      if (next.length === 1) {
+        setGradeClass(newEntry.gradeClass);
+        setTurma(newEntry.turma);
+        setRoom(newEntry.room);
+        setShift(newEntry.shift);
+        setSubject(newEntry.subject);
+      }
+      return next;
+    });
+  };
+
+  const handleRemoveAssignedTurma = (idx: number) => {
+    if (assignedTurmas.length <= 1) {
+      setErrorMsg('O professor deve ter pelo menos 1 turma atribuída sob sua responsabilidade. Pode redefinir a classe/turma diretamente na linha.');
+      return;
+    }
+    setErrorMsg(null);
+    setAssignedTurmas((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (next[0]) {
+        setGradeClass(next[0].gradeClass);
+        setTurma(next[0].turma);
+        setRoom(next[0].room);
+        setShift(next[0].shift);
+        setSubject(next[0].subject);
+      }
+      return next;
+    });
+  };
 
   const handleAddScheduleItem = () => {
     if (!newDay || !newPeriod || !newSubject) {
@@ -162,20 +273,38 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
       return;
     }
 
+    const finalAssignments: TeacherTurmaAssignment[] =
+      assignedTurmas.length > 0
+        ? assignedTurmas
+        : [
+            {
+              id: `asg-${teacher.id}-primary`,
+              gradeClass: gradeClass.trim(),
+              turma: turma.trim(),
+              room: room.trim(),
+              shift,
+              subject: subject.trim(),
+              isClassRegent: true,
+            },
+          ];
+
+    const primary = finalAssignments[0];
+
     const updatedTeacher: DirectorTeacher = {
       ...teacher,
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim(),
       schoolName: targetSchool.trim(),
-      gradeClass: gradeClass.trim(),
-      room: room.trim(),
-      turma: turma.trim(),
-      shift,
-      subject: subject.trim(),
+      gradeClass: primary.gradeClass.trim(),
+      room: primary.room.trim(),
+      turma: primary.turma.trim(),
+      shift: primary.shift,
+      subject: primary.subject.trim() || subject.trim(),
       location: location.trim(),
       presenceRate: Number(presenceRate) || 98,
       directorName: teacher.directorName || directorName,
+      assignedTurmas: finalAssignments,
       schedule,
     };
 
@@ -183,9 +312,11 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
     onClose();
   };
 
+  const availableSubjectsForNewTurma = getDisciplinasForClass(newTurmaGrade);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
           <div className="flex items-center gap-3">
@@ -195,14 +326,15 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-                  Editar Dados do Professor
+                  Distribuir & Redefinir Turmas do Professor
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
                   Gestão do Diretor
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                {teacher.name} • {teacher.gradeClass} ({teacher.turma}) • {teacher.room}
+                {teacher.name} • {assignedTurmas.length}{' '}
+                {assignedTurmas.length === 1 ? 'turma atribuída' : 'turmas atribuídas'}
               </p>
             </div>
           </div>
@@ -228,7 +360,10 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>Alocação & Dados Escolares</span>
+            <span>Distribuição & Redefinição de Turmas</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-100 text-[#f75142] font-bold ml-0.5">
+              {assignedTurmas.length}
+            </span>
           </button>
 
           <button
@@ -270,14 +405,345 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
             </div>
           )}
 
-          {/* TAB 1: ALOCAÇÃO & DADOS ESCOLARES */}
+          {/* TAB 1: DISTRIBUIÇÃO & REDEFINIÇÃO DE TURMAS */}
           {activeTab === 'alocacao' && (
             <div className="space-y-4">
-              {/* Identificação Geral */}
+              {/* QUADRO DE TURMAS SOB RESPONSABILIDADE DO PROFESSOR */}
+              <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-200/80 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-blue-950 block text-xs flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-blue-700" />
+                      <span>1. Turmas Atribuídas sob Responsabilidade do Professor</span>
+                    </span>
+                    <p className="text-[11px] text-blue-800/80 mt-0.5">
+                      Redefina a classe, turma, sala, turno ou disciplina de cada turma, ou adicione novas turmas ao docente.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-900 text-white">
+                    {assignedTurmas.length} {assignedTurmas.length === 1 ? 'Turma Atribuída' : 'Turmas Atribuídas'}
+                  </span>
+                </div>
+
+                <datalist id="grade-presets">
+                  {GRADE_PRESETS.map((g) => (
+                    <option key={g} value={g} />
+                  ))}
+                </datalist>
+                <datalist id="room-presets">
+                  {ROOM_PRESETS.map((r) => (
+                    <option key={r} value={r} />
+                  ))}
+                </datalist>
+                <datalist id="turma-presets">
+                  {TURMA_PRESETS.map((tm) => (
+                    <option key={tm} value={tm} />
+                  ))}
+                </datalist>
+
+                <div className="space-y-2.5">
+                  {assignedTurmas.map((asg, idx) => (
+                    <div
+                      key={asg.id || idx}
+                      className={`p-3 rounded-xl border transition-all ${
+                        idx === 0
+                          ? 'bg-white border-blue-400 shadow-xs ring-1 ring-blue-400/30'
+                          : 'bg-white/90 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              idx === 0
+                                ? 'bg-[#f75142] text-white'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {idx === 0 ? 'Turma Principal' : `Turma #${idx + 1}`}
+                          </span>
+                          <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={asg.isClassRegent !== false}
+                              onChange={(e) =>
+                                handleUpdateAssignedTurma(idx, {
+                                  isClassRegent: e.target.checked,
+                                })
+                              }
+                              className="rounded border-slate-300 text-[#f75142] focus:ring-[#f75142]"
+                            />
+                            <span>Diretor de Turma / Professor Regente</span>
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetPrimaryTurma(idx)}
+                              className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
+                              title="Tornar esta a turma principal do professor"
+                            >
+                              Definir como Principal
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAssignedTurma(idx)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Remover esta turma da responsabilidade do professor"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                            Classe
+                          </label>
+                          <select
+                            value={asg.gradeClass}
+                            onChange={(e) =>
+                              handleUpdateAssignedTurma(idx, {
+                                gradeClass: e.target.value,
+                              })
+                            }
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                          >
+                            {!GRADE_PRESETS.includes(asg.gradeClass) && (
+                              <option value={asg.gradeClass}>{asg.gradeClass}</option>
+                            )}
+                            {GRADE_PRESETS.map((g) => (
+                              <option key={g} value={g}>
+                                {g}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                            Turma
+                          </label>
+                          <select
+                            value={asg.turma}
+                            onChange={(e) =>
+                              handleUpdateAssignedTurma(idx, {
+                                turma: e.target.value,
+                              })
+                            }
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                          >
+                            {!TURMA_PRESETS.includes(asg.turma) && (
+                              <option value={asg.turma}>{asg.turma}</option>
+                            )}
+                            {TURMA_PRESETS.map((tm) => (
+                              <option key={tm} value={tm}>
+                                {tm}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                            Sala
+                          </label>
+                          <select
+                            value={asg.room}
+                            onChange={(e) =>
+                              handleUpdateAssignedTurma(idx, {
+                                room: e.target.value,
+                              })
+                            }
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                          >
+                            {!ROOM_PRESETS.includes(asg.room) && (
+                              <option value={asg.room}>{asg.room}</option>
+                            )}
+                            {ROOM_PRESETS.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                            Turno
+                          </label>
+                          <select
+                            value={asg.shift}
+                            onChange={(e) =>
+                              handleUpdateAssignedTurma(idx, {
+                                shift: e.target.value as 'Manhã' | 'Tarde' | 'Integral',
+                              })
+                            }
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                          >
+                            <option value="Manhã">Manhã</option>
+                            <option value="Tarde">Tarde</option>
+                            <option value="Integral">Integral</option>
+                          </select>
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                            Disciplina / Função
+                          </label>
+                          <input
+                            type="text"
+                            value={asg.subject}
+                            onChange={(e) =>
+                              handleUpdateAssignedTurma(idx, {
+                                subject: e.target.value,
+                              })
+                            }
+                            placeholder="Ex: Matemática ou Regente"
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Formulário para atribuir mais uma turma ao professor */}
+                <div className="p-3 bg-white rounded-xl border border-dashed border-blue-300 space-y-2.5">
+                  <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-[#f75142]" />
+                    <span>Distribuir / Atribuir Nova Turma a este Professor</span>
+                  </span>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Classe
+                      </label>
+                      <select
+                        value={newTurmaGrade}
+                        onChange={(e) => {
+                          const g = e.target.value;
+                          setNewTurmaGrade(g);
+                          const discs = getDisciplinasForClass(g);
+                          if (discs.length > 0) {
+                            setNewTurmaSubject(discs[0]);
+                          }
+                        }}
+                        className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                      >
+                        {GRADE_PRESETS.map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Turma
+                      </label>
+                      <select
+                        value={newTurmaName}
+                        onChange={(e) => setNewTurmaName(e.target.value)}
+                        className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                      >
+                        {TURMA_PRESETS.map((tm) => (
+                          <option key={tm} value={tm}>
+                            {tm}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Sala
+                      </label>
+                      <select
+                        value={newTurmaRoom}
+                        onChange={(e) => setNewTurmaRoom(e.target.value)}
+                        className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                      >
+                        {ROOM_PRESETS.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Turno
+                      </label>
+                      <select
+                        value={newTurmaShift}
+                        onChange={(e) =>
+                          setNewTurmaShift(e.target.value as 'Manhã' | 'Tarde' | 'Integral')
+                        }
+                        className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                      >
+                        <option value="Manhã">Manhã</option>
+                        <option value="Tarde">Tarde</option>
+                        <option value="Integral">Integral</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Disciplina
+                      </label>
+                      <select
+                        value={newTurmaSubject}
+                        onChange={(e) => setNewTurmaSubject(e.target.value)}
+                        className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                      >
+                        <option value="Regente (Todas as Disciplinas)">
+                          Regente (Todas as Disciplinas)
+                        </option>
+                        {availableSubjectsForNewTurma.map((dName) => (
+                          <option key={dName} value={dName}>
+                            {dName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newTurmaIsRegent}
+                        onChange={(e) => setNewTurmaIsRegent(e.target.checked)}
+                        className="rounded border-slate-300 text-[#f75142] focus:ring-[#f75142]"
+                      />
+                      <span>Designar como Diretor de Turma / Professor Regente desta turma</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handleAddAssignedTurma}
+                      className="px-3.5 py-1.5 bg-[#002133] hover:bg-[#00334e] text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-[#f75142]" />
+                      <span>Atribuir Turma ao Professor</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Identificação Geral & Contacto */}
               <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
                 <span className="font-bold text-slate-800 block text-xs flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-[#f75142]" />
-                  <span>1. Identificação Básica & Contacto</span>
+                  <span>2. Identificação Básica, Contacto & Localização</span>
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -329,105 +795,6 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="professor@ucore.edu.ao"
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Alocação Pedagógica */}
-              <div className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3">
-                <span className="font-bold text-blue-900 block text-xs flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-blue-700" />
-                  <span>2. Alocação Pedagógica (Turma, Sala e Turno)</span>
-                </span>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Classe */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Classe / Ano Escolar
-                    </label>
-                    <input
-                      type="text"
-                      list="grade-presets"
-                      value={gradeClass}
-                      onChange={(e) => setGradeClass(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                    />
-                    <datalist id="grade-presets">
-                      {GRADE_PRESETS.map((g) => (
-                        <option key={g} value={g} />
-                      ))}
-                    </datalist>
-                  </div>
-
-                  {/* Sala */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Sala de Aula
-                    </label>
-                    <input
-                      type="text"
-                      list="room-presets"
-                      value={room}
-                      onChange={(e) => setRoom(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                    />
-                    <datalist id="room-presets">
-                      {ROOM_PRESETS.map((r) => (
-                        <option key={r} value={r} />
-                      ))}
-                    </datalist>
-                  </div>
-
-                  {/* Turma */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Turma
-                    </label>
-                    <input
-                      type="text"
-                      list="turma-presets"
-                      value={turma}
-                      onChange={(e) => setTurma(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                    />
-                    <datalist id="turma-presets">
-                      {TURMA_PRESETS.map((tm) => (
-                        <option key={tm} value={tm} />
-                      ))}
-                    </datalist>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Turno */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Turno de Trabalho
-                    </label>
-                    <select
-                      value={shift}
-                      onChange={(e) => setShift(e.target.value as any)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
-                    >
-                      <option value="Manhã">Turno Manhã (07h30 - 12h30)</option>
-                      <option value="Tarde">Turno Tarde (13h00 - 18h00)</option>
-                      <option value="Integral">Integral / Manhã e Tarde</option>
-                    </select>
-                  </div>
-
-                  {/* Disciplina Principal */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Disciplina / Cadeira Principal
-                    </label>
-                    <input
-                      type="text"
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      placeholder="Ex.: Língua Portuguesa & Matemática"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#f75142]"
                     />
                   </div>
                 </div>

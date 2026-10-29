@@ -1355,35 +1355,86 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             regMap.set(key, { ...(regMap.get(key) || {}), ...regData });
           }
 
-          const subject = String(item.subject || item.disciplinas || regData?.disciplinas || 'Língua Portuguesa');
-          const gradeClass = String(
-            item.gradeClass || item.niveisLecciona?.[0]?.nome || regData?.niveisLecciona?.[0]?.nome || 'Ensino Primário'
+          const existingAdmin = adminMap.get(key);
+          const existingDir = dirMap.get(key);
+          const mergedReg = regMap.get(key) || regData;
+
+          const assignedTurmas =
+            item.assignedTurmas ||
+            mergedReg?.assignedTurmas ||
+            existingDir?.assignedTurmas ||
+            existingAdmin?.assignedTurmas;
+
+          const primaryTurmaEntry = assignedTurmas?.[0];
+
+          const subject = String(
+            item.subject ||
+              primaryTurmaEntry?.subject ||
+              item.disciplinas ||
+              mergedReg?.disciplinas ||
+              existingDir?.subject ||
+              'Língua Portuguesa'
           );
-          const phone = String(item.phone || item.telefone || regData?.telefone || '+244 923 000 000');
-          const email = String(item.email || regData?.email || '');
-          const room = String(item.room || 'Sala 01');
-          const turma = String(item.turma || 'Turma A');
+          const gradeClass = String(
+            item.gradeClass ||
+              item.primaryGradeClass ||
+              mergedReg?.primaryGradeClass ||
+              primaryTurmaEntry?.gradeClass ||
+              existingDir?.gradeClass ||
+              item.niveisLecciona?.[0]?.nome ||
+              mergedReg?.niveisLecciona?.[0]?.nome ||
+              'Ensino Primário'
+          );
+          const phone = String(item.phone || item.telefone || mergedReg?.telefone || existingDir?.phone || '+244 923 000 000');
+          const email = String(item.email || mergedReg?.email || existingDir?.email || '');
+          const room = String(
+            item.room ||
+              item.primaryRoom ||
+              mergedReg?.primaryRoom ||
+              primaryTurmaEntry?.room ||
+              existingDir?.room ||
+              existingAdmin?.room ||
+              'Sala 01'
+          );
+          const turma = String(
+            item.turma ||
+              item.primaryTurma ||
+              mergedReg?.primaryTurma ||
+              primaryTurmaEntry?.turma ||
+              existingDir?.turma ||
+              existingAdmin?.turma ||
+              'Turma A'
+          );
 
           const adminObj: AdminTeacher = {
-            id: id || `prof-${Date.now()}`,
+            id: id || existingAdmin?.id || `prof-${Date.now()}`,
             name: name,
             phone,
             gradeClass,
             room,
             turma,
-            category: item.category || item.funcaoCategoria || regData?.funcaoCategoria || 'Docente / Professor',
-            location: item.location || `${item.municipioEscola || regData?.municipioEscola || 'Quêssua'}`,
+            category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || existingAdmin?.category || 'Docente / Professor',
+            location: item.location || existingAdmin?.location || `${item.municipioEscola || mergedReg?.municipioEscola || 'Quêssua'}`,
             schoolName,
-            schoolId: item.schoolId || item.escolaId || regData?.escolaId,
-            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 100,
+            schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId || existingAdmin?.schoolId,
+            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : (existingAdmin?.presenceRate ?? 100),
             subject,
-            gender: (item.gender || (item.sexo === 'Feminino' || regData?.sexo === 'Feminino' ? 'F' : 'M')) as 'M' | 'F',
-            qualification: item.qualification || item.nivelAcademico || regData?.nivelAcademico,
-            registrationData: regData || adminMap.get(key)?.registrationData,
+            gender: (item.gender || (item.sexo === 'Feminino' || mergedReg?.sexo === 'Feminino' ? 'F' : 'M')) as 'M' | 'F',
+            qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico || existingAdmin?.qualification,
+            assignedTurmas,
+            registrationData: mergedReg || existingAdmin?.registrationData,
           };
-          adminMap.set(key, { ...(adminMap.get(key) || {}), ...adminObj });
+          adminMap.set(key, { ...(existingAdmin || {}), ...adminObj });
 
-          const shiftVal = (item.shift || (item.turnos?.[0] === 'Tarde' ? 'Tarde' : 'Manhã')) as 'Manhã' | 'Tarde';
+          const shiftVal = (
+            item.shift ||
+            item.primaryShift ||
+            mergedReg?.primaryShift ||
+            primaryTurmaEntry?.shift ||
+            existingDir?.shift ||
+            (item.turnos?.[0] === 'Tarde' || mergedReg?.turnos?.[0] === 'Tarde' ? 'Tarde' : 'Manhã')
+          ) as 'Manhã' | 'Tarde' | 'Integral';
+
           const dirObj: DirectorTeacher = {
             id: adminObj.id,
             name: adminObj.name,
@@ -1391,15 +1442,16 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             gradeClass: adminObj.gradeClass,
             room: adminObj.room,
             turma: adminObj.turma,
-            directorName: item.directorName || 'Direção Escolar',
+            directorName: item.directorName || existingDir?.directorName || 'Direção Escolar',
             location: adminObj.location,
             subject: adminObj.subject,
             presenceRate: adminObj.presenceRate,
             shift: shiftVal,
             phone: adminObj.phone,
             email: email || undefined,
+            assignedTurmas,
             registrationData: adminObj.registrationData,
-            schedule: item.schedule || dirMap.get(key)?.schedule || [
+            schedule: item.schedule || existingDir?.schedule || [
               {
                 day: 'Segunda',
                 period: shiftVal === 'Tarde' ? '13h00 - 17h15' : '07h30 - 12h00',
@@ -1408,7 +1460,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
               },
             ],
           };
-          dirMap.set(key, { ...(dirMap.get(key) || {}), ...dirObj });
+          dirMap.set(key, { ...(existingDir || {}), ...dirObj });
 
           if (!fromCloud) {
             const existsInCloud = cloudTeachers.some(
