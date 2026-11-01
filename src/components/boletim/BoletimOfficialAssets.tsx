@@ -1,100 +1,21 @@
 import React from 'react';
 
 /**
- * Insígnia Oficial da República de Angola em formato SVG vetorial nítido
+ * Insígnia Oficial da República de Angola
  */
 export const AngolaCoatOfArms: React.FC<{ className?: string; size?: number }> = ({
   className = '',
   size = 54,
 }) => {
   return (
-    <svg
+    <img
+      src="/assets/aistudio/Emblem_of_Angola.svg_72d14653.webp"
+      alt="Insígnia da República de Angola"
       width={size}
       height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+      style={{ width: size, height: 'auto' }}
       className={className}
-      aria-label="Insígnia da República de Angola"
-    >
-      {/* Círculo de fundo dourado suave */}
-      <circle cx="50" cy="50" r="48" fill="#FFFBEB" stroke="#D97706" strokeWidth="2" />
-
-      {/* Roda dentada (esquerda / base) */}
-      <circle
-        cx="50"
-        cy="50"
-        r="38"
-        stroke="#B45309"
-        strokeWidth="3"
-        strokeDasharray="4 2"
-        fill="none"
-      />
-
-      {/* Sol nascente no centro */}
-      <circle cx="50" cy="52" r="14" fill="#FBBF24" />
-      <path
-        d="M50 34V28M50 76V70M26 52H20M80 52H74M33 35L29 31M71 73L67 69M33 69L29 73M71 35L67 31"
-        stroke="#D97706"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-
-      {/* Livro aberto (Educação) */}
-      <path
-        d="M34 68C42 66 48 68 50 70C52 68 58 66 66 68V54C58 52 52 54 50 56C48 54 42 52 34 54V68Z"
-        fill="#FFFFFF"
-        stroke="#0F172A"
-        strokeWidth="1.5"
-      />
-      <line x1="50" y1="56" x2="50" y2="70" stroke="#0F172A" strokeWidth="1.5" />
-
-      {/* Catana e Enxada cruzadas */}
-      <line x1="32" y1="62" x2="68" y2="38" stroke="#DC2626" strokeWidth="3" strokeLinecap="round" />
-      <line x1="68" y1="62" x2="32" y2="38" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" />
-
-      {/* Estrela Amarela de 5 pontas no topo */}
-      <polygon
-        points="50,18 53,26 61,26 55,31 57,39 50,34 43,39 45,31 39,26 47,26"
-        fill="#F59E0B"
-        stroke="#B45309"
-        strokeWidth="1"
-      />
-
-      {/* Ramos exteriores de milho e algodão */}
-      <path
-        d="M20 74C16 58 20 40 32 28"
-        stroke="#15803D"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M80 74C84 58 80 40 68 28"
-        stroke="#15803D"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-
-      {/* Fita inferior */}
-      <path
-        d="M22 84C32 80 50 82 50 82C50 82 68 80 78 84V89C68 85 50 87 50 87C50 87 32 85 22 89V84Z"
-        fill="#DC2626"
-        stroke="#991B1B"
-        strokeWidth="1"
-      />
-      <text
-        x="50"
-        y="87"
-        fontSize="5.5"
-        fontWeight="bold"
-        fill="#FFFFFF"
-        textAnchor="middle"
-        letterSpacing="0.5"
-        fontFamily="sans-serif"
-      >
-        REPÚBLICA DE ANGOLA
-      </text>
-    </svg>
+    />
   );
 };
 

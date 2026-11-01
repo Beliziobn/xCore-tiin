@@ -426,7 +426,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       cleanEmail.includes('dmedoquessua');
     const isSuperAdmin =
       cleanEmail === 'beliziodos20@gmail.com' ||
-      cleanEmail === 'socienciadaeduca2018@gmail.com' ||
       cleanEmail.includes('belizio');
 
     // 1. Sync fresh applications from server / Firestore to ensure we check any existing application
@@ -492,10 +491,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setLastName('');
       }
 
-      // Reinicia o assistente de inscrição no Passo 1 (escolher perfil e escola)
-      setRegStep(1);
+      // Se estava no login, inicia o assistente de inscrição no Passo 1; se já estava a inscrever-se, preserva o passo e perfil escolhidos
+      if (mode !== 'register') {
+        setRegStep(1);
+        setHasChosenRole(false);
+      }
       setRegistrationSubmitted(false);
-      setHasChosenRole(false);
       setStepErrors({});
       setFieldErrors({});
       setErrorMsg(null);
@@ -505,7 +506,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setMode('register');
       onModeChange?.('register');
       setGoogleNotice(
-        `O e-mail ${cleanEmail} ainda não possui conta registada no sistema. Selecione o seu perfil e escola (Passo 1 e 2) e conclua a sua inscrição com este e-mail.`
+        `O e-mail ${cleanEmail} foi vinculado com sucesso. Selecione o seu perfil e escola e conclua a sua inscrição com este e-mail.`
       );
 
       // Rola suavemente até ao início do formulário de inscrição
@@ -721,8 +722,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       municipalityOrDepartment: 'Quessua',
       titlePrefix: resolvedPrefix,
       greeting: `Olá ${resolvedPrefix} ${gFirst}`,
-      avatar: photoURL || undefined,
-      status: 'ativo',
+      avatar: photoURL || existingFirestoreUser?.avatar || undefined,
+      status:
+        existingFirestoreUser?.status === 'pendente'
+          ? 'pendente'
+          : 'ativo',
     };
 
     setSuccessMsg(`Autenticado com sucesso via Google (${cleanEmail})! A aceder à plataforma...`);
@@ -1026,9 +1030,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         // 3. Resolve exact role, scope, and cargo from the authenticated user's record
         //    (NEVER treat DME staff as School Directors or as the Municipal Director!)
         const isMasterAdmin =
-          cleanEmail === 'dmedoquessua@gmail.com' ||
-          cleanEmail === 'beliziodos20@gmail.com' ||
-          cleanEmail === 'socienciadaeduca2018@gmail.com';
+          cleanEmail === 'dmedoquessua@gmail.com' || cleanEmail === 'beliziodos20@gmail.com';
 
         let matchedScope: 'escola' | 'administracao' = 'escola';
         let matchedSchoolRole: SchoolStaffRole | undefined = undefined;
@@ -1043,19 +1045,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         let resolvedUserId = 'usr_' + Date.now();
 
         if (isMasterAdmin) {
-          const isBelizioOrUser = cleanEmail === 'beliziodos20@gmail.com' || cleanEmail === 'socienciadaeduca2018@gmail.com';
           matchedScope = 'administracao';
-          matchedAdminRole = isBelizioOrUser ? 'admin_sistema' : 'diretor_municipal';
+          matchedAdminRole = cleanEmail === 'beliziodos20@gmail.com' ? 'admin_sistema' : 'diretor_municipal';
           resolvedRole = 'admin';
           resolvedCargoTitle =
-            isBelizioOrUser
+            cleanEmail === 'beliziodos20@gmail.com'
               ? 'Administrador de Sistema Sigre (Super Admin)'
               : 'Director Municipal da Educação de Quessua';
-          resolvedPrefix = isBelizioOrUser ? 'Admin.' : 'Dr.';
-          resolvedFirst = isBelizioOrUser ? 'Belízio' : 'Director Municipal';
-          resolvedLast = isBelizioOrUser ? 'Administrador' : 'da Educação';
+          resolvedPrefix = cleanEmail === 'beliziodos20@gmail.com' ? 'Admin.' : 'Dr.';
+          resolvedFirst = cleanEmail === 'beliziodos20@gmail.com' ? 'Belízio' : 'Director Municipal';
+          resolvedLast = cleanEmail === 'beliziodos20@gmail.com' ? 'Administrador' : 'da Educação';
           resolvedSchoolName = 'Direcção Municipal da Educação de Quêssua';
-          resolvedUserId = isBelizioOrUser ? 'usr_belizio_admin' : 'usr_dme_quessua';
+          resolvedUserId = cleanEmail === 'beliziodos20@gmail.com' ? 'usr_belizio_admin' : 'usr_dme_quessua';
         } else if (accountLookup.app) {
           const app = accountLookup.app;
           resolvedUserId = app.userId || app.id || resolvedUserId;
@@ -2322,6 +2323,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </li>
                 </ol>
               </nav>
+
+              {!isGoogleLockedEmail && !registrationSubmitted && (
+                <div className="mb-5 flex flex-col gap-2">
+                  <GoogleSignInButton
+                    onClick={handleGoogleSignInFlow}
+                    isLoading={isGoogleLoading}
+                    label="Começar com o Google"
+                    className="w-full justify-center"
+                  />
+                </div>
+              )}
 
               {googleNotice && !registrationSubmitted && (
                 <div className="notice" style={{ marginBottom: 20, marginTop: 0 }}>

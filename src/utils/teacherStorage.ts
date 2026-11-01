@@ -372,7 +372,115 @@ export function saveTeacher(
   return updatedList;
 }
 
-export function deleteTeacher(id: string, teacherName?: string): TeacherRegistrationData[] {
+export function checkDuplicateTeacherBI(
+  biNif: string,
+  excludeId?: string
+): { isDuplicate: boolean; existingName?: string; existingRole?: string } {
+  const normBi = (biNif || '').trim().toUpperCase();
+  if (!normBi || normBi.length < 5) return { isDuplicate: false };
+
+  const currentTeachers = getStoredTeachers();
+  for (const t of currentTeachers) {
+    if (excludeId && t.id === excludeId) continue;
+    if ((t.biNif || '').trim().toUpperCase() === normBi) {
+      return {
+        isDuplicate: true,
+        existingName: t.nomeCompleto,
+        existingRole: `Professor(a) (${t.nomeEscola || 'Quadro Docente'})`,
+      };
+    }
+  }
+
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      // Check ucore_director_teachers_v1
+      const rawDir = localStorage.getItem('ucore_director_teachers_v1');
+      if (rawDir) {
+        const dirList = JSON.parse(rawDir);
+        if (Array.isArray(dirList)) {
+          for (const dt of dirList) {
+            if (excludeId && dt.id === excludeId) continue;
+            const dtBi = (dt.bi || dt.registrationData?.biNif || '').trim().toUpperCase();
+            if (dtBi && dtBi === normBi) {
+              return {
+                isDuplicate: true,
+                existingName: dt.name,
+                existingRole: `Professor(a) (${dt.schoolName || 'Quadro da Escola'})`,
+              };
+            }
+          }
+        }
+      }
+
+      // Check ucore_admin_teachers
+      const rawAdmin = localStorage.getItem('ucore_admin_teachers');
+      if (rawAdmin) {
+        const adminList = JSON.parse(rawAdmin);
+        if (Array.isArray(adminList)) {
+          for (const at of adminList) {
+            if (excludeId && at.id === excludeId) continue;
+            const atBi = (at.registrationData?.biNif || '').trim().toUpperCase();
+            if (atBi && atBi === normBi) {
+              return {
+                isDuplicate: true,
+                existingName: at.name,
+                existingRole: `Professor(a) (${at.schoolName || 'Rede Municipal'})`,
+              };
+            }
+          }
+        }
+      }
+
+      // Check ucore_pending_applications
+      const rawApps = localStorage.getItem('ucore_pending_applications');
+      if (rawApps) {
+        const appsList = JSON.parse(rawApps);
+        if (Array.isArray(appsList)) {
+          for (const app of appsList) {
+            if (!app || app.status === 'rejeitado') continue;
+            if (excludeId && (app.id === excludeId || app.userId === excludeId)) continue;
+            const appBi = (app.biNumber || '').trim().toUpperCase();
+            if (appBi && appBi === normBi) {
+              return {
+                isDuplicate: true,
+                existingName: app.fullName,
+                existingRole: app.roleRequested || 'Conta Registada',
+              };
+            }
+          }
+        }
+      }
+
+      // Check ucore_registered_directors_v2
+      const rawDirectors = localStorage.getItem('ucore_registered_directors_v2');
+      if (rawDirectors) {
+        const dirDossiers = JSON.parse(rawDirectors);
+        if (Array.isArray(dirDossiers)) {
+          for (const d of dirDossiers) {
+            if (excludeId && d.id === excludeId) continue;
+            if ((d.biNif || '').trim().toUpperCase() === normBi) {
+              return {
+                isDuplicate: true,
+                existingName: d.nomeCompleto,
+                existingRole: `Director(a) (${d.nomeEscola || 'Direcção Escolar'})`,
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return { isDuplicate: false };
+}
+
+export function deleteTeacher(
+  id: string,
+  teacherName?: string,
+  teacherBi?: string
+): TeacherRegistrationData[] {
   const normTargetName = (teacherName || '').trim().toLowerCase();
   const current = getStoredTeachers();
   const removed = current.find(
@@ -381,11 +489,14 @@ export function deleteTeacher(id: string, teacherName?: string): TeacherRegistra
       (normTargetName && t.nomeCompleto.trim().toLowerCase() === normTargetName)
   );
   const targetName = normTargetName || (removed?.nomeCompleto || '').trim().toLowerCase();
+  const targetBi = (teacherBi || removed?.biNif || '').trim().toUpperCase();
+  const targetEmail = (removed?.email || '').trim().toLowerCase();
 
   const updated = current.filter(
     (t) =>
       t.id !== id &&
-      (!targetName || t.nomeCompleto.trim().toLowerCase() !== targetName)
+      (!targetName || t.nomeCompleto.trim().toLowerCase() !== targetName) &&
+      (!targetBi || (t.biNif || '').trim().toUpperCase() !== targetBi)
   );
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
@@ -393,12 +504,14 @@ export function deleteTeacher(id: string, teacherName?: string): TeacherRegistra
 
       // Remover de ucore_admin_teachers
       const rawAdmin = localStorage.getItem('ucore_admin_teachers');
+      let filteredAdmin: AdminTeacher[] = [];
       if (rawAdmin) {
         const adminList: AdminTeacher[] = JSON.parse(rawAdmin);
-        const filteredAdmin = adminList.filter(
+        filteredAdmin = adminList.filter(
           (at) =>
             at.id !== id &&
-            (!targetName || at.name.trim().toLowerCase() !== targetName)
+            (!targetName || at.name.trim().toLowerCase() !== targetName) &&
+            (!targetBi || (at.registrationData?.biNif || '').trim().toUpperCase() !== targetBi)
         );
         localStorage.setItem('ucore_admin_teachers', JSON.stringify(filteredAdmin));
       }
@@ -410,16 +523,69 @@ export function deleteTeacher(id: string, teacherName?: string): TeacherRegistra
         const filteredDir = dirList.filter(
           (dt) =>
             dt.id !== id &&
-            (!targetName || dt.name.trim().toLowerCase() !== targetName)
+            (!targetName || dt.name.trim().toLowerCase() !== targetName) &&
+            (!targetBi || (dt.registrationData?.biNif || '').trim().toUpperCase() !== targetBi)
         );
         localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(filteredDir));
       }
 
-      // Remover do Firestore em tempo real
+      // Libertar registo vinculado em ucore_pending_applications (para liberar o nº do BI)
+      const rawApps = localStorage.getItem('ucore_pending_applications');
+      if (rawApps) {
+        const appsList = JSON.parse(rawApps);
+        if (Array.isArray(appsList)) {
+          const filteredApps = appsList.filter((app: any) => {
+            if (!app) return false;
+            if (app.id === id || app.userId === id) return false;
+            if (targetBi && (app.biNumber || '').trim().toUpperCase() === targetBi) return false;
+            if (targetEmail && (app.email || '').trim().toLowerCase() === targetEmail && app.type === 'professor') {
+              return false;
+            }
+            return true;
+          });
+          localStorage.setItem('ucore_pending_applications', JSON.stringify(filteredApps));
+        }
+      }
+
+      // Remover referências de regência em ucore_director_classes
+      const rawClasses = localStorage.getItem('ucore_director_classes');
+      if (rawClasses) {
+        const classesList: DirectorClass[] = JSON.parse(rawClasses);
+        if (Array.isArray(classesList)) {
+          const cleanedClasses = classesList.map((cls) => ({
+            ...cls,
+            teachers: (cls.teachers || []).filter(
+              (tName) => !targetName || tName.trim().toLowerCase() !== targetName
+            ),
+            turmasDetails: (cls.turmasDetails || []).map((td) => {
+              if (
+                td.responsibleTeacherId === id ||
+                (targetName && (td.responsibleTeacherName || '').trim().toLowerCase() === targetName)
+              ) {
+                return {
+                  ...td,
+                  responsibleTeacherId: undefined,
+                  responsibleTeacherName: undefined,
+                  responsibleSubject: undefined,
+                };
+              }
+              return td;
+            }),
+          }));
+          localStorage.setItem('ucore_director_classes', JSON.stringify(cleanedClasses));
+        }
+      }
+
+      // Remover do Firestore e sincronizar servidor em tempo real
       deleteTeacherFromFirestore(id).catch(() => {});
       if (targetName) {
         deleteTeacherFromFirestore(targetName).catch(() => {});
       }
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teachers: filteredAdmin }),
+      }).catch(() => {});
 
       window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));

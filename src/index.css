@@ -1124,6 +1124,7 @@ html.lenis.lenis-stopped {
   #root,
   #root > div,
   #main-content,
+  #director-students-page,
   #declaracao-efectividade-page,
   #declaracao-efectividade-page > main,
   #declaracao-efectividade-page > main > div,
@@ -1146,6 +1147,10 @@ html.lenis.lenis-stopped {
     overflow: hidden !important;
   }
 
+  #director-students-page > *:not(:has(#boletim-a4-document)) {
+    display: none !important;
+  }
+
   #siteHeader,
   #ucore-hero-section,
   #ucore-cloud-footer,
@@ -1166,8 +1171,11 @@ html.lenis.lenis-stopped {
   }
 
   #oficial-a4-sheet,
-  #official-modal-print-sheet {
-    display: block !important;
+  #official-modal-print-sheet,
+  #boletim-a4-document {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
     box-sizing: border-box !important;
     width: 210mm !important;
     max-width: 210mm !important;

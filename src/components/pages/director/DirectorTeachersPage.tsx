@@ -18,7 +18,9 @@ import {
   LayoutGrid,
   List,
   GraduationCap,
-  Eye
+  Eye,
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
@@ -36,6 +38,7 @@ import { getPendingApplications, approveApplication, rejectApplication } from '.
 import {
   getRegistrationDataFromDirectorTeacher,
   saveTeacher,
+  deleteTeacher,
   distributeTeacherTurmas,
   assignResponsibleTeacherToClassTurma,
 } from '../../../utils/teacherStorage';
@@ -102,6 +105,22 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   const [isFullDossierModalOpen, setIsFullDossierModalOpen] = useState(false);
   const [dossierToEdit, setDossierToEdit] = useState<TeacherRegistrationData | null>(null);
   const [editToast, setEditToast] = useState<string | null>(null);
+  const [teacherToDelete, setTeacherToDelete] = useState<DirectorTeacher | null>(null);
+
+  const handleConfirmDeleteTeacher = () => {
+    if (!teacherToDelete) return;
+    const tName = teacherToDelete.name;
+    const tBi = teacherToDelete.registrationData?.biNif;
+    deleteTeacher(teacherToDelete.id, tName, tBi);
+    const remaining = teachers.filter((t) => t.id !== teacherToDelete.id);
+    persistTeachers(remaining);
+    if (selectedTeacherId === teacherToDelete.id) {
+      setSelectedTeacherId(remaining[0]?.id || '');
+    }
+    setTeacherToDelete(null);
+    setEditToast(`Professor(a) "${tName}" foi apagado(a) do quadro e o respetivo nº do BI ficou disponível.`);
+    setTimeout(() => setEditToast(null), 5000);
+  };
 
   // Pending teacher applications & Turma distribution workflow
   const [activeTab, setActiveTab] = useState<'quadro' | 'distribuicao' | 'candidaturas'>('quadro');
@@ -585,14 +604,24 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(t, 'alocacao')}
-                          className="w-full py-2 px-3 rounded-lg bg-[#002133] hover:bg-black text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-[#f75142]" />
-                          <span>Distribuir / Redefinir Turmas</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(t, 'alocacao')}
+                            className="flex-1 py-2 px-3 rounded-lg bg-[#002133] hover:bg-black text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-[#f75142]" />
+                            <span>Distribuir / Redefinir Turmas</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTeacherToDelete(t)}
+                            className="p-2 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                            title="Apagar Professor do Quadro"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1063,6 +1092,14 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                             <GraduationCap className="w-3 h-3" />
                             <span className="hidden sm:inline">Dossiê</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setTeacherToDelete(teacher)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                            title="Apagar Professor(a) do Quadro"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1143,6 +1180,16 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
               >
                 <GraduationCap className="w-3.5 h-3.5" />
                 <span>Dossiê Ministerial</span>
+              </button>
+              <button
+                id="btn-apagar-docente-selecionado"
+                type="button"
+                onClick={() => currentTeacher && setTeacherToDelete(currentTeacher)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Apagar Professor do Quadro"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Apagar Professor</span>
               </button>
             </div>
           </div>
@@ -1489,6 +1536,46 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
         schoolName={schoolName}
         directorName={directorName}
       />
+
+      {/* Modal de Confirmação de Exclusão de Professor */}
+      {teacherToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  Apagar Professor(a) do Quadro?
+                </h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Tem a certeza que deseja apagar o registo de{' '}
+                  <strong className="text-slate-900">{teacherToDelete.name}</strong>? Esta ação remove o docente do quadro da escola e liberta o respetivo número do BI para novo registo se necessário.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setTeacherToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTeacher}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirmar e Apagar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

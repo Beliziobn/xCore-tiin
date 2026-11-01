@@ -864,16 +864,13 @@ export function getOccupiedDmeCargos(): Record<
  */
 export function checkDuplicateRegistration(
   email: string,
-  biNumber?: string
+  biNumber?: string,
+  excludeId?: string
 ): { duplicate: boolean; reason?: string } {
   const normEmail = (email || '').trim().toLowerCase();
   const normBi = (biNumber || '').trim().toUpperCase();
 
-  if (
-    normEmail === OFFICIAL_DME_ADMIN_EMAIL ||
-    normEmail === 'beliziodos20@gmail.com' ||
-    normEmail === 'socienciadaeduca2018@gmail.com'
-  ) {
+  if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
     return {
       duplicate: true,
       reason:
@@ -885,6 +882,7 @@ export function checkDuplicateRegistration(
   const apps = getPendingApplications();
   for (const app of apps) {
     if (app.status === 'rejeitado') continue;
+    if (excludeId && (app.id === excludeId || app.userId === excludeId)) continue;
     if (normEmail && app.email && app.email.trim().toLowerCase() === normEmail) {
       return {
         duplicate: true,
@@ -894,7 +892,7 @@ export function checkDuplicateRegistration(
     if (normBi && normBi.length >= 5 && app.biNumber && app.biNumber.trim().toUpperCase() === normBi) {
       return {
         duplicate: true,
-        reason: `O Bilhete de Identidade "${biNumber?.trim()}" já se encontra vinculado à conta de ${app.fullName} (${app.roleRequested || 'Utilizador'}).`,
+        reason: `O Bilhete de Identidade nº "${biNumber?.trim().toUpperCase()}" já se encontra vinculado à conta de ${app.fullName} (${app.roleRequested || 'Utilizador'}). Não é permitido ter duas contas ou registos com o mesmo número do BI.`,
       };
     }
   }
@@ -905,18 +903,79 @@ export function checkDuplicateRegistration(
     if (rawDme) {
       const dmeList = JSON.parse(rawDme);
       if (Array.isArray(dmeList)) {
-        const foundDme = dmeList.find(
-          (m: any) => m && m.email && m.email.trim().toLowerCase() === normEmail
-        );
-        if (foundDme) {
-          return {
-            duplicate: true,
-            reason: `Este e-mail já está registado no quadro da Direcção Municipal (${foundDme.name} • ${foundDme.cargoTitle}).`,
-          };
+        for (const m of dmeList) {
+          if (!m) continue;
+          if (excludeId && m.id === excludeId) continue;
+          if (normEmail && m.email && m.email.trim().toLowerCase() === normEmail) {
+            return {
+              duplicate: true,
+              reason: `Este e-mail já está registado no quadro da Direcção Municipal (${m.name} • ${m.cargoTitle}).`,
+            };
+          }
+          if (normBi && normBi.length >= 5 && m.biNumber && m.biNumber.trim().toUpperCase() === normBi) {
+            return {
+              duplicate: true,
+              reason: `O Bilhete de Identidade nº "${biNumber?.trim().toUpperCase()}" já pertence ao registo de ${m.name} (${m.cargoTitle || 'Direcção Municipal'}). Não pode haver duas contas no mesmo nº do BI.`,
+            };
+          }
         }
       }
     }
   } catch {}
+
+  // Check registered teachers across all teacher stores by BI number
+  if (normBi && normBi.length >= 5) {
+    for (const teacherKey of ['ucore_registered_teachers_v2', 'ucore_admin_teachers', 'ucore_director_teachers_v1']) {
+      try {
+        const rawT = localStorage.getItem(teacherKey);
+        if (rawT) {
+          const listT = JSON.parse(rawT);
+          if (Array.isArray(listT)) {
+            for (const t of listT) {
+              if (!t) continue;
+              if (excludeId && t.id === excludeId) continue;
+              const tBi = (t.biNif || t.bi || t.registrationData?.biNif || '').trim().toUpperCase();
+              const tEmail = (t.email || t.registrationData?.email || '').trim().toLowerCase();
+              // Allow if the same user (same email) is claiming their pre-registered teacher record
+              if (tBi && tBi === normBi && (!normEmail || !tEmail || tEmail !== normEmail)) {
+                const tName = t.nomeCompleto || t.name || 'Docente';
+                const tSchool = t.nomeEscola || t.schoolName || 'Quadro Docente';
+                return {
+                  duplicate: true,
+                  reason: `O Bilhete de Identidade nº "${biNumber?.trim().toUpperCase()}" já está registado no sistema para ${tName} (${tSchool}). Não pode haver duas contas com o mesmo nº do BI.`,
+                };
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // Check registered directors by BI number
+    for (const dirKey of ['ucore_registered_directors_v2', 'ucore_admin_directors']) {
+      try {
+        const rawD = localStorage.getItem(dirKey);
+        if (rawD) {
+          const listD = JSON.parse(rawD);
+          if (Array.isArray(listD)) {
+            for (const d of listD) {
+              if (!d) continue;
+              if (excludeId && d.id === excludeId) continue;
+              const dBi = (d.biNif || d.registrationData?.biNif || '').trim().toUpperCase();
+              const dEmail = (d.emailPessoal || d.emailInstitucional || d.email || '').trim().toLowerCase();
+              if (dBi && dBi === normBi && (!normEmail || !dEmail || dEmail !== normEmail)) {
+                const dName = d.nomeCompleto || d.name || 'Director(a)';
+                return {
+                  duplicate: true,
+                  reason: `O Bilhete de Identidade nº "${biNumber?.trim().toUpperCase()}" já pertence ao registo de ${dName} (Direcção Escolar). Não pode haver duas contas com o mesmo nº do BI.`,
+                };
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+  }
 
   return { duplicate: false };
 }
@@ -938,11 +997,7 @@ export function findRegisteredAccountByEmail(email: string): {
   const normEmail = (email || '').trim().toLowerCase();
   if (!normEmail) return { exists: false };
 
-  if (
-    normEmail === OFFICIAL_DME_ADMIN_EMAIL ||
-    normEmail === 'beliziodos20@gmail.com' ||
-    normEmail === 'socienciadaeduca2018@gmail.com'
-  ) {
+  if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
     return {
       exists: true,
       isMasterAdmin: true,

@@ -43,6 +43,13 @@ export async function exportBoletimToPDF(
       pixelRatio: 2.2,
       backgroundColor: '#ffffff',
       cacheBust: true,
+      skipFonts: true,
+      fontEmbedCSS: '',
+      style: {
+        border: 'none',
+        boxShadow: 'none',
+        outline: 'none',
+      },
       filter: (node) => {
         // Ignora elementos marcados como no-print
         if (node instanceof HTMLElement && node.classList.contains('no-print')) {

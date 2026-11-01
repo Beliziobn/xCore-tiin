@@ -18,7 +18,8 @@ import {
   Edit3,
   CheckCircle2,
   Trash2,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import type { AdminSchool, AdminTeacher, TeacherRegistrationData } from '../../../types';
@@ -66,6 +67,8 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
   const [preselectedSchoolName, setPreselectedSchoolName] = useState<string>('');
   const [detailModalTeacher, setDetailModalTeacher] = useState<TeacherRegistrationData | null>(null);
   const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState<TeacherRegistrationData | null>(null);
+  const [deleteToast, setDeleteToast] = useState<string | null>(null);
 
   // Sync stored teachers on mount and local/cloud real-time changes
   useEffect(() => {
@@ -155,12 +158,26 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
     setSelectedTeacherId(saved.id);
   };
 
-  const handleDeleteTeacher = (id: string) => {
-    const updated = deleteTeacher(id);
+  const handleDeleteTeacher = (teacher: TeacherRegistrationData) => {
+    setTeacherToDelete(teacher);
+  };
+
+  const confirmDeleteTeacher = () => {
+    if (!teacherToDelete) return;
+    const updated = deleteTeacher(
+      teacherToDelete.id,
+      teacherToDelete.nomeCompleto,
+      teacherToDelete.biNif
+    );
     setDetailedTeachers(updated);
-    if (selectedTeacherId === id) {
+    if (selectedTeacherId === teacherToDelete.id) {
       setSelectedTeacherId(updated[0]?.id || '');
     }
+    setDeleteToast(
+      `Professor(a) "${teacherToDelete.nomeCompleto}" (BI: ${teacherToDelete.biNif}) foi apagado(a) com sucesso.`
+    );
+    setTeacherToDelete(null);
+    setTimeout(() => setDeleteToast(null), 5000);
   };
 
   return (
@@ -174,6 +191,21 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {deleteToast && (
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{deleteToast}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeleteToast(null)}
+              className="text-emerald-700 hover:underline text-[11px] font-bold cursor-pointer"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
         {/* Security Hierarchy Banner */}
         <div className="mb-6 p-4 bg-gradient-to-r from-[#fef2f1] to-white border border-[#fee4e2] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
@@ -368,6 +400,14 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
               >
                 <Edit3 className="w-3.5 h-3.5 text-white" />
                 <span>Editar Cadastro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteTeacher(activeTeacher)}
+                className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Apagar Professor</span>
               </button>
             </div>
           )}
@@ -620,7 +660,7 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteTeacher(t.id);
+                              handleDeleteTeacher(t);
                             }}
                             className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Apagar Cadastro do Docente"
@@ -670,6 +710,47 @@ export const AdminTeachersPage: React.FC<AdminTeachersPageProps> = ({
         onClose={() => setIsMatrixModalOpen(false)}
         teachers={detailedTeachers}
       />
+
+      {/* 4. Modal: Confirmação de Exclusão de Professor */}
+      {teacherToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  Apagar Cadastro do Professor(a)?
+                </h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Confirma a eliminação de{' '}
+                  <strong className="text-slate-900">{teacherToDelete.nomeCompleto}</strong> (BI:{' '}
+                  <span className="font-mono font-bold">{teacherToDelete.biNif}</span>)? O registo será removido da planilha oficial e o nº do BI ficará livre para novo cadastro.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setTeacherToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteTeacher}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirmar e Apagar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
