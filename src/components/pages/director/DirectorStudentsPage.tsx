@@ -545,31 +545,8 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
             </div>
           ) : (
             <>
-              {/* Quick Student Selector Chips */}
-              <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
-                  Alternar Aluno:
-                </span>
-                {filteredStudents.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedStudentId(s.id)}
-                    className={`text-xs px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                      currentStudent?.id === s.id
-                        ? 'bg-[#f75142] text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    <span>
-                      {s.name.split(' ')[0]} {s.name.split(' ')[1] || ''}
-                    </span>
-                    <span className={`w-2 h-2 rounded-full ${s.hasDocuments ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                  </button>
-                ))}
-              </div>
-
               {/* Grid de Informações: 7 colunas organizadas sem cartões pesados */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-y-4 gap-x-6 pt-4 border-t border-slate-100">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-y-4 gap-x-6">
                 {/* 1. Nome */}
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">

@@ -2,6 +2,7 @@
  * Storage and helper utilities for Guia de Férias (Serviços SIGRE)
  * República de Angola · Governo Provincial de Malanje · Administração Municipal do Quêssua
  */
+import { saveGuiaFeriasToFirestore, deleteGuiaFeriasFromFirestore } from './firestoreSync';
 
 export interface GuiaFeriasRecord {
   id: string;
@@ -107,6 +108,12 @@ export function saveGuiaFeriasRecord(record: Omit<GuiaFeriasRecord, 'id' | 'cria
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    saveGuiaFeriasToFirestore(finalRecord).catch(() => {});
+    fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guiasFerias: updated }),
+    }).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated', { detail: finalRecord }));
   } catch {}
 
@@ -118,6 +125,7 @@ export function deleteGuiaFeriasRecord(id: string): boolean {
   const filtered = existing.filter((r) => r.id !== id);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    deleteGuiaFeriasFromFirestore(id).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
     return true;
   } catch {

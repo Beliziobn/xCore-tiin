@@ -2,6 +2,7 @@
  * Storage and helper utilities for Guia de Colocação (Serviços SIGRE)
  * República de Angola · Governo Provincial de Malanje · Direcção Municipal de Educação
  */
+import { saveGuiaColocacaoToFirestore, deleteGuiaColocacaoFromFirestore } from './firestoreSync';
 
 export interface GuiaColocacaoRecord {
   id: string;
@@ -173,6 +174,12 @@ export function saveGuiaColocacaoRecord(
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    saveGuiaColocacaoToFirestore(finalRecord).catch(() => {});
+    fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guiasColocacao: updated }),
+    }).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated', { detail: finalRecord }));
   } catch {}
 
@@ -184,6 +191,7 @@ export function deleteGuiaColocacaoRecord(id: string): boolean {
   const filtered = existing.filter((r) => r.id !== id);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    deleteGuiaColocacaoFromFirestore(id).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
     return true;
   } catch {

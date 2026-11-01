@@ -3,6 +3,9 @@
  * Fornece sincronização diária, snapshots de integridade e restauração restrita ao Administrador Máximo (Belízio).
  */
 
+import { flushAllLocalDataToCloudAndServer } from '../utils/firestoreSync';
+import { syncSchoolsFromServer } from '../utils/schoolStorage';
+
 export interface BackupItem {
   id: string;
   filename: string;
@@ -61,7 +64,7 @@ export async function fetchBackupsList(): Promise<BackupListResponse> {
 }
 
 /**
- * Cria um snapshot de backup manual ou de segurança
+ * Cria um snapshot de backup manual ou de segurança (sincronizando antes todos os dados locais com o servidor e Firestore)
  */
 export async function createManualBackup(label: string = 'manual', actorEmail: string = SUPER_ADMIN_EMAIL): Promise<{
   success: boolean;
@@ -70,6 +73,7 @@ export async function createManualBackup(label: string = 'manual', actorEmail: s
   error?: string;
 }> {
   try {
+    await flushAllLocalDataToCloudAndServer(false);
     const res = await fetch('/api/backup/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -111,9 +115,14 @@ export async function restoreDatabaseFromBackup(
       return { success: false, error: data.error || 'Falha ao restaurar dados.' };
     }
 
+    await syncSchoolsFromServer();
+    await flushAllLocalDataToCloudAndServer(false);
+
     // Trigger local storage refresh events so all components and open tabs reload immediately
     window.dispatchEvent(new CustomEvent('sigre-database-restored', { detail: data }));
     window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { restored: true } }));
+    window.dispatchEvent(new CustomEvent('sigre-data-synced', { detail: { source: 'backup-restore' } }));
+    window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
     window.dispatchEvent(new CustomEvent('storage'));
 
     return { success: true, message: data.message, stats: data.stats };

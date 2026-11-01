@@ -17,6 +17,12 @@ import {
   deleteStudentFromFirestore,
   deleteDirectorFromFirestore,
   fetchSchoolsFromFirestore,
+  fetchTeachersFromFirestore,
+  fetchStudentsFromFirestore,
+  fetchStaffFromFirestore,
+  fetchEfectividadeFromFirestore,
+  fetchDeclaracaoServicoFromFirestore,
+  isEntityTombstoned,
 } from './firestoreSync';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
@@ -779,9 +785,10 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
 }
 
 /**
- * Synchronizes registered schools, directors, teachers, students, and pending applications
- * between the browser localStorage and the shared backend (/api/network/state).
- * Ensures that when other people register on any session/device, all registered schools and their data appear.
+ * Synchronizes registered schools, directors, teachers, students, staff, applications,
+ * efectividade, declaracaoServico, guias, rooms, and classes
+ * between the browser localStorage, Firestore, and the shared backend (/api/network/sync).
+ * Ensures that when users register on any session/device or reload the app, zero data is lost.
  */
 export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
@@ -789,80 +796,134 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
   }
 
   const norm = (str?: string) => (str || '').trim().toLowerCase();
+  const safeParseArr = (key: string): any[] => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
 
   try {
-    const localRawSchools = localStorage.getItem(STORAGE_KEY_SCHOOLS);
-    const localSchools: AdminSchool[] = localRawSchools ? JSON.parse(localRawSchools) : [];
-    const localRawDirs = localStorage.getItem('ucore_admin_directors');
-    const localDirs = localRawDirs ? JSON.parse(localRawDirs) : [];
-    const localRawTeachers = localStorage.getItem('ucore_admin_teachers');
-    const localTeachers = localRawTeachers ? JSON.parse(localRawTeachers) : [];
-    const localRawStudents = localStorage.getItem('ucore_admin_students');
-    const localStudents = localRawStudents ? JSON.parse(localRawStudents) : [];
-    const localRawApps = localStorage.getItem('ucore_pending_applications');
-    const localApps = localRawApps ? JSON.parse(localRawApps) : [];
+    const localSchools: AdminSchool[] = safeParseArr(STORAGE_KEY_SCHOOLS);
+    const localDirs = safeParseArr('ucore_admin_directors');
+    const localRegDirs = safeParseArr('ucore_registered_directors_v2');
+    const localTeachers = safeParseArr('ucore_admin_teachers');
+    const localRegTeachers = safeParseArr('ucore_registered_teachers_v2');
+    const localDirTeachers = safeParseArr('ucore_director_teachers_v1');
+    const localStudents = safeParseArr('ucore_admin_students');
+    const localRegStudents = safeParseArr('ucore_registered_students_v2');
+    const localDirStudents = safeParseArr('ucore_director_students');
+    const localTeacherStudents = safeParseArr('ucore_teacher_students');
+    const localStaff = safeParseArr('ucore_registered_staff_v1');
+    const localApps = safeParseArr('ucore_pending_applications');
+    const localEfectividade = safeParseArr('sigre_cadastramento_efectividade_v2');
+    const localDeclaracao = safeParseArr('sigre_declaracao_servico_v1');
+    const localGuiasFerias = safeParseArr('sigre_guias_ferias_records_v1');
+    const localGuiasColocacao = safeParseArr('sigre_guias_colocacao_records_v1');
+    const localMiniPautas = safeParseArr('sigre_teacher_mini_pautas_v5_blank');
+    const localRooms = safeParseArr('ucore_director_rooms');
+    const localClasses = safeParseArr('ucore_director_classes');
 
-    // 0. Pull authoritative schools from Firestore first
-    let firestoreSchools: AdminSchool[] = [];
-    try {
-      firestoreSchools = await fetchSchoolsFromFirestore();
-    } catch {}
+    // 0. Pull authoritative collections from Firestore in parallel
+    const [
+      firestoreSchools,
+      firestoreTeachers,
+      firestoreStudents,
+      firestoreStaff,
+      firestoreEfectividade,
+      firestoreDeclaracao,
+    ] = await Promise.all([
+      fetchSchoolsFromFirestore().catch(() => []),
+      fetchTeachersFromFirestore().catch(() => []),
+      fetchStudentsFromFirestore().catch(() => []),
+      fetchStaffFromFirestore().catch(() => []),
+      fetchEfectividadeFromFirestore().catch(() => []),
+      fetchDeclaracaoServicoFromFirestore().catch(() => []),
+    ]);
 
     const res = await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        schools: Array.isArray(localSchools) ? localSchools : [],
-        directors: Array.isArray(localDirs) ? localDirs : [],
-        teachers: Array.isArray(localTeachers) ? localTeachers : [],
-        students: Array.isArray(localStudents) ? localStudents : [],
-        applications: Array.isArray(localApps) ? localApps : [],
+        schools: localSchools,
+        directors: localDirs.length > 0 ? localDirs : localRegDirs,
+        teachers: localTeachers.length > 0 ? localTeachers : localRegTeachers,
+        students: localStudents.length > 0 ? localStudents : localRegStudents,
+        staff: localStaff,
+        applications: localApps,
+        efectividade: localEfectividade,
+        declaracaoServico: localDeclaracao,
+        guiasFerias: localGuiasFerias,
+        guiasColocacao: localGuiasColocacao,
+        miniPautas: localMiniPautas,
+        rooms: localRooms,
+        classes: localClasses,
       }),
     });
 
     if (!res.ok) {
-      return Array.isArray(localSchools) ? localSchools : [];
+      return localSchools;
     }
 
     const data = await res.json();
     let changed = false;
 
+    // 1. Merge Schools
     if ((Array.isArray(data.schools) && data.schools.length > 0) || firestoreSchools.length > 0) {
       const mergedMap = new Map<string, AdminSchool>();
-      (Array.isArray(localSchools) ? localSchools : []).forEach((s) => {
+      localSchools.forEach((s) => {
         if (s && s.name && !isModeloCentralSchool(s.name)) {
-          mergedMap.set(norm(s.name), s);
+          if (!isEntityTombstoned('schools', s.id) && !isEntityTombstoned('schools', s.name)) {
+            mergedMap.set(norm(s.name), s);
+          }
         }
       });
       if (Array.isArray(data.schools)) {
         data.schools.forEach((s: AdminSchool) => {
           if (s && s.name && !isModeloCentralSchool(s.name)) {
-            const existing = mergedMap.get(norm(s.name));
-            mergedMap.set(norm(s.name), existing ? { ...existing, ...s } : s);
+            if (!isEntityTombstoned('schools', s.id) && !isEntityTombstoned('schools', s.name)) {
+              const existing = mergedMap.get(norm(s.name));
+              mergedMap.set(norm(s.name), existing ? { ...existing, ...s, registrationData: s.registrationData || existing.registrationData } : s);
+            }
           }
         });
       }
       firestoreSchools.forEach((s: AdminSchool) => {
         if (s && s.name && !isModeloCentralSchool(s.name)) {
-          const existing = mergedMap.get(norm(s.name));
-          mergedMap.set(norm(s.name), existing ? { ...existing, ...s } : s);
+          if (!isEntityTombstoned('schools', s.id) && !isEntityTombstoned('schools', s.name)) {
+            const existing = mergedMap.get(norm(s.name));
+            mergedMap.set(norm(s.name), existing ? { ...existing, ...s, registrationData: s.registrationData || existing.registrationData } : s);
+          }
         }
       });
       const mergedSchools = Array.from(mergedMap.values());
       if (JSON.stringify(mergedSchools) !== JSON.stringify(localSchools)) {
         localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(mergedSchools));
+        const regs = mergedSchools.map((sc) => sc.registrationData).filter(Boolean);
+        if (regs.length > 0) {
+          localStorage.setItem('sigre_school_registrations', JSON.stringify(regs));
+        }
         changed = true;
       }
     }
 
+    // 2. Merge Directors
     if (Array.isArray(data.directors) && data.directors.length > 0) {
       const dirMap = new Map<string, any>();
-      (Array.isArray(localDirs) ? localDirs : []).forEach((d: any) => {
-        if (d && (d.id || d.name)) dirMap.set(norm(d.id || d.name), d);
+      localDirs.forEach((d: any) => {
+        const k = norm(d?.id || d?.name || d?.nomeCompleto);
+        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.name || d.nomeCompleto)) {
+          dirMap.set(k, d);
+        }
       });
       data.directors.forEach((d: any) => {
-        if (d && (d.id || d.name)) {
-          const k = norm(d.id || d.name);
+        if (!d) return;
+        const k = norm(d.id || d.name || d.nomeCompleto);
+        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.name || d.nomeCompleto)) {
           dirMap.set(k, { ...(dirMap.get(k) || {}), ...d });
         }
       });
@@ -873,14 +934,392 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       }
     }
 
+    // 3. Merge Teachers (Server + Firestore -> ucore_admin_teachers, ucore_registered_teachers_v2, ucore_director_teachers_v1)
+    const incomingTeachers = [
+      ...(Array.isArray(data.teachers) ? data.teachers : []),
+      ...firestoreTeachers,
+    ];
+    if (incomingTeachers.length > 0) {
+      const adminTMap = new Map<string, any>();
+      const regTMap = new Map<string, any>();
+      const dirTMap = new Map<string, any>();
+
+      localTeachers.forEach((t: any) => {
+        const k = norm(t?.id || t?.name);
+        if (k && !isEntityTombstoned('teachers', t.id) && !isEntityTombstoned('teachers', t.name)) {
+          adminTMap.set(k, t);
+        }
+      });
+      localRegTeachers.forEach((t: any) => {
+        const k = norm(t?.id || t?.nomeCompleto);
+        if (k && !isEntityTombstoned('teachers', t.id) && !isEntityTombstoned('teachers', t.nomeCompleto)) {
+          regTMap.set(k, t);
+        }
+      });
+      localDirTeachers.forEach((t: any) => {
+        const k = norm(t?.id || t?.name);
+        if (k && !isEntityTombstoned('teachers', t.id) && !isEntityTombstoned('teachers', t.name)) {
+          dirTMap.set(k, t);
+        }
+      });
+
+      incomingTeachers.forEach((item: any) => {
+        if (!item) return;
+        const id = String(item.id || '').trim();
+        const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
+        if (!id && !name) return;
+        if (isEntityTombstoned('teachers', id) || isEntityTombstoned('teachers', name)) return;
+        const schoolName = String(item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua').trim();
+        if (isModeloCentralSchool(schoolName)) return;
+
+        const k = norm(id || name);
+        const regData = item.nomeCompleto ? item : item.registrationData;
+        if (regData && regData.nomeCompleto) {
+          regTMap.set(k, { ...(regTMap.get(k) || {}), ...regData });
+        }
+
+        const existingAdmin = adminTMap.get(k);
+        const mergedReg = regTMap.get(k) || regData;
+        const adminEntry = {
+          ...(existingAdmin || {}),
+          id: id || existingAdmin?.id || `prof-${Date.now()}`,
+          name,
+          phone: item.phone || item.telefone || mergedReg?.telefone || existingAdmin?.phone || '+244 923 000 000',
+          gradeClass: item.gradeClass || item.primaryGradeClass || mergedReg?.primaryGradeClass || existingAdmin?.gradeClass || 'Ensino Primário',
+          room: item.room || item.primaryRoom || mergedReg?.primaryRoom || existingAdmin?.room || 'Sala 01',
+          turma: item.turma || item.primaryTurma || mergedReg?.primaryTurma || existingAdmin?.turma || 'Turma A',
+          category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || existingAdmin?.category || 'Docente / Professor',
+          location: item.location || existingAdmin?.location || 'Quêssua',
+          schoolName,
+          schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId || existingAdmin?.schoolId,
+          presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : (existingAdmin?.presenceRate ?? 100),
+          subject: item.subject || item.disciplinas || mergedReg?.disciplinas || existingAdmin?.subject || 'Língua Portuguesa',
+          gender: item.gender || (item.sexo === 'Feminino' || mergedReg?.sexo === 'Feminino' ? 'F' : 'M'),
+          qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico || existingAdmin?.qualification,
+          assignedTurmas: item.assignedTurmas || mergedReg?.assignedTurmas || existingAdmin?.assignedTurmas,
+          registrationData: mergedReg || existingAdmin?.registrationData,
+        };
+        adminTMap.set(k, adminEntry);
+
+        const existingDir = dirTMap.get(k);
+        const dirEntry = {
+          ...(existingDir || {}),
+          id: adminEntry.id,
+          name: adminEntry.name,
+          schoolName: adminEntry.schoolName,
+          gradeClass: adminEntry.gradeClass,
+          room: adminEntry.room,
+          turma: adminEntry.turma,
+          directorName: item.directorName || existingDir?.directorName || 'Direção Escolar',
+          location: adminEntry.location,
+          subject: adminEntry.subject,
+          presenceRate: adminEntry.presenceRate,
+          shift: item.shift || item.primaryShift || mergedReg?.primaryShift || existingDir?.shift || 'Manhã',
+          phone: adminEntry.phone,
+          email: item.email || mergedReg?.email || existingDir?.email,
+          assignedTurmas: adminEntry.assignedTurmas,
+          registrationData: adminEntry.registrationData,
+          schedule: item.schedule || existingDir?.schedule || [
+            { day: 'Segunda', period: '07h30 - 12h00', subject: adminEntry.subject, room: adminEntry.room },
+          ],
+        };
+        dirTMap.set(k, dirEntry);
+      });
+
+      const nextAdminT = Array.from(adminTMap.values());
+      const nextRegT = Array.from(regTMap.values());
+      const nextDirT = Array.from(dirTMap.values());
+
+      if (JSON.stringify(nextAdminT) !== JSON.stringify(localTeachers)) {
+        localStorage.setItem('ucore_admin_teachers', JSON.stringify(nextAdminT));
+        changed = true;
+      }
+      if (nextRegT.length > 0 && JSON.stringify(nextRegT) !== JSON.stringify(localRegTeachers)) {
+        localStorage.setItem('ucore_registered_teachers_v2', JSON.stringify(nextRegT));
+        changed = true;
+      }
+      if (nextDirT.length > 0 && JSON.stringify(nextDirT) !== JSON.stringify(localDirTeachers)) {
+        localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(nextDirT));
+        changed = true;
+      }
+    }
+
+    // 4. Merge Students (Server + Firestore -> ucore_admin_students, ucore_registered_students_v2, ucore_director_students, ucore_teacher_students)
+    const incomingStudents = [
+      ...(Array.isArray(data.students) ? data.students : []),
+      ...firestoreStudents,
+    ];
+    if (incomingStudents.length > 0) {
+      const adminSMap = new Map<string, any>();
+      const regSMap = new Map<string, any>();
+      const dirSMap = new Map<string, any>();
+      const teachSMap = new Map<string, any>();
+
+      localStudents.forEach((s: any) => {
+        const k = norm(s?.id || `${s?.name}::${s?.schoolName}`);
+        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.name)) {
+          adminSMap.set(k, s);
+        }
+      });
+      localRegStudents.forEach((s: any) => {
+        const k = norm(s?.id || `${s?.nomeCompleto || s?.name}::${s?.escola}`);
+        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.nomeCompleto || s.name)) {
+          regSMap.set(k, s);
+        }
+      });
+      localDirStudents.forEach((s: any) => {
+        const k = norm(s?.id || s?.name);
+        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.name)) {
+          dirSMap.set(k, s);
+        }
+      });
+      localTeacherStudents.forEach((s: any) => {
+        const k = norm(s?.id || s?.name);
+        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.name)) {
+          teachSMap.set(k, s);
+        }
+      });
+
+      incomingStudents.forEach((item: any) => {
+        if (!item) return;
+        const id = String(item.id || '').trim();
+        const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
+        if (!id && !name) return;
+        if (isEntityTombstoned('students', id) || isEntityTombstoned('students', name)) return;
+        const schoolName = String(item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial').trim();
+        if (isModeloCentralSchool(schoolName)) return;
+
+        const k = norm(id || `${name}::${schoolName}`);
+        const studentId = id || `std-${Math.abs(k.split('').reduce((a, c) => a + c.charCodeAt(0), 1000))}`;
+        const genero: 'M' | 'F' =
+          item.genero === 'M' || item.gender === 'M' || item.registrationData?.genero === 'M' ? 'M' : 'F';
+        const classe = String(
+          item.classeEtapaModulo || item.classe || item.gradeClass || item.registrationData?.classe || '1.ª Classe'
+        );
+        const turma = String(item.turma || item.registrationData?.turma || 'Turma A');
+        const sala = String(item.sala || item.room || item.registrationData?.sala || 'Sala 01');
+        const tipoDoc =
+          item.tipoDocumento || item.documentType || item.registrationData?.tipoDocumento || (item.hasDocuments === false ? 'sem Documento' : 'BI');
+        const hasDocs = tipoDoc !== 'sem Documento';
+        const encarregado = String(
+          item.encarregado || item.guardianName || item.registrationData?.encarregado || 'Encarregado de Educação'
+        );
+        const endereco = String(item.endereco || item.location || item.registrationData?.endereco || 'Quêssua, Malanje');
+        const dataNascimento = String(item.dataNascimento || item.registrationData?.dataNascimento || '2016-05-10');
+        const idade = Number(item.idade ?? item.age ?? item.registrationData?.idade ?? 9);
+
+        const regObj = {
+          ...(regSMap.get(k) || {}),
+          ...(item.registrationData || {}),
+          ...(item.nomeCompleto || item.escola ? item : {}),
+          id: studentId,
+          name,
+          nomeCompleto: name,
+          genero,
+          dataNascimento,
+          idade,
+          tipoDocumento: tipoDoc,
+          numeroDocumento: item.numeroDocumento || item.registrationData?.numeroDocumento,
+          naturezaEscola: item.naturezaEscola || item.schoolType || item.registrationData?.naturezaEscola || 'Pública',
+          tipoEscolaModalidade: item.tipoEscolaModalidade || item.registrationData?.tipoEscolaModalidade || 'primario_regular',
+          classeEtapaModulo: classe,
+          classe,
+          turma,
+          sala,
+          escola: schoolName,
+          schoolId: item.schoolId || item.registrationData?.schoolId,
+          condicaoMatricula: item.condicaoMatricula || item.registrationData?.condicaoMatricula || 'primeira_vez',
+          alunoRepetente: Boolean(item.alunoRepetente || item.condicaoMatricula === 'repetente'),
+          encarregado,
+          telefone: item.telefone || item.registrationData?.telefone || '+244 923 000 000',
+          endereco,
+        };
+        regSMap.set(k, regObj);
+
+        const adminObj = {
+          ...(adminSMap.get(k) || {}),
+          id: studentId,
+          name,
+          gender: genero,
+          gradeClass: classe,
+          room: sala,
+          turma,
+          guardianName: encarregado,
+          location: endereco,
+          presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 98,
+          hasDocuments: hasDocs,
+          documentType: tipoDoc,
+          numeroDocumento: regObj.numeroDocumento,
+          dataNascimento,
+          idade,
+          condicaoMatricula: regObj.condicaoMatricula,
+          foto: item.foto || regObj.foto,
+          anexoDocumentoNome: item.anexoDocumentoNome || regObj.anexoDocumentoNome,
+          performanceScore: typeof item.performanceScore === 'number' ? item.performanceScore : 8.5,
+          schoolName,
+          schoolId: regObj.schoolId,
+          schoolType: regObj.naturezaEscola,
+          registrationData: regObj,
+        };
+        adminSMap.set(k, adminObj);
+
+        const dirObj = {
+          ...(dirSMap.get(k) || {}),
+          id: studentId,
+          name,
+          gradeClass: classe,
+          room: sala,
+          turma,
+          teacherName: item.teacherName || 'Corpo Docente',
+          guardianName: encarregado,
+          location: endereco,
+          hasDocuments: hasDocs,
+          documentType: tipoDoc,
+          numeroDocumento: regObj.numeroDocumento,
+          dataNascimento,
+          idade,
+          condicaoMatricula: regObj.condicaoMatricula,
+          foto: adminObj.foto,
+          anexoDocumentoNome: adminObj.anexoDocumentoNome,
+          performanceScore: adminObj.performanceScore,
+          presenceRate: adminObj.presenceRate,
+          registrationData: regObj,
+        };
+        dirSMap.set(k, dirObj);
+
+        if (!teachSMap.has(k)) {
+          teachSMap.set(k, {
+            id: studentId,
+            name,
+            sala,
+            turma,
+            classe,
+            genero,
+            idade,
+            dataNascimento,
+            tipoDocumento: tipoDoc,
+            numeroDocumento: regObj.numeroDocumento,
+            temDocumentos: hasDocs,
+            encarregado,
+            telefone: regObj.telefone,
+            endereco,
+          });
+        }
+      });
+
+      const nextAdminS = Array.from(adminSMap.values());
+      const nextRegS = Array.from(regSMap.values());
+      const nextDirS = Array.from(dirSMap.values());
+      const nextTeachS = Array.from(teachSMap.values());
+
+      if (JSON.stringify(nextAdminS) !== JSON.stringify(localStudents)) {
+        localStorage.setItem('ucore_admin_students', JSON.stringify(nextAdminS));
+        changed = true;
+      }
+      if (nextRegS.length > 0 && JSON.stringify(nextRegS) !== JSON.stringify(localRegStudents)) {
+        localStorage.setItem('ucore_registered_students_v2', JSON.stringify(nextRegS));
+        changed = true;
+      }
+      if (nextDirS.length > 0 && JSON.stringify(nextDirS) !== JSON.stringify(localDirStudents)) {
+        localStorage.setItem('ucore_director_students', JSON.stringify(nextDirS));
+        changed = true;
+      }
+      if (nextTeachS.length > 0 && JSON.stringify(nextTeachS) !== JSON.stringify(localTeacherStudents)) {
+        localStorage.setItem('ucore_teacher_students', JSON.stringify(nextTeachS));
+        changed = true;
+      }
+    }
+
+    // 5. Merge Staff, Efectividade, Declaração de Serviço, Guias & Applications
+    const incomingStaff = [...(Array.isArray(data.staff) ? data.staff : []), ...firestoreStaff];
+    if (incomingStaff.length > 0) {
+      const stMap = new Map<string, any>();
+      localStaff.forEach((s: any) => {
+        const k = norm(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name);
+        if (k && !isEntityTombstoned('staff', k)) stMap.set(k, s);
+      });
+      incomingStaff.forEach((s: any) => {
+        const k = norm(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name);
+        if (k && !isEntityTombstoned('staff', k)) stMap.set(k, { ...(stMap.get(k) || {}), ...s });
+      });
+      const mergedStaff = Array.from(stMap.values());
+      if (JSON.stringify(mergedStaff) !== JSON.stringify(localStaff)) {
+        localStorage.setItem('ucore_registered_staff_v1', JSON.stringify(mergedStaff));
+        changed = true;
+      }
+    }
+
+    const incomingEf = [...(Array.isArray(data.efectividade) ? data.efectividade : []), ...firestoreEfectividade];
+    if (incomingEf.length > 0) {
+      const efMap = new Map<string, any>();
+      localEfectividade.forEach((e: any) => {
+        if (e?.id && !isEntityTombstoned('efectividade', e.id)) efMap.set(e.id, e);
+      });
+      incomingEf.forEach((e: any) => {
+        if (e?.id && !isEntityTombstoned('efectividade', e.id)) efMap.set(e.id, { ...(efMap.get(e.id) || {}), ...e });
+      });
+      const mergedEf = Array.from(efMap.values());
+      if (JSON.stringify(mergedEf) !== JSON.stringify(localEfectividade)) {
+        localStorage.setItem('sigre_cadastramento_efectividade_v2', JSON.stringify(mergedEf));
+        changed = true;
+      }
+    }
+
+    const incomingDecl = [...(Array.isArray(data.declaracaoServico) ? data.declaracaoServico : []), ...firestoreDeclaracao];
+    if (incomingDecl.length > 0) {
+      const decMap = new Map<string, any>();
+      localDeclaracao.forEach((d: any) => {
+        if (d?.id && !isEntityTombstoned('declaracao_servico', d.id)) decMap.set(d.id, d);
+      });
+      incomingDecl.forEach((d: any) => {
+        if (d?.id && !isEntityTombstoned('declaracao_servico', d.id)) decMap.set(d.id, { ...(decMap.get(d.id) || {}), ...d });
+      });
+      const mergedDecl = Array.from(decMap.values());
+      if (JSON.stringify(mergedDecl) !== JSON.stringify(localDeclaracao)) {
+        localStorage.setItem('sigre_declaracao_servico_v1', JSON.stringify(mergedDecl));
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(data.guiasFerias) && data.guiasFerias.length > 0) {
+      const gfMap = new Map<string, any>();
+      localGuiasFerias.forEach((g: any) => {
+        if (g?.id && !isEntityTombstoned('guias_ferias', g.id)) gfMap.set(g.id, g);
+      });
+      data.guiasFerias.forEach((g: any) => {
+        if (g?.id && !isEntityTombstoned('guias_ferias', g.id)) gfMap.set(g.id, { ...(gfMap.get(g.id) || {}), ...g });
+      });
+      const mergedGf = Array.from(gfMap.values());
+      if (JSON.stringify(mergedGf) !== JSON.stringify(localGuiasFerias)) {
+        localStorage.setItem('sigre_guias_ferias_records_v1', JSON.stringify(mergedGf));
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(data.guiasColocacao) && data.guiasColocacao.length > 0) {
+      const gcMap = new Map<string, any>();
+      localGuiasColocacao.forEach((g: any) => {
+        if (g?.id && !isEntityTombstoned('guias_colocacao', g.id)) gcMap.set(g.id, g);
+      });
+      data.guiasColocacao.forEach((g: any) => {
+        if (g?.id && !isEntityTombstoned('guias_colocacao', g.id)) gcMap.set(g.id, { ...(gcMap.get(g.id) || {}), ...g });
+      });
+      const mergedGc = Array.from(gcMap.values());
+      if (JSON.stringify(mergedGc) !== JSON.stringify(localGuiasColocacao)) {
+        localStorage.setItem('sigre_guias_colocacao_records_v1', JSON.stringify(mergedGc));
+        changed = true;
+      }
+    }
+
     if (Array.isArray(data.applications) && data.applications.length > 0) {
       const appMap = new Map<string, any>();
-      (Array.isArray(localApps) ? localApps : []).forEach((a: any) => {
-        if (a && (a.id || a.userId || a.email)) appMap.set(norm(a.id || a.userId || a.email), a);
+      localApps.forEach((a: any) => {
+        const k = norm(a?.id || a?.userId || a?.email);
+        if (k && !isEntityTombstoned('applications', k)) appMap.set(k, a);
       });
       data.applications.forEach((a: any) => {
-        if (a && (a.id || a.userId || a.email)) {
-          const k = norm(a.id || a.userId || a.email);
+        const k = norm(a?.id || a?.userId || a?.email);
+        if (k && !isEntityTombstoned('applications', k)) {
           appMap.set(k, { ...(appMap.get(k) || {}), ...a });
         }
       });
@@ -892,6 +1331,7 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     }
 
     if (changed) {
+      window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     }
 

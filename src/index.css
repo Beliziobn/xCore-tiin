@@ -1095,7 +1095,9 @@ html.lenis.lenis-stopped {
 #oficial-a4-sheet,
 #oficial-a4-sheet *,
 #official-modal-print-sheet,
-#official-modal-print-sheet * {
+#official-modal-print-sheet *,
+#boletim-a4-document,
+#boletim-a4-document * {
   font-family: 'Times New Roman', Times, serif !important;
 }
 
@@ -1119,6 +1121,8 @@ html.lenis.lenis-stopped {
     outline: 0 !important;
     box-shadow: none !important;
     overflow: hidden !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   #root,
@@ -1182,7 +1186,7 @@ html.lenis.lenis-stopped {
     height: 296mm !important;
     max-height: 296mm !important;
     margin: 0 auto !important;
-    padding: 15mm 20mm !important;
+    padding: 16mm 20mm !important;
     border: 0 !important;
     outline: 0 !important;
     box-shadow: none !important;

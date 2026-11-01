@@ -229,48 +229,50 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
           <div
             ref={printableRef}
             id="boletim-a4-document"
-            className="bg-white border-0 rounded-none px-8 py-10 sm:px-14 sm:py-12 shadow-none print:shadow-none print:border-0 w-full max-w-[794px] min-h-[1020px] flex flex-col justify-between text-slate-950 font-serif"
+            style={{ fontFamily: "'Times New Roman', Times, serif" }}
+            className="bg-white border-0 rounded-none px-10 py-10 sm:px-14 sm:py-12 shadow-none print:shadow-none print:border-0 w-[794px] min-w-[794px] max-w-[794px] min-h-[1060px] flex flex-col justify-between text-black box-border"
           >
-            {/* 1. CABEÇALHO OFICIAL PADRÃO DOCUMENTO ESCOLAR A4 */}
-            <div className="pb-3">
-              <div className="grid grid-cols-1 sm:grid-cols-12 items-start gap-4">
-                {/* Canto Superior Esquerdo: Visto da Direcção (Padrão Documento Escolar) */}
-                <div className="hidden sm:flex sm:col-span-3 flex-col items-center justify-center text-center pt-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-black">
+            {/* BLOCO SUPERIOR E CORPO DO DOCUMENTO (FLUXO CONTÍNUO E PROPORCIONAL) */}
+            <div className="flex flex-col">
+              {/* 1. CABEÇALHO OFICIAL PADRÃO DOCUMENTO ESCOLAR A4 */}
+              <div className="grid grid-cols-12 items-start gap-3">
+                {/* Canto Superior Esquerdo: Visto da Direcção */}
+                <div className="col-span-3 flex flex-col items-center justify-start text-center pt-3">
+                  <p className="text-[13px] font-bold uppercase tracking-wide text-black leading-tight">
                     Visto
                   </p>
-                  <p className="text-[9px] font-semibold uppercase text-slate-800">
+                  <p className="text-[12px] font-bold uppercase text-black leading-tight mt-0.5">
                     O Director da Escola
                   </p>
-                  <div className="w-32 border-b border-black mt-7 mb-1" />
-                  <span className="text-[9px] text-slate-600 italic">
+                  <div className="w-36 border-b border-black mt-8 mb-1.5" />
+                  <span className="text-[11px] text-black italic leading-tight">
                     Assinatura e Carimbo
                   </span>
                 </div>
 
                 {/* Centro: Insígnia e Cabeçalho Institucional da Escola */}
-                <div className="sm:col-span-6 flex flex-col items-center text-center">
-                  <AngolaCoatOfArms size={58} />
-                  <p className="text-xs font-bold uppercase tracking-widest text-black mt-2 leading-snug">
+                <div className="col-span-6 flex flex-col items-center text-center px-1">
+                  <AngolaCoatOfArms size={62} />
+                  <p className="text-[14px] font-bold uppercase tracking-wider text-black mt-2 leading-[1.35]">
                     República de Angola
                   </p>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-black leading-snug">
+                  <p className="text-[14px] font-bold uppercase tracking-wide text-black leading-[1.35]">
                     Ministério da Educação
                   </p>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-900 leading-snug">
+                  <p className="text-[14px] font-bold uppercase text-black leading-[1.35]">
                     Governo Provincial de {student.provincia || 'Malanje'}
                   </p>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-900 leading-snug">
+                  <p className="text-[14px] font-bold uppercase text-black leading-[1.35]">
                     Direcção Municipal da Educação de {student.municipio || 'Quéssua'}
                   </p>
-                  <h1 className="text-sm sm:text-base font-black uppercase tracking-wide text-black mt-2 pt-1 px-3">
+                  <h1 className="text-[16px] font-bold uppercase tracking-wide text-black mt-2 pt-0.5 leading-snug">
                     {student.escola || 'Escola Oficial'}
                   </h1>
                 </div>
 
                 {/* Canto Superior Direito: Fotografia 3x4 Tipo Passe */}
-                <div className="sm:col-span-3 flex justify-center sm:justify-end pt-1">
-                  <div className="w-24 h-28 border border-black bg-white flex flex-col items-center justify-center p-1 text-center overflow-hidden shadow-2xs">
+                <div className="col-span-3 flex justify-end pt-1">
+                  <div className="w-[100px] h-[130px] border border-black bg-white flex flex-col items-center justify-center p-1 text-center overflow-hidden">
                     {student.foto ? (
                       <img
                         src={student.foto}
@@ -278,7 +280,7 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-[9px] font-sans font-semibold uppercase text-slate-500 leading-tight">
+                      <span className="text-[11px] font-normal uppercase text-black leading-snug">
                         Fotografia
                         <br />
                         Tipo Passe
@@ -291,124 +293,126 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
               </div>
 
               {/* Título Oficial do Documento A4 */}
-              <div className="mt-5 text-center">
-                <div className="inline-block py-1.5 px-8">
-                  <h2 className="text-sm sm:text-base font-black uppercase tracking-[0.18em] text-black">
-                    Boletim Oficial de Matrícula
-                  </h2>
-                </div>
+              <div className="mt-8 mb-6 text-center">
+                <h2 className="text-[18px] font-bold uppercase tracking-[0.12em] text-black leading-tight">
+                  Boletim Oficial de Matrícula
+                </h2>
+              </div>
+
+              {/* 2. CORPO DECLARATIVO EM PARÁGRAFOS UNIFORMES (12pt / 16px Times New Roman) */}
+              <div className="space-y-5 text-[16px] text-black leading-[1.85] text-justify">
+                <p className="indent-10">
+                  A Direcção da instituição de ensino{' '}
+                  <strong className="uppercase font-bold">
+                    {student.escola || 'Escola Oficial'}
+                  </strong>
+                  , afecta à Direcção Municipal da Educação de{' '}
+                  <strong className="font-bold">{student.municipio || 'Quéssua'}</strong>, Província de{' '}
+                  <strong className="font-bold">{student.provincia || 'Malanje'}</strong>, declara, para os devidos efeitos
+                  legais e académicos, que o(a) aluno(a){' '}
+                  <strong
+                    style={{ color: '#dc2626' }}
+                    className="uppercase text-red-600 print:text-red-600 font-bold"
+                  >
+                    {student.nomeCompleto || student.name}
+                  </strong>
+                  , do sexo{' '}
+                  <strong className="font-bold">
+                    {student.genero === 'F'
+                      ? 'Feminino'
+                      : student.genero === 'M'
+                      ? 'Masculino'
+                      : 'Não especificado'}
+                  </strong>
+                  , nascido(a) aos <strong className="font-bold">{dataExtensoNasc}</strong>
+                  {student.idade ? (
+                    <>
+                      {' '}
+                      (com <strong className="font-bold">{student.idade} anos de idade</strong>)
+                    </>
+                  ) : null}
+                  , portador(a) do documento de identificação{' '}
+                  <strong className="font-bold">
+                    {student.tipoDocumento === 'sem Documento' || !student.numeroDocumento
+                      ? 'Sem documento registado no acto'
+                      : `${student.tipoDocumento || 'B.I.'} n.º ${student.numeroDocumento}`}
+                  </strong>
+                  , residente em{' '}
+                  <strong className="font-bold">
+                    {student.endereco || 'Quéssua'}, Município de {student.municipio || 'Quéssua'}
+                  </strong>
+                  , foi regularmente <strong className="font-bold">matriculado(a)</strong> na{' '}
+                  <strong className="font-bold">
+                    {student.classeEtapaModulo || student.classe || '1.ª Classe'}
+                  </strong>
+                  , inserido(a) na <strong className="font-bold">{student.turma || 'Turma A'}</strong>,{' '}
+                  <strong className="font-bold">
+                    {student.sala || 'Sala n.º 01'}
+                  </strong>
+                  , no período da <strong className="font-bold">{student.periodo || student.turno || 'Manhã'}</strong>
+                  {student.modalidadeLabel ? (
+                    <>
+                      , na modalidade de <strong className="font-bold">{student.modalidadeLabel}</strong>
+                    </>
+                  ) : null}{' '}
+                  desta instituição de ensino (<strong className="font-bold">{student.escola || 'Escola Oficial'}</strong>),
+                  para o <strong className="font-bold">Ano Lectivo 2026 / 2027</strong>, sob o Processo de Matrícula n.º{' '}
+                  <strong className="font-bold">{student.codigoMatricula || 'MAT-2026-0001'}</strong>.
+                </p>
+
+                <p className="indent-10">
+                  Mais se informa que o(a) referido(a) educando(a) se encontra sob a responsabilidade
+                  directa do(a) seu(sua) Encarregado(a) de Educação, o(a) Sr.(a){' '}
+                  <strong className="uppercase font-bold">{student.encarregado || 'Não informado'}</strong>, na
+                  qualidade de <strong className="font-bold">{student.parentescoEncarregado || 'Responsável Legal'}</strong>,
+                  com o contacto telefónico registado n.º{' '}
+                  <strong className="font-bold">{student.telefone || 'Não informado'}</strong>
+                  {student.necessidadesEspeciais && student.necessidadesEspeciais !== 'Nenhuma' ? (
+                    <>
+                      , tendo sido igualmente registada a condição de acompanhamento pedagógico especial:{' '}
+                      <strong className="font-bold">{student.necessidadesEspeciais}</strong>
+                    </>
+                  ) : null}
+                  .
+                </p>
+
+                <p className="indent-10">
+                  Por ser verdade e para constar junto das autoridades escolares, administrativas e do
+                  Encarregado de Educação, garantindo a vaga lectiva, a frequência regular às aulas e os
+                  direitos académicos do(a) estudante no presente ano lectivo, mandou-se passar o presente
+                  Boletim Oficial de Matrícula, que vai devidamente assinado e autenticado por esta Direcção.
+                </p>
+              </div>
+
+              {/* 3. LOCAL E DATA */}
+              <div className="mt-8 text-center">
+                <p className="text-[16px] font-normal text-black">
+                  {student.municipio || 'Quéssua'}, aos {dataExtensoEmissao}.
+                </p>
               </div>
             </div>
 
-            {/* 2. CORPO DECLARATIVO EM PARÁGRAFOS ORGANIZADOS DO BOLETIM ESCOLAR */}
-            <div className="py-4 px-2 sm:px-4 space-y-5 font-serif text-sm sm:text-[15px] text-slate-950 leading-[1.9] text-justify">
-              <p className="indent-8">
-                A Direcção da instituição de ensino{' '}
-                <strong className="uppercase">
-                  {student.escola || 'Escola Oficial'}
-                </strong>
-                , afecta à Direcção Municipal da Educação de{' '}
-                <strong>{student.municipio || 'Quéssua'}</strong>, Província de{' '}
-                <strong>{student.provincia || 'Malanje'}</strong>, declara, para os devidos efeitos
-                legais e académicos, que o(a) aluno(a){' '}
-                <strong className="uppercase text-red-600 print:text-red-600 font-black">
-                  {student.nomeCompleto || student.name}
-                </strong>
-                , do sexo{' '}
-                <strong>
-                  {student.genero === 'F'
-                    ? 'Feminino'
-                    : student.genero === 'M'
-                    ? 'Masculino'
-                    : 'Não especificado'}
-                </strong>
-                , nascido(a) aos <strong>{dataExtensoNasc}</strong>
-                {student.idade ? (
-                  <>
-                    {' '}
-                    (com <strong>{student.idade} anos de idade</strong>)
-                  </>
-                ) : null}
-                , portador(a) do documento de identificação{' '}
-                <strong>
-                  {student.tipoDocumento === 'sem Documento' || !student.numeroDocumento
-                    ? 'Sem documento registado no acto'
-                    : `${student.tipoDocumento || 'B.I.'} n.º ${student.numeroDocumento}`}
-                </strong>
-                , residente em{' '}
-                <strong>
-                  {student.endereco || 'Quéssua'}, Município de {student.municipio || 'Quéssua'}
-                </strong>
-                , foi regularmente <strong>matriculado(a)</strong> na{' '}
-                <strong>
-                  {student.classeEtapaModulo || student.classe || '1.ª Classe'}
-                </strong>
-                , inserido(a) na <strong>{student.turma || 'Turma A'}</strong>,{' '}
-                <strong>
-                  {student.sala || 'Sala n.º 01'}
-                </strong>
-                , no período da <strong>{student.periodo || student.turno || 'Manhã'}</strong>
-                {student.modalidadeLabel ? (
-                  <>
-                    , na modalidade de <strong>{student.modalidadeLabel}</strong>
-                  </>
-                ) : null}{' '}
-                desta instituição de ensino (<strong>{student.escola || 'Escola Oficial'}</strong>),
-                para o <strong>Ano Lectivo 2026 / 2027</strong>, sob o Processo de Matrícula n.º{' '}
-                <strong className="font-mono">{student.codigoMatricula || 'MAT-2026-0001'}</strong>.
-              </p>
-
-              <p className="indent-8">
-                Mais se informa que o(a) referido(a) educando(a) se encontra sob a responsabilidade
-                directa do(a) seu(sua) Encarregado(a) de Educação, o(a) Sr.(a){' '}
-                <strong className="uppercase">{student.encarregado || 'Não informado'}</strong>, na
-                qualidade de <strong>{student.parentescoEncarregado || 'Responsável Legal'}</strong>,
-                com o contacto telefónico registado n.º{' '}
-                <strong className="font-mono">{student.telefone || 'Não informado'}</strong>
-                {student.necessidadesEspeciais && student.necessidadesEspeciais !== 'Nenhuma' ? (
-                  <>
-                    , tendo sido igualmente registada a condição de acompanhamento pedagógico especial:{' '}
-                    <strong>{student.necessidadesEspeciais}</strong>
-                  </>
-                ) : null}
-                .
-              </p>
-            </div>
-
-            {/* 3. DECLARAÇÃO COMPLEMENTAR, DATA E ASSINATURAS DO DOCUMENTO A4 */}
-            <div className="pt-2 space-y-6 text-xs sm:text-sm text-slate-900">
-              <p className="leading-relaxed text-justify font-serif indent-8">
-                Por ser verdade e para constar junto das autoridades escolares, administrativas e do
-                Encarregado de Educação, garantindo a vaga lectiva, a frequência regular às aulas e os
-                direitos académicos do(a) estudante no presente ano lectivo, mandou-se passar o presente
-                Boletim Oficial de Matrícula, que vai devidamente assinado e autenticado por esta Direcção.
-              </p>
-
-              <p className="text-center font-semibold font-sans pt-1">
-                {student.municipio || 'Quéssua'}, aos {dataExtensoEmissao}.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 pt-8 text-center font-sans">
-                <div>
-                  <div className="border-t border-slate-900 pt-2 max-w-[260px] mx-auto">
-                    <span className="block text-xs font-bold uppercase text-slate-900">
-                      O(A) Encarregado(a) de Educação
-                    </span>
-                    <span className="block text-[11px] text-slate-600 mt-0.5">
-                      {student.encarregado || 'Assinatura do Responsável'}
-                    </span>
-                  </div>
+            {/* 4. BLOCO DE ASSINATURAS NO RODAPÉ DO DOCUMENTO A4 */}
+            <div className="pt-14 pb-4 grid grid-cols-2 gap-12 text-center text-black">
+              <div>
+                <div className="border-t border-black pt-2 max-w-[270px] mx-auto">
+                  <span className="block text-[14px] font-bold uppercase text-black leading-snug">
+                    O(A) Encarregado(a) de Educação
+                  </span>
+                  <span className="block text-[13px] text-black mt-0.5 leading-snug">
+                    {student.encarregado || 'Assinatura do Responsável'}
+                  </span>
                 </div>
+              </div>
 
-                <div>
-                  <div className="border-t border-slate-900 pt-2 max-w-[260px] mx-auto">
-                    <span className="block text-xs font-bold uppercase text-slate-900">
-                      A Direcção / Secretaria da Escola
-                    </span>
-                    <span className="block text-[11px] text-slate-600 mt-0.5">
-                      Assinatura e Carimbo Oficial
-                    </span>
-                  </div>
+              <div>
+                <div className="border-t border-black pt-2 max-w-[270px] mx-auto">
+                  <span className="block text-[14px] font-bold uppercase text-black leading-snug">
+                    A Direcção / Secretaria da Escola
+                  </span>
+                  <span className="block text-[13px] text-black mt-0.5 leading-snug">
+                    Assinatura e Carimbo Oficial
+                  </span>
                 </div>
               </div>
             </div>

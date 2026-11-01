@@ -175,6 +175,24 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // Collection: /guias_ferias/{guiaId}
+    // Official Guia de Férias records
+    // ==========================================
+    match /guias_ferias/{guiaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /guias_colocacao/{guiaId}
+    // Official Guia de Colocação records
+    // ==========================================
+    match /guias_colocacao/{guiaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
     // Collection: /users/{userId}
     // Institutional user accounts
     // ==========================================

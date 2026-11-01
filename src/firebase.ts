@@ -1,16 +1,37 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  doc,
+  getDocFromServer,
+  Firestore,
+} from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase app singleton
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Export Firebase services
-// Initialize Firestore using optional custom databaseId if configured
-export const db = (firebaseConfig as Record<string, any>).firestoreDatabaseId
-  ? getFirestore(app, (firebaseConfig as Record<string, any>).firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Firestore with durable IndexedDB local cache + multi-tab synchronization
+function initDurableFirestore(): Firestore {
+  const databaseId = (firebaseConfig as Record<string, any>).firestoreDatabaseId;
+  try {
+    const settings = {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    };
+    return databaseId
+      ? initializeFirestore(app, settings, databaseId)
+      : initializeFirestore(app, settings);
+  } catch {
+    return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  }
+}
+
+export const db = initDurableFirestore();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 

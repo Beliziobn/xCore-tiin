@@ -49,6 +49,7 @@ export async function exportBoletimToPDF(
         border: 'none',
         boxShadow: 'none',
         outline: 'none',
+        fontFamily: "'Times New Roman', Times, serif",
       },
       filter: (node) => {
         // Ignora elementos marcados como no-print

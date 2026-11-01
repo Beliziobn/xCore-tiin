@@ -100,48 +100,81 @@ async function startServer() {
     applications: any[];
     efectividade: any[];
     declaracaoServico?: any[];
+    guiasFerias?: any[];
+    guiasColocacao?: any[];
+    miniPautas?: any[];
+    rooms?: any[];
+    classes?: any[];
     quickRequests: any[];
     updatedAt: string;
   }
 
   const networkDataDir = path.join(process.cwd(), "data");
   const networkStoreFile = path.join(networkDataDir, "sigre-network-store.json");
+  const networkStoreBackupFile = path.join(networkDataDir, "sigre-network-store.bak.json");
+  const networkStoreTmpFile = path.join(networkDataDir, "sigre-network-store.json.tmp");
+  const backupsDir = path.join(networkDataDir, "backups");
+
+  function normalizeStoreObject(parsed: any): NetworkRegistryStore {
+    return {
+      schools: Array.isArray(parsed?.schools) ? parsed.schools : [],
+      directors: Array.isArray(parsed?.directors) ? parsed.directors : [],
+      teachers: Array.isArray(parsed?.teachers) ? parsed.teachers : [],
+      students: Array.isArray(parsed?.students) ? parsed.students : [],
+      staff: Array.isArray(parsed?.staff) ? parsed.staff : [],
+      applications: Array.isArray(parsed?.applications) ? parsed.applications : [],
+      efectividade: Array.isArray(parsed?.efectividade) ? parsed.efectividade : [],
+      declaracaoServico: Array.isArray(parsed?.declaracaoServico) ? parsed.declaracaoServico : [],
+      guiasFerias: Array.isArray(parsed?.guiasFerias) ? parsed.guiasFerias : [],
+      guiasColocacao: Array.isArray(parsed?.guiasColocacao) ? parsed.guiasColocacao : [],
+      miniPautas: Array.isArray(parsed?.miniPautas) ? parsed.miniPautas : [],
+      rooms: Array.isArray(parsed?.rooms) ? parsed.rooms : [],
+      classes: Array.isArray(parsed?.classes) ? parsed.classes : [],
+      quickRequests: Array.isArray(parsed?.quickRequests) ? parsed.quickRequests : [],
+      updatedAt: parsed?.updatedAt || new Date().toISOString(),
+    };
+  }
 
   function loadNetworkStore(): NetworkRegistryStore {
+    const candidates = [networkStoreFile, networkStoreBackupFile];
+    for (const fileCandidate of candidates) {
+      try {
+        if (fs.existsSync(fileCandidate)) {
+          const raw = fs.readFileSync(fileCandidate, "utf-8");
+          if (raw && raw.trim().length > 2) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              return normalizeStoreObject(parsed);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[NetworkStore] Failed to read ${path.basename(fileCandidate)}, trying fallback:`, err);
+      }
+    }
+
+    // Fallback to latest backup snapshot if main and .bak files were corrupted
     try {
-      if (fs.existsSync(networkStoreFile)) {
-        const raw = fs.readFileSync(networkStoreFile, "utf-8");
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") {
-          return {
-            schools: Array.isArray(parsed.schools) ? parsed.schools : [],
-            directors: Array.isArray(parsed.directors) ? parsed.directors : [],
-            teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
-            students: Array.isArray(parsed.students) ? parsed.students : [],
-            staff: Array.isArray(parsed.staff) ? parsed.staff : [],
-            applications: Array.isArray(parsed.applications) ? parsed.applications : [],
-            efectividade: Array.isArray(parsed.efectividade) ? parsed.efectividade : [],
-            declaracaoServico: Array.isArray(parsed.declaracaoServico) ? parsed.declaracaoServico : [],
-            quickRequests: Array.isArray(parsed.quickRequests) ? parsed.quickRequests : [],
-            updatedAt: parsed.updatedAt || new Date().toISOString(),
-          };
+      if (fs.existsSync(backupsDir)) {
+        const files = fs
+          .readdirSync(backupsDir)
+          .filter((f) => f.endsWith(".json"))
+          .sort()
+          .reverse();
+        for (const f of files) {
+          try {
+            const raw = fs.readFileSync(path.join(backupsDir, f), "utf-8");
+            const parsed = JSON.parse(raw);
+            if (parsed?.store && typeof parsed.store === "object") {
+              console.info(`[NetworkStore] Recovered state from backup snapshot: ${f}`);
+              return normalizeStoreObject(parsed.store);
+            }
+          } catch {}
         }
       }
-    } catch (err) {
-      console.warn("[NetworkStore] Failed to read store file, initializing empty:", err);
-    }
-    return {
-      schools: [],
-      directors: [],
-      teachers: [],
-      students: [],
-      staff: [],
-      applications: [],
-      efectividade: [],
-      declaracaoServico: [],
-      quickRequests: [],
-      updatedAt: new Date().toISOString(),
-    };
+    } catch {}
+
+    return normalizeStoreObject({});
   }
 
   const networkStore: NetworkRegistryStore = loadNetworkStore();
@@ -152,9 +185,16 @@ async function startServer() {
         fs.mkdirSync(networkDataDir, { recursive: true });
       }
       networkStore.updatedAt = new Date().toISOString();
-      fs.writeFileSync(networkStoreFile, JSON.stringify(networkStore, null, 2), "utf-8");
+      const serialized = JSON.stringify(networkStore, null, 2);
+      // Atomic write via temporary file then rename, plus redundant .bak mirror
+      fs.writeFileSync(networkStoreTmpFile, serialized, "utf-8");
+      fs.renameSync(networkStoreTmpFile, networkStoreFile);
+      fs.writeFileSync(networkStoreBackupFile, serialized, "utf-8");
     } catch (err) {
-      console.warn("[NetworkStore] Failed to write store file:", err);
+      console.warn("[NetworkStore] Failed atomic write, attempting direct write:", err);
+      try {
+        fs.writeFileSync(networkStoreFile, JSON.stringify(networkStore, null, 2), "utf-8");
+      } catch {}
     }
   }
 
@@ -166,7 +206,6 @@ async function startServer() {
   // ============================================================================
   // BACKUP ENGINE & DATA PRESERVATION VAULT (DAILY SNAPSHOTS & 1-CLICK RESTORE)
   // ============================================================================
-  const backupsDir = path.join(networkDataDir, "backups");
   if (!fs.existsSync(backupsDir)) {
     fs.mkdirSync(backupsDir, { recursive: true });
   }
@@ -207,14 +246,23 @@ async function startServer() {
         directors: (networkStore.directors || []).length,
         teachers: (networkStore.teachers || []).length,
         students: (networkStore.students || []).length,
+        staff: (networkStore.staff || []).length,
         applications: (networkStore.applications || []).length,
         efectividade: (networkStore.efectividade || []).length,
+        declaracaoServico: (networkStore.declaracaoServico || []).length,
+        guiasFerias: (networkStore.guiasFerias || []).length,
+        guiasColocacao: (networkStore.guiasColocacao || []).length,
         quickRequests: (networkStore.quickRequests || []).length,
         totalRecords:
           (networkStore.schools || []).length +
+          (networkStore.directors || []).length +
           (networkStore.teachers || []).length +
           (networkStore.students || []).length +
+          (networkStore.staff || []).length +
           (networkStore.efectividade || []).length +
+          (networkStore.declaracaoServico || []).length +
+          (networkStore.guiasFerias || []).length +
+          (networkStore.guiasColocacao || []).length +
           (networkStore.quickRequests || []).length,
       };
 
@@ -232,8 +280,15 @@ async function startServer() {
           directors: networkStore.directors || [],
           teachers: networkStore.teachers || [],
           students: networkStore.students || [],
+          staff: networkStore.staff || [],
           applications: networkStore.applications || [],
           efectividade: networkStore.efectividade || [],
+          declaracaoServico: networkStore.declaracaoServico || [],
+          guiasFerias: networkStore.guiasFerias || [],
+          guiasColocacao: networkStore.guiasColocacao || [],
+          miniPautas: networkStore.miniPautas || [],
+          rooms: networkStore.rooms || [],
+          classes: networkStore.classes || [],
           quickRequests: networkStore.quickRequests || [],
           updatedAt: networkStore.updatedAt,
         },
@@ -722,8 +777,30 @@ async function startServer() {
   app.delete("/api/network/homologados", clearHomologadosHandler);
   app.post("/api/network/clear-homologated", clearHomologadosHandler);
 
+  app.get("/api/network/sync", (_req, res) => {
+    res.json({
+      success: true,
+      ...networkStore,
+    });
+  });
+
   app.post("/api/network/sync", (req, res) => {
-    const { schools, directors, teachers, students, staff, applications, efectividade, declaracaoServico } = req.body || {};
+    const {
+      schools,
+      directors,
+      teachers,
+      students,
+      staff,
+      applications,
+      efectividade,
+      declaracaoServico,
+      guiasFerias,
+      guiasColocacao,
+      miniPautas,
+      rooms,
+      classes,
+      quickRequests,
+    } = req.body || {};
     let changed = false;
 
     if (Array.isArray(schools) && schools.length > 0) {
@@ -750,7 +827,7 @@ async function startServer() {
       networkStore.directors = upsertByKey(
         networkStore.directors,
         directors,
-        (d) => String(d.id || d.name || d.nomeCompleto || "").trim().toLowerCase()
+        (d) => String(d.id || d.biNif || d.name || d.nomeCompleto || "").trim().toLowerCase()
       );
       changed = true;
     }
@@ -759,7 +836,7 @@ async function startServer() {
       networkStore.teachers = upsertByKey(
         networkStore.teachers,
         teachers,
-        (t) => String(t.id || t.name || t.nomeCompleto || "").trim().toLowerCase()
+        (t) => String(t.id || t.biNif || t.name || t.nomeCompleto || "").trim().toLowerCase()
       );
       changed = true;
     }
@@ -768,7 +845,7 @@ async function startServer() {
       networkStore.students = upsertByKey(
         networkStore.students,
         students,
-        (s) => String(s.id || s.name || s.nomeCompleto || "").trim().toLowerCase()
+        (s) => String(s.id || s.numeroDocumento || s.name || s.nomeCompleto || "").trim().toLowerCase()
       );
       changed = true;
     }
@@ -814,6 +891,78 @@ async function startServer() {
         networkStore.declaracaoServico,
         declaracaoServico,
         (rec) => String(rec.id || rec.ref || `${rec.bi || ""}::${rec.agente || ""}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(guiasFerias) && guiasFerias.length > 0) {
+      if (!Array.isArray(networkStore.guiasFerias)) {
+        networkStore.guiasFerias = [];
+      }
+      networkStore.guiasFerias = upsertByKey(
+        networkStore.guiasFerias,
+        guiasFerias,
+        (g) => String(g.id || `${g.numeroAgente || ""}::${g.dataSaida || ""}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(guiasColocacao) && guiasColocacao.length > 0) {
+      if (!Array.isArray(networkStore.guiasColocacao)) {
+        networkStore.guiasColocacao = [];
+      }
+      networkStore.guiasColocacao = upsertByKey(
+        networkStore.guiasColocacao,
+        guiasColocacao,
+        (g) => String(g.id || `${g.numeroGuia || ""}::${g.bi || ""}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(miniPautas) && miniPautas.length > 0) {
+      if (!Array.isArray(networkStore.miniPautas)) {
+        networkStore.miniPautas = [];
+      }
+      networkStore.miniPautas = upsertByKey(
+        networkStore.miniPautas,
+        miniPautas,
+        (p) => String(p.id || `${p.schoolName || ""}::${p.className || ""}::${p.subject || ""}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(rooms) && rooms.length > 0) {
+      if (!Array.isArray(networkStore.rooms)) {
+        networkStore.rooms = [];
+      }
+      networkStore.rooms = upsertByKey(
+        networkStore.rooms,
+        rooms,
+        (r) => String(r.id || `${r.schoolName || ""}::${r.number || ""}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(classes) && classes.length > 0) {
+      if (!Array.isArray(networkStore.classes)) {
+        networkStore.classes = [];
+      }
+      networkStore.classes = upsertByKey(
+        networkStore.classes,
+        classes,
+        (c) => String(c.id || `${c.schoolName || ""}::${c.name || ""}`).trim().toLowerCase()
+      );
+      changed = true;
+    }
+
+    if (Array.isArray(quickRequests) && quickRequests.length > 0) {
+      if (!Array.isArray(networkStore.quickRequests)) {
+        networkStore.quickRequests = [];
+      }
+      networkStore.quickRequests = upsertByKey(
+        networkStore.quickRequests,
+        quickRequests,
+        (q) => String(q.id || "").trim().toLowerCase()
       );
       changed = true;
     }
@@ -1360,13 +1509,20 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "Arquivo de backup corrompido ou inválido." });
       }
 
-      // Restore in memory
+      // Restore in memory across all collections
       networkStore.schools = Array.isArray(backupData.store.schools) ? backupData.store.schools : [];
       networkStore.directors = Array.isArray(backupData.store.directors) ? backupData.store.directors : [];
       networkStore.teachers = Array.isArray(backupData.store.teachers) ? backupData.store.teachers : [];
       networkStore.students = Array.isArray(backupData.store.students) ? backupData.store.students : [];
+      networkStore.staff = Array.isArray(backupData.store.staff) ? backupData.store.staff : [];
       networkStore.applications = Array.isArray(backupData.store.applications) ? backupData.store.applications : [];
       networkStore.efectividade = Array.isArray(backupData.store.efectividade) ? backupData.store.efectividade : [];
+      networkStore.declaracaoServico = Array.isArray(backupData.store.declaracaoServico) ? backupData.store.declaracaoServico : [];
+      networkStore.guiasFerias = Array.isArray(backupData.store.guiasFerias) ? backupData.store.guiasFerias : [];
+      networkStore.guiasColocacao = Array.isArray(backupData.store.guiasColocacao) ? backupData.store.guiasColocacao : [];
+      networkStore.miniPautas = Array.isArray(backupData.store.miniPautas) ? backupData.store.miniPautas : [];
+      networkStore.rooms = Array.isArray(backupData.store.rooms) ? backupData.store.rooms : [];
+      networkStore.classes = Array.isArray(backupData.store.classes) ? backupData.store.classes : [];
       networkStore.quickRequests = Array.isArray(backupData.store.quickRequests) ? backupData.store.quickRequests : [];
       networkStore.updatedAt = new Date().toISOString();
 
@@ -1376,8 +1532,10 @@ async function startServer() {
         success: true,
         message: "Base de dados restaurada com sucesso!",
         restoredFrom: targetFile,
+        store: networkStore,
         stats: {
           schools: networkStore.schools.length,
+          directors: networkStore.directors.length,
           teachers: networkStore.teachers.length,
           students: networkStore.students.length,
           efectividade: networkStore.efectividade.length,

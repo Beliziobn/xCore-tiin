@@ -47,6 +47,8 @@ const ANNOUNCEMENTS_COL = 'announcements';
 const ROOMS_COL = 'rooms';
 const CLASSES_COL = 'classes';
 const CHAT_MESSAGES_COL = 'chatMessages';
+const GUIAS_FERIAS_COL = 'guias_ferias';
+const GUIAS_COLOCACAO_COL = 'guias_colocacao';
 
 const DELETED_ENTITIES_KEY = 'sigre_deleted_entities_tombstones_v1';
 
@@ -389,7 +391,11 @@ export async function saveSchoolToFirestore(school: AdminSchool): Promise<void> 
     const docId = sanitizeDocId(school.id || school.name.toLowerCase());
     if (!docId) return;
     removeEntityTombstone(SCHOOLS_COL, docId);
+    removeEntityTombstone(SCHOOLS_COL, school.id || '');
     removeEntityTombstone(SCHOOLS_COL, school.name.trim().toLowerCase());
+    if (school.codigoSIGE) {
+      removeEntityTombstone(SCHOOLS_COL, school.codigoSIGE);
+    }
     const ref = doc(db, SCHOOLS_COL, docId);
     await setDoc(ref, cleanObject({ ...school, updatedAt: new Date().toISOString() }), { merge: true });
   } catch (error) {
@@ -462,11 +468,26 @@ export async function saveTeacherToFirestore(
   teacher: AdminTeacher | TeacherRegistrationData | DirectorTeacher
 ): Promise<void> {
   try {
-    const id = sanitizeDocId(teacher.id || (teacher as any).nomeCompleto || (teacher as any).name);
+    const rawName = (teacher as any).nomeCompleto || (teacher as any).name || (teacher as any).registrationData?.nomeCompleto || '';
+    const rawBi = (teacher as any).biNif || (teacher as any).bi || (teacher as any).registrationData?.biNif || '';
+    const id = sanitizeDocId(teacher.id || rawName);
     if (!id) return;
     removeEntityTombstone(TEACHERS_COL, id);
+    if (teacher.id) removeEntityTombstone(TEACHERS_COL, teacher.id);
+    if (rawName) removeEntityTombstone(TEACHERS_COL, rawName);
+    if (rawBi) removeEntityTombstone(TEACHERS_COL, rawBi);
     const ref = doc(db, TEACHERS_COL, id);
-    await setDoc(ref, cleanObject({ ...teacher, id, updatedAt: new Date().toISOString() }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({
+        ...teacher,
+        id,
+        name: rawName || (teacher as any).name,
+        nomeCompleto: rawName || (teacher as any).nomeCompleto,
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
   } catch (error) {
     console.warn('[Firestore] Erro ao gravar professor no Firestore:', error);
   }
@@ -536,18 +557,38 @@ export async function saveStudentToFirestore(
   student: StudentRegistrationData | AdminStudent | DirectorStudent | Record<string, any>
 ): Promise<void> {
   try {
-    const id = sanitizeDocId(student.id || (student as any).nomeCompleto || (student as any).name);
+    const nomeCompleto =
+      (student as any).nomeCompleto ||
+      (student as any).name ||
+      (student as any).registrationData?.nomeCompleto ||
+      'Estudante';
+    const id = sanitizeDocId(student.id || nomeCompleto);
     if (!id) return;
     removeEntityTombstone(STUDENTS_COL, id);
-    const nomeCompleto = (student as any).nomeCompleto || (student as any).name || 'Estudante';
-    const schoolId = (student as any).schoolId || (student as any).escola || (student as any).schoolName || 'escola_municipal';
-    const turma = (student as any).turma || 'Turma A';
-    const classe = (student as any).classe || (student as any).gradeClass || (student as any).classeEtapaModulo || '1ª Classe';
+    if (student.id) removeEntityTombstone(STUDENTS_COL, String(student.id));
+    if (nomeCompleto) removeEntityTombstone(STUDENTS_COL, String(nomeCompleto));
+    const numDoc = (student as any).numeroDocumento || (student as any).registrationData?.numeroDocumento;
+    if (numDoc) removeEntityTombstone(STUDENTS_COL, String(numDoc));
+
+    const schoolId =
+      (student as any).schoolId ||
+      (student as any).escola ||
+      (student as any).schoolName ||
+      (student as any).registrationData?.escola ||
+      'escola_municipal';
+    const turma = (student as any).turma || (student as any).registrationData?.turma || 'Turma A';
+    const classe =
+      (student as any).classe ||
+      (student as any).gradeClass ||
+      (student as any).classeEtapaModulo ||
+      (student as any).registrationData?.classe ||
+      '1ª Classe';
 
     const ref = doc(db, STUDENTS_COL, id);
     await setDoc(
       ref,
       cleanObject({
+        ...((student as any).registrationData || {}),
         ...student,
         id,
         nomeCompleto,
@@ -628,11 +669,24 @@ export async function saveDirectorToFirestore(
   director: AdminDirector | DirectorRegistrationData | Record<string, any>
 ): Promise<void> {
   try {
-    const id = sanitizeDocId(director.id || (director as any).nomeCompleto || (director as any).name);
+    const rawName = (director as any).nomeCompleto || (director as any).name || (director as any).registrationData?.nomeCompleto || '';
+    const id = sanitizeDocId(director.id || rawName);
     if (!id) return;
     removeEntityTombstone(DIRECTORS_COL, id);
+    if (director.id) removeEntityTombstone(DIRECTORS_COL, String(director.id));
+    if (rawName) removeEntityTombstone(DIRECTORS_COL, String(rawName));
     const ref = doc(db, DIRECTORS_COL, id);
-    await setDoc(ref, cleanObject({ ...director, id, updatedAt: new Date().toISOString() }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({
+        ...director,
+        id,
+        name: rawName || (director as any).name,
+        nomeCompleto: rawName || (director as any).nomeCompleto,
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
   } catch (error) {
     console.warn('[Firestore] Erro ao gravar diretor no Firestore:', error);
   }
@@ -1221,6 +1275,110 @@ export function subscribeToChatMessages(onUpdate: (list: ChatMessage[]) => void)
         onUpdate(list);
       },
       (err) => console.warn('[Firestore] ChatMessages subscription error:', err)
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+// ============================================================================
+// 11B. GUIAS DE FÉRIAS & GUIAS DE COLOCAÇÃO - FIRESTORE CLOUD STORE
+// ============================================================================
+
+export async function saveGuiaFeriasToFirestore(record: Record<string, any>): Promise<void> {
+  try {
+    const docId = sanitizeDocId(record.id || `${record.ng || ''}_${record.ang || ''}_${record.agente || ''}`);
+    if (!docId) return;
+    removeEntityTombstone(GUIAS_FERIAS_COL, docId);
+    const ref = doc(db, GUIAS_FERIAS_COL, docId);
+    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+  } catch (error) {
+    console.warn('[Firestore] Erro ao gravar Guia de Férias no Firestore:', error);
+  }
+}
+
+export async function deleteGuiaFeriasFromFirestore(id: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(id);
+    if (!docId) return;
+    addEntityTombstone(GUIAS_FERIAS_COL, docId);
+    await deleteDoc(doc(db, GUIAS_FERIAS_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar Guia de Férias no Firestore:', error);
+  }
+}
+
+export async function fetchGuiasFeriasFromFirestore(): Promise<any[]> {
+  try {
+    const snapshot = await getDocs(collection(db, GUIAS_FERIAS_COL));
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeToGuiasFerias(onUpdate: (records: any[]) => void): Unsubscribe {
+  try {
+    return onSnapshot(
+      collection(db, GUIAS_FERIAS_COL),
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => list.push(d.data()));
+        onUpdate(list);
+      },
+      (err) => console.warn('[Firestore] Guias de Férias subscription error:', err)
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+export async function saveGuiaColocacaoToFirestore(record: Record<string, any>): Promise<void> {
+  try {
+    const docId = sanitizeDocId(record.id || `${record.num || ''}_${record.ano || ''}_${record.agente || ''}`);
+    if (!docId) return;
+    removeEntityTombstone(GUIAS_COLOCACAO_COL, docId);
+    const ref = doc(db, GUIAS_COLOCACAO_COL, docId);
+    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+  } catch (error) {
+    console.warn('[Firestore] Erro ao gravar Guia de Colocação no Firestore:', error);
+  }
+}
+
+export async function deleteGuiaColocacaoFromFirestore(id: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(id);
+    if (!docId) return;
+    addEntityTombstone(GUIAS_COLOCACAO_COL, docId);
+    await deleteDoc(doc(db, GUIAS_COLOCACAO_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar Guia de Colocação no Firestore:', error);
+  }
+}
+
+export async function fetchGuiasColocacaoFromFirestore(): Promise<any[]> {
+  try {
+    const snapshot = await getDocs(collection(db, GUIAS_COLOCACAO_COL));
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeToGuiasColocacao(onUpdate: (records: any[]) => void): Unsubscribe {
+  try {
+    return onSnapshot(
+      collection(db, GUIAS_COLOCACAO_COL),
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => list.push(d.data()));
+        onUpdate(list);
+      },
+      (err) => console.warn('[Firestore] Guias de Colocação subscription error:', err)
     );
   } catch {
     return () => {};
@@ -2098,6 +2256,63 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
     })
   );
 
+  // 9. REAL-TIME GUIAS DE FÉRIAS & GUIAS DE COLOCAÇÃO UNIFICATION
+  unsubs.push(
+    subscribeToGuiasFerias((cloudGuias) => {
+      try {
+        const localGuias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1');
+        const map = new Map<string, any>();
+
+        localGuias.forEach((lg) => {
+          if (!lg || !lg.id || isEntityTombstoned(GUIAS_FERIAS_COL, lg.id)) return;
+          map.set(lg.id, lg);
+          if (!cloudGuias.some((cg) => cg && cg.id === lg.id)) {
+            saveGuiaFeriasToFirestore(lg).catch(() => {});
+          }
+        });
+
+        cloudGuias.forEach((cg) => {
+          if (!cg || !cg.id || isEntityTombstoned(GUIAS_FERIAS_COL, cg.id)) return;
+          map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
+        });
+
+        const merged = Array.from(map.values());
+        if (merged.length > 0 && safeWriteJsonIfChanged('sigre_guias_ferias_records_v1', merged)) {
+          window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
+      } catch {}
+    })
+  );
+
+  unsubs.push(
+    subscribeToGuiasColocacao((cloudGuias) => {
+      try {
+        const localGuias = safeReadJsonArray<any>('sigre_guias_colocacao_records_v1');
+        const map = new Map<string, any>();
+
+        localGuias.forEach((lg) => {
+          if (!lg || !lg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, lg.id)) return;
+          map.set(lg.id, lg);
+          if (!cloudGuias.some((cg) => cg && cg.id === lg.id)) {
+            saveGuiaColocacaoToFirestore(lg).catch(() => {});
+          }
+        });
+
+        cloudGuias.forEach((cg) => {
+          if (!cg || !cg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, cg.id)) return;
+          map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
+        });
+
+        const merged = Array.from(map.values());
+        if (merged.length > 0 && safeWriteJsonIfChanged('sigre_guias_colocacao_records_v1', merged)) {
+          window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
+      } catch {}
+    })
+  );
+
   unsubs.push(
     subscribeToUsers((cloudUsers) => {
       try {
@@ -2121,7 +2336,36 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
     })
   );
 
+  // Automatic Background & Pre-Unload Persistence Engine (Zero Data Loss Guarantee)
+  const handleOnlineFlush = () => {
+    flushAllLocalDataToCloudAndServer(false).catch(() => {});
+  };
+  const handleVisibilityFlush = () => {
+    if (document.visibilityState === 'hidden') {
+      flushAllLocalDataToCloudAndServer(true).catch(() => {});
+    }
+  };
+  const handleBeforeUnloadFlush = () => {
+    flushAllLocalDataToCloudAndServer(true).catch(() => {});
+  };
+
+  window.addEventListener('online', handleOnlineFlush);
+  document.addEventListener('visibilitychange', handleVisibilityFlush);
+  window.addEventListener('pagehide', handleBeforeUnloadFlush);
+  window.addEventListener('beforeunload', handleBeforeUnloadFlush);
+
+  // Initial full flush + periodic 25s heartbeat sync
+  flushAllLocalDataToCloudAndServer(false).catch(() => {});
+  const periodicFlushTimer = setInterval(() => {
+    flushAllLocalDataToCloudAndServer(false).catch(() => {});
+  }, 25000);
+
   globalRealtimeUnsubscribe = () => {
+    clearInterval(periodicFlushTimer);
+    window.removeEventListener('online', handleOnlineFlush);
+    document.removeEventListener('visibilitychange', handleVisibilityFlush);
+    window.removeEventListener('pagehide', handleBeforeUnloadFlush);
+    window.removeEventListener('beforeunload', handleBeforeUnloadFlush);
     unsubs.forEach((fn) => {
       try {
         fn();
@@ -2131,4 +2375,66 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
   };
 
   return globalRealtimeUnsubscribe;
+}
+
+/**
+ * Flushes all local collections (schools, directors, teachers, students, staff, applications,
+ * efectividade, declaracaoServico, guiasFerias, guiasColocacao, miniPautas, rooms, classes)
+ * to both the shared backend disk store (/api/network/sync) and Firestore cloud database.
+ */
+export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: boolean = false): Promise<void> {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const schools = safeReadJsonArray<AdminSchool>('ucore_admin_schools');
+    const directors = safeReadJsonArray<any>('ucore_admin_directors');
+    const regDirectors = safeReadJsonArray<any>('ucore_registered_directors_v2');
+    const teachers = safeReadJsonArray<any>('ucore_admin_teachers');
+    const regTeachers = safeReadJsonArray<any>('ucore_registered_teachers_v2');
+    const dirTeachers = safeReadJsonArray<any>('ucore_director_teachers_v1');
+    const students = safeReadJsonArray<any>('ucore_admin_students');
+    const regStudents = safeReadJsonArray<any>('ucore_registered_students_v2');
+    const dirStudents = safeReadJsonArray<any>('ucore_director_students');
+    const staff = safeReadJsonArray<any>('ucore_registered_staff_v1');
+    const applications = safeReadJsonArray<any>('ucore_pending_applications');
+    const efectividade = safeReadJsonArray<any>('sigre_cadastramento_efectividade_v2');
+    const declaracaoServico = safeReadJsonArray<any>('sigre_declaracao_servico_v1');
+    const guiasFerias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1');
+    const guiasColocacao = safeReadJsonArray<any>('sigre_guias_colocacao_records_v1');
+    const miniPautas = safeReadJsonArray<any>('sigre_teacher_mini_pautas_v5_blank');
+    const rooms = safeReadJsonArray<any>('ucore_director_rooms');
+    const classes = safeReadJsonArray<any>('ucore_director_classes');
+
+    const payload = {
+      schools,
+      directors: directors.length > 0 ? directors : regDirectors,
+      teachers: teachers.length > 0 ? teachers : regTeachers.length > 0 ? regTeachers : dirTeachers,
+      students: students.length > 0 ? students : regStudents.length > 0 ? regStudents : dirStudents,
+      staff,
+      applications,
+      efectividade,
+      declaracaoServico,
+      guiasFerias,
+      guiasColocacao,
+      miniPautas,
+      rooms,
+      classes,
+    };
+
+    const jsonBody = JSON.stringify(payload);
+
+    if (useBeaconOrKeepalive && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      try {
+        const blob = new Blob([jsonBody], { type: 'application/json' });
+        navigator.sendBeacon('/api/network/sync', blob);
+        return;
+      } catch {}
+    }
+
+    await fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: jsonBody,
+      keepalive: useBeaconOrKeepalive,
+    }).catch(() => {});
+  } catch {}
 }

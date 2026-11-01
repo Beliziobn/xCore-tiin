@@ -670,6 +670,18 @@
         "$ref": "#/entities/AuditLog"
       },
       "description": "Mensagens em tempo real do chat institucional e suporte"
+    },
+    "/guias_ferias/{guiaId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Guias oficiais de férias emitidas para docentes e funcionários"
+    },
+    "/guias_colocacao/{guiaId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Guias oficiais de colocação emitidas pela Direcção Municipal de Educação"
     }
   }
 }

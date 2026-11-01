@@ -174,12 +174,12 @@ export default function App() {
     purgeModeloCentralData();
   }
 
-  // Admin dynamic state
+  // Admin dynamic state (hydrated from both admin and detailed registration keys)
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_schools');
       const list: AdminSchool[] = saved ? JSON.parse(saved) : initialAdminSchools;
-      return Array.isArray(list) ? list.filter((s) => !isModeloCentralSchool(s.name)) : [];
+      return Array.isArray(list) ? list.filter((s) => s && !isModeloCentralSchool(s.name)) : [];
     } catch {
       return initialAdminSchools;
     }
@@ -189,7 +189,36 @@ export default function App() {
     try {
       const saved = localStorage.getItem('ucore_admin_teachers');
       const list: AdminTeacher[] = saved ? JSON.parse(saved) : initialAdminTeachers;
-      return Array.isArray(list) ? list.filter((t) => !isModeloCentralSchool(t.schoolName)) : [];
+      if (Array.isArray(list) && list.length > 0) {
+        return list.filter((t) => t && !isModeloCentralSchool(t.schoolName));
+      }
+      const savedReg = localStorage.getItem('ucore_registered_teachers_v2');
+      if (savedReg) {
+        const regList = JSON.parse(savedReg);
+        if (Array.isArray(regList) && regList.length > 0) {
+          return regList
+            .filter((r: any) => r && !isModeloCentralSchool(r.nomeEscola))
+            .map((r: any) => ({
+              id: r.id,
+              name: r.nomeCompleto,
+              phone: r.telefone || '+244 923 000 000',
+              gradeClass: r.primaryGradeClass || r.niveisLecciona?.[0]?.nome || 'Ensino Primário',
+              room: r.primaryRoom || 'Sala 01',
+              turma: r.primaryTurma || 'Turma A',
+              category: r.funcaoCategoria || 'Docente / Professor',
+              location: `${r.municipioEscola || 'Quêssua'}`,
+              schoolName: r.nomeEscola || 'Escola Municipal de Quêssua',
+              schoolId: r.escolaId,
+              presenceRate: 99,
+              subject: r.disciplinas || 'Língua Portuguesa',
+              gender: (r.sexo === 'Feminino' ? 'F' : 'M') as 'M' | 'F',
+              qualification: r.nivelAcademico,
+              assignedTurmas: r.assignedTurmas,
+              registrationData: r,
+            }));
+        }
+      }
+      return [];
     } catch {
       return initialAdminTeachers;
     }
@@ -199,7 +228,42 @@ export default function App() {
     try {
       const saved = localStorage.getItem('ucore_admin_students');
       const list: AdminStudent[] = saved ? JSON.parse(saved) : initialAdminStudents;
-      return Array.isArray(list) ? list.filter((st) => !isModeloCentralSchool(st.schoolName)) : [];
+      if (Array.isArray(list) && list.length > 0) {
+        return list.filter((st) => st && !isModeloCentralSchool(st.schoolName));
+      }
+      const savedReg = localStorage.getItem('ucore_registered_students_v2');
+      if (savedReg) {
+        const regList = JSON.parse(savedReg);
+        if (Array.isArray(regList) && regList.length > 0) {
+          return regList
+            .filter((s: any) => s && !isModeloCentralSchool(s.escola))
+            .map((s: any) => ({
+              id: s.id,
+              name: s.nomeCompleto || s.name,
+              gender: (s.genero === 'M' ? 'M' : 'F') as 'M' | 'F',
+              gradeClass: s.classeEtapaModulo || s.classe || '1.ª Classe',
+              room: s.sala || 'Sala 01',
+              turma: s.turma || 'Turma A',
+              guardianName: s.encarregado || 'Encarregado de Educação',
+              location: s.endereco || 'Quêssua, Malanje',
+              presenceRate: 98,
+              hasDocuments: s.tipoDocumento !== 'sem Documento',
+              documentType: s.tipoDocumento,
+              numeroDocumento: s.numeroDocumento,
+              dataNascimento: s.dataNascimento,
+              idade: s.idade,
+              condicaoMatricula: s.condicaoMatricula,
+              foto: s.foto,
+              anexoDocumentoNome: s.anexoDocumentoNome,
+              performanceScore: 8.5,
+              schoolName: s.escola || 'Escola Oficial',
+              schoolId: s.schoolId,
+              schoolType: s.naturezaEscola || 'Pública',
+              registrationData: s,
+            }));
+        }
+      }
+      return [];
     } catch {
       return initialAdminStudents;
     }
@@ -209,7 +273,7 @@ export default function App() {
     try {
       const saved = localStorage.getItem('ucore_admin_directors');
       const list: AdminDirector[] = saved ? JSON.parse(saved) : initialAdminDirectors;
-      return Array.isArray(list) ? list.filter((d) => !isModeloCentralSchool(d.schoolName)) : [];
+      return Array.isArray(list) ? list.filter((d) => d && !isModeloCentralSchool(d.schoolName)) : [];
     } catch {
       return initialAdminDirectors;
     }
@@ -253,15 +317,21 @@ export default function App() {
     });
   }, []);
 
-  // Persist admin entities on change and sync to backend network store
+  // Persist admin entities on change and sync to backend network store (never overwrite non-empty storage with empty initial state)
   useEffect(() => {
     try {
+      if (adminSchools.length === 0) {
+        const existing = localStorage.getItem('ucore_admin_schools');
+        if (existing && JSON.parse(existing)?.length > 0) return;
+      }
       localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schools: adminSchools }),
-      }).catch(() => {});
+      if (adminSchools.length > 0) {
+        fetch('/api/network/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ schools: adminSchools }),
+        }).catch(() => {});
+      }
     } catch {
       // ignore
     }
@@ -269,12 +339,18 @@ export default function App() {
 
   useEffect(() => {
     try {
+      if (adminTeachers.length === 0) {
+        const existing = localStorage.getItem('ucore_admin_teachers');
+        if (existing && JSON.parse(existing)?.length > 0) return;
+      }
       localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teachers: adminTeachers }),
-      }).catch(() => {});
+      if (adminTeachers.length > 0) {
+        fetch('/api/network/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teachers: adminTeachers }),
+        }).catch(() => {});
+      }
     } catch {
       // ignore
     }
@@ -282,12 +358,18 @@ export default function App() {
 
   useEffect(() => {
     try {
+      if (adminDirectors.length === 0) {
+        const existing = localStorage.getItem('ucore_admin_directors');
+        if (existing && JSON.parse(existing)?.length > 0) return;
+      }
       localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directors: adminDirectors }),
-      }).catch(() => {});
+      if (adminDirectors.length > 0) {
+        fetch('/api/network/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ directors: adminDirectors }),
+        }).catch(() => {});
+      }
     } catch {
       // ignore
     }
@@ -295,12 +377,18 @@ export default function App() {
 
   useEffect(() => {
     try {
+      if (adminStudents.length === 0) {
+        const existing = localStorage.getItem('ucore_admin_students');
+        if (existing && JSON.parse(existing)?.length > 0) return;
+      }
       localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: adminStudents }),
-      }).catch(() => {});
+      if (adminStudents.length > 0) {
+        fetch('/api/network/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ students: adminStudents }),
+        }).catch(() => {});
+      }
     } catch {
       // ignore
     }
