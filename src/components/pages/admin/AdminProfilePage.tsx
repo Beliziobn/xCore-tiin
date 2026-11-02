@@ -38,6 +38,7 @@ import {
   syncApplicationsFromServer,
   getOccupiedDmeCargos,
   OFFICIAL_DME_ADMIN_EMAIL,
+  syncUpdatedUserProfileAcrossSystem,
 } from '../../../utils/authApprovalStorage';
 import type {
   AdminSchool,
@@ -72,6 +73,7 @@ interface AdminProfilePageProps {
   onOpenRegisterModal?: (type: AdminModalType) => void;
   sessionSettings?: SessionSettings;
   onSaveSessionSettings?: (updated: SessionSettings) => void;
+  onUpdateCurrentUser?: (updated: Partial<UserAccount>) => void;
   initialTab?: 'visao-geral' | 'configuracoes';
   focusZone?: boolean;
   settingsTrigger?: number;
@@ -109,6 +111,7 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
   onOpenExcelExport,
   onOpenBackupManager,
   onOpenAuditLogs,
+  onUpdateCurrentUser,
   initialTab,
   focusZone,
   settingsTrigger,
@@ -328,14 +331,16 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
         user?.schoolName ||
         'Direcção Municipal da Educação de Quêssua',
       biNumber: user?.biNumber || '005481920ME031',
+      agentNumber: user?.numeroMecanograficoOuNif || 'DME-AG-0001',
       address: 'Sede da Direcção Municipal da Educação de Quêssua, Malanje',
     };
   };
 
-  const [adminData, setAdminData] = useState<UserProfileData>(() => {
-    const fallback = buildDefaultAdminProfile(currentUser);
+  const loadSavedAdminProfile = (user?: UserAccount | null): UserProfileData => {
+    const fallback = buildDefaultAdminProfile(user);
+    const key = user?.id ? `${STORAGE_KEY_ADMIN_DATA}_${user.id}` : STORAGE_KEY_ADMIN_DATA;
     try {
-      const saved = localStorage.getItem(userAdminDataKey);
+      const saved = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_ADMIN_DATA);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (
@@ -352,15 +357,17 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
       // ignore
     }
     return fallback;
-  });
+  };
+
+  const [adminData, setAdminData] = useState<UserProfileData>(() => loadSavedAdminProfile(currentUser));
 
   useEffect(() => {
     if (!currentUser) return;
-    setAdminData(buildDefaultAdminProfile(currentUser));
-  }, [currentUser?.id, currentUser?.email, currentUser?.cargoTitle]);
+    setAdminData(loadSavedAdminProfile(currentUser));
+  }, [currentUser?.id]);
 
   const handleUpdateAdminData = (updated: Partial<UserProfileData>) => {
-    const next = {
+    const next: UserProfileData = {
       ...adminData,
       ...updated,
       avatar: updated.avatar !== undefined ? updated.avatar : adminPhoto,
@@ -377,23 +384,47 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     }
     try {
       localStorage.setItem(userAdminDataKey, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY_ADMIN_DATA, JSON.stringify(next));
     } catch {
       // ignore
     }
+
+    const syncedPatch = syncUpdatedUserProfileAcrossSystem(currentUser, {
+      name: next.name,
+      email: next.email,
+      phone: next.phone,
+      roleTitle: next.roleTitle,
+      biNumber: next.biNumber,
+      agentNumber: next.agentNumber,
+      schoolName: next.schoolName,
+      avatar: next.avatar || undefined,
+      birthDate: next.birthDate,
+      gender: next.gender,
+      address: next.address,
+      emergencyContact: next.emergencyContact,
+      emergencyPhone: next.emergencyPhone,
+    });
+    onUpdateCurrentUser?.(syncedPatch);
   };
 
   const handlePhotoChange = (newPhoto: string | null) => {
     setAdminPhoto(newPhoto);
-    setAdminData((prev) => ({ ...prev, avatar: newPhoto }));
+    const next = { ...adminData, avatar: newPhoto };
+    setAdminData(next);
     try {
       if (newPhoto) {
         localStorage.setItem(userAdminAvatarKey, newPhoto);
       } else {
         localStorage.removeItem(userAdminAvatarKey);
       }
+      localStorage.setItem(userAdminDataKey, JSON.stringify(next));
     } catch {
       // ignore
     }
+    const syncedPatch = syncUpdatedUserProfileAcrossSystem(currentUser, {
+      avatar: newPhoto || undefined,
+    });
+    onUpdateCurrentUser?.({ ...syncedPatch, avatarUrl: newPhoto || undefined });
   };
 
   const totalStudents =
@@ -915,14 +946,8 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
 
             <ProfileOptionsSection
               user={{
-                name: adminData.name,
-                email: adminData.email,
-                phone: adminData.phone,
-                roleTitle: adminData.roleTitle,
+                ...adminData,
                 avatar: adminPhoto,
-                schoolName: adminData.schoolName,
-                biNumber: adminData.biNumber,
-                address: adminData.address,
               }}
               onUpdateUser={handleUpdateAdminData}
               showBackHeader={false}
@@ -937,14 +962,8 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
         {activeTab === 'visao-geral' && (
           <ProfileOptionsSection
             user={{
-              name: adminData.name,
-              email: adminData.email,
-              phone: adminData.phone,
-              roleTitle: adminData.roleTitle,
+              ...adminData,
               avatar: adminPhoto,
-              schoolName: adminData.schoolName,
-              biNumber: adminData.biNumber,
-              address: adminData.address,
             }}
             onUpdateUser={handleUpdateAdminData}
             externalActiveModal={activeModal}

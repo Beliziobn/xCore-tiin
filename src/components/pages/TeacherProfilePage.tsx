@@ -21,6 +21,7 @@ import { initialTeacherData, TeacherData, StudentProfile } from '../../data/teac
 import { ProfilePhotoUploader } from '../ProfilePhotoUploader';
 import { ProfileOptionsSection, UserProfileData, ProfileModalType } from '../profile/ProfileOptionsSection';
 import { AccessDeniedGuard } from '../common/AccessDeniedGuard';
+import { syncUpdatedUserProfileAcrossSystem } from '../../utils/authApprovalStorage';
 import type { UserAccount } from '../../types';
 
 interface TeacherProfilePageProps {
@@ -33,12 +34,14 @@ interface TeacherProfilePageProps {
   onBackToHome?: () => void;
   onLogout?: () => void;
   onUpdateTeacher?: (updated: Partial<TeacherData>) => void;
+  onUpdateCurrentUser?: (updated: Partial<UserAccount>) => void;
   initialTab?: 'visao-geral' | 'configuracoes';
   focusZone?: boolean;
   settingsTrigger?: number;
 }
 
 const STORAGE_KEY_TEACHER_AVATAR = 'ucore_teacher_avatar';
+const STORAGE_KEY_TEACHER_DATA = 'ucore_teacher_profile_data';
 
 export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   onBackToStats,
@@ -50,6 +53,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   onBackToHome,
   onLogout,
   onUpdateTeacher,
+  onUpdateCurrentUser,
   initialTab,
   focusZone,
   settingsTrigger,
@@ -95,55 +99,117 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
     ? `${STORAGE_KEY_TEACHER_AVATAR}_${currentUser.id}`
     : STORAGE_KEY_TEACHER_AVATAR;
 
+  const userDataStorageKey = currentUser?.id
+    ? `${STORAGE_KEY_TEACHER_DATA}_${currentUser.id}`
+    : STORAGE_KEY_TEACHER_DATA;
+
   const [teacherAvatar, setTeacherAvatar] = useState<string | null>(() => {
     try {
-      return localStorage.getItem(userAvatarStorageKey) || currentUser?.avatarUrl || teacher.avatar || null;
+      return (
+        localStorage.getItem(userAvatarStorageKey) ||
+        currentUser?.avatar ||
+        currentUser?.avatarUrl ||
+        teacher.avatar ||
+        null
+      );
     } catch {
       return currentUser?.avatarUrl || teacher.avatar || null;
     }
   });
 
-  const [teacherProfileData, setTeacherProfileData] = useState<UserProfileData>(() => {
-    const teacherName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : teacher.name;
-    const teacherEmail = currentUser?.email || teacher.email || 'santar.goes@ucore.edu.ao';
-    const school = currentUser?.schoolName || teacher.escola || 'Escola Primária Nº 1024 - Quessua';
-    return {
+  const loadTeacherProfileData = (user?: UserAccount | null): UserProfileData => {
+    const key = user?.id ? `${STORAGE_KEY_TEACHER_DATA}_${user.id}` : STORAGE_KEY_TEACHER_DATA;
+    const teacherName = user ? `${user.firstName} ${user.lastName}`.trim() : teacher.name;
+    const teacherEmail = user?.email || teacher.email || 'santar.goes@ucore.edu.ao';
+    const school = user?.schoolName || teacher.escola || 'Escola Primária Nº 1024 - Quessua';
+    const base: UserProfileData = {
       name: teacherName,
       email: teacherEmail,
-      phone: teacher.telefone || '+244 931 224 550',
-      roleTitle: `Docente Titular • Turma ${teacher.turma} (${teacher.classe} Classe)`,
+      phone: user?.phone || teacher.telefone || '+244 931 224 550',
+      roleTitle:
+        user?.cargoTitle || `Docente Titular • Turma ${teacher.turma} (${teacher.classe} Classe)`,
       schoolName: school,
-      biNumber: '006849102LA089',
-      address: 'Bairro Palanca, Kilamba Kiaxi, Luanda',
+      biNumber: user?.biNumber || '006849102ME089',
+      agentNumber: user?.numeroMecanograficoOuNif || 'PROF-AG-2026',
+      address: 'Bairro Sede, Quêssua, Malanje',
     };
-  });
+    try {
+      const saved = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_TEACHER_DATA);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...base, ...parsed };
+      }
+    } catch {
+      // ignore
+    }
+    return base;
+  };
+
+  const [teacherProfileData, setTeacherProfileData] = useState<UserProfileData>(() =>
+    loadTeacherProfileData(currentUser)
+  );
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setTeacherProfileData(loadTeacherProfileData(currentUser));
+  }, [currentUser?.id]);
 
   const handleUpdateTeacherUser = (updated: Partial<UserProfileData>) => {
-    setTeacherProfileData((prev) => ({ ...prev, ...updated }));
+    const next: UserProfileData = { ...teacherProfileData, ...updated };
+    setTeacherProfileData(next);
+    try {
+      localStorage.setItem(userDataStorageKey, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY_TEACHER_DATA, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
     if (updated.avatar !== undefined) {
       handlePhotoChange(updated.avatar);
     }
     if (onUpdateTeacher) {
       onUpdateTeacher({
-        name: updated.name || teacher.name,
-        email: updated.email || teacher.email,
-        telefone: updated.phone || teacher.telefone,
-        escola: updated.schoolName || teacher.escola,
+        name: next.name || teacher.name,
+        email: next.email || teacher.email,
+        telefone: next.phone || teacher.telefone,
+        escola: next.schoolName || teacher.escola,
       });
     }
+    const syncedPatch = syncUpdatedUserProfileAcrossSystem(currentUser, {
+      name: next.name,
+      email: next.email,
+      phone: next.phone,
+      roleTitle: next.roleTitle,
+      biNumber: next.biNumber,
+      agentNumber: next.agentNumber,
+      schoolName: next.schoolName,
+      avatar: updated.avatar !== undefined ? (updated.avatar || undefined) : (teacherAvatar || undefined),
+      birthDate: next.birthDate,
+      gender: next.gender,
+      address: next.address,
+      emergencyContact: next.emergencyContact,
+      emergencyPhone: next.emergencyPhone,
+    });
+    onUpdateCurrentUser?.(syncedPatch);
   };
 
   const handlePhotoChange = (newPhoto: string | null) => {
     setTeacherAvatar(newPhoto);
+    const next = { ...teacherProfileData, avatar: newPhoto };
+    setTeacherProfileData(next);
     try {
       if (newPhoto) {
         localStorage.setItem(userAvatarStorageKey, newPhoto);
       } else {
         localStorage.removeItem(userAvatarStorageKey);
       }
+      localStorage.setItem(userDataStorageKey, JSON.stringify(next));
     } catch {
       // ignore
     }
+    const syncedPatch = syncUpdatedUserProfileAcrossSystem(currentUser, {
+      avatar: newPhoto || undefined,
+    });
+    onUpdateCurrentUser?.({ ...syncedPatch, avatarUrl: newPhoto || undefined });
   };
 
   // Dynamic calculations from students if available
@@ -239,25 +305,25 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
                   Perfil do professor
                 </span>
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#03283c] tracking-tight leading-tight my-1.5">
-                  {teacher.name}
+                  {teacherProfileData.name || teacher.name}
                 </h1>
                 <p className="text-sm font-medium text-[#61788b]">
-                  Docente titular da 4ª Classe do Ensino Primário
+                  {teacherProfileData.roleTitle || 'Docente titular da 4ª Classe do Ensino Primário'}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-slate-500 font-medium">
                   <span className="inline-flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-[#f75142]" />
-                    <span>{teacher.email || 'santar.goes@ucore.edu.ao'}</span>
+                    <span>{teacherProfileData.email || teacher.email || 'santar.goes@ucore.edu.ao'}</span>
                   </span>
                   <span className="text-slate-300 hidden sm:inline">·</span>
                   <span className="inline-flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5 text-[#f75142]" />
-                    <span>{teacher.telefone || '+244 931 224 550'}</span>
+                    <span>{teacherProfileData.phone || teacher.telefone || '+244 931 224 550'}</span>
                   </span>
                   <span className="text-slate-300 hidden sm:inline">·</span>
                   <span className="inline-flex items-center gap-1.5">
                     <School className="w-3.5 h-3.5 text-[#f75142]" />
-                    <span>{teacher.escola}</span>
+                    <span>{teacherProfileData.schoolName || teacher.escola}</span>
                   </span>
                 </div>
               </div>
@@ -268,8 +334,8 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
                   id="teacher-profile-avatar-uploader"
                   photo={teacherAvatar}
                   onPhotoChange={handlePhotoChange}
-                  fallbackInitials={teacher.name.charAt(0)}
-                  fallbackIcon={<span className="text-3xl font-black text-white">{teacher.name.charAt(0)}</span>}
+                  fallbackInitials={(teacherProfileData.name || teacher.name).charAt(0)}
+                  fallbackIcon={<span className="text-3xl font-black text-white">{(teacherProfileData.name || teacher.name).charAt(0)}</span>}
                   shape="circle"
                   badgePosition="bottom-right"
                   className="w-[88px] h-[88px] rounded-full bg-[#f75142] text-white font-black text-3xl shadow-md border-4 border-white flex items-center justify-center cursor-pointer hover:ring-4 hover:ring-[#f75142]/20 transition-all"
@@ -325,7 +391,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
                   Telefone
                 </span>
                 <strong className="text-sm sm:text-base font-bold text-[#03283c] block tracking-tight font-mono truncate">
-                  {teacher.telefone}
+                  {teacherProfileData.phone || teacher.telefone}
                 </strong>
                 <small className="text-xs text-[#7890a2] block mt-0.5">Contacto direto</small>
               </div>
@@ -467,19 +533,19 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
                       {teacherAvatar ? (
                         <img
                           src={teacherAvatar}
-                          alt={teacher.name}
+                          alt={teacherProfileData.name || teacher.name}
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <span>{teacher.name.charAt(0)}</span>
+                        <span>{(teacherProfileData.name || teacher.name).charAt(0)}</span>
                       )}
                     </div>
                     <div className="min-w-0">
                       <strong className="text-base font-black text-[#03283c] block truncate">
-                        {teacher.name}
+                        {teacherProfileData.name || teacher.name}
                       </strong>
                       <span className="text-xs text-[#7890a2] block truncate">
-                        {teacher.email || 'santar.goes@ucore.edu.ao'}
+                        {teacherProfileData.email || teacher.email || 'santar.goes@ucore.edu.ao'}
                       </span>
                     </div>
                   </div>
@@ -577,14 +643,8 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
             <ProfileOptionsSection
               user={{
-                name: teacherProfileData.name,
-                email: teacherProfileData.email,
-                phone: teacherProfileData.phone,
-                roleTitle: teacherProfileData.roleTitle,
+                ...teacherProfileData,
                 avatar: teacherAvatar,
-                schoolName: teacherProfileData.schoolName,
-                biNumber: teacherProfileData.biNumber,
-                address: teacherProfileData.address,
               }}
               onUpdateUser={handleUpdateTeacherUser}
               showBackHeader={false}
@@ -600,14 +660,8 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
       {activeTab === 'visao-geral' && (
         <ProfileOptionsSection
           user={{
-            name: teacherProfileData.name,
-            email: teacherProfileData.email,
-            phone: teacherProfileData.phone,
-            roleTitle: teacherProfileData.roleTitle,
+            ...teacherProfileData,
             avatar: teacherAvatar,
-            schoolName: teacherProfileData.schoolName,
-            biNumber: teacherProfileData.biNumber,
-            address: teacherProfileData.address,
           }}
           onUpdateUser={handleUpdateTeacherUser}
           externalActiveModal={activeModal}

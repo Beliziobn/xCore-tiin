@@ -1,3 +1,5 @@
+import { saveApplicationToFirestore, saveUserToFirestore } from './firestoreSync';
+
 const PASSWORDS_STORAGE_KEY = 'ucore_user_passwords';
 const SECURITY_LOGS_KEY = 'ucore_security_logs';
 
@@ -66,7 +68,50 @@ function findApplicationPasswordVerifier(normalizedEmail: string): string | unde
   } catch {
     // ignore
   }
+  try {
+    const rawActive = localStorage.getItem('ucore_active_user');
+    if (rawActive) {
+      const active = JSON.parse(rawActive);
+      if (active && typeof active.email === 'string' && active.email.trim().toLowerCase() === normalizedEmail && active.passwordVerifier) {
+        return active.passwordVerifier;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const rawUsers = localStorage.getItem('ucore_registered_users');
+    if (rawUsers) {
+      const users = JSON.parse(rawUsers);
+      if (Array.isArray(users)) {
+        const matchedUser = users.find(
+          (u: any) => u && typeof u.email === 'string' && u.email.trim().toLowerCase() === normalizedEmail
+        );
+        if (matchedUser?.passwordVerifier) {
+          return matchedUser.passwordVerifier;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
   return undefined;
+}
+
+export function hasRegisteredPassword(email: string): boolean {
+  if (!email) return false;
+  const normalizedEmail = email.trim().toLowerCase();
+  const stored = getStoredPasswords();
+  if (typeof stored[normalizedEmail] === 'string' && stored[normalizedEmail].length > 0) {
+    return true;
+  }
+  if (DEFAULT_PASSWORDS[normalizedEmail]) {
+    return true;
+  }
+  if (findApplicationPasswordVerifier(normalizedEmail)) {
+    return true;
+  }
+  return false;
 }
 
 export function getUserPassword(email: string): string {
@@ -84,7 +129,7 @@ export function getUserPassword(email: string): string {
 
 /**
  * Strictly verifies that inputPassword matches the exact registered password for this email.
- * Zero tolerance for 1-digit differences, fuzzy matches, or generic fallback passwords.
+ * Checks locally updated passwords first so recent password changes take immediate effect.
  */
 export function verifyPassword(
   email: string,
@@ -93,19 +138,36 @@ export function verifyPassword(
 ): boolean {
   if (!email || !inputPassword) return false;
   const normalizedEmail = email.trim().toLowerCase();
-  // Do NOT strip internal spaces or alter characters; compare exact string entered by user
   const candidatePassword = inputPassword;
   const stored = getStoredPasswords();
 
-  // 1. Official Master Admin (dmedoquessua@gmail.com / beliziodos20@gmail.com)
+  // 1. Check locally stored exact password first (most recent user update on this device)
+  if (typeof stored[normalizedEmail] === 'string' && stored[normalizedEmail].length > 0) {
+    if (candidatePassword === stored[normalizedEmail]) {
+      return true;
+    }
+    // Also check if stored value is a verifier hash
+    if (stored[normalizedEmail].startsWith('v2_')) {
+      return encodePasswordVerifier(normalizedEmail, candidatePassword) === stored[normalizedEmail];
+    }
+    return false;
+  }
+
+  // 2. Official Master Admin (dmedoquessua@gmail.com / beliziodos20@gmail.com)
   if (normalizedEmail === 'dmedoquessua@gmail.com' || normalizedEmail === 'beliziodos20@gmail.com') {
-    if (typeof stored[normalizedEmail] === 'string' && stored[normalizedEmail].length > 0) {
-      return candidatePassword === stored[normalizedEmail];
+    if (remotePasswordVerifier) {
+      const expectedVerifier = encodePasswordVerifier(normalizedEmail, candidatePassword);
+      if (remotePasswordVerifier.startsWith('v2_') && expectedVerifier === remotePasswordVerifier) {
+        return true;
+      }
+      if (candidatePassword === remotePasswordVerifier) {
+        return true;
+      }
     }
     return candidatePassword === DEFAULT_PASSWORDS[normalizedEmail];
   }
 
-  // 2. If a remote/cloud passwordVerifier is present on the user's application or profile, verify strictly against it
+  // 3. If a remote/cloud or local application passwordVerifier is present, verify against it
   const verifierToUse = remotePasswordVerifier || findApplicationPasswordVerifier(normalizedEmail);
   if (verifierToUse) {
     const expectedVerifier = encodePasswordVerifier(normalizedEmail, candidatePassword);
@@ -115,23 +177,18 @@ export function verifyPassword(
     return candidatePassword === verifierToUse;
   }
 
-  // 3. Check locally stored exact password for this specific email
-  if (typeof stored[normalizedEmail] === 'string' && stored[normalizedEmail].length > 0) {
-    return candidatePassword === stored[normalizedEmail];
-  }
-
   // 4. Check explicit default password map if any
   if (DEFAULT_PASSWORDS[normalizedEmail]) {
     return candidatePassword === DEFAULT_PASSWORDS[normalizedEmail];
   }
 
-  // Never allow fallback passwords or unregistered logins
   return false;
 }
 
 export function updatePassword(
   email: string,
-  newPassword: string
+  newPassword: string,
+  oldEmail?: string
 ): { success: boolean; message: string; verifier?: string } {
   if (!email) {
     return { success: false, message: 'Utilizador não identificado.' };
@@ -141,14 +198,19 @@ export function updatePassword(
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const normalizedOldEmail = oldEmail ? oldEmail.trim().toLowerCase() : normalizedEmail;
   const stored = getStoredPasswords();
+  if (normalizedOldEmail && normalizedOldEmail !== normalizedEmail) {
+    delete stored[normalizedOldEmail];
+  }
   stored[normalizedEmail] = newPassword;
   const verifier = encodePasswordVerifier(normalizedEmail, newPassword);
+  const nowIso = new Date().toISOString();
 
   try {
     localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(stored));
 
-    // Also update passwordVerifier in local pending applications if present
+    // 1. Update passwordVerifier in local pending applications AND sync to Firestore + Server
     try {
       const rawApps = localStorage.getItem('ucore_pending_applications');
       if (rawApps) {
@@ -156,9 +218,24 @@ export function updatePassword(
         if (Array.isArray(apps)) {
           let updatedAny = false;
           const nextApps = apps.map((a: any) => {
-            if (a && typeof a.email === 'string' && a.email.trim().toLowerCase() === normalizedEmail) {
+            if (!a || typeof a.email !== 'string') return a;
+            const appEmail = a.email.trim().toLowerCase();
+            if (appEmail === normalizedEmail || appEmail === normalizedOldEmail) {
               updatedAny = true;
-              return { ...a, passwordVerifier: verifier };
+              const updatedApp = {
+                ...a,
+                email: email.trim(),
+                passwordVerifier: verifier,
+                updatedAt: nowIso,
+              };
+              saveApplicationToFirestore(updatedApp).catch(() => {});
+              fetch('/api/network/applications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ application: updatedApp }),
+                keepalive: true,
+              }).catch(() => {});
+              return updatedApp;
             }
             return a;
           });
@@ -171,7 +248,64 @@ export function updatePassword(
       // ignore
     }
 
-    // Add audit log
+    // 2. Update active user in localStorage and Firestore
+    try {
+      const rawActive = localStorage.getItem('ucore_active_user');
+      if (rawActive) {
+        const activeUser = JSON.parse(rawActive);
+        if (
+          activeUser &&
+          typeof activeUser.email === 'string' &&
+          (activeUser.email.trim().toLowerCase() === normalizedEmail ||
+            activeUser.email.trim().toLowerCase() === normalizedOldEmail)
+        ) {
+          const updatedActive = {
+            ...activeUser,
+            email: email.trim(),
+            passwordVerifier: verifier,
+            updatedAt: nowIso,
+          };
+          localStorage.setItem('ucore_active_user', JSON.stringify(updatedActive));
+          saveUserToFirestore(updatedActive).catch(() => {});
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Update registered users list in localStorage and Firestore
+    try {
+      const rawUsers = localStorage.getItem('ucore_registered_users');
+      if (rawUsers) {
+        const users = JSON.parse(rawUsers);
+        if (Array.isArray(users)) {
+          let userUpdated = false;
+          const nextUsers = users.map((u: any) => {
+            if (!u || typeof u.email !== 'string') return u;
+            const uEmail = u.email.trim().toLowerCase();
+            if (uEmail === normalizedEmail || uEmail === normalizedOldEmail) {
+              userUpdated = true;
+              const nextU = {
+                ...u,
+                email: email.trim(),
+                passwordVerifier: verifier,
+                updatedAt: nowIso,
+              };
+              saveUserToFirestore(nextU).catch(() => {});
+              return nextU;
+            }
+            return u;
+          });
+          if (userUpdated) {
+            localStorage.setItem('ucore_registered_users', JSON.stringify(nextUsers));
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 4. Add audit log
     const logs: SecurityAuditLog[] = (() => {
       try {
         const raw = localStorage.getItem(SECURITY_LOGS_KEY);
@@ -207,4 +341,5 @@ export function updatePassword(
     verifier,
   };
 }
+
 

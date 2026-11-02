@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { verifyPassword, updatePassword } from '../../utils/passwordService';
+import React, { useState, useEffect, useRef } from 'react';
+import { verifyPassword, updatePassword, hasRegisteredPassword } from '../../utils/passwordService';
 import {
   User,
   CreditCard,
@@ -21,7 +21,8 @@ import {
   IdCard,
   Camera,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  Upload
 } from 'lucide-react';
 
 export interface UserProfileData {
@@ -31,6 +32,7 @@ export interface UserProfileData {
   phone?: string;
   avatar?: string | null;
   biNumber?: string;
+  agentNumber?: string;
   birthDate?: string;
   gender?: string;
   address?: string;
@@ -68,6 +70,21 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
 }) => {
   const [activeModal, setActiveModal] = useState<ProfileModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const storageExtraKey = `ucore_profile_extra_${(user.email || 'default').trim().toLowerCase()}`;
+
+  const getSavedExtra = (): Partial<UserProfileData> => {
+    try {
+      const raw = localStorage.getItem(storageExtraKey);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+    return {};
+  };
+
+  const savedExtra = getSavedExtra();
 
   useEffect(() => {
     if (externalActiveModal !== undefined) {
@@ -88,20 +105,27 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
   };
 
   // Manage Profile State
-  const [editName, setEditName] = useState(user.name);
-  const [editEmail, setEditEmail] = useState(user.email);
-  const [editPhone, setEditPhone] = useState(user.phone || '');
-  const [editRole, setEditRole] = useState(user.roleTitle || '');
-  const [editAvatar, setEditAvatar] = useState<string | null>(user.avatar || null);
+  const [editName, setEditName] = useState(user.name || savedExtra.name || '');
+  const [editEmail, setEditEmail] = useState(user.email || savedExtra.email || '');
+  const [editPhone, setEditPhone] = useState(user.phone || savedExtra.phone || '');
+  const [editRole, setEditRole] = useState(user.roleTitle || savedExtra.roleTitle || '');
+  const [editAvatar, setEditAvatar] = useState<string | null>(user.avatar ?? savedExtra.avatar ?? null);
 
   // Personal Info State
-  const [biNumber, setBiNumber] = useState(user.biNumber || '007849201LA042');
-  const [birthDate, setBirthDate] = useState(user.birthDate || '1988-05-14');
-  const [gender, setGender] = useState(user.gender || 'Masculino');
-  const [address, setAddress] = useState(user.address || 'Rua 21 de Janeiro, Maianga, Luanda');
-  const [emergencyContact, setEmergencyContact] = useState(user.emergencyContact || 'Maria dos Santos');
-  const [emergencyPhone, setEmergencyPhone] = useState(user.emergencyPhone || '+244 923 555 777');
-  const [schoolName, setSchoolName] = useState(user.schoolName || 'Complexo Escolar Primário e Secundário Sigre');
+  const [biNumber, setBiNumber] = useState(user.biNumber || savedExtra.biNumber || '007849201LA042');
+  const [agentNumber, setAgentNumber] = useState(user.agentNumber || savedExtra.agentNumber || '');
+  const [birthDate, setBirthDate] = useState(user.birthDate || savedExtra.birthDate || '1988-05-14');
+  const [gender, setGender] = useState(user.gender || savedExtra.gender || 'Masculino');
+  const [address, setAddress] = useState(user.address || savedExtra.address || 'Bairro Sede, Quêssua, Malanje');
+  const [emergencyContact, setEmergencyContact] = useState(
+    user.emergencyContact || savedExtra.emergencyContact || 'Maria dos Santos'
+  );
+  const [emergencyPhone, setEmergencyPhone] = useState(
+    user.emergencyPhone || savedExtra.emergencyPhone || '+244 923 555 777'
+  );
+  const [schoolName, setSchoolName] = useState(
+    user.schoolName || savedExtra.schoolName || 'Complexo Escolar Primário e Secundário Sigre'
+  );
 
   // Notifications State
   const [notifications, setNotifications] = useState(() => {
@@ -131,19 +155,72 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  // Sync with prop changes
+  // Sync with primitive prop changes ONLY when no modal is currently open
+  // so background 3s/5s cloud syncs never wipe out what the user is typing!
   useEffect(() => {
-    setEditName(user.name);
-    setEditEmail(user.email);
-    setEditPhone(user.phone || '');
-    setEditRole(user.roleTitle || '');
-    setEditAvatar(user.avatar || null);
-    if (user.biNumber) setBiNumber(user.biNumber);
-    if (user.birthDate) setBirthDate(user.birthDate);
-    if (user.gender) setGender(user.gender);
-    if (user.address) setAddress(user.address);
-    if (user.schoolName) setSchoolName(user.schoolName);
-  }, [user]);
+    if (activeModal !== null) return;
+    const extra = getSavedExtra();
+    setEditName(user.name || extra.name || '');
+    setEditEmail(user.email || extra.email || '');
+    setEditPhone(user.phone || extra.phone || '');
+    setEditRole(user.roleTitle || extra.roleTitle || '');
+    setEditAvatar(user.avatar ?? extra.avatar ?? null);
+    if (user.biNumber || extra.biNumber) setBiNumber(user.biNumber || extra.biNumber || '');
+    if (user.agentNumber !== undefined || extra.agentNumber !== undefined) {
+      setAgentNumber(user.agentNumber ?? extra.agentNumber ?? '');
+    }
+    if (user.birthDate || extra.birthDate) setBirthDate(user.birthDate || extra.birthDate || '1988-05-14');
+    if (user.gender || extra.gender) setGender(user.gender || extra.gender || 'Masculino');
+    if (user.address || extra.address) setAddress(user.address || extra.address || '');
+    if (user.schoolName || extra.schoolName) setSchoolName(user.schoolName || extra.schoolName || '');
+    if (user.emergencyContact || extra.emergencyContact) {
+      setEmergencyContact(user.emergencyContact || extra.emergencyContact || '');
+    }
+    if (user.emergencyPhone || extra.emergencyPhone) {
+      setEmergencyPhone(user.emergencyPhone || extra.emergencyPhone || '');
+    }
+  }, [
+    activeModal,
+    user.name,
+    user.email,
+    user.phone,
+    user.roleTitle,
+    user.avatar,
+    user.biNumber,
+    user.agentNumber,
+    user.birthDate,
+    user.gender,
+    user.address,
+    user.schoolName,
+    user.emergencyContact,
+    user.emergencyPhone,
+  ]);
+
+  const persistExtraProfile = (patch: Partial<UserProfileData>) => {
+    try {
+      const currentExtra = getSavedExtra();
+      const merged = { ...currentExtra, ...patch };
+      localStorage.setItem(storageExtraKey, JSON.stringify(merged));
+      if (patch.email && patch.email.trim().toLowerCase() !== (user.email || '').trim().toLowerCase()) {
+        const newKey = `ucore_profile_extra_${patch.email.trim().toLowerCase()}`;
+        localStorage.setItem(newKey, JSON.stringify(merged));
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setEditAvatar(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Handlers
   const handleSaveManageProfile = (e: React.FormEvent) => {
@@ -158,16 +235,31 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       phone: editPhone.trim(),
       roleTitle: editRole.trim(),
       avatar: editAvatar,
+      biNumber: biNumber.trim(),
+      agentNumber: agentNumber.trim(),
+      schoolName: schoolName.trim(),
+      birthDate,
+      gender,
+      address: address.trim(),
+      emergencyContact: emergencyContact.trim(),
+      emergencyPhone: emergencyPhone.trim(),
     };
+    persistExtraProfile(updated);
     onUpdateUser?.(updated);
-    showToast('Perfil atualizado com sucesso!');
-    setActiveModal(null);
+    showToast('Perfil e dados de registo atualizados com sucesso!');
+    closeModal();
   };
 
   const handleSavePersonalInfo = (e: React.FormEvent) => {
     e.preventDefault();
     const updated: Partial<UserProfileData> = {
+      name: editName.trim() || user.name,
+      email: editEmail.trim() || user.email,
+      phone: editPhone.trim() || user.phone,
+      roleTitle: editRole.trim() || user.roleTitle,
+      avatar: editAvatar,
       biNumber: biNumber.trim(),
+      agentNumber: agentNumber.trim(),
       birthDate,
       gender,
       address: address.trim(),
@@ -175,9 +267,10 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       emergencyPhone: emergencyPhone.trim(),
       schoolName: schoolName.trim(),
     };
+    persistExtraProfile(updated);
     onUpdateUser?.(updated);
-    showToast('Informações pessoais salvas com sucesso!');
-    setActiveModal(null);
+    showToast('Informações pessoais e registo salvos com sucesso!');
+    closeModal();
   };
 
   const handleToggleNotification = (key: keyof typeof notifications) => {
@@ -207,18 +300,22 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
     e.preventDefault();
     setPasswordError(null);
 
+    const targetEmail = (editEmail || user.email || '').trim();
     if (!currentPassword) {
       setPasswordError('Por favor, informe a sua palavra-passe atual.');
       showToast('Informe a sua palavra-passe atual.');
       return;
     }
 
-    // Real validation against stored credential / fallback
-    const isCurrentValid = verifyPassword(user.email, currentPassword);
-    if (!isCurrentValid) {
-      setPasswordError('A palavra-passe atual informada não confere com os nossos registos.');
-      showToast('A palavra-passe atual informada está incorreta.');
-      return;
+    // If user already has a registered password, verify it; if account was created via demo/Google without stored password, allow setting new password
+    if (hasRegisteredPassword(targetEmail) || hasRegisteredPassword(user.email)) {
+      const isCurrentValid =
+        verifyPassword(targetEmail, currentPassword) || verifyPassword(user.email, currentPassword);
+      if (!isCurrentValid) {
+        setPasswordError('A palavra-passe atual informada não confere com os nossos registos.');
+        showToast('A palavra-passe atual informada está incorreta.');
+        return;
+      }
     }
 
     if (newPassword.length < 6) {
@@ -233,7 +330,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       return;
     }
 
-    const res = updatePassword(user.email, newPassword);
+    const res = updatePassword(targetEmail, newPassword, user.email);
     if (!res.success) {
       setPasswordError(res.message);
       showToast(res.message);
@@ -248,7 +345,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       setNewPassword('');
       setConfirmPassword('');
       setPasswordError(null);
-      setActiveModal(null);
+      closeModal();
     }, 1500);
   };
 
@@ -296,15 +393,15 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       {!hideProfileHeaderCard && (
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs mb-6 flex items-center gap-4 sm:gap-5">
           <div className="relative shrink-0">
-            {user.avatar ? (
+            {editAvatar || user.avatar ? (
               <img
-                src={user.avatar}
-                alt={user.name}
+                src={(editAvatar || user.avatar) as string}
+                alt={editName || user.name}
                 className="w-16 h-16 sm:w-18 sm:h-18 rounded-full object-cover border-2 border-white shadow-xs"
               />
             ) : (
               <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-gradient-to-tr from-[#f75142] to-[#ff7a6e] text-white font-black text-2xl flex items-center justify-center shadow-xs">
-                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                {(editName || user.name) ? (editName || user.name).charAt(0).toUpperCase() : 'U'}
               </div>
             )}
             <button
@@ -318,14 +415,14 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
 
           <div className="flex-1 min-w-0">
             <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate leading-snug">
-              {user.name}
+              {editName || user.name}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 truncate mt-0.5">
-              {user.email}
+              {editEmail || user.email}
             </p>
-            {user.roleTitle && (
+            {(editRole || user.roleTitle) && (
               <span className="inline-block mt-1.5 text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#fef2f1] text-[#f75142] border border-[#fee4e2]">
-                {user.roleTitle}
+                {editRole || user.roleTitle}
               </span>
             )}
           </div>
@@ -336,7 +433,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
       <div id="secao-conta-dados" className="mb-5 scroll-mt-28">
         <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
           <span>Conta & Identificação</span>
-          <span className="text-[10px] text-slate-400 font-semibold">Dados Pessoais</span>
+          <span className="text-[10px] text-slate-400 font-semibold">Dados Pessoais e Registo</span>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs divide-y divide-slate-100">
           {/* Gerir perfil */}
@@ -345,20 +442,20 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
             onClick={() => setActiveModal('manage-profile')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
-            <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+            <div className="flex items-center gap-3.5 min-w-0 pr-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors shrink-0">
                 <User className="w-4 h-4 stroke-[2]" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
-                  Gerir perfil
+                  Gerir perfil e contactos
                 </span>
-                <span className="text-xs text-slate-500 block">
-                  Nome, foto de exibição, cargo e contactos
+                <span className="text-xs text-slate-500 block truncate">
+                  {editName || user.name} • {editPhone || user.phone || 'Sem telefone'} • {editRole || user.roleTitle || 'Cargo'}
                 </span>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
           </button>
 
           {/* Informações pessoais */}
@@ -367,20 +464,20 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
             onClick={() => setActiveModal('personal-info')}
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left group cursor-pointer"
           >
-            <div className="flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors">
+            <div className="flex items-center gap-3.5 min-w-0 pr-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-100/80 text-slate-700 border border-slate-200/70 flex items-center justify-center group-hover:bg-[#fef2f1] group-hover:text-[#f75142] transition-colors shrink-0">
                 <CreditCard className="w-4 h-4 stroke-[2]" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950 block">
-                  Informações pessoais
+                  Informações pessoais e registo oficial
                 </span>
-                <span className="text-xs text-slate-500 block">
-                  B.I., morada oficial, dados de emergência e vínculo
+                <span className="text-xs text-slate-500 block truncate">
+                  B.I.: {biNumber || 'Não definido'} {agentNumber ? `• Agente: ${agentNumber}` : ''} • {schoolName || 'Instituição'}
                 </span>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
           </button>
         </div>
       </div>
@@ -469,8 +566,8 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <User className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Gerir Perfil</h4>
-                  <p className="text-xs text-white/70">Edite as informações públicas e de contacto da sua conta</p>
+                  <h4 className="text-base font-bold text-white leading-tight">Gerir Perfil e Dados de Registo</h4>
+                  <p className="text-xs text-white/70">Edite o seu nome, número de telefone, B.I., cargo e contactos</p>
                 </div>
               </div>
               <button
@@ -482,9 +579,9 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
             </div>
 
             <form onSubmit={handleSaveManageProfile} className="p-5 sm:p-6 overflow-y-auto space-y-4">
-              {/* Avatar Preview & URL */}
+              {/* Avatar Preview & Upload/URL */}
               <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-                <div className="relative">
+                <div className="relative shrink-0">
                   {editAvatar ? (
                     <img
                       src={editAvatar}
@@ -497,15 +594,30 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                     </div>
                   )}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Link da Foto de Perfil (Avatar)
+                    Foto de Perfil (Carregar Imagem ou Link)
                   </label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="url"
-                      placeholder="https://exemplo.com/foto.jpg"
-                      value={editAvatar || ''}
+                      ref={avatarFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => avatarFileInputRef.current?.click()}
+                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Carregar
+                    </button>
+                    <input
+                      type="text"
+                      placeholder="Ou cole o link da foto..."
+                      value={editAvatar && editAvatar.startsWith('data:') ? '' : editAvatar || ''}
                       onChange={(e) => setEditAvatar(e.target.value)}
                       className="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
                     />
@@ -513,7 +625,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setEditAvatar(null)}
-                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                         title="Remover foto"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -537,32 +649,64 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 />
               </div>
 
-              {/* Email */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Endereço de E-mail
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Endereço de E-mail
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Número de Telefone / WhatsApp
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="+244 923 000 000"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
+                  />
+                </div>
               </div>
 
-              {/* Phone */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Telefone / WhatsApp
-                </label>
-                <input
-                  type="tel"
-                  placeholder="+244 923 000 000"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* BI Number */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nº do Bilhete de Identidade (B.I.)
+                  </label>
+                  <input
+                    type="text"
+                    value={biNumber}
+                    onChange={(e) => setBiNumber(e.target.value.toUpperCase())}
+                    placeholder="000000000LA000"
+                    className="w-full text-xs uppercase font-mono px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
+                  />
+                </div>
+
+                {/* Agent / Mecanografico Number */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nº de Agente / Nº Mecanográfico
+                  </label>
+                  <input
+                    type="text"
+                    value={agentNumber}
+                    onChange={(e) => setAgentNumber(e.target.value)}
+                    placeholder="Ex: AG-2026-8841"
+                    className="w-full text-xs font-mono px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
+                  />
+                </div>
               </div>
 
               {/* Role */}
@@ -579,10 +723,24 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 />
               </div>
 
+              {/* School / Institution */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Unidade Escolar / Instituição
+                </label>
+                <input
+                  type="text"
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  placeholder="Nome da Escola ou Direcção Municipal"
+                  className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
+                />
+              </div>
+
               <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setActiveModal(null)}
+                  onClick={closeModal}
                   className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
@@ -611,7 +769,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   <CreditCard className="w-5 h-5 text-[#f75142]" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white leading-tight">Informações Pessoais</h4>
+                  <h4 className="text-base font-bold text-white leading-tight">Informações Pessoais e Registo</h4>
                   <p className="text-xs text-white/70">Documentos oficiais e dados de identificação do Sigre</p>
                 </div>
               </div>
@@ -633,20 +791,36 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 </div>
               </div>
 
-              {/* BI Number */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Nº do Bilhete de Identidade (B.I.) ou Cédula
-                </label>
-                <div className="relative">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* BI Number */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nº do Bilhete de Identidade (B.I.)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={biNumber}
+                      onChange={(e) => setBiNumber(e.target.value.toUpperCase())}
+                      placeholder="000000000LA000"
+                      className="w-full text-xs uppercase font-mono px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
+                    />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                {/* Agent Number */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nº de Agente / Nº Mecanográfico
+                  </label>
                   <input
                     type="text"
-                    value={biNumber}
-                    onChange={(e) => setBiNumber(e.target.value)}
-                    placeholder="000000000LA000"
-                    className="w-full text-xs uppercase font-mono px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
+                    value={agentNumber}
+                    onChange={(e) => setAgentNumber(e.target.value)}
+                    placeholder="Ex: AG-2026-8841"
+                    className="w-full text-xs font-mono px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
                   />
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
 
@@ -690,7 +864,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Ex: Bairro Alvalade, Rua Comandante Gika, Luanda"
+                  placeholder="Ex: Bairro Sede, Quêssua, Malanje"
                   className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-[#f75142] outline-none"
                 />
               </div>
@@ -739,7 +913,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
               <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setActiveModal(null)}
+                  onClick={closeModal}
                   className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
@@ -911,7 +1085,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
             <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
               <button
                 type="button"
-                onClick={() => setActiveModal(null)}
+                onClick={closeModal}
                 className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
                 Concluir
@@ -1083,7 +1257,7 @@ export const ProfileOptionsSection: React.FC<ProfileOptionsSectionProps> = ({
                 <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setActiveModal(null)}
+                    onClick={closeModal}
                     className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancelar

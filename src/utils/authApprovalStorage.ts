@@ -12,10 +12,12 @@ import {
   saveTeacherToFirestore,
   saveDirectorToFirestore,
   saveDmeStaffToFirestore,
+  saveUserToFirestore,
   deleteTeacherFromFirestore,
   deleteDirectorFromFirestore,
   deleteDmeStaffFromFirestore,
 } from './firestoreSync';
+import { encodePasswordVerifier } from './passwordService';
 
 export const UCORE_MUNICIPALITIES = [
   'Quêssua (Malanje)',
@@ -172,15 +174,26 @@ export async function syncApplicationsFromServer(): Promise<PendingApplication[]
       }
     } catch {}
 
-    // 3. Local applications
+    // 3. Local applications (preserve local records that are newer or not yet on server)
     const localApps = getPendingApplications();
     localApps.forEach((la) => {
       const key = String(la.id || la.userId || la.email).trim().toLowerCase();
       if (!key || deletedIds.has(key)) return;
-      if (!map.has(key)) {
-        if (la.status === 'pendente') {
+      const existingRemote = map.get(key);
+      if (!existingRemote) {
+        if (la.status === 'pendente' || la.status === 'aprovado') {
           map.set(key, la);
           saveApplicationToFirestore(la).catch(() => {});
+        }
+      } else {
+        const localUpdated = (la as any).updatedAt ? new Date((la as any).updatedAt).getTime() : 0;
+        const remoteUpdated = (existingRemote as any).updatedAt
+          ? new Date((existingRemote as any).updatedAt).getTime()
+          : 0;
+        if (localUpdated > remoteUpdated) {
+          const mergedApp = { ...existingRemote, ...la };
+          map.set(key, mergedApp);
+          saveApplicationToFirestore(mergedApp).catch(() => {});
         }
       }
     });
@@ -209,11 +222,31 @@ export function initRealtimeApplicationsSync(
   realtimeUnsubscribe = subscribeToApplications((firestoreApps) => {
     try {
       const deletedIds = getDeletedApplicationIds();
-      const validApps = firestoreApps.filter((a) => {
-        const aId = String(a.id || '').trim().toLowerCase();
-        const uId = String(a.userId || '').trim().toLowerCase();
-        return !deletedIds.has(aId) && !deletedIds.has(uId);
+      const localApps = getPendingApplications();
+      const localMap = new Map<string, PendingApplication>();
+      localApps.forEach((la) => {
+        const k = String(la.id || la.userId || la.email).trim().toLowerCase();
+        if (k) localMap.set(k, la);
       });
+
+      const validApps = firestoreApps
+        .filter((a) => {
+          const aId = String(a.id || '').trim().toLowerCase();
+          const uId = String(a.userId || '').trim().toLowerCase();
+          return !deletedIds.has(aId) && !deletedIds.has(uId);
+        })
+        .map((remoteApp) => {
+          const k = String(remoteApp.id || remoteApp.userId || remoteApp.email).trim().toLowerCase();
+          const localApp = localMap.get(k);
+          if (localApp) {
+            const localUpdated = (localApp as any).updatedAt ? new Date((localApp as any).updatedAt).getTime() : 0;
+            const remoteUpdated = (remoteApp as any).updatedAt ? new Date((remoteApp as any).updatedAt).getTime() : 0;
+            if (localUpdated > remoteUpdated) {
+              return { ...remoteApp, ...localApp };
+            }
+          }
+          return remoteApp;
+        });
 
       localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(validApps));
       if (typeof window !== 'undefined') {
@@ -1405,5 +1438,422 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
     return { success: false, count: 0, message: 'Erro ao limpar dados homologados.' };
   }
 }
+
+export interface UserProfileSyncUpdates {
+  name?: string;
+  email?: string;
+  phone?: string;
+  roleTitle?: string;
+  biNumber?: string;
+  agentNumber?: string;
+  schoolName?: string;
+  avatar?: string;
+  birthDate?: string;
+  gender?: string;
+  address?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  turma?: string;
+  classe?: string;
+  sala?: string;
+  periodo?: string;
+  subject?: string;
+}
+
+/**
+ * Propagates user profile/settings changes (name, phone, email, BI, agent number, role, school, etc.)
+ * across active user session, registered users, pending/approved applications, DME staff,
+ * director rosters, teacher rosters, school records, Cloud Firestore, and backend server APIs.
+ */
+export function syncUpdatedUserProfileAcrossSystem(
+  currentUser: UserAccount | null | undefined,
+  updates: UserProfileSyncUpdates
+): Partial<UserAccount> {
+  const nowIso = new Date().toISOString();
+  const oldEmail = (currentUser?.email || '').trim().toLowerCase();
+  const newEmail = (updates.email || currentUser?.email || '').trim();
+  const normNewEmail = newEmail.toLowerCase();
+  const targetUserId = currentUser?.id || '';
+
+  const fullName = (
+    updates.name ||
+    (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : '')
+  ).trim();
+  const nameParts = fullName.split(/\s+/).filter(Boolean);
+  const firstName = nameParts[0] || currentUser?.firstName || 'Utilizador';
+  const lastName = nameParts.slice(1).join(' ') || currentUser?.lastName || '';
+
+  const updatedUserFields: Partial<UserAccount> = {
+    ...(fullName ? { firstName, lastName } : {}),
+    ...(newEmail ? { email: newEmail } : {}),
+    ...(updates.phone !== undefined ? { phone: updates.phone } : {}),
+    ...(updates.biNumber !== undefined ? { biNumber: updates.biNumber } : {}),
+    ...(updates.agentNumber !== undefined ? { numeroMecanograficoOuNif: updates.agentNumber } : {}),
+    ...(updates.roleTitle !== undefined ? { cargoTitle: updates.roleTitle } : {}),
+    ...(updates.schoolName !== undefined ? { schoolName: updates.schoolName } : {}),
+    ...(updates.avatar !== undefined ? { avatar: updates.avatar } : {}),
+    ...(updates.subject !== undefined ? { disciplina: updates.subject } : {}),
+    ...(updates.classe !== undefined ? { grauClasse: updates.classe } : {}),
+  };
+
+  // 1. If email changed, migrate stored password and recompute passwordVerifier
+  let newVerifier: string | undefined;
+  try {
+    const rawPasswords = localStorage.getItem('ucore_user_passwords');
+    if (rawPasswords) {
+      const pwMap = JSON.parse(rawPasswords);
+      const existingPw = pwMap[oldEmail] || pwMap[normNewEmail];
+      if (existingPw && typeof existingPw === 'string') {
+        if (oldEmail && oldEmail !== normNewEmail) {
+          delete pwMap[oldEmail];
+        }
+        pwMap[normNewEmail] = existingPw;
+        localStorage.setItem('ucore_user_passwords', JSON.stringify(pwMap));
+        if (!existingPw.startsWith('v2_')) {
+          newVerifier = encodePasswordVerifier(normNewEmail, existingPw);
+        }
+      }
+    }
+  } catch {}
+
+  const matchesRecord = (idCandidate?: string, emailCandidate?: string) => {
+    const normId = (idCandidate || '').trim();
+    const normEm = (emailCandidate || '').trim().toLowerCase();
+    if (targetUserId && normId && normId === targetUserId) return true;
+    if (oldEmail && normEm && normEm === oldEmail) return true;
+    if (normNewEmail && normEm && normEm === normNewEmail) return true;
+    return false;
+  };
+
+  // 2. Update ucore_active_user
+  try {
+    const rawActive = localStorage.getItem('ucore_active_user');
+    const baseActive = rawActive ? JSON.parse(rawActive) : currentUser || {};
+    if (baseActive && (baseActive.id || baseActive.email || currentUser)) {
+      const mergedActive = {
+        ...currentUser,
+        ...baseActive,
+        ...updatedUserFields,
+        ...(newVerifier ? { passwordVerifier: newVerifier } : {}),
+        ...(updates.birthDate !== undefined ? { birthDate: updates.birthDate } : {}),
+        ...(updates.gender !== undefined ? { gender: updates.gender } : {}),
+        ...(updates.address !== undefined ? { address: updates.address } : {}),
+        ...(updates.emergencyContact !== undefined ? { emergencyContact: updates.emergencyContact } : {}),
+        ...(updates.emergencyPhone !== undefined ? { emergencyPhone: updates.emergencyPhone } : {}),
+        updatedAt: nowIso,
+      };
+      localStorage.setItem('ucore_active_user', JSON.stringify(mergedActive));
+      if (mergedActive.id) {
+        saveUserToFirestore(mergedActive).catch(() => {});
+      }
+    }
+  } catch {}
+
+  // 3. Update ucore_registered_users
+  try {
+    const rawUsers = localStorage.getItem(STORAGE_KEY_USERS);
+    const users: any[] = rawUsers ? JSON.parse(rawUsers) : [];
+    if (Array.isArray(users)) {
+      let foundUser = false;
+      const nextUsers = users.map((u) => {
+        if (u && matchesRecord(u.id, u.email)) {
+          foundUser = true;
+          const nextU = {
+            ...u,
+            ...updatedUserFields,
+            ...(newVerifier ? { passwordVerifier: newVerifier } : {}),
+            ...(updates.birthDate !== undefined ? { birthDate: updates.birthDate } : {}),
+            ...(updates.gender !== undefined ? { gender: updates.gender } : {}),
+            ...(updates.address !== undefined ? { address: updates.address } : {}),
+            updatedAt: nowIso,
+          };
+          if (nextU.id) {
+            saveUserToFirestore(nextU).catch(() => {});
+          }
+          return nextU;
+        }
+        return u;
+      });
+      if (!foundUser && currentUser?.id) {
+        const addedU = {
+          ...currentUser,
+          ...updatedUserFields,
+          updatedAt: nowIso,
+        };
+        nextUsers.push(addedU);
+        saveUserToFirestore(addedU as UserAccount).catch(() => {});
+      }
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(nextUsers));
+    }
+  } catch {}
+
+  // 4. Update ucore_pending_applications
+  try {
+    const rawApps = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
+    if (rawApps) {
+      const apps: PendingApplication[] = JSON.parse(rawApps);
+      if (Array.isArray(apps)) {
+        let updatedAnyApp = false;
+        const nextApps = apps.map((app) => {
+          if (app && (matchesRecord(app.id, app.email) || matchesRecord(app.userId, app.email))) {
+            updatedAnyApp = true;
+            const nextApp: PendingApplication = {
+              ...app,
+              ...(fullName ? { fullName } : {}),
+              ...(newEmail ? { email: newEmail } : {}),
+              ...(updates.phone !== undefined ? { phone: updates.phone } : {}),
+              ...(updates.biNumber !== undefined ? { biNumber: updates.biNumber } : {}),
+              ...(updates.agentNumber !== undefined
+                ? { numeroMecanograficoOuNif: updates.agentNumber }
+                : {}),
+              ...(updates.roleTitle !== undefined ? { roleRequested: updates.roleTitle } : {}),
+              ...(updates.schoolName !== undefined ? { schoolName: updates.schoolName } : {}),
+              ...(updates.subject !== undefined ? { disciplina: updates.subject } : {}),
+              ...(updates.classe !== undefined ? { grauClasse: updates.classe } : {}),
+              ...(newVerifier ? { passwordVerifier: newVerifier } : {}),
+              complementaryData: {
+                ...(app.complementaryData || {}),
+                ...(updates.birthDate !== undefined ? { dataNascimento: updates.birthDate } : {}),
+                ...(updates.gender !== undefined ? { genero: updates.gender as any } : {}),
+                ...(updates.address !== undefined ? { morada: updates.address } : {}),
+                ...(updates.agentNumber !== undefined ? { numeroAgente: updates.agentNumber } : {}),
+              },
+              updatedAt: nowIso,
+            } as PendingApplication;
+
+            saveApplicationToFirestore(nextApp).catch(() => {});
+            fetch('/api/network/applications', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ application: nextApp }),
+              keepalive: true,
+            }).catch(() => {});
+
+            return nextApp;
+          }
+          return app;
+        });
+        if (updatedAnyApp) {
+          localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(nextApps));
+        }
+      }
+    }
+  } catch {}
+
+  // 5. Update DME Staff List (ucore_dme_staff_list)
+  try {
+    const rawDme = localStorage.getItem('ucore_dme_staff_list');
+    if (rawDme) {
+      const dmeList = JSON.parse(rawDme);
+      if (Array.isArray(dmeList)) {
+        let dmeChanged = false;
+        const nextDme = dmeList.map((m: any) => {
+          if (m && matchesRecord(m.id, m.email)) {
+            dmeChanged = true;
+            const nextM = {
+              ...m,
+              ...(fullName ? { name: fullName } : {}),
+              ...(newEmail ? { email: newEmail } : {}),
+              ...(updates.phone !== undefined ? { phone: updates.phone } : {}),
+              ...(updates.biNumber !== undefined ? { biNumber: updates.biNumber } : {}),
+              ...(updates.agentNumber !== undefined ? { agentNumber: updates.agentNumber } : {}),
+              ...(updates.roleTitle !== undefined ? { cargoTitle: updates.roleTitle } : {}),
+              ...(updates.birthDate !== undefined ? { birthDate: updates.birthDate } : {}),
+              ...(updates.gender !== undefined ? { gender: updates.gender } : {}),
+              ...(updates.address !== undefined ? { address: updates.address } : {}),
+              updatedAt: nowIso,
+            };
+            saveDmeStaffToFirestore(nextM).catch(() => {});
+            return nextM;
+          }
+          return m;
+        });
+        if (dmeChanged) {
+          localStorage.setItem('ucore_dme_staff_list', JSON.stringify(nextDme));
+        }
+      }
+    }
+  } catch {}
+
+  // 6. Update Director stores (ucore_admin_directors, sigre_admin_directors, ucore_registered_directors_v2)
+  for (const dirKey of ['ucore_admin_directors', 'sigre_admin_directors', 'ucore_registered_directors_v2']) {
+    try {
+      const rawDirs = localStorage.getItem(dirKey);
+      if (rawDirs) {
+        const dirs = JSON.parse(rawDirs);
+        if (Array.isArray(dirs)) {
+          let dirChanged = false;
+          const nextDirs = dirs.map((d: any) => {
+            if (
+              d &&
+              (matchesRecord(d.id, d.email) ||
+                matchesRecord(d.id, d.emailPessoal) ||
+                matchesRecord(d.id, d.emailInstitucional))
+            ) {
+              dirChanged = true;
+              const nextD = {
+                ...d,
+                ...(fullName ? { name: fullName, nomeCompleto: fullName } : {}),
+                ...(newEmail ? { email: newEmail, emailPessoal: newEmail } : {}),
+                ...(updates.phone !== undefined
+                  ? { phone: updates.phone, telefonePrincipal: updates.phone }
+                  : {}),
+                ...(updates.biNumber !== undefined ? { biNif: updates.biNumber, biNumber: updates.biNumber } : {}),
+                ...(updates.agentNumber !== undefined ? { numeroAgente: updates.agentNumber } : {}),
+                ...(updates.schoolName !== undefined
+                  ? { schoolName: updates.schoolName, nomeEscola: updates.schoolName }
+                  : {}),
+                ...(updates.avatar !== undefined ? { avatar: updates.avatar } : {}),
+                registrationData: {
+                  ...(d.registrationData || {}),
+                  ...(fullName ? { nomeCompleto: fullName } : {}),
+                  ...(newEmail ? { emailPessoal: newEmail } : {}),
+                  ...(updates.phone !== undefined ? { telefonePrincipal: updates.phone } : {}),
+                  ...(updates.biNumber !== undefined ? { biNif: updates.biNumber } : {}),
+                  ...(updates.agentNumber !== undefined ? { numeroAgente: updates.agentNumber } : {}),
+                  ...(updates.schoolName !== undefined ? { nomeEscola: updates.schoolName } : {}),
+                  ...(updates.birthDate !== undefined ? { dataNascimento: updates.birthDate } : {}),
+                  ...(updates.gender !== undefined ? { genero: updates.gender } : {}),
+                  ...(updates.address !== undefined ? { morada: updates.address } : {}),
+                },
+                updatedAt: nowIso,
+              };
+              saveDirectorToFirestore(nextD).catch(() => {});
+              return nextD;
+            }
+            return d;
+          });
+          if (dirChanged) {
+            localStorage.setItem(dirKey, JSON.stringify(nextDirs));
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 7. Update Teacher stores (ucore_admin_teachers, ucore_director_teachers_v1, ucore_registered_teachers_v2)
+  for (const tKey of ['ucore_admin_teachers', 'ucore_director_teachers_v1', 'ucore_registered_teachers_v2']) {
+    try {
+      const rawTeachers = localStorage.getItem(tKey);
+      if (rawTeachers) {
+        const teachers = JSON.parse(rawTeachers);
+        if (Array.isArray(teachers)) {
+          let teacherChanged = false;
+          const nextTeachers = teachers.map((t: any) => {
+            if (t && (matchesRecord(t.id, t.email) || matchesRecord(t.id, t.registrationData?.email))) {
+              teacherChanged = true;
+              const nextT = {
+                ...t,
+                ...(fullName ? { name: fullName, nomeCompleto: fullName } : {}),
+                ...(newEmail ? { email: newEmail } : {}),
+                ...(updates.phone !== undefined
+                  ? { phone: updates.phone, telefone: updates.phone, telefonePrincipal: updates.phone }
+                  : {}),
+                ...(updates.biNumber !== undefined ? { biNif: updates.biNumber, bi: updates.biNumber } : {}),
+                ...(updates.agentNumber !== undefined
+                  ? { agentNumber: updates.agentNumber, numeroAgente: updates.agentNumber }
+                  : {}),
+                ...(updates.schoolName !== undefined
+                  ? { schoolName: updates.schoolName, escola: updates.schoolName, nomeEscola: updates.schoolName }
+                  : {}),
+                ...(updates.avatar !== undefined ? { avatar: updates.avatar } : {}),
+                ...(updates.turma !== undefined ? { turma: updates.turma } : {}),
+                ...(updates.classe !== undefined
+                  ? { classe: updates.classe, gradeClass: updates.classe }
+                  : {}),
+                ...(updates.sala !== undefined ? { sala: updates.sala, room: updates.sala } : {}),
+                ...(updates.periodo !== undefined ? { periodo: updates.periodo, period: updates.periodo } : {}),
+                ...(updates.subject !== undefined ? { subject: updates.subject } : {}),
+                registrationData: {
+                  ...(t.registrationData || {}),
+                  ...(fullName ? { nomeCompleto: fullName } : {}),
+                  ...(newEmail ? { email: newEmail } : {}),
+                  ...(updates.phone !== undefined ? { telefonePrincipal: updates.phone } : {}),
+                  ...(updates.biNumber !== undefined ? { biNif: updates.biNumber } : {}),
+                  ...(updates.agentNumber !== undefined ? { numeroAgente: updates.agentNumber } : {}),
+                  ...(updates.schoolName !== undefined ? { nomeEscola: updates.schoolName } : {}),
+                  ...(updates.birthDate !== undefined ? { dataNascimento: updates.birthDate } : {}),
+                  ...(updates.gender !== undefined ? { genero: updates.gender } : {}),
+                  ...(updates.address !== undefined ? { morada: updates.address } : {}),
+                },
+                updatedAt: nowIso,
+              };
+              saveTeacherToFirestore(nextT).catch(() => {});
+              return nextT;
+            }
+            return t;
+          });
+          if (teacherChanged) {
+            localStorage.setItem(tKey, JSON.stringify(nextTeachers));
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 8. If Director, also update school record's directorName / directorPhone / directorEmail
+  if (currentUser?.role === 'diretor') {
+    const targetSchoolName = (updates.schoolName || currentUser.schoolName || '').trim().toLowerCase();
+    for (const scKey of ['ucore_admin_schools', 'ucore_registered_schools_v1']) {
+      try {
+        const rawSchools = localStorage.getItem(scKey);
+        if (rawSchools) {
+          const schools = JSON.parse(rawSchools);
+          if (Array.isArray(schools)) {
+            let schoolChanged = false;
+            const nextSchools = schools.map((s: any) => {
+              if (!s) return s;
+              const sName = (s.name || s.nomeOficial || '').trim().toLowerCase();
+              const sDirEmail = (s.directorEmail || s.registrationData?.director?.email || '')
+                .trim()
+                .toLowerCase();
+              if (
+                (targetSchoolName && sName && (sName === targetSchoolName || sName.includes(targetSchoolName))) ||
+                (oldEmail && sDirEmail === oldEmail) ||
+                (normNewEmail && sDirEmail === normNewEmail)
+              ) {
+                schoolChanged = true;
+                const nextS = {
+                  ...s,
+                  ...(fullName ? { directorName: fullName } : {}),
+                  ...(updates.phone !== undefined ? { directorPhone: updates.phone } : {}),
+                  ...(newEmail ? { directorEmail: newEmail } : {}),
+                  registrationData: s.registrationData
+                    ? {
+                        ...s.registrationData,
+                        director: {
+                          ...(s.registrationData.director || {}),
+                          ...(fullName ? { nome: fullName } : {}),
+                          ...(updates.phone !== undefined ? { telefone: updates.phone } : {}),
+                          ...(newEmail ? { email: newEmail } : {}),
+                          ...(updates.biNumber !== undefined ? { biNif: updates.biNumber } : {}),
+                        },
+                      }
+                    : s.registrationData,
+                  updatedAt: nowIso,
+                };
+                if (scKey === 'ucore_admin_schools') {
+                  saveSchoolToFirestore(nextS).catch(() => {});
+                }
+                return nextS;
+              }
+              return s;
+            });
+            if (schoolChanged) {
+              localStorage.setItem(scKey, JSON.stringify(nextSchools));
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+  }
+
+  return updatedUserFields;
+}
+
 
 

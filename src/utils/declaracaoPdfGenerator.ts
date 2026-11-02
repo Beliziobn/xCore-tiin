@@ -1532,7 +1532,7 @@ export async function downloadGuiaColocacaoPdf(
   y += 12;
   const localEmi = record.local?.trim() || mun;
   const prepDateMun = mun.toLowerCase().includes('quêssua') || mun.toLowerCase().includes('quessua') ? 'do' : 'de';
-  const dateLine = `A Direcção Municipal de Educação ${prepDateMun} ${mun}, em ${localEmi} aos ${dataExt}.`;
+  const dateLine = `Direcção Municipal de Educação ${prepDateMun} ${mun}, ${localEmi} aos ${dataExt}.`;
 
   doc.setFont('times', 'bold');
   doc.setFontSize(12);

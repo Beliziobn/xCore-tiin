@@ -970,9 +970,7 @@ export default function App() {
     setAuthLoadingAction(null);
     try {
       sessionStorage.setItem('ucore_session_active', 'true');
-      if (user.rememberMe) {
-        localStorage.setItem('ucore_active_user', JSON.stringify(user));
-      }
+      localStorage.setItem('ucore_active_user', JSON.stringify(user));
     } catch {
       // ignore
     }
@@ -1062,6 +1060,53 @@ export default function App() {
       return updatedSessions;
     });
     showToast(`Configurações de ${activeSession.title} salvas com sucesso!`);
+  };
+
+  const handleUpdateCurrentUser = (updated: Partial<UserAccount>) => {
+    setCurrentUser((prev) => {
+      if (!prev) return prev;
+      const nextUser: UserAccount = {
+        ...prev,
+        ...updated,
+        greeting: updated.firstName
+          ? `Olá ${prev.titlePrefix ? prev.titlePrefix + ' ' : ''}${updated.firstName}`
+          : prev.greeting,
+      };
+      try {
+        localStorage.setItem('ucore_active_user', JSON.stringify(nextUser));
+      } catch {
+        // ignore
+      }
+      saveUserToFirestore(nextUser).catch(() => {});
+      return nextUser;
+    });
+
+    // Also refresh local state rosters if they were updated in localStorage
+    try {
+      const rawDirs = localStorage.getItem('sigre_admin_directors') || localStorage.getItem('ucore_admin_directors');
+      if (rawDirs) {
+        const parsedDirs = JSON.parse(rawDirs);
+        if (Array.isArray(parsedDirs) && parsedDirs.length > 0) {
+          setAdminDirectors(parsedDirs);
+        }
+      }
+      const rawTeachers = localStorage.getItem('ucore_admin_teachers');
+      if (rawTeachers) {
+        const parsedTeachers = JSON.parse(rawTeachers);
+        if (Array.isArray(parsedTeachers) && parsedTeachers.length > 0) {
+          setAdminTeachers(parsedTeachers);
+        }
+      }
+      const rawSchools = localStorage.getItem('ucore_admin_schools');
+      if (rawSchools) {
+        const parsedSchools = JSON.parse(rawSchools);
+        if (Array.isArray(parsedSchools) && parsedSchools.length > 0) {
+          setAdminSchools(parsedSchools);
+        }
+      }
+    } catch {
+      // ignore
+    }
   };
 
   const handleSelectPage = (pageId: string) => {
@@ -1648,6 +1693,7 @@ export default function App() {
           onOpenRegisterModal={(type) => setAdminModalType(type)}
           sessionSettings={activeSession.settings}
           onSaveSessionSettings={handleSaveSettings}
+          onUpdateCurrentUser={handleUpdateCurrentUser}
           initialTab={profileInitialTab}
           focusZone={profileFocusZone}
           settingsTrigger={settingsTriggerCount}
@@ -1843,9 +1889,12 @@ export default function App() {
           }}
           onLogout={handleLogout}
           onOpenSettings={() => {
+            setProfileInitialTab('configuracoes');
             setProfileFocusZone(true);
             setSettingsTriggerCount((c) => c + 1);
           }}
+          onUpdateCurrentUser={handleUpdateCurrentUser}
+          initialTab={profileInitialTab}
           focusZone={profileFocusZone}
           settingsTrigger={settingsTriggerCount}
         />
@@ -2087,6 +2136,7 @@ export default function App() {
             onUpdateTeacher={(updated) => {
               setTeacherProfile((prev) => ({ ...prev, ...updated }));
             }}
+            onUpdateCurrentUser={handleUpdateCurrentUser}
             initialTab={profileInitialTab}
             focusZone={profileFocusZone}
             settingsTrigger={settingsTriggerCount}

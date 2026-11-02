@@ -1196,6 +1196,39 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           loggedUser.approverTargetSchoolName = app.schoolName;
         }
 
+        // Apply any user-saved profile/settings updates from Firestore or local profile storage
+        if (firestoreUser) {
+          if (firestoreUser.firstName) loggedUser.firstName = firestoreUser.firstName;
+          if (firestoreUser.lastName !== undefined) loggedUser.lastName = firestoreUser.lastName;
+          if (firestoreUser.phone) loggedUser.phone = firestoreUser.phone;
+          if (firestoreUser.biNumber) loggedUser.biNumber = firestoreUser.biNumber;
+          if (firestoreUser.numeroMecanograficoOuNif) {
+            loggedUser.numeroMecanograficoOuNif = firestoreUser.numeroMecanograficoOuNif;
+          }
+          if (firestoreUser.cargoTitle) loggedUser.cargoTitle = firestoreUser.cargoTitle;
+          if (firestoreUser.schoolName) loggedUser.schoolName = firestoreUser.schoolName;
+          if (firestoreUser.avatar) loggedUser.avatar = firestoreUser.avatar;
+        }
+        try {
+          const rawExtra = localStorage.getItem(`ucore_profile_extra_${cleanEmail}`);
+          if (rawExtra) {
+            const extra = JSON.parse(rawExtra);
+            if (extra.name && typeof extra.name === 'string') {
+              const parts = extra.name.trim().split(/\s+/).filter(Boolean);
+              if (parts[0]) loggedUser.firstName = parts[0];
+              loggedUser.lastName = parts.slice(1).join(' ');
+            }
+            if (extra.phone) loggedUser.phone = extra.phone;
+            if (extra.biNumber) loggedUser.biNumber = extra.biNumber;
+            if (extra.agentNumber) loggedUser.numeroMecanograficoOuNif = extra.agentNumber;
+            if (extra.roleTitle) loggedUser.cargoTitle = extra.roleTitle;
+            if (extra.schoolName) loggedUser.schoolName = extra.schoolName;
+            if (extra.avatar) loggedUser.avatar = extra.avatar;
+          }
+        } catch {}
+
+        loggedUser.greeting = `Olá ${loggedUser.titlePrefix ? loggedUser.titlePrefix + ' ' : ''}${loggedUser.firstName}`;
+
         if (approvalCheck.status === 'pendente' && !isMasterAdmin) {
           loggedUser.status = 'pendente';
           setSuccessMsg(

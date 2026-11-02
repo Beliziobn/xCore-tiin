@@ -363,20 +363,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                       <button
                         onClick={() => {
-                          if (onOpenBackupManager) onOpenBackupManager();
-                          setShowPagesDropdown(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors uppercase tracking-wider font-semibold cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <Archive className="w-4 h-4 text-emerald-600" strokeWidth={2} />
-                          <span>Cofre de Backups</span>
-                        </span>
-                        <span className="text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">1-Click</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
                           onSelectPage('admin-perfil');
                           setShowPagesDropdown(false);
                         }}

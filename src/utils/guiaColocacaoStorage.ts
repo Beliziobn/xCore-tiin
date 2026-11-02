@@ -99,8 +99,8 @@ export function formatColocacaoDateExtenso(v: string): string {
   if (parts.length < 3) return '';
   const a = parts[0];
   const m = parseInt(parts[1], 10);
-  const d = parts[2];
-  if (!m || m < 1 || m > 12) return '';
+  const d = parseInt(parts[2], 10);
+  if (!m || m < 1 || m > 12 || !d) return '';
   return `${d} de ${MESES[m - 1]} de ${a}`;
 }
 

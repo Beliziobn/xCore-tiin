@@ -913,7 +913,7 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
                       <div className="a4-date-line" style={{ textAlign: 'center' }}>
                         <span>
                           <strong>
-                            A Direcção Municipal de Educação {prepDateMun} {mun}, em{' '}
+                            Direcção Municipal de Educação {prepDateMun} {mun},{' '}
                             {livePreviewRecord.local || mun} aos {dataExtenso}.
                           </strong>
                         </span>

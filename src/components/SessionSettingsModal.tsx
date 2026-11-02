@@ -18,7 +18,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import type { SessionProfile, SessionSettings } from '../types';
-import { verifyPassword, updatePassword } from '../utils/passwordService';
+import { verifyPassword, updatePassword, hasRegisteredPassword } from '../utils/passwordService';
 
 interface SessionSettingsModalProps {
   isOpen: boolean;
@@ -89,7 +89,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
 
   const [savedFeedback, setSavedFeedback] = useState<string | null>(null);
 
-  // Sync when session changes or modal opens
+  // Sync when session ID changes or modal opens
   useEffect(() => {
     if (isOpen) {
       setSettings(getInitialSettings(session));
@@ -101,7 +101,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
       setConfirmPassword('');
       setSavedFeedback(null);
     }
-  }, [isOpen, session, initialTab]);
+  }, [isOpen, session.id, initialTab]);
 
   if (!isOpen) return null;
 
@@ -128,7 +128,7 @@ export const SessionSettingsModal: React.FC<SessionSettingsModalProps> = ({
       return;
     }
 
-    if (!verifyPassword(userEmail, currentPassword)) {
+    if (hasRegisteredPassword(userEmail) && !verifyPassword(userEmail, currentPassword)) {
       setPasswordError('A palavra-passe atual informada está incorreta.');
       return;
     }
