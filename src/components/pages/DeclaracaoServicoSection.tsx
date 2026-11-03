@@ -295,7 +295,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
         if (v > todayISO) return 'A data não pode ser futura.';
         return '';
       case 'profissao':
-        if (!v) return 'Escolha a profissão.';
+        if (!v) return 'Escolha ou escreva a profissão.';
         return '';
       case 'grau':
         if (!v) return 'Indique o grau.';
@@ -1325,28 +1325,48 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                 <label htmlFor="f-servico-profissao" className="block text-[13px] font-semibold text-slate-800 mb-1.5">
                   Profissão / Carreira docente <span className="text-[#d92d20]">*</span>
                 </label>
-                <select
+                <input
                   id="f-servico-profissao"
+                  type="text"
+                  list="f-servico-profissao-list"
                   value={formData.profissao}
                   onChange={(e) => handleFieldChange('profissao', e.target.value)}
                   onBlur={() => handleFieldBlur('profissao')}
+                  placeholder="Escolha da lista ou escreva a profissão..."
                   className={pillInputClass(Boolean(errors.profissao))}
-                >
-                  <option value="">Escolha</option>
-                  <option value="Professor do Ensino Primário">Professor do Ensino Primário</option>
-                  <option value="Professor do Ensino Secundário">Professor do Ensino Secundário</option>
-                  <option value="Professor do Ensino Primário e Secundário">
-                    Professor do Ensino Primário e Secundário
-                  </option>
-                  {formData.profissao &&
-                    ![
-                      'Professor do Ensino Primário',
-                      'Professor do Ensino Secundário',
-                      'Professor do Ensino Primário e Secundário',
-                    ].includes(formData.profissao) && (
-                      <option value={formData.profissao}>{formData.profissao}</option>
-                    )}
-                </select>
+                />
+                <datalist id="f-servico-profissao-list">
+                  <option value="Professor do Ensino Primário" />
+                  <option value="Professor do Ensino Secundário" />
+                  <option value="Professor do Ensino Primário e Secundário" />
+                  <option value="Director Escolar" />
+                  <option value="Subdirector Pedagógico" />
+                  <option value="Subdirector Administrativo" />
+                  <option value="Secretário Escolar" />
+                  <option value="Técnico Administrativo" />
+                  <option value="Auxiliar de Limpeza" />
+                  <option value="Vigilante Escolar" />
+                </datalist>
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {[
+                    'Professor do Ensino Primário',
+                    'Professor do Ensino Secundário',
+                    'Professor do Ensino Primário e Secundário',
+                  ].map((opcao) => (
+                    <button
+                      key={opcao}
+                      type="button"
+                      onClick={() => handleFieldChange('profissao', opcao)}
+                      className={`text-[11px] font-medium rounded-full px-3 py-1 transition-colors cursor-pointer ${
+                        formData.profissao === opcao
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-[#f2f4f7] hover:bg-slate-200/80 text-slate-800'
+                      }`}
+                    >
+                      {opcao}
+                    </button>
+                  ))}
+                </div>
                 {errors.profissao && (
                   <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.profissao}</p>
                 )}
@@ -1430,12 +1450,118 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                 <input
                   id="f-servico-escola"
                   type="text"
+                  list="f-servico-escola-list"
                   value={formData.escola}
                   onChange={(e) => handleFieldChange('escola', e.target.value)}
                   onBlur={() => handleFieldBlur('escola')}
-                  placeholder="Ex.: Complexo Escolar Católico n.º 166 MJE São Pedro – Quêssua"
+                  placeholder="Selecione uma escola da lista ou escreva o nome da escola..."
                   className={pillInputClass(Boolean(errors.escola))}
                 />
+                <datalist id="f-servico-escola-list">
+                  <option value="Complexo Escolar Católico n.º 269 MJE – Lar Nazaré – Quêssua" />
+                  <option value="Complexo Escolar Católico n.º 274 MJE – Nossa Senhora de Guadalupe – Quêssua" />
+                  <option value="Complexo Escolar Católico n.º 282 MJE – Kudyelela – Quêssua" />
+                  <option value="Complexo Escolar Católico n.º 290 MJE – Paz e Amor – Quêssua" />
+                  <option value="Complexo Escolar Católico n.º 293 MJE – São Francisco de Assis – Quêssua" />
+                  <option value="Complexo Escolar Metodista n.º 294 MJE – Missão do Quêssua – Quêssua" />
+                  <option value="Complexo Escolar Metodista Sião n.º 288 MJE – Episcopal Africana – Quêssua" />
+                  <option value="Complexo Escolar Metodista Sião n.º 289 MJE – Monte Sinai – Quêssua" />
+                  <option value="Complexo Escolar Missionário n.º 263 MJE – Bom Deus – Quêssua" />
+                  <option value="Complexo Escolar n.º 285 MJE – Cambondo – Quêssua" />
+                  <option value="Complexo Escolar n.º 291 MJE – Quissol – Quêssua" />
+                  <option value="Complexo Escolar n.º 292 MJE – Samora Machel – Quêssua" />
+                  <option value="Escola Primária Metodista n.º 209 MJE – São Paulo – Quêssua" />
+                  <option value="Escola Primária Metodista Sião n.º 207 MJE – Rei Salomão – Quêssua" />
+                  <option value="Escola Primária Católica n.º 202 MJE – Edith Al MJEida De Sousa - Quéssua" />
+                  <option value="Escola Primária Católica n.º 208 MJE – Santa Teresinha – Quêssua" />
+                  <option value="Escola Primária Católica n.º 210 MJE – Vila Matilde – Quêssua" />
+                  <option value="Escola Primária IEPA n.º 163 MJE – Rev. Ferreira Francisco – Quêssua" />
+                  <option value="Escola Primária n.º 115 MJE – Cabuabuata – Quêssua" />
+                  <option value="Escola Primária n.º 199 MJE – Campo da Vitória – Quêssua" />
+                  <option value="Escola Primária n.º 200 MJE – Comandante Gika – Quêssua" />
+                  <option value="Escola Primária n.º 201 MJE – Dr. António Agostinho Neto – Quêssua" />
+                  <option value="Escola Primária n.º 203 MJE – Luzia Inglês Van – Quêssua" />
+                  <option value="Escola Primária n.º 204 MJE – Major Kanhangulo – Quêssua" />
+                  <option value="Escola Primária n.º 205 MJE – Quizanga – Quêssua" />
+                  <option value="Escola Primária n.º 206 MJE – Quizanga da Barraca – Quêssua" />
+                  <option value="Escola Primária n.º 125 – Cazeta – Quêssua" />
+                  <option value="Complexo Escolar Católico n.º 166 MJE São Pedro Quêssua" />
+                </datalist>
+                <div className="mt-2">
+                  <select
+                    aria-label="Selecionar escola da lista de opções"
+                    value={
+                      [
+                        'Complexo Escolar Católico n.º 269 MJE – Lar Nazaré – Quêssua',
+                        'Complexo Escolar Católico n.º 274 MJE – Nossa Senhora de Guadalupe – Quêssua',
+                        'Complexo Escolar Católico n.º 282 MJE – Kudyelela – Quêssua',
+                        'Complexo Escolar Católico n.º 290 MJE – Paz e Amor – Quêssua',
+                        'Complexo Escolar Católico n.º 293 MJE – São Francisco de Assis – Quêssua',
+                        'Complexo Escolar Metodista n.º 294 MJE – Missão do Quêssua – Quêssua',
+                        'Complexo Escolar Metodista Sião n.º 288 MJE – Episcopal Africana – Quêssua',
+                        'Complexo Escolar Metodista Sião n.º 289 MJE – Monte Sinai – Quêssua',
+                        'Complexo Escolar Missionário n.º 263 MJE – Bom Deus – Quêssua',
+                        'Complexo Escolar n.º 285 MJE – Cambondo – Quêssua',
+                        'Complexo Escolar n.º 291 MJE – Quissol – Quêssua',
+                        'Complexo Escolar n.º 292 MJE – Samora Machel – Quêssua',
+                        'Escola Primária Metodista n.º 209 MJE – São Paulo – Quêssua',
+                        'Escola Primária Metodista Sião n.º 207 MJE – Rei Salomão – Quêssua',
+                        'Escola Primária Católica n.º 202 MJE – Edith Al MJEida De Sousa - Quéssua',
+                        'Escola Primária Católica n.º 208 MJE – Santa Teresinha – Quêssua',
+                        'Escola Primária Católica n.º 210 MJE – Vila Matilde – Quêssua',
+                        'Escola Primária IEPA n.º 163 MJE – Rev. Ferreira Francisco – Quêssua',
+                        'Escola Primária n.º 115 MJE – Cabuabuata – Quêssua',
+                        'Escola Primária n.º 199 MJE – Campo da Vitória – Quêssua',
+                        'Escola Primária n.º 200 MJE – Comandante Gika – Quêssua',
+                        'Escola Primária n.º 201 MJE – Dr. António Agostinho Neto – Quêssua',
+                        'Escola Primária n.º 203 MJE – Luzia Inglês Van – Quêssua',
+                        'Escola Primária n.º 204 MJE – Major Kanhangulo – Quêssua',
+                        'Escola Primária n.º 205 MJE – Quizanga – Quêssua',
+                        'Escola Primária n.º 206 MJE – Quizanga da Barraca – Quêssua',
+                        'Escola Primária n.º 125 – Cazeta – Quêssua',
+                        'Complexo Escolar Católico n.º 166 MJE São Pedro Quêssua',
+                      ].includes(formData.escola)
+                        ? formData.escola
+                        : ''
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleFieldChange('escola', e.target.value);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] font-medium text-slate-700 hover:border-slate-300 focus:border-[#0B2240] focus:bg-white focus:outline-none transition-colors"
+                  >
+                    <option value="">— Ou escolha rapidamente uma das 28 escolas da lista oficial —</option>
+                    <option value="Complexo Escolar Católico n.º 269 MJE – Lar Nazaré – Quêssua">Complexo Escolar Católico n.º 269 MJE – Lar Nazaré – Quêssua</option>
+                    <option value="Complexo Escolar Católico n.º 274 MJE – Nossa Senhora de Guadalupe – Quêssua">Complexo Escolar Católico n.º 274 MJE – Nossa Senhora de Guadalupe – Quêssua</option>
+                    <option value="Complexo Escolar Católico n.º 282 MJE – Kudyelela – Quêssua">Complexo Escolar Católico n.º 282 MJE – Kudyelela – Quêssua</option>
+                    <option value="Complexo Escolar Católico n.º 290 MJE – Paz e Amor – Quêssua">Complexo Escolar Católico n.º 290 MJE – Paz e Amor – Quêssua</option>
+                    <option value="Complexo Escolar Católico n.º 293 MJE – São Francisco de Assis – Quêssua">Complexo Escolar Católico n.º 293 MJE – São Francisco de Assis – Quêssua</option>
+                    <option value="Complexo Escolar Metodista n.º 294 MJE – Missão do Quêssua – Quêssua">Complexo Escolar Metodista n.º 294 MJE – Missão do Quêssua – Quêssua</option>
+                    <option value="Complexo Escolar Metodista Sião n.º 288 MJE – Episcopal Africana – Quêssua">Complexo Escolar Metodista Sião n.º 288 MJE – Episcopal Africana – Quêssua</option>
+                    <option value="Complexo Escolar Metodista Sião n.º 289 MJE – Monte Sinai – Quêssua">Complexo Escolar Metodista Sião n.º 289 MJE – Monte Sinai – Quêssua</option>
+                    <option value="Complexo Escolar Missionário n.º 263 MJE – Bom Deus – Quêssua">Complexo Escolar Missionário n.º 263 MJE – Bom Deus – Quêssua</option>
+                    <option value="Complexo Escolar n.º 285 MJE – Cambondo – Quêssua">Complexo Escolar n.º 285 MJE – Cambondo – Quêssua</option>
+                    <option value="Complexo Escolar n.º 291 MJE – Quissol – Quêssua">Complexo Escolar n.º 291 MJE – Quissol – Quêssua</option>
+                    <option value="Complexo Escolar n.º 292 MJE – Samora Machel – Quêssua">Complexo Escolar n.º 292 MJE – Samora Machel – Quêssua</option>
+                    <option value="Escola Primária Metodista n.º 209 MJE – São Paulo – Quêssua">Escola Primária Metodista n.º 209 MJE – São Paulo – Quêssua</option>
+                    <option value="Escola Primária Metodista Sião n.º 207 MJE – Rei Salomão – Quêssua">Escola Primária Metodista Sião n.º 207 MJE – Rei Salomão – Quêssua</option>
+                    <option value="Escola Primária Católica n.º 202 MJE – Edith Al MJEida De Sousa - Quéssua">Escola Primária Católica n.º 202 MJE – Edith Al MJEida De Sousa - Quéssua</option>
+                    <option value="Escola Primária Católica n.º 208 MJE – Santa Teresinha – Quêssua">Escola Primária Católica n.º 208 MJE – Santa Teresinha – Quêssua</option>
+                    <option value="Escola Primária Católica n.º 210 MJE – Vila Matilde – Quêssua">Escola Primária Católica n.º 210 MJE – Vila Matilde – Quêssua</option>
+                    <option value="Escola Primária IEPA n.º 163 MJE – Rev. Ferreira Francisco – Quêssua">Escola Primária IEPA n.º 163 MJE – Rev. Ferreira Francisco – Quêssua</option>
+                    <option value="Escola Primária n.º 115 MJE – Cabuabuata – Quêssua">Escola Primária n.º 115 MJE – Cabuabuata – Quêssua</option>
+                    <option value="Escola Primária n.º 199 MJE – Campo da Vitória – Quêssua">Escola Primária n.º 199 MJE – Campo da Vitória – Quêssua</option>
+                    <option value="Escola Primária n.º 200 MJE – Comandante Gika – Quêssua">Escola Primária n.º 200 MJE – Comandante Gika – Quêssua</option>
+                    <option value="Escola Primária n.º 201 MJE – Dr. António Agostinho Neto – Quêssua">Escola Primária n.º 201 MJE – Dr. António Agostinho Neto – Quêssua</option>
+                    <option value="Escola Primária n.º 203 MJE – Luzia Inglês Van – Quêssua">Escola Primária n.º 203 MJE – Luzia Inglês Van – Quêssua</option>
+                    <option value="Escola Primária n.º 204 MJE – Major Kanhangulo – Quêssua">Escola Primária n.º 204 MJE – Major Kanhangulo – Quêssua</option>
+                    <option value="Escola Primária n.º 205 MJE – Quizanga – Quêssua">Escola Primária n.º 205 MJE – Quizanga – Quêssua</option>
+                    <option value="Escola Primária n.º 206 MJE – Quizanga da Barraca – Quêssua">Escola Primária n.º 206 MJE – Quizanga da Barraca – Quêssua</option>
+                    <option value="Escola Primária n.º 125 – Cazeta – Quêssua">Escola Primária n.º 125 – Cazeta – Quêssua</option>
+                    <option value="Complexo Escolar Católico n.º 166 MJE São Pedro Quêssua">Complexo Escolar Católico n.º 166 MJE São Pedro Quêssua</option>
+                  </select>
+                </div>
                 {errors.escola && <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.escola}</p>}
               </div>
             </div>
