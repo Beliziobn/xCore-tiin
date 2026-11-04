@@ -7,6 +7,15 @@ import type { GuiaFeriasRecord } from './guiaFeriasStorage';
 import { formatDateExtenso } from './guiaFeriasStorage';
 import type { GuiaColocacaoRecord } from './guiaColocacaoStorage';
 import { formatColocacaoDateExtenso, formatCategoriaGrauColocacao } from './guiaColocacaoStorage';
+import type { FichaAvaliacaoRecord } from './fichaAvaliacaoStorage';
+import {
+  INDICADORES_AVALIACAO,
+  ANUAL_INDICADORES_ORDER,
+  computeFichaAvaliacaoMetrics,
+  formatAvaliacaoDateShort,
+  splitAvaliacaoDateParts,
+  formatAvaliacaoNumber,
+} from './fichaAvaliacaoStorage';
 import type { QuickServiceRequest } from '../types';
 import { formatAngolanDateExtenso } from './efectividadeStorage';
 import {
@@ -441,44 +450,56 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
   <style>
     @page {
       size: A4 portrait;
-      margin: 0mm !important;
+      margin: ${elementId === 'ficha-avaliacao-a4-sheet' ? '12mm 16mm' : '0mm'} !important;
     }
     * {
       box-sizing: border-box !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
-      font-family: 'Times New Roman', Times, serif !important;
+      font-family: ${
+        elementId === 'ficha-avaliacao-a4-sheet'
+          ? "'Century Gothic', CenturyGothic, AppleGothic, sans-serif"
+          : "'Times New Roman', Times, serif"
+      } !important;
       color: #000000 !important;
     }
     html, body {
-      width: 210mm !important;
-      height: 296mm !important;
-      max-height: 296mm !important;
+      width: ${elementId === 'ficha-avaliacao-a4-sheet' ? '100%' : '210mm'} !important;
+      height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'auto' : '296mm'} !important;
+      max-height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'none' : '296mm'} !important;
       margin: 0 !important;
       padding: 0 !important;
       background: #ffffff !important;
-      overflow: hidden !important;
-      page-break-after: avoid !important;
+      overflow: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'visible' : 'hidden'} !important;
+      ${
+        elementId === 'ficha-avaliacao-a4-sheet'
+          ? ''
+          : `page-break-after: avoid !important;
       page-break-before: avoid !important;
       page-break-inside: avoid !important;
-      break-inside: avoid !important;
+      break-inside: avoid !important;`
+      }
     }
     #${elementId} {
-      width: 210mm !important;
-      max-width: 210mm !important;
-      height: 296mm !important;
-      max-height: 296mm !important;
-      padding: 15mm 20mm !important;
+      width: ${elementId === 'ficha-avaliacao-a4-sheet' ? '100%' : '210mm'} !important;
+      max-width: ${elementId === 'ficha-avaliacao-a4-sheet' ? '100%' : '210mm'} !important;
+      height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'auto' : '296mm'} !important;
+      max-height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'none' : '296mm'} !important;
+      padding: ${elementId === 'ficha-avaliacao-a4-sheet' ? '0' : '15mm 20mm'} !important;
       margin: 0 auto !important;
       border: 0 !important;
       outline: 0 !important;
       box-shadow: none !important;
       background: #ffffff !important;
-      overflow: hidden !important;
-      page-break-inside: avoid !important;
+      overflow: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'visible' : 'hidden'} !important;
+      ${
+        elementId === 'ficha-avaliacao-a4-sheet'
+          ? ''
+          : `page-break-inside: avoid !important;
       break-inside: avoid !important;
       page-break-after: avoid !important;
-      break-after: avoid !important;
+      break-after: avoid !important;`
+      }
     }
     .a4-emblem-img, img {
       width: 60px !important;
@@ -486,11 +507,11 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       max-height: 60px !important;
       object-fit: contain !important;
       display: block !important;
-      margin: 0 auto 6px auto !important;
+      margin: ${elementId === 'declaracao-servico-a4-sheet' ? '0 auto 14pt auto' : '0 auto 6px auto'} !important;
     }
     .a4-header-block {
       text-align: center !important;
-      margin-bottom: 10pt !important;
+      margin-bottom: ${elementId === 'declaracao-servico-a4-sheet' ? '26pt' : '10pt'} !important;
       padding-bottom: 0 !important;
       border: 0 !important;
     }
@@ -500,8 +521,8 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       font-weight: 700 !important;
       text-transform: uppercase !important;
       letter-spacing: 0.03em !important;
-      line-height: 1.25 !important;
-      margin: 0 0 2pt 0 !important;
+      line-height: ${elementId === 'declaracao-servico-a4-sheet' ? '1.35' : '1.25'} !important;
+      margin: 0 0 ${elementId === 'declaracao-servico-a4-sheet' ? '6pt' : '2pt'} 0 !important;
       text-align: center !important;
     }
     .a4-header-block p.a4-inst-line,
@@ -511,13 +532,14 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       font-weight: 700 !important;
       text-transform: uppercase !important;
       letter-spacing: 0.01em !important;
-      line-height: 1.25 !important;
-      margin: 1.5pt 0 !important;
+      line-height: ${elementId === 'declaracao-servico-a4-sheet' ? '1.35' : '1.25'} !important;
+      margin: ${elementId === 'declaracao-servico-a4-sheet' ? '3.5pt' : '1.5pt'} 0 !important;
       text-align: center !important;
     }
     .a4-title-wrap {
-      padding-top: 12pt !important;
-      padding-bottom: 4pt !important;
+      padding-top: ${elementId === 'declaracao-servico-a4-sheet' ? '14pt' : '12pt'} !important;
+      padding-bottom: ${elementId === 'declaracao-servico-a4-sheet' ? '12pt' : '4pt'} !important;
+      margin-bottom: ${elementId === 'declaracao-servico-a4-sheet' ? '20pt' : '0'} !important;
       text-align: center !important;
     }
     .a4-title-wrap h1,
@@ -534,18 +556,36 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
     }
     .a4-body-copy,
     .doc-text-12 {
-      margin-top: 10pt !important;
+      margin-top: ${elementId === 'declaracao-servico-a4-sheet' ? '18pt' : '10pt'} !important;
       font-size: 12pt !important;
-      line-height: ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? '1.42' : '1.5'} !important;
+      line-height: ${
+        elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet'
+          ? '1.42'
+          : elementId === 'declaracao-servico-a4-sheet'
+          ? '1.75'
+          : '1.5'
+      } !important;
       text-align: justify !important;
     }
     .a4-body-copy p,
     .doc-text-12 p {
       font-size: 12pt !important;
-      line-height: ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? '1.42' : '1.5'} !important;
+      line-height: ${
+        elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet'
+          ? '1.42'
+          : elementId === 'declaracao-servico-a4-sheet'
+          ? '1.75'
+          : '1.5'
+      } !important;
       text-align: justify !important;
       text-indent: 1.25cm !important;
-      margin: 0 0 ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? '8pt' : '10pt'} 0 !important;
+      margin: 0 0 ${
+        elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet'
+          ? '8pt'
+          : elementId === 'declaracao-servico-a4-sheet'
+          ? '18pt'
+          : '10pt'
+      } 0 !important;
     }
     .a4-body-copy p.a4-equals-divider,
     .a4-body-copy p.a4-underscore-divider {
@@ -568,8 +608,8 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       font-weight: 700 !important;
     }
     .a4-footer-block {
-      margin-top: 14pt !important;
-      padding-top: 2pt !important;
+      margin-top: ${elementId === 'declaracao-servico-a4-sheet' ? '38pt' : '14pt'} !important;
+      padding-top: ${elementId === 'declaracao-servico-a4-sheet' ? '8pt' : '2pt'} !important;
       border: 0 !important;
     }
     .a4-date-line,
@@ -577,7 +617,7 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       font-size: 12pt !important;
       line-height: 1.35 !important;
       text-align: ${elementId === 'oficial-a4-sheet' || elementId === 'official-modal-print-sheet' ? 'right' : 'center'} !important;
-      margin-bottom: 20pt !important;
+      margin-bottom: ${elementId === 'declaracao-servico-a4-sheet' ? '34pt' : '20pt'} !important;
       display: block !important;
     }
     .a4-sig-container {
@@ -589,7 +629,7 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       font-size: 12pt !important;
       font-weight: 700 !important;
       line-height: 1.3 !important;
-      margin: 0 0 26pt 0 !important;
+      margin: 0 0 ${elementId === 'declaracao-servico-a4-sheet' ? '34pt' : '26pt'} 0 !important;
       text-align: center !important;
     }
     .a4-sig-line {
@@ -604,20 +644,90 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       margin: 5pt 0 0 0 !important;
       text-align: center !important;
     }
+    .text-left { text-align: left !important; }
     .text-center { text-align: center !important; }
     .text-right { text-align: right !important; }
     .text-justify { text-align: justify !important; }
     .font-bold { font-weight: 700 !important; }
+    .font-normal { font-weight: 400 !important; }
     .uppercase { text-transform: uppercase !important; }
+    .mx-auto { margin-left: auto !important; margin-right: auto !important; }
+    .w-full { width: 100% !important; }
+    .w-80 { width: 320px !important; }
+    .border-b { border-bottom: 1px solid #000000 !important; }
+    .border { border: 1px solid #000000 !important; }
+    .flex { display: flex !important; }
+    .inline-flex { display: inline-flex !important; }
+    .inline-block { display: inline-block !important; }
+    .flex-col { flex-direction: column !important; }
+    .flex-wrap { flex-wrap: wrap !important; }
+    .flex-1 { flex: 1 1 0% !important; }
+    .items-center { align-items: center !important; }
+    .items-baseline { align-items: baseline !important; }
+    .justify-center { justify-content: center !important; }
+    .shrink-0 { flex-shrink: 0 !important; }
     table {
       width: 100% !important;
       border-collapse: collapse !important;
-      margin: 6pt 0 !important;
+      margin: ${elementId === 'ficha-avaliacao-a4-sheet' ? '2pt 0 5pt 0' : '6pt 0'} !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
     th, td {
       border: 1px solid #000000 !important;
-      padding: 3pt 5pt !important;
-      font-size: 11pt !important;
+      padding: ${elementId === 'ficha-avaliacao-a4-sheet' ? '4pt 6pt' : '3pt 5pt'} !important;
+      font-size: ${elementId === 'ficha-avaliacao-a4-sheet' ? '8pt' : '11pt'} !important;
+      font-weight: ${elementId === 'ficha-avaliacao-a4-sheet' ? '400' : 'inherit'} !important;
+      vertical-align: middle !important;
+    }
+    #ficha-avaliacao-a4-sheet p,
+    #ficha-avaliacao-a4-sheet span,
+    #ficha-avaliacao-a4-sheet td,
+    #ficha-avaliacao-a4-sheet div {
+      font-size: 8pt !important;
+      font-weight: 400 !important;
+    }
+    #ficha-avaliacao-a4-sheet h1,
+    #ficha-avaliacao-a4-sheet th,
+    #ficha-avaliacao-a4-sheet .ficha-title-10,
+    #ficha-avaliacao-a4-sheet .font-bold,
+    #ficha-avaliacao-a4-sheet p.font-bold,
+    #ficha-avaliacao-a4-sheet th.font-bold,
+    #ficha-avaliacao-a4-sheet td.font-bold,
+    #ficha-avaliacao-a4-sheet span.font-bold {
+      font-weight: 700 !important;
+      font-size: 10pt !important;
+    }
+    #ficha-avaliacao-a4-sheet .a4-eval-section {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin-bottom: 8pt !important;
+    }
+    #ficha-avaliacao-a4-sheet .a4-page-break-after {
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    #ficha-avaliacao-a4-sheet .ficha-comment-line {
+      height: 19px !important;
+      border-bottom: 1px solid #000000 !important;
+      width: 100% !important;
+      display: block !important;
+    }
+    #ficha-avaliacao-a4-sheet .ficha-sig-line {
+      width: 250px !important;
+      border-bottom: 1px solid #000000 !important;
+      margin: 0 auto !important;
+      height: 1px !important;
+      display: block !important;
+    }
+    #ficha-avaliacao-a4-sheet img,
+    #ficha-avaliacao-a4-sheet .ficha-emblem-img {
+      width: 80px !important;
+      height: 80px !important;
+      max-height: 80px !important;
+      object-fit: contain !important;
+      display: block !important;
+      margin: 0 auto 6pt auto !important;
     }
   </style>
 </head>
@@ -1126,12 +1236,12 @@ export async function downloadDeclaracaoServicoPdf(
   const usableWidth = pageWidth - marginX * 2;
   const centerX = pageWidth / 2;
   const firstLineIndent = 12.5;
-  const lineHeightMm = 6.8;
-  const paragraphGapMm = 5.2;
+  const lineHeightMm = 7.4;
+  const paragraphGapMm = 7.5;
 
   const isFem = record.tratamento === 'Senhora';
 
-  let y = 18;
+  let y = 20;
 
   const emblemData = await loadEmblemPngDataUrl(emblemAngolaImg);
   if (emblemData) {
@@ -1145,32 +1255,32 @@ export async function downloadDeclaracaoServicoPdf(
       emblemWidth,
       emblemHeight
     );
-    y += emblemHeight + 5.5;
+    y += emblemHeight + 8.5;
   } else {
-    y += 10;
+    y += 12;
   }
 
   doc.setFont('times', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(0, 0, 0);
   doc.text('REPÚBLICA DE ANGOLA', centerX, y, { align: 'center' });
-  y += 5.4;
+  y += 6.5;
 
   doc.setFont('times', 'bold');
   doc.setFontSize(12);
   if (record.provEmissao) {
     doc.text(`GOVERNO PROVINCIAL DE ${record.provEmissao.toUpperCase()}`, centerX, y, { align: 'center' });
-    y += 5.0;
+    y += 5.8;
   }
   if (record.municipioAdm) {
     doc.text(`ADMINISTRAÇÃO MUNICIPAL DE ${record.municipioAdm.toUpperCase()}`, centerX, y, { align: 'center' });
-    y += 5.0;
+    y += 5.8;
   }
   if (record.direccao) {
     doc.text(record.direccao.toUpperCase(), centerX, y, { align: 'center' });
-    y += 5.0;
+    y += 5.8;
   }
-  y += 6.5;
+  y += 12;
 
   doc.setFont('times', 'bold');
   doc.setFontSize(14);
@@ -1180,7 +1290,7 @@ export async function downloadDeclaracaoServicoPdf(
   doc.setLineWidth(0.45);
   doc.line(centerX - titleW / 2, y + 1.2, centerX + titleW / 2, y + 1.2);
 
-  y += 12;
+  y += 16;
 
   const filiacao =
     (isFem ? 'filha' : 'filho') +
@@ -1221,7 +1331,7 @@ export async function downloadDeclaracaoServicoPdf(
   y += paragraphGapMm;
   y = renderJustifiedParagraph(doc, p3, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
 
-  y += 12;
+  y += 18;
   const localParts = [record.direccao, record.localEmissao].filter(Boolean).join(', ');
   const dateLine =
     (localParts ? `${localParts} ` : '') +
@@ -1231,16 +1341,16 @@ export async function downloadDeclaracaoServicoPdf(
     doc.setFont('times', 'normal');
     doc.setFontSize(12);
     doc.text(dateLine, centerX, y, { align: 'center' });
-    y += 14;
+    y += 18;
   } else {
-    y += 10;
+    y += 14;
   }
 
   doc.setFont('times', 'bold');
   doc.setFontSize(12);
   doc.text('O Director Municipal', centerX, y, { align: 'center' });
 
-  y += 15;
+  y += 18;
   doc.setLineWidth(0.35);
   doc.line(centerX - 35, y, centerX + 35, y);
 
@@ -1562,6 +1672,547 @@ export async function downloadGuiaColocacaoPdf(
 
   doc.save(`Guia_Colocacao_${safeName}.pdf`);
 }
+
+/**
+ * Gera e descarrega a Ficha de Avaliação de Desempenho Docente (Anexo III — Diário da República)
+ * em formato PDF nativo, estruturada rigorosamente em 3 páginas A4 bem enquadradas.
+ */
+export async function downloadFichaAvaliacaoPdf(
+  record: FichaAvaliacaoRecord
+): Promise<void> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 16;
+  const marginTop = 14;
+  const usableWidth = pageWidth - marginX * 2; // 178mm
+  const centerX = pageWidth / 2;
+
+  const metrics = computeFichaAvaliacaoMetrics(record.notas);
+
+  let y = marginTop;
+
+  // =========================================================================
+  // PÁGINA 1: Cabeçalho + Identificação + Período + Indicadores Trimestrais + Nota (1 a 6)
+  // =========================================================================
+  const emblemData = await loadEmblemPngDataUrl(emblemAngolaImg);
+  if (emblemData) {
+    const emblemHeight = 22;
+    const emblemWidth = emblemHeight * emblemData.ratio;
+    doc.addImage(
+      emblemData.dataUrl,
+      'PNG',
+      centerX - emblemWidth / 2,
+      y,
+      emblemWidth,
+      emblemHeight
+    );
+    y += emblemHeight + 5;
+  } else {
+    y += 10;
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text('REPÚBLICA DE ANGOLA', centerX, y, { align: 'center' });
+  y += 4.5;
+  doc.text('GOVERNO PROVINCIAL DE MALANJE', centerX, y, { align: 'center' });
+  y += 4.5;
+  doc.text('ADMINISTRAÇÃO MUNICIPAL DO QUÊSSUA', centerX, y, { align: 'center' });
+  y += 4.5;
+  doc.text('DIRECÇÃO MUNICIPAL DE EDUCAÇÃO', centerX, y, { align: 'center' });
+  y += 6;
+
+  doc.setFontSize(10);
+  doc.text(
+    'FICHA DE AVALIAÇÃO DE DESEMPENHO ANUAL DO EDUCADOR DE INFÂNCIA',
+    centerX,
+    y,
+    { align: 'center' }
+  );
+  y += 4.5;
+  doc.text('E DO PROFESSOR DO ENSINO PRIMÁRIO E SECUNDÁRIO', centerX, y, { align: 'center' });
+  y += 6.5;
+
+  const drawLabeledLine = (
+    label: string,
+    val: string,
+    startX: number,
+    curY: number,
+    totalW: number
+  ) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(label, startX, curY);
+    const lw = doc.getTextWidth(label) + 2.5;
+    const lineStart = startX + lw;
+    const lineEnd = startX + totalW;
+    if (val) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(val, lineStart + 2, curY - 0.5);
+    }
+    doc.setLineWidth(0.3);
+    doc.line(lineStart, curY + 1.1, lineEnd, curY + 1.1);
+  };
+
+  const drawSlashDateLine = (
+    prefixLabel: string,
+    isoDate: string | undefined,
+    startX: number,
+    curY: number,
+    segW: number = 18,
+    centered: boolean = false,
+    boldLabel: boolean = false
+  ) => {
+    const [d, m, a] = splitAvaliacaoDateParts(isoDate);
+    doc.setFont('helvetica', boldLabel ? 'bold' : 'normal');
+    doc.setFontSize(boldLabel ? 10 : 8);
+    const labelW = prefixLabel ? doc.getTextWidth(prefixLabel) + 2.5 : 0;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    const slashW = doc.getTextWidth(' / ');
+    const yearW = segW + 4;
+    const totalW = labelW + segW + slashW * 2 + segW + yearW;
+    let x = centered ? centerX - totalW / 2 : startX;
+
+    if (prefixLabel) {
+      doc.setFont('helvetica', boldLabel ? 'bold' : 'normal');
+      doc.setFontSize(boldLabel ? 10 : 8);
+      doc.text(prefixLabel, x, curY);
+      x += labelW;
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setLineWidth(0.3);
+    if (d) doc.text(d, x + segW / 2, curY - 0.5, { align: 'center' });
+    doc.line(x, curY + 1.1, x + segW, curY + 1.1);
+    x += segW;
+    doc.text(' / ', x, curY);
+    x += slashW;
+
+    if (m) doc.text(m, x + segW / 2, curY - 0.5, { align: 'center' });
+    doc.line(x, curY + 1.1, x + segW, curY + 1.1);
+    x += segW;
+    doc.text(' / ', x, curY);
+    x += slashW;
+
+    if (a) doc.text(a, x + yearW / 2, curY - 0.5, { align: 'center' });
+    doc.line(x, curY + 1.1, x + yearW, curY + 1.1);
+    return x + yearW;
+  };
+
+  // Identificação: a), b), c) e Dados do Avaliado (em Tabela)
+  const idRowH = 6.8;
+  const idRows: Array<{ label: string; value: string }> = [
+    { label: 'a)', value: record.provincia || '' },
+    { label: 'b)', value: record.municipio || '' },
+    { label: 'c)', value: record.escola || '' },
+    { label: 'Nome Completo:', value: record.nome || '' },
+    { label: 'Categoria:', value: record.categoria || '' },
+    { label: 'Agente nº:', value: record.agente || '' },
+  ];
+  doc.setLineWidth(0.3);
+  for (const row of idRows) {
+    doc.rect(marginX, y, usableWidth, idRowH);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(row.label, marginX + 3, y + 4.6);
+    const lw = doc.getTextWidth(row.label) + 2.5;
+    if (row.value) {
+      doc.text(row.value, marginX + 3 + lw, y + 4.6);
+    }
+    y += idRowH;
+  }
+  const dateRowH = 7.4;
+  doc.rect(marginX, y, usableWidth, dateRowH);
+  drawSlashDateLine('Data de Avaliação:', record.dataAval, marginX + 3, y + 5.0, 18, false, false);
+  y += dateRowH + 5;
+
+  // Período a que respeita avaliação (em Tabela)
+  const perHeaderH = 7.0;
+  const perBodyH = 7.6;
+  doc.setLineWidth(0.3);
+  doc.rect(marginX, y, usableWidth, perHeaderH);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Período a que respeita avaliação', centerX, y + 4.9, { align: 'center' });
+  y += perHeaderH;
+
+  doc.rect(marginX, y, usableWidth, perBodyH);
+  const afterDeX = drawSlashDateLine('De', record.de, marginX + 28, y + 5.1, 16, false, false);
+  drawSlashDateLine(' :a', record.ate, afterDeX + 4, y + 5.1, 16, false, false);
+  y += perBodyH + 6;
+
+  // Classificação dos Indicadores Anual Trimestral
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Classificação dos Indicadores Anual Trimestral', marginX, y);
+  y += 3.0;
+
+  const colW3 = [12, 86, 20, 20, 20, 20]; // sum = 178
+  const rowH3 = 6.8;
+  const headers3 = ['Nº', 'Indicadores', 'Iº Trim', 'IIº Trim', 'IIIº Trim', 'Média'];
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  let cx = marginX;
+  for (let i = 0; i < headers3.length; i++) {
+    doc.rect(cx, y, colW3[i], rowH3);
+    doc.text(headers3[i], i === 1 ? cx + 2.5 : cx + colW3[i] / 2, y + 4.7, {
+      align: i === 1 ? 'left' : 'center',
+    });
+    cx += colW3[i];
+  }
+  y += rowH3;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  for (let r = 0; r < INDICADORES_AVALIACAO.length; r++) {
+    cx = marginX;
+    const rowVals = [
+      String(r + 1),
+      INDICADORES_AVALIACAO[r],
+      formatAvaliacaoNumber(record.notas?.[r]?.[0]),
+      formatAvaliacaoNumber(record.notas?.[r]?.[1]),
+      formatAvaliacaoNumber(record.notas?.[r]?.[2]),
+      formatAvaliacaoNumber(metrics.mediasIndicadores[r]),
+    ];
+    for (let c = 0; c < rowVals.length; c++) {
+      doc.rect(cx, y, colW3[c], rowH3);
+      doc.text(rowVals[c], c === 1 ? cx + 2.5 : cx + colW3[c] / 2, y + 4.6, {
+        align: c === 1 ? 'left' : 'center',
+      });
+      cx += colW3[c];
+    }
+    y += rowH3;
+  }
+
+  // Classificação Quantitativa row
+  cx = marginX;
+  doc.rect(cx, y, colW3[0], rowH3);
+  cx += colW3[0];
+  doc.rect(cx, y, colW3[1], rowH3);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Classificação Quantitativa', cx + 2.5, y + 4.7);
+  cx += colW3[1];
+  const quantVals = [
+    formatAvaliacaoNumber(metrics.quantTrim[0]),
+    formatAvaliacaoNumber(metrics.quantTrim[1]),
+    formatAvaliacaoNumber(metrics.quantTrim[2]),
+    formatAvaliacaoNumber(metrics.quantMedia),
+  ];
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  for (let c = 0; c < 4; c++) {
+    doc.rect(cx, y, colW3[c + 2], rowH3);
+    doc.text(quantVals[c], cx + colW3[c + 2] / 2, y + 4.6, { align: 'center' });
+    cx += colW3[c + 2];
+  }
+  y += rowH3;
+
+  // Classificação Qualitativa row
+  cx = marginX;
+  doc.rect(cx, y, colW3[0], rowH3);
+  cx += colW3[0];
+  doc.rect(cx, y, colW3[1], rowH3);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Classificação Qualitativa', cx + 2.5, y + 4.7);
+  cx += colW3[1];
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  for (let c = 0; c < 4; c++) {
+    doc.rect(cx, y, colW3[c + 2], rowH3);
+    doc.text(record.qualTrim?.[c] || '', cx + colW3[c + 2] / 2, y + 4.6, { align: 'center' });
+    cx += colW3[c + 2];
+  }
+  y += rowH3 + 5;
+
+  // Nota: 1 a 6 (na Página 1)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Nota:', marginX, y);
+  y += 4.2;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const notasExplicativas = [
+    '1. A pontuação trimestral é a nota atribuída pelo avaliador, resultado da soma de todos indicadores.',
+    '2. Classificação Quantitativa ou Notas de Classificação é a soma das notas obtidas por cada indicador.',
+    '3. Classificação Qualitativa ou Faixa Correspondente é o resultado atribuído a cada Nota de Classificação.',
+    '4. A média final é a soma dos trimestres dividida pelos trimestres lectivos do ano.',
+    '5. Classificação final é a soma das médias dos indicadores.',
+    '6. Os comentários devem ser efectuados por trimestre.',
+  ];
+  for (const notaLine of notasExplicativas) {
+    const splitLines = doc.splitTextToSize(notaLine, usableWidth);
+    for (const sl of splitLines) {
+      doc.text(sl, marginX, y);
+      y += 4.0;
+    }
+  }
+
+  // =========================================================================
+  // PÁGINA 2: Classificação Anual + Classificação Final + Apreciação Geral (4 Comentários × 5 linhas)
+  // =========================================================================
+  doc.addPage();
+  y = marginTop + 2;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Classificação Anual dos Indicadores', marginX, y);
+  y += 3.0;
+
+  const colW4 = [12, 130, 36]; // sum = 178
+  const rowH4 = 6.8;
+  const headers4 = ['Nº', 'Indicadores', 'Média Final'];
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  cx = marginX;
+  for (let i = 0; i < headers4.length; i++) {
+    doc.rect(cx, y, colW4[i], rowH4);
+    doc.text(headers4[i], i === 1 ? cx + 2.5 : cx + colW4[i] / 2, y + 4.7, {
+      align: i === 1 ? 'left' : 'center',
+    });
+    cx += colW4[i];
+  }
+  y += rowH4;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  for (let pos = 0; pos < ANUAL_INDICADORES_ORDER.length; pos++) {
+    const indIdx = ANUAL_INDICADORES_ORDER[pos];
+    cx = marginX;
+    doc.rect(cx, y, colW4[0], rowH4);
+    doc.text(String(pos + 1), cx + colW4[0] / 2, y + 4.6, { align: 'center' });
+    cx += colW4[0];
+
+    doc.rect(cx, y, colW4[1], rowH4);
+    doc.text(INDICADORES_AVALIACAO[indIdx], cx + 2.5, y + 4.6);
+    cx += colW4[1];
+
+    doc.rect(cx, y, colW4[2], rowH4);
+    doc.text(formatAvaliacaoNumber(metrics.anualMedias[pos]), cx + colW4[2] / 2, y + 4.6, {
+      align: 'center',
+    });
+    y += rowH4;
+  }
+  y += 6;
+
+  // Classificação Final
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Classificação Final', marginX, y);
+  y += 3.0;
+
+  // Row 1: Quantitativa
+  doc.rect(marginX, y, colW4[0], rowH4);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('1', marginX + colW4[0] / 2, y + 4.6, { align: 'center' });
+  doc.rect(marginX + colW4[0], y, colW4[1], rowH4);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Quantitativa', marginX + colW4[0] + 2.5, y + 4.7);
+  doc.rect(marginX + colW4[0] + colW4[1], y, colW4[2], rowH4);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(
+    formatAvaliacaoNumber(metrics.finalQuant),
+    marginX + colW4[0] + colW4[1] + colW4[2] / 2,
+    y + 4.6,
+    { align: 'center' }
+  );
+  y += rowH4;
+
+  // Row 2: Qualitativa
+  doc.rect(marginX, y, colW4[0], rowH4);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('2', marginX + colW4[0] / 2, y + 4.6, { align: 'center' });
+  doc.rect(marginX + colW4[0], y, colW4[1], rowH4);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Qualitativa', marginX + colW4[0] + 2.5, y + 4.7);
+  doc.rect(marginX + colW4[0] + colW4[1], y, colW4[2], rowH4);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(
+    record.finalQual || '',
+    marginX + colW4[0] + colW4[1] + colW4[2] / 2,
+    y + 4.6,
+    { align: 'center' }
+  );
+  y += rowH4 + 7;
+
+  // Apreciação Geral (Comentários dos Avaliadores)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Apreciação Geral', marginX, y);
+  y += 4.2;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('(Comentários dos Avaliadores)', marginX, y);
+  y += 6.0;
+
+  const drawCommentBlock = (title: string, textVal: string) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(title, marginX, y);
+    y += 5.5;
+    const lineSpacing = 5.6;
+    const startY = y;
+    if (textVal && textVal.trim()) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      const splitLines = doc.splitTextToSize(textVal.trim(), usableWidth - 4).slice(0, 5);
+      for (const sl of splitLines) {
+        doc.text(sl, marginX + 2, y);
+        y += lineSpacing;
+      }
+    }
+    doc.setLineWidth(0.25);
+    let lineY = startY + 1.2;
+    for (let i = 0; i < 5; i++) {
+      doc.line(marginX, lineY, marginX + usableWidth, lineY);
+      lineY += lineSpacing;
+    }
+    y = startY + 5 * lineSpacing + 2.5;
+  };
+
+  drawCommentBlock('Comentário 1', record.c1 || '');
+  drawCommentBlock('Comentário 2', record.c2 || '');
+  drawCommentBlock('Comentário 3', record.c3 || '');
+  drawCommentBlock('Comentário Final', record.cf || '');
+
+  // =========================================================================
+  // PÁGINA 3: Identificação e Assinatura do Avaliador + Concordância e Homologação
+  // =========================================================================
+  doc.addPage();
+  y = marginTop + 8;
+
+  const avRowH = 7.4;
+  doc.setLineWidth(0.3);
+  // Linha 1: Nome
+  doc.rect(marginX, y, usableWidth, avRowH);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Nome:', marginX + 3, y + 5.0);
+  const nomeLw = doc.getTextWidth('Nome:') + 2.5;
+  if (record.avNome) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(record.avNome, marginX + 3 + nomeLw, y + 5.0);
+  }
+  y += avRowH;
+
+  // Linha 2: Função
+  doc.rect(marginX, y, usableWidth, avRowH);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Função:', marginX + 3, y + 5.0);
+  const funcLw = doc.getTextWidth('Função:') + 2.5;
+  if (record.avFuncao) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(record.avFuncao, marginX + 3 + funcLw, y + 5.0);
+  }
+  y += avRowH;
+
+  // Linha 3: Data
+  doc.rect(marginX, y, usableWidth, avRowH);
+  drawSlashDateLine('Data:', record.avData, marginX + 3, y + 5.0, 18, false, true);
+  y += avRowH + 10;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('O Avaliador', centerX, y, { align: 'center' });
+  y += 14;
+  doc.setLineWidth(0.35);
+  doc.line(centerX - 42, y, centerX + 42, y);
+  if (record.avNome) {
+    y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(record.avNome, centerX, y, { align: 'center' });
+  }
+  y += 16;
+
+  // Concordância com Avaliação e Homologação
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Concordância com Avaliação', marginX, y);
+  y += 9;
+
+  const drawBoxOption = (label: string, checked: boolean, bx: number, by: number) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(label, bx, by);
+    const lw = doc.getTextWidth(label) + 2.5;
+    doc.rect(bx + lw, by - 3.6, 5.0, 5.0);
+    if (checked) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('X', bx + lw + 2.5, by - 0.3, { align: 'center' });
+    }
+    return bx + lw + 22;
+  };
+
+  let nextX = marginX;
+  nextX = drawBoxOption('Concordo', record.conc === 'Sim', nextX, y);
+  drawBoxOption('Não concordo', record.conc === 'Não', nextX, y);
+  y += 15;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('O Avaliado', centerX, y, { align: 'center' });
+  y += 14;
+  doc.setLineWidth(0.35);
+  doc.line(centerX - 42, y, centerX + 42, y);
+  y += 13;
+
+  drawSlashDateLine('Data', record.avdData, marginX, y, 16, true, true);
+  y += 15;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('O Homologante', centerX, y, { align: 'center' });
+  y += 14;
+  doc.setLineWidth(0.35);
+  doc.line(centerX - 42, y, centerX + 42, y);
+
+  // Numerar páginas no rodapé
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Página ${p} de ${totalPages}`, pageWidth - marginX, pageHeight - 10, {
+      align: 'right',
+    });
+  }
+
+  const safeName = (record.nome || record.agente || 'Docente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  doc.save(`Ficha_Avaliacao_Docente_${safeName}.pdf`);
+}
+
 
 
 

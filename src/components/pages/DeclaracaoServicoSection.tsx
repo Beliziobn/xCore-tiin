@@ -981,35 +981,43 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
         <div className="flex justify-center w-full bg-[#f8f9fa] p-3 sm:p-6 rounded-2xl border border-slate-200/70 print:bg-white print:block print:m-0 print:p-0 print:border-0">
           <div
             id="declaracao-servico-a4-sheet"
-            className="bg-white w-full max-w-[210mm] p-6 sm:p-10 md:px-[20mm] md:py-[14mm] border border-slate-200/90 print:border-0 shadow-xs print:shadow-none text-black mx-auto"
+            className="bg-white w-full max-w-[210mm] min-h-[297mm] p-6 sm:p-10 md:px-[20mm] md:py-[18mm] border border-slate-200/90 print:border-0 shadow-xs print:shadow-none text-black mx-auto flex flex-col justify-between"
             style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
           >
-            <div style={{ lineHeight: 1.5 }}>
-              <div className="a4-header-block">
-                <div className="flex justify-center">
+            <div style={{ lineHeight: 1.65 }}>
+              <div className="a4-header-block" style={{ marginBottom: '26pt' }}>
+                <div className="flex justify-center" style={{ marginBottom: '14pt' }}>
                   <img
                     src={emblemAngolaImg}
                     alt="Insígnia da República de Angola"
                     className="a4-emblem-img"
+                    style={{ margin: '0 auto' }}
                   />
                 </div>
-                <p className="a4-republic-title">REPÚBLICA DE ANGOLA</p>
+                <p className="a4-republic-title" style={{ marginBottom: '6pt', lineHeight: 1.35 }}>
+                  REPÚBLICA DE ANGOLA
+                </p>
                 {livePreviewRecord.provEmissao && (
-                  <p className="a4-inst-line">
+                  <p className="a4-inst-line" style={{ margin: '3.5pt 0', lineHeight: 1.35 }}>
                     GOVERNO PROVINCIAL DE {livePreviewRecord.provEmissao.toUpperCase()}
                   </p>
                 )}
                 {livePreviewRecord.municipioAdm && (
-                  <p className="a4-inst-line">
+                  <p className="a4-inst-line" style={{ margin: '3.5pt 0', lineHeight: 1.35 }}>
                     ADMINISTRAÇÃO MUNICIPAL DE {livePreviewRecord.municipioAdm.toUpperCase()}
                   </p>
                 )}
                 {livePreviewRecord.direccao && (
-                  <p className="a4-inst-line">{livePreviewRecord.direccao.toUpperCase()}</p>
+                  <p className="a4-inst-line" style={{ margin: '3.5pt 0', lineHeight: 1.35 }}>
+                    {livePreviewRecord.direccao.toUpperCase()}
+                  </p>
                 )}
               </div>
 
-              <div className="a4-title-wrap">
+              <div
+                className="a4-title-wrap"
+                style={{ paddingTop: '14pt', paddingBottom: '12pt', marginBottom: '20pt' }}
+              >
                 <h1>DECLARAÇÃO DE SERVIÇO</h1>
               </div>
 
@@ -1026,8 +1034,11 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
 
                 return (
                   <>
-                    <div className="a4-body-copy mt-6 space-y-5" style={{ lineHeight: 1.5 }}>
-                      <p style={{ lineHeight: 1.5 }}>
+                    <div
+                      className="a4-body-copy"
+                      style={{ marginTop: '18pt', lineHeight: 1.75 }}
+                    >
+                      <p style={{ lineHeight: 1.75, marginBottom: '18pt' }}>
                         Para os devidos efeitos achados convenientes, declara-se que{' '}
                         {f ? 'a senhora ' : 'o senhor '}
                         <strong>{livePreviewRecord.nome}</strong>, {fil}, natural de{' '}
@@ -1052,21 +1063,24 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                         .
                       </p>
 
-                      <p style={{ lineHeight: 1.5 }}>
+                      <p style={{ lineHeight: 1.75, marginBottom: '18pt' }}>
                         <strong>Observação:</strong> A presente declaração destina-se{' '}
                         {livePreviewRecord.finalidade.replace(/\.$/, '')}.
                       </p>
 
-                      <p style={{ lineHeight: 1.5 }}>
+                      <p style={{ lineHeight: 1.75, marginBottom: '18pt' }}>
                         Por ser verdade e me ter sido pedido, mandei passar a presente
                         declaração, que vai por mim assinada e autenticada com carimbo a óleo em
                         uso nesta Direcção.
                       </p>
                     </div>
 
-                    <div className="a4-footer-block">
+                    <div className="a4-footer-block" style={{ marginTop: '38pt', paddingTop: '8pt' }}>
                       {(local || livePreviewRecord.dataEmissao) && (
-                        <div className="a4-date-line" style={{ textAlign: 'center' }}>
+                        <div
+                          className="a4-date-line"
+                          style={{ textAlign: 'center', marginBottom: '34pt' }}
+                        >
                           <span>
                             {local ? `${local} ` : ''}
                             {livePreviewRecord.dataEmissao
@@ -1078,10 +1092,14 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
 
                       <div className="flex flex-col items-center justify-center">
                         <div className="a4-sig-container">
-                          <p className="a4-sig-role">O Director Municipal</p>
+                          <p className="a4-sig-role" style={{ marginBottom: '34pt' }}>
+                            O Director Municipal
+                          </p>
                           <div className="a4-sig-line"></div>
                           {livePreviewRecord.director && (
-                            <p className="a4-sig-name">{livePreviewRecord.director}</p>
+                            <p className="a4-sig-name" style={{ marginTop: '6pt' }}>
+                              {livePreviewRecord.director}
+                            </p>
                           )}
                         </div>
                       </div>

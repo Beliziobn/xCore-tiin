@@ -1101,6 +1101,35 @@ html.lenis.lenis-stopped {
   font-family: 'Times New Roman', Times, serif !important;
 }
 
+/* Ficha de Avaliação de Desempenho Docente (Anexo III): 100% Century Gothic, 10pt bold titles/chapters, 8pt normal text */
+#ficha-avaliacao-a4-sheet,
+#ficha-avaliacao-a4-sheet * {
+  font-family: 'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', 'Avant Garde', sans-serif !important;
+  color: #000000 !important;
+  letter-spacing: normal !important;
+  box-sizing: border-box !important;
+}
+
+#ficha-avaliacao-a4-sheet p,
+#ficha-avaliacao-a4-sheet span,
+#ficha-avaliacao-a4-sheet td,
+#ficha-avaliacao-a4-sheet div {
+  font-size: 8pt !important;
+  font-weight: 400 !important;
+}
+
+#ficha-avaliacao-a4-sheet h1,
+#ficha-avaliacao-a4-sheet th,
+#ficha-avaliacao-a4-sheet .ficha-title-10,
+#ficha-avaliacao-a4-sheet .font-bold,
+#ficha-avaliacao-a4-sheet p.font-bold,
+#ficha-avaliacao-a4-sheet td.font-bold,
+#ficha-avaliacao-a4-sheet th.font-bold,
+#ficha-avaliacao-a4-sheet span.font-bold {
+  font-size: 10pt !important;
+  font-weight: 700 !important;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -1200,6 +1229,40 @@ html.lenis.lenis-stopped {
     break-after: avoid !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
+  }
+
+  html:has(#ficha-avaliacao-module),
+  body:has(#ficha-avaliacao-module),
+  html:has(#ficha-avaliacao-module) #root,
+  html:has(#ficha-avaliacao-module) #root > div,
+  html:has(#ficha-avaliacao-module) #main-content,
+  html:has(#ficha-avaliacao-module) #declaracao-efectividade-page,
+  html:has(#ficha-avaliacao-module) #declaracao-efectividade-page > main,
+  html:has(#ficha-avaliacao-module) #declaracao-efectividade-page > main > div,
+  html:has(#ficha-avaliacao-module) #declaracao-efectividade-page > main > div > div,
+  #ficha-avaliacao-module,
+  #ficha-avaliacao-live-preview-panel {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #ficha-avaliacao-a4-sheet {
+    width: 100% !important;
+    max-width: 210mm !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 12mm 16mm !important;
+    margin: 0 auto !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  #ficha-avaliacao-a4-sheet .a4-page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
   }
 }
 

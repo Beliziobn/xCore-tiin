@@ -27,6 +27,7 @@ import {
   Sparkles,
   CalendarRange,
   MapPin,
+  ClipboardCheck,
   Zap,
 } from 'lucide-react';
 import { Hero } from '../Hero';
@@ -36,6 +37,7 @@ import { QuickRequestsManagementView } from '../quick-services/QuickRequestsMana
 import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
 import { GuiaFeriasSection } from './GuiaFeriasSection';
 import { GuiaColocacaoSection } from './GuiaColocacaoSection';
+import { FichaAvaliacaoSection } from './FichaAvaliacaoSection';
 import type { UserAccount } from '../../types';
 import {
   CadastramentoEfectividadeRecord,
@@ -70,7 +72,15 @@ interface DeclaracaoEfectividadePageProps {
   initialTab?: ActiveTab;
 }
 
-type ActiveTab = 'form' | 'declaracao-servico' | 'guia-ferias' | 'guia-colocacao' | 'database' | 'pedidos' | 'view-ficha';
+type ActiveTab =
+  | 'form'
+  | 'declaracao-servico'
+  | 'guia-ferias'
+  | 'guia-colocacao'
+  | 'ficha-avaliacao'
+  | 'database'
+  | 'pedidos'
+  | 'view-ficha';
 
 interface FormState {
   id?: string;
@@ -877,7 +887,9 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #guia-ferias-a4-sheet,
         #guia-ferias-a4-sheet *,
         #guia-colocacao-a4-sheet,
-        #guia-colocacao-a4-sheet * {
+        #guia-colocacao-a4-sheet *,
+        #ficha-avaliacao-a4-sheet,
+        #ficha-avaliacao-a4-sheet * {
           font-family: 'Times New Roman', Times, serif !important;
           color: #000000;
         }
@@ -1160,7 +1172,9 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #guia-ferias-a4-sheet,
           #guia-ferias-a4-sheet *,
           #guia-colocacao-a4-sheet,
-          #guia-colocacao-a4-sheet * {
+          #guia-colocacao-a4-sheet *,
+          #ficha-avaliacao-a4-sheet,
+          #ficha-avaliacao-a4-sheet * {
             font-family: 'Times New Roman', Times, serif !important;
           }
           #oficial-a4-sheet,
@@ -1189,6 +1203,28 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             page-break-before: avoid !important;
             break-before: avoid !important;
           }
+          #ficha-avaliacao-a4-sheet {
+            display: block !important;
+            box-sizing: border-box !important;
+            box-shadow: none !important;
+            border: 0 !important;
+            outline: 0 !important;
+            border-radius: 0 !important;
+            background: #ffffff !important;
+            padding: 16mm 18mm !important;
+            margin: 0 auto !important;
+            width: 210mm !important;
+            max-width: 210mm !important;
+            min-height: 297mm !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+          #ficha-avaliacao-a4-sheet .a4-eval-section,
+          #ficha-avaliacao-a4-sheet table {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
         }
       `}</style>
 
@@ -1203,6 +1239,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               ? 'Guia de Férias'
               : activeTab === 'guia-colocacao'
               ? 'Guia de Colocação'
+              : activeTab === 'ficha-avaliacao'
+              ? 'Ficha de Avaliação de Desempenho Docente'
               : activeTab === 'pedidos'
               ? 'Serviços Rápidos — Pedidos dos Usuários'
               : 'Cadastramento e Declarações Oficiais'
@@ -1293,7 +1331,37 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       <MapPin className="w-4 h-4 text-slate-700 shrink-0" />
                       <span className="truncate">Guia de Colocação</span>
                     </button>
+
+                    <button
+                      id="tab-ficha-avaliacao"
+                      type="button"
+                      onClick={() => setActiveTab('ficha-avaliacao')}
+                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                        activeTab === 'ficha-avaliacao'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <ClipboardCheck className="w-4 h-4 text-slate-700 shrink-0" />
+                      <span className="truncate">Ficha de Avaliação</span>
+                    </button>
                   </>
+                )}
+
+                {isDirector && (
+                  <button
+                    id="tab-ficha-avaliacao-director"
+                    type="button"
+                    onClick={() => setActiveTab('ficha-avaliacao')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'ficha-avaliacao'
+                        ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <ClipboardCheck className="w-4 h-4 text-slate-700 shrink-0" />
+                    <span className="truncate">Ficha de Avaliação</span>
+                  </button>
                 )}
 
                 <div className={isDirector ? '' : 'pt-2 mt-2 border-t border-slate-100'}>
@@ -2370,6 +2438,16 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {activeTab === 'guia-colocacao' && (
               <GuiaColocacaoSection
+                isLoggedIn={isLoggedIn}
+                currentUser={currentUser}
+              />
+            )}
+
+            {/* ============================================================== */}
+            {/* SERVICE 5: FICHA DE AVALIAÇÃO DE DESEMPENHO DOCENTE            */}
+            {/* ============================================================== */}
+            {activeTab === 'ficha-avaliacao' && (
+              <FichaAvaliacaoSection
                 isLoggedIn={isLoggedIn}
                 currentUser={currentUser}
               />

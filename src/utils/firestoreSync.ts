@@ -49,6 +49,7 @@ const CLASSES_COL = 'classes';
 const CHAT_MESSAGES_COL = 'chatMessages';
 const GUIAS_FERIAS_COL = 'guias_ferias';
 const GUIAS_COLOCACAO_COL = 'guias_colocacao';
+const FICHAS_AVALIACAO_COL = 'fichas_avaliacao';
 
 const DELETED_ENTITIES_KEY = 'sigre_deleted_entities_tombstones_v1';
 
@@ -1385,6 +1386,45 @@ export function subscribeToGuiasColocacao(onUpdate: (records: any[]) => void): U
   }
 }
 
+export async function saveFichaAvaliacaoToFirestore(record: Record<string, any>): Promise<void> {
+  try {
+    const docId = sanitizeDocId(record.id || `${record.agente || ''}_${record.dataAval || ''}`);
+    if (!docId) return;
+    removeEntityTombstone(FICHAS_AVALIACAO_COL, docId);
+    const ref = doc(db, FICHAS_AVALIACAO_COL, docId);
+    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+  } catch (error) {
+    console.warn('[Firestore] Erro ao gravar Ficha de Avaliação no Firestore:', error);
+  }
+}
+
+export async function deleteFichaAvaliacaoFromFirestore(id: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(id);
+    if (!docId) return;
+    addEntityTombstone(FICHAS_AVALIACAO_COL, docId);
+    await deleteDoc(doc(db, FICHAS_AVALIACAO_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar Ficha de Avaliação no Firestore:', error);
+  }
+}
+
+export function subscribeToFichasAvaliacao(onUpdate: (records: any[]) => void): Unsubscribe {
+  try {
+    return onSnapshot(
+      collection(db, FICHAS_AVALIACAO_COL),
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => list.push(d.data()));
+        onUpdate(list);
+      },
+      (err) => console.warn('[Firestore] Fichas de Avaliação subscription error:', err)
+    );
+  } catch {
+    return () => {};
+  }
+}
+
 // ============================================================================
 // 12. GLOBAL REAL-TIME UNIFIED DATABASE ORCHESTRATOR
 // Synchronizes and unifies all collections between Firestore, localStorage, and Backend
@@ -2314,6 +2354,34 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
   );
 
   unsubs.push(
+    subscribeToFichasAvaliacao((cloudFichas) => {
+      try {
+        const localFichas = safeReadJsonArray<any>('sigre_fichas_avaliacao_records_v1');
+        const map = new Map<string, any>();
+
+        localFichas.forEach((lf) => {
+          if (!lf || !lf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, lf.id)) return;
+          map.set(lf.id, lf);
+          if (!cloudFichas.some((cf) => cf && cf.id === lf.id)) {
+            saveFichaAvaliacaoToFirestore(lf).catch(() => {});
+          }
+        });
+
+        cloudFichas.forEach((cf) => {
+          if (!cf || !cf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, cf.id)) return;
+          map.set(cf.id, { ...(map.get(cf.id) || {}), ...cf });
+        });
+
+        const merged = Array.from(map.values());
+        if (merged.length > 0 && safeWriteJsonIfChanged('sigre_fichas_avaliacao_records_v1', merged)) {
+          window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
+      } catch {}
+    })
+  );
+
+  unsubs.push(
     subscribeToUsers((cloudUsers) => {
       try {
         const localUsers = safeReadJsonArray<UserAccount>('ucore_registered_users');
@@ -2400,6 +2468,7 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
     const declaracaoServico = safeReadJsonArray<any>('sigre_declaracao_servico_v1');
     const guiasFerias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1');
     const guiasColocacao = safeReadJsonArray<any>('sigre_guias_colocacao_records_v1');
+    const fichasAvaliacao = safeReadJsonArray<any>('sigre_fichas_avaliacao_records_v1');
     const miniPautas = safeReadJsonArray<any>('sigre_teacher_mini_pautas_v5_blank');
     const rooms = safeReadJsonArray<any>('ucore_director_rooms');
     const classes = safeReadJsonArray<any>('ucore_director_classes');
@@ -2415,6 +2484,7 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
       declaracaoServico,
       guiasFerias,
       guiasColocacao,
+      fichasAvaliacao,
       miniPautas,
       rooms,
       classes,
