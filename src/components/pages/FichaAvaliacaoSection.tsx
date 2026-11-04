@@ -261,8 +261,8 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
       de: formData.de.trim(),
       ate: formData.ate.trim(),
       notas: numericNotas,
-      qualTrim: formData.qualTrim,
-      finalQual: formData.finalQual.trim(),
+      qualTrim: formMetrics.qualTrim,
+      finalQual: formMetrics.finalQual,
       c1: formData.c1.trim(),
       c2: formData.c2.trim(),
       c3: formData.c3.trim(),
@@ -273,7 +273,7 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
       conc: formData.conc,
       avdData: formData.avdData.trim(),
     };
-  }, [formData, numericNotas, submittedRecord, todayISO]);
+  }, [formData, numericNotas, formMetrics, submittedRecord, todayISO]);
 
   const previewMetrics = useMemo(
     () => computeFichaAvaliacaoMetrics(livePreviewRecord.notas),
@@ -403,7 +403,7 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
           purpose: 'Avaliação de Desempenho Docente (Anexo III)',
           notes: `Submissão de Ficha de Avaliação de Desempenho Docente. Média Final Quantitativa: ${
             formatAvaliacaoNumber(formMetrics.finalQuant) || '—'
-          } (${formData.finalQual.trim() || '—'}).`,
+          } (${formMetrics.finalQual || '—'}).`,
         },
       });
       handleResetForm();
@@ -426,8 +426,8 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
       de: formData.de.trim(),
       ate: formData.ate.trim(),
       notas: numericNotas,
-      qualTrim: formData.qualTrim,
-      finalQual: formData.finalQual.trim(),
+      qualTrim: formMetrics.qualTrim,
+      finalQual: formMetrics.finalQual,
       c1: formData.c1.trim(),
       c2: formData.c2.trim(),
       c3: formData.c3.trim(),
@@ -526,7 +526,7 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
         r.de,
         r.ate,
         formatAvaliacaoNumber(m.finalQuant),
-        r.finalQual,
+        m.finalQual || r.finalQual,
         r.conc,
         r.avNome,
         r.avFuncao,
@@ -793,7 +793,7 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
                           {formatAvaliacaoNumber(m.finalQuant) || '—'}
                         </td>
                         <td className="px-3.5 py-2.5 text-center font-semibold text-slate-800">
-                          {r.finalQual || '—'}
+                          {m.finalQual || r.finalQual || '—'}
                         </td>
                         <td className="px-3.5 py-2.5 whitespace-nowrap text-right">
                           <div className="inline-flex items-center gap-1.5">
@@ -1280,16 +1280,16 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
                             Classificação Qualitativa
                           </td>
                           <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
-                            {livePreviewRecord.qualTrim?.[0] || ''}
+                            {previewMetrics.qualTrim[0] || livePreviewRecord.qualTrim?.[0] || ''}
                           </td>
                           <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
-                            {livePreviewRecord.qualTrim?.[1] || ''}
+                            {previewMetrics.qualTrim[1] || livePreviewRecord.qualTrim?.[1] || ''}
                           </td>
                           <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
-                            {livePreviewRecord.qualTrim?.[2] || ''}
+                            {previewMetrics.qualTrim[2] || livePreviewRecord.qualTrim?.[2] || ''}
                           </td>
                           <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
-                            {livePreviewRecord.qualTrim?.[3] || ''}
+                            {previewMetrics.qualTrim[3] || livePreviewRecord.qualTrim?.[3] || ''}
                           </td>
                         </tr>
                       </tbody>
@@ -1444,7 +1444,7 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
                             Qualitativa
                           </td>
                           <td style={{ ...cellNormalStyle, width: '22%', textAlign: 'center' }}>
-                            {livePreviewRecord.finalQual}
+                            {previewMetrics.finalQual || livePreviewRecord.finalQual}
                           </td>
                         </tr>
                       </tbody>
@@ -2243,8 +2243,8 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
                       </td>
                     </tr>
 
-                    {/* Classificação qualitativa */}
-                    <tr>
+                    {/* Classificação qualitativa (preenchimento automático) */}
+                    <tr className="bg-slate-50/70">
                       <td
                         colSpan={2}
                         className="px-3.5 py-2 border-r border-slate-200 text-center font-bold text-slate-900"
@@ -2258,11 +2258,13 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
                         >
                           <input
                             type="text"
-                            list="qualitativa-suggestions-list"
-                            value={formData.qualTrim[colIdx] || ''}
-                            onChange={(e) => handleQualTrimChange(colIdx, e.target.value)}
-                            placeholder="Ex.: Bom"
-                            className="w-full h-9 px-2 rounded-lg border border-slate-300 text-center text-xs text-slate-900 focus:border-slate-900 outline-none"
+                            readOnly
+                            tabIndex={-1}
+                            value={formMetrics.qualTrim[colIdx] || '—'}
+                            aria-label={`Classificação qualitativa automática coluna ${colIdx + 1}`}
+                            className={`w-full h-9 px-2 rounded-lg border border-slate-200 bg-slate-100/80 text-center text-xs font-bold outline-none cursor-default ${
+                              colIdx === 3 ? 'text-emerald-800' : 'text-slate-900'
+                            }`}
                           />
                         </td>
                       ))}
@@ -2321,7 +2323,7 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
                         {formatAvaliacaoNumber(formMetrics.finalQuant) || '—'}
                       </td>
                     </tr>
-                    <tr>
+                    <tr className="bg-slate-50/70">
                       <td
                         colSpan={2}
                         className="px-3.5 py-2 border-r border-slate-200 text-center font-bold text-slate-900"
@@ -2331,11 +2333,11 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
                       <td className="p-1.5">
                         <input
                           type="text"
-                          list="qualitativa-suggestions-list"
-                          value={formData.finalQual}
-                          onChange={(e) => handleFieldChange('finalQual', e.target.value)}
-                          placeholder="Ex.: Bom / Muito Bom"
-                          className="w-full h-9 px-2.5 rounded-lg border border-slate-300 text-center font-semibold text-xs text-slate-900 focus:border-slate-900 outline-none"
+                          readOnly
+                          tabIndex={-1}
+                          value={formMetrics.finalQual || '—'}
+                          aria-label="Classificação final qualitativa automática"
+                          className="w-full h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-100/80 text-center font-bold text-xs text-emerald-800 outline-none cursor-default"
                         />
                       </td>
                     </tr>

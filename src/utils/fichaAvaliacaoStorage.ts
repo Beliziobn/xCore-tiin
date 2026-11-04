@@ -118,8 +118,25 @@ export interface ComputedFichaAvaliacaoMetrics {
   mediasIndicadores: (number | null)[]; // [m0, m1, m2, m3, m4]
   quantTrim: (number | null)[]; // [q0, q1, q2]
   quantMedia: number | null; // q3
+  qualTrim: [string, string, string, string]; // [qual I, qual II, qual III, qual Média]
   anualMedias: (number | null)[]; // [a0, a1, a2, a3, a4] ordered by ANUAL_INDICADORES_ORDER
   finalQuant: number | null; // fq = sum of non-null mediasIndicadores
+  finalQual: string; // Classificação final qualitativa automática
+}
+
+export function computeQualitativaFromScore(
+  score: number | null | undefined,
+  isHundredScale: boolean = false
+): string {
+  if (score === null || score === undefined || Number.isNaN(score)) return '';
+  // Normaliza para a escala de 0 a 20 caso as notas por indicador tenham sido inseridas na escala 0–20 (soma até 100)
+  const normalized = isHundredScale || score > 20 ? score / 5 : score;
+  const rounded = Math.round(normalized * 100) / 100;
+  if (rounded >= 17) return 'Muito Bom';
+  if (rounded >= 14) return 'Bom';
+  if (rounded >= 10) return 'Suficiente';
+  if (rounded >= 7) return 'Medíocre';
+  return 'Mau';
 }
 
 const STORAGE_KEY = 'sigre_fichas_avaliacao_records_v1';
@@ -163,6 +180,11 @@ export function computeFichaAvaliacaoMetrics(
     });
   });
 
+  const allEnteredValues = safeNotas
+    .flat()
+    .filter((v): v is number => v !== null);
+  const isHundredScale = allEnteredValues.some((v) => v > 4);
+
   const mediasIndicadores = safeNotas.map((row) => {
     const valid = row.filter((v): v is number => v !== null);
     if (!valid.length) return null;
@@ -180,6 +202,13 @@ export function computeFichaAvaliacaoMetrics(
     ? validTrims.reduce((a, b) => a + b, 0) / validTrims.length
     : null;
 
+  const qualTrim: [string, string, string, string] = [
+    computeQualitativaFromScore(quantTrim[0], isHundredScale),
+    computeQualitativaFromScore(quantTrim[1], isHundredScale),
+    computeQualitativaFromScore(quantTrim[2], isHundredScale),
+    computeQualitativaFromScore(quantMedia, isHundredScale),
+  ];
+
   const anualMedias = ANUAL_INDICADORES_ORDER.map((idx) => mediasIndicadores[idx]);
 
   const validMedias = mediasIndicadores.filter((v): v is number => v !== null);
@@ -187,12 +216,16 @@ export function computeFichaAvaliacaoMetrics(
     ? validMedias.reduce((a, b) => a + b, 0)
     : null;
 
+  const finalQual = computeQualitativaFromScore(finalQuant, isHundredScale);
+
   return {
     mediasIndicadores,
     quantTrim,
     quantMedia,
+    qualTrim,
     anualMedias,
     finalQuant,
+    finalQual,
   };
 }
 

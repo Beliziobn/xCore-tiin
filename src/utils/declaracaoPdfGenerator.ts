@@ -1934,7 +1934,12 @@ export async function downloadFichaAvaliacaoPdf(
   doc.setFontSize(8);
   for (let c = 0; c < 4; c++) {
     doc.rect(cx, y, colW3[c + 2], rowH3);
-    doc.text(record.qualTrim?.[c] || '', cx + colW3[c + 2] / 2, y + 4.6, { align: 'center' });
+    doc.text(
+      metrics.qualTrim[c] || record.qualTrim?.[c] || '',
+      cx + colW3[c + 2] / 2,
+      y + 4.6,
+      { align: 'center' }
+    );
     cx += colW3[c + 2];
   }
   y += rowH3 + 5;
@@ -2049,7 +2054,7 @@ export async function downloadFichaAvaliacaoPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.text(
-    record.finalQual || '',
+    metrics.finalQual || record.finalQual || '',
     marginX + colW4[0] + colW4[1] + colW4[2] / 2,
     y + 4.6,
     { align: 'center' }
