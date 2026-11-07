@@ -624,18 +624,41 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       text-align: center !important;
       width: 280px !important;
       margin: 0 auto !important;
+      position: relative !important;
     }
     .a4-sig-role {
       font-size: 12pt !important;
       font-weight: 700 !important;
       line-height: 1.3 !important;
-      margin: 0 0 ${elementId === 'declaracao-servico-a4-sheet' ? '34pt' : '26pt'} 0 !important;
+      margin: 0 0 ${elementId === 'oficial-a4-sheet' ? '2pt' : elementId === 'declaracao-servico-a4-sheet' ? '34pt' : '26pt'} 0 !important;
       text-align: center !important;
+    }
+    .a4-sig-img-wrap {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      height: 48px !important;
+      margin: -4px auto -8px auto !important;
+      position: relative !important;
+      z-index: 2 !important;
+    }
+    .a4-sig-img {
+      height: 46px !important;
+      max-height: 46px !important;
+      width: auto !important;
+      max-width: 200px !important;
+      object-fit: contain !important;
+      filter: brightness(0) !important;
+      -webkit-filter: brightness(0) !important;
+      display: block !important;
+      margin: 0 auto !important;
     }
     .a4-sig-line {
       border-bottom: 1px solid #000000 !important;
       width: 250px !important;
       margin: 0 auto !important;
+      position: relative !important;
+      z-index: 1 !important;
     }
     .a4-sig-name {
       font-size: 12pt !important;

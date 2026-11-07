@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { Hero } from '../Hero';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
+import directorSignatureImg from '../../assets/images/assinatura_director_black.png';
 import { BackupManagerModal } from '../modals/BackupManagerModal';
 import { QuickRequestsManagementView } from '../quick-services/QuickRequestsManagementView';
 import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
@@ -863,6 +864,24 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             <div className="flex flex-col items-center justify-center">
               <div className="a4-sig-container">
                 <p className="a4-sig-role">O Director Municipal</p>
+                <div className="a4-sig-img-wrap">
+                  <img
+                    src={directorSignatureImg}
+                    alt="Assinatura do Director Municipal"
+                    className="a4-sig-img"
+                    style={{
+                      height: '46px',
+                      maxHeight: '46px',
+                      width: 'auto',
+                      maxWidth: '200px',
+                      objectFit: 'contain',
+                      filter: 'brightness(0)',
+                      WebkitFilter: 'brightness(0)',
+                      display: 'block',
+                      margin: '0 auto',
+                    }}
+                  />
+                </div>
                 <div className="a4-sig-line"></div>
                 <p className="a4-sig-name">{directorNome}</p>
               </div>
@@ -1056,7 +1075,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           margin-bottom: 20pt;
           color: #000000;
         }
-        #oficial-a4-sheet .a4-sig-container,
+        #oficial-a4-sheet .a4-sig-container {
+          text-align: center;
+          width: 280px;
+          margin: 0 auto;
+          position: relative;
+        }
         #declaracao-servico-a4-sheet .a4-sig-container,
         #guia-ferias-a4-sheet .a4-sig-container,
         #guia-colocacao-a4-sheet .a4-sig-container {
@@ -1064,7 +1088,35 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           width: 280px;
           margin: 0 auto;
         }
-        #oficial-a4-sheet .a4-sig-role,
+        #oficial-a4-sheet .a4-sig-role {
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 12pt;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 0 0 2pt 0;
+          color: #000000;
+        }
+        #oficial-a4-sheet .a4-sig-img-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 48px;
+          margin: -4px auto -8px auto;
+          position: relative;
+          z-index: 2;
+          pointer-events: none;
+        }
+        #oficial-a4-sheet .a4-sig-img {
+          height: 46px;
+          max-height: 46px;
+          width: auto;
+          max-width: 200px;
+          object-fit: contain;
+          filter: brightness(0);
+          -webkit-filter: brightness(0);
+          display: block;
+          margin: 0 auto;
+        }
         #declaracao-servico-a4-sheet .a4-sig-role,
         #guia-ferias-a4-sheet .a4-sig-role,
         #guia-colocacao-a4-sheet .a4-sig-role {
@@ -1082,6 +1134,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           border-bottom: 1px solid #000000;
           width: 250px;
           margin: 0 auto;
+          position: relative;
+          z-index: 1;
         }
         #oficial-a4-sheet .a4-sig-name,
         #declaracao-servico-a4-sheet .a4-sig-name,
