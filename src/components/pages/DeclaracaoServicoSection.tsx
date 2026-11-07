@@ -126,7 +126,7 @@ function getInitialServicoFormState(): DeclaracaoServicoFormState {
     direccao: 'Direcção Municipal de Educação',
     localEmissao: 'Quêssua',
     dataEmissao: getTodayIso(),
-    director: 'Belizio Miguel dos Santos António',
+    director: 'Belízio Miguel dos Santos António',
   };
 }
 
@@ -242,7 +242,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
       direccao: formData.direccao.trim() || 'Direcção Municipal de Educação',
       localEmissao: formData.localEmissao.trim() || 'Quêssua',
       dataEmissao: formData.dataEmissao.trim() || todayISO,
-      director: formData.director.trim() || 'Belizio Miguel dos Santos António',
+      director: formData.director.trim() || 'Belízio Miguel dos Santos António',
     };
   }, [formData, submittedRecord, todayISO]);
 
@@ -506,7 +506,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
       direccao: formData.direccao.trim() || 'Direcção Municipal de Educação',
       localEmissao: formData.localEmissao.trim() || 'Quêssua',
       dataEmissao: formData.dataEmissao.trim() || todayISO,
-      director: formData.director.trim() || 'Belizio Miguel dos Santos António',
+      director: formData.director.trim() || 'Belízio Miguel dos Santos António',
     });
 
     if (!saveRes.success || !saveRes.record) {
@@ -609,7 +609,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
       direccao: r.direccao || 'Direcção Municipal de Educação',
       localEmissao: r.localEmissao || 'Quêssua',
       dataEmissao: r.dataEmissao || todayISO,
-      director: r.director || 'Belizio Miguel dos Santos António',
+      director: r.director ? r.director.replace(/Belizio/g, 'Belízio') : 'Belízio Miguel dos Santos António',
     });
     setSubmittedRecord(null);
     setErrors({});
@@ -1098,7 +1098,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                           <div className="a4-sig-line"></div>
                           {livePreviewRecord.director && (
                             <p className="a4-sig-name" style={{ marginTop: '6pt' }}>
-                              {livePreviewRecord.director}
+                              {livePreviewRecord.director.replace(/Belizio/g, 'Belízio')}
                             </p>
                           )}
                         </div>

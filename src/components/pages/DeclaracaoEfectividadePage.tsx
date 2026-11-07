@@ -176,7 +176,7 @@ const getInitialFormState = (currentUser?: UserAccount | null): FormState => ({
   governoProv: 'Malanje',
   administracao: 'Quêssua',
   direccao: 'Educação',
-  director: 'Belizio Miguel dos Santos António',
+  director: 'Belízio Miguel dos Santos António',
   local: 'Quêssua',
   dataEmissao: getTodayIso(),
 });
@@ -397,7 +397,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       governoProv: formData.governoProv.trim() || 'Malanje',
       administracao: formData.administracao.trim() || 'Quêssua',
       direccao: formData.direccao.trim() || 'Educação',
-      director: formData.director.trim() || 'Belizio Miguel dos Santos António',
+      director: formData.director.trim() || 'Belízio Miguel dos Santos António',
       local: formData.local.trim() || 'Quêssua',
       dataEmissao: formData.dataEmissao || today,
       cadastradoEm: today,
@@ -772,7 +772,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     const nascimentoExtenso = formatAngolanDateExtenso(record.nascimento);
     const biEmissaoExtenso = formatAngolanDateExtenso(record.biEmissao);
 
-    const directorNome = record.director?.trim() || 'Belizio Miguel dos Santos António';
+    const directorNome =
+      (record.director?.trim() || 'Belízio Miguel dos Santos António').replace(/Belizio/g, 'Belízio');
 
     return (
       <div className="flex justify-center w-full print:block print:m-0 print:p-0">
@@ -870,10 +871,10 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                     alt="Assinatura do Director Municipal"
                     className="a4-sig-img"
                     style={{
-                      height: '46px',
-                      maxHeight: '46px',
+                      height: '80px',
+                      maxHeight: '80px',
                       width: 'auto',
-                      maxWidth: '200px',
+                      maxWidth: '260px',
                       objectFit: 'contain',
                       filter: 'brightness(0)',
                       WebkitFilter: 'brightness(0)',
@@ -1100,17 +1101,17 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           display: flex;
           align-items: center;
           justify-content: center;
-          height: 48px;
-          margin: -4px auto -8px auto;
+          height: 72px;
+          margin: -12px auto -18px auto;
           position: relative;
           z-index: 2;
           pointer-events: none;
         }
         #oficial-a4-sheet .a4-sig-img {
-          height: 46px;
-          max-height: 46px;
+          height: 80px;
+          max-height: 80px;
           width: auto;
-          max-width: 200px;
+          max-width: 260px;
           object-fit: contain;
           filter: brightness(0);
           -webkit-filter: brightness(0);
@@ -2400,7 +2401,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                             type="text"
                             value={formData.director}
                             onChange={(e) => handleInputChange('director', e.target.value)}
-                            placeholder="Belizio Miguel dos Santos António"
+                            placeholder="Belízio Miguel dos Santos António"
                             className={pillInputClass(false)}
                           />
                         </div>

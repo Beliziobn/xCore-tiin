@@ -251,7 +251,8 @@ export async function downloadDeclaracaoEfectividadePdf(
   const dataEmissaoExtenso = formatAngolanDateExtenso(record.dataEmissao);
   const nascimentoExtenso = formatAngolanDateExtenso(record.nascimento);
   const biEmissaoExtenso = formatAngolanDateExtenso(record.biEmissao);
-  const directorNome = record.director?.trim() || 'Belizio Miguel dos Santos António';
+  const directorNome =
+    (record.director?.trim() || 'Belízio Miguel dos Santos António').replace(/Belizio/g, 'Belízio');
 
   let y = 17;
 
@@ -637,16 +638,16 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      height: 48px !important;
-      margin: -4px auto -8px auto !important;
+      height: 72px !important;
+      margin: -12px auto -18px auto !important;
       position: relative !important;
       z-index: 2 !important;
     }
     .a4-sig-img {
-      height: 46px !important;
-      max-height: 46px !important;
+      height: 80px !important;
+      max-height: 80px !important;
       width: auto !important;
-      max-width: 200px !important;
+      max-width: 260px !important;
       object-fit: contain !important;
       filter: brightness(0) !important;
       -webkit-filter: brightness(0) !important;
@@ -1224,7 +1225,7 @@ export async function downloadQuickServiceDocumentPdf(
   doc.setFontSize(12);
   doc.text(
     request.serviceType === 'DECLARACAO_EFECTIVIDADE'
-      ? 'Belizio Miguel dos Santos António'
+      ? 'Belízio Miguel dos Santos António'
       : details.resolvedBy || request.targetSchoolName || 'Direcção Escolar Oficial',
     centerX,
     y,

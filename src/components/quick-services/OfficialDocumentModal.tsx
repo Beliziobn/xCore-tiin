@@ -599,7 +599,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   <div className="border-b border-black w-56 text-center pb-1"></div>
                 </div>
                 <p className="font-bold text-black">
-                  Belizio Miguel dos Santos António
+                  Belízio Miguel dos Santos António
                 </p>
               </div>
             </div>
