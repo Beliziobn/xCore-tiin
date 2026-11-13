@@ -1,8 +1,10 @@
 import jsPDF from 'jspdf';
+import emblemAngolaImg from '../assets/images/Emblem_of_Angola.svg.webp';
+import { loadEmblemPngDataUrl } from './declaracaoPdfGenerator';
 import type { TurmaStudentListResult, TurmaStudentItem } from './turmaStudentsService';
 
 /**
- * Robust constructor getter to handle various ESM/CJS bundler quirks for jsPDF
+ * Obtém o construtor jsPDF de forma segura em ambientes ESM/CJS.
  */
 function getJsPDFConstructor(): any {
   if (typeof (jsPDF as any)?.jsPDF === 'function') {
@@ -23,8 +25,10 @@ export interface ExportTurmaPdfOptions {
 }
 
 /**
- * Generates an official, publication-ready vector PDF for the student list of any turma,
- * strictly organized from A to Z with official Angolan Ministry of Education styling.
+ * Gera e descarrega a Lista Nominal de Alunos por Turma em PDF A4 nativo,
+ * seguindo rigorosamente o mesmo sistema estrutural, margens (16mm / 14mm),
+ * insígnia oficial (22mm), hierarquia tipográfica (10pt negrito / 8pt normal)
+ * e grelhas em preto puro (#000000) da Ficha Individual (Anexo III).
  */
 export async function exportTurmaStudentListToPDF(
   data: TurmaStudentListResult,
@@ -44,276 +48,278 @@ export async function exportTurmaStudentListToPDF(
 
   const pageWidth = 210;
   const pageHeight = 297;
-  const marginX = 12;
-  const contentWidth = 186;
+  const marginX = 16;
+  const marginTop = 14;
+  const marginBottom = 14;
+  const usableWidth = pageWidth - marginX * 2; // 178mm
+  const centerX = pageWidth / 2;
 
-  // Colors (Clean Official School Document Black/Slate)
-  const COLOR_PRIMARY = [15, 23, 42]; // #0f172a
-  const COLOR_TEXT = [15, 23, 42]; // #0f172a
-  const COLOR_MUTED = [71, 85, 105]; // #475569
-  const COLOR_BORDER = [30, 41, 59]; // #1e293b formal grid border
-  const COLOR_HEADER_BG = [241, 245, 249]; // #f1f5f9
+  const cleanTurma = data.metadata.turma.replace(/^Turma\s+/i, '');
+  const cleanSala = data.metadata.sala.replace(/^Sala\s+/i, '');
 
-  // Column definitions (Sum = 186mm)
-  const columns: { key: string; title: string; width: number; align: 'left' | 'center' | 'right' }[] = [
+  // Colunas da tabela nominal (soma = 178mm)
+  const columns: {
+    key: string;
+    title: string;
+    width: number;
+    align: 'left' | 'center' | 'right';
+  }[] = [
     { key: 'ordem', title: 'Nº', width: 12, align: 'center' },
-    { key: 'nome', title: 'NOME COMPLETO DO ALUNO', width: 104, align: 'left' },
-    { key: 'genero', title: 'SEXO', width: 18, align: 'center' },
-    { key: 'idade', title: 'IDADE', width: 18, align: 'center' },
-    { key: 'situacao', title: 'OBSERVAÇÃO', width: 34, align: 'center' },
+    { key: 'codigo', title: 'Código', width: 28, align: 'center' },
+    { key: 'nome', title: 'Nome Completo do Aluno', width: 82, align: 'left' },
+    { key: 'genero', title: 'Sexo', width: 14, align: 'center' },
+    { key: 'idade', title: 'Idade', width: 14, align: 'center' },
+    { key: 'situacao', title: 'Observação', width: 28, align: 'center' },
   ];
 
-  const students = data.students;
-  const totalStudents = students.length;
+  pdf.setDrawColor(0, 0, 0);
+  pdf.setTextColor(0, 0, 0);
+  pdf.setLineWidth(0.3);
 
-  // Determine row count per page
-  const isSinglePage = totalStudents <= 28;
-  const maxRowsPage1 = isSinglePage ? 28 : 30;
-  const page1Students = students.slice(0, maxRowsPage1);
-  const page2Students = isSinglePage ? [] : students.slice(maxRowsPage1);
-  const totalPages = isSinglePage ? 1 : 2;
+  let y = marginTop;
 
-  const renderHeader = (pageNumber: number) => {
-    if (pageNumber === 1) {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text('REPÚBLICA DE ANGOLA', pageWidth / 2, 14, { align: 'center' });
-      pdf.text('MINISTÉRIO DA EDUCAÇÃO', pageWidth / 2, 18.5, { align: 'center' });
+  // =========================================================================
+  // 1. CABEÇALHO INSTITUCIONAL COM INSÍGNIA DA REPÚBLICA DE ANGOLA
+  // =========================================================================
+  const emblemData = await loadEmblemPngDataUrl(emblemAngolaImg);
+  if (emblemData) {
+    const emblemHeight = 22;
+    const emblemWidth = emblemHeight * emblemData.ratio;
+    pdf.addImage(
+      emblemData.dataUrl,
+      'PNG',
+      centerX - emblemWidth / 2,
+      y,
+      emblemWidth,
+      emblemHeight
+    );
+    y += emblemHeight + 5;
+  } else {
+    y += 8;
+  }
 
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8);
-      pdf.text(`${data.metadata.provincia.toUpperCase()} • ${data.metadata.direccao.toUpperCase()}`, pageWidth / 2, 23, { align: 'center' });
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(10);
+  pdf.setTextColor(0, 0, 0);
+  pdf.text('REPÚBLICA DE ANGOLA', centerX, y, { align: 'center' });
+  y += 4.5;
+  pdf.text('GOVERNO PROVINCIAL DE MALANJE', centerX, y, { align: 'center' });
+  y += 4.5;
+  pdf.text('ADMINISTRAÇÃO MUNICIPAL DO QUÊSSUA', centerX, y, { align: 'center' });
+  y += 4.5;
+  pdf.text('DIRECÇÃO MUNICIPAL DE EDUCAÇÃO', centerX, y, { align: 'center' });
+  y += 6;
 
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.text(data.metadata.escola.toUpperCase(), pageWidth / 2, 28, { align: 'center' });
+  pdf.setFontSize(10);
+  pdf.text(
+    `LISTA NOMINAL DOS ALUNOS POR TURMA — ANO LECTIVO ${data.metadata.anoLectivo}`,
+    centerX,
+    y,
+    { align: 'center' }
+  );
+  y += 5.5;
 
-      pdf.setFontSize(9.5);
-      pdf.text('LISTA NOMINAL DOS ALUNOS', pageWidth / 2, 34.5, { align: 'center' });
+  // =========================================================================
+  // 2. IDENTIFICAÇÃO DA ESCOLA E DA TURMA (a), b), c) — BORDAS 0.3mm PRETAS)
+  // =========================================================================
+  const idRowH = 6.8;
+  pdf.setLineWidth(0.3);
 
-      // Metadata Line
-      const metaY = 38.5;
-      pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-      pdf.line(marginX, metaY, marginX + contentWidth, metaY);
+  // Linha 1: a) Malanje | b) Quêssua
+  const halfW = usableWidth / 2;
+  pdf.rect(marginX, y, halfW, idRowH);
+  pdf.rect(marginX + halfW, y, halfW, idRowH);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text('a) Província: Malanje', marginX + 3, y + 4.6);
+  pdf.text('b) Município: Quêssua', marginX + halfW + 3, y + 4.6);
+  y += idRowH;
 
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
-      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-      const cleanTurma = data.metadata.turma.replace(/^Turma\s+/i, '');
-      const cleanSala = data.metadata.sala.replace(/^Sala\s+/i, '');
-      pdf.text(`Ano Lectivo: ${data.metadata.anoLectivo}`, marginX, metaY + 4.5);
-      pdf.text(`Classe: ${data.metadata.classe}`, marginX + 44, metaY + 4.5);
-      pdf.text(`Turma: ${cleanTurma}`, marginX + 82, metaY + 4.5);
-      pdf.text(`Período: ${data.metadata.turno}`, marginX + 114, metaY + 4.5);
-      pdf.text(`Sala: ${cleanSala}`, marginX + 158, metaY + 4.5);
+  // Linha 2: c) Escola / Instituição
+  pdf.rect(marginX, y, usableWidth, idRowH);
+  pdf.text(`c) Escola / Instituição: ${data.metadata.escola}`, marginX + 3, y + 4.6);
+  y += idRowH;
 
-      pdf.line(marginX, metaY + 6.5, marginX + contentWidth, metaY + 6.5);
+  // Linha 3: Classe | Turma | Período | Sala
+  const metaWidths = [42, 32, 68, 36]; // sum = 178
+  const metaTexts = [
+    `Classe: ${data.metadata.classe}`,
+    `Turma: ${cleanTurma}`,
+    `Período: ${data.metadata.turno}`,
+    `Sala: ${cleanSala}`,
+  ];
+  let mx = marginX;
+  for (let i = 0; i < metaWidths.length; i++) {
+    pdf.rect(mx, y, metaWidths[i], idRowH);
+    pdf.text(metaTexts[i], mx + 3, y + 4.6);
+    mx += metaWidths[i];
+  }
+  y += idRowH;
 
-      return metaY + 9;
-    } else {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(
-        `${data.metadata.escola.toUpperCase()} — LISTA NOMINAL: ${data.metadata.classe} (${data.metadata.turma})`,
-        marginX,
-        15
-      );
-      pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-      pdf.line(marginX, 17, marginX + contentWidth, 17);
-      return 20;
-    }
-  };
+  // Linha 4: Professor Titular | Data de Emissão
+  pdf.rect(marginX, y, halfW, idRowH);
+  pdf.rect(marginX + halfW, y, halfW, idRowH);
+  pdf.text(`Professor(a) Titular: ${data.metadata.professorTitular}`, marginX + 3, y + 4.6);
+  pdf.text(`Data de Emissão: ${data.metadata.dataEmissao}`, marginX + halfW + 3, y + 4.6);
+  y += idRowH + 6;
 
-  const renderTableHeader = (startY: number) => {
-    const headerHeight = 6.5;
-    pdf.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
-    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-    pdf.rect(marginX, startY, contentWidth, headerHeight, 'FD');
-
-    let currentX = marginX;
+  // =========================================================================
+  // 3. TABELA NOMINAL DOS ALUNOS
+  // =========================================================================
+  const drawSectionTitle = (title: string) => {
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-
-    columns.forEach((col, i) => {
-      let textX = currentX + 2;
-      if (col.align === 'center') {
-        textX = currentX + col.width / 2;
-      } else if (col.align === 'right') {
-        textX = currentX + col.width - 2;
-      }
-
-      pdf.text(col.title, textX, startY + 4.5, { align: col.align });
-      if (i < columns.length - 1) {
-        pdf.line(currentX + col.width, startY, currentX + col.width, startY + headerHeight);
-      }
-      currentX += col.width;
-    });
-
-    return startY + headerHeight;
+    pdf.setFontSize(10);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(title, marginX, y);
+    y += 3;
   };
 
-  const renderStudentRow = (student: TurmaStudentItem, y: number, _isAlt: boolean) => {
-    const rowHeight = 6.4;
+  const renderTableHeader = () => {
+    const headerH = 7;
+    let cx = marginX;
+    pdf.setLineWidth(0.3);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(0, 0, 0);
 
-    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-    pdf.rect(marginX, y, contentWidth, rowHeight, 'D');
+    columns.forEach((col) => {
+      pdf.rect(cx, y, col.width, headerH);
+      const tx =
+        col.align === 'center'
+          ? cx + col.width / 2
+          : col.align === 'right'
+          ? cx + col.width - 2.5
+          : cx + 2.5;
+      pdf.text(col.title, tx, y + 4.8, { align: col.align });
+      cx += col.width;
+    });
+    y += headerH;
+  };
 
-    let currentX = marginX;
-    const textY = y + 4.4;
+  const renderStudentRow = (student: TurmaStudentItem) => {
+    const rowH = 6.5;
+    let cx = marginX;
+    pdf.setLineWidth(0.3);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(0, 0, 0);
 
-    columns.forEach((col, i) => {
+    columns.forEach((col) => {
+      pdf.rect(cx, y, col.width, rowH);
       let val = '';
-      let isBold = false;
-
       if (col.key === 'ordem') {
         val = String(student.numeroOrdem).padStart(2, '0');
-        isBold = true;
+      } else if (col.key === 'codigo') {
+        val = student.codigoMatricula || '—';
       } else if (col.key === 'nome') {
         val = student.nomeCompleto;
       } else if (col.key === 'genero') {
         val = student.genero;
       } else if (col.key === 'idade') {
-        val = String(student.idade);
+        val = `${student.idade}`;
       } else if (col.key === 'situacao') {
-        val = (student.condicaoMatricula as string) === 'Matriculado' || student.condicaoMatricula === 'Novo' ? '' : student.condicaoMatricula;
+        val =
+          (student.condicaoMatricula as string) === 'Matriculado' ||
+          student.condicaoMatricula === 'Novo'
+            ? ''
+            : student.condicaoMatricula;
       }
 
-      pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-
-      let textX = currentX + 2;
-      if (col.align === 'center') {
-        textX = currentX + col.width / 2;
-      } else if (col.align === 'right') {
-        textX = currentX + col.width - 2;
-      }
-
-      const maxColTextWidth = col.width - 4;
+      const maxTextW = col.width - 4;
       let printVal = val;
-      if (pdf.getTextWidth(printVal) > maxColTextWidth) {
-        while (pdf.getTextWidth(printVal + '..') > maxColTextWidth && printVal.length > 3) {
+      if (pdf.getTextWidth(printVal) > maxTextW) {
+        while (pdf.getTextWidth(printVal + '...') > maxTextW && printVal.length > 3) {
           printVal = printVal.slice(0, -1);
         }
-        printVal = printVal + '..';
+        printVal = printVal + '...';
       }
 
-      pdf.text(printVal, textX, textY, { align: col.align });
-
-      if (i < columns.length - 1) {
-        pdf.line(currentX + col.width, y, currentX + col.width, y + rowHeight);
-      }
-
-      currentX += col.width;
+      const tx =
+        col.align === 'center'
+          ? cx + col.width / 2
+          : col.align === 'right'
+          ? cx + col.width - 2.5
+          : cx + 2.5;
+      pdf.text(printVal, tx, y + 4.4, { align: col.align });
+      cx += col.width;
     });
 
-    return y + rowHeight;
+    y += rowH;
   };
 
-  const renderFooter = (pageNumber: number) => {
-    const footerY = 289;
+  onProgress?.('Renderizando lista nominal dos alunos...');
+  drawSectionTitle('Relação Nominal dos Alunos');
+  renderTableHeader();
+
+  const rowH = 6.5;
+  const maxPageY = pageHeight - marginBottom;
+
+  if (data.students.length === 0) {
+    pdf.rect(marginX, y, usableWidth, 10);
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7);
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text(
-      `Página ${pageNumber} de ${totalPages}`,
-      pageWidth - marginX,
-      footerY,
-      { align: 'right' }
-    );
-  };
-
-  // --- RENDER PAGE 1 ---
-  onProgress?.('Renderizando estudantes (Página 1)...');
-  let currentY = renderHeader(1);
-  currentY = renderTableHeader(currentY);
-
-  page1Students.forEach((student, idx) => {
-    currentY = renderStudentRow(student, currentY, idx % 2 === 1);
-  });
-
-  renderFooter(1);
-
-  // If single page, render statistical summary and signatures on page 1
-  if (isSinglePage) {
-    renderStatsAndSignatures(pdf, currentY + 3, data, marginX, contentWidth);
-  } else {
-    // --- RENDER PAGE 2 ---
-    onProgress?.('Renderizando continuação e termo de homologação (Página 2)...');
-    pdf.addPage('a4', 'portrait');
-
-    currentY = renderHeader(2);
-    currentY = renderTableHeader(currentY);
-
-    page2Students.forEach((student, idx) => {
-      currentY = renderStudentRow(student, currentY, idx % 2 === 1);
+    pdf.setFontSize(8);
+    pdf.text('Nenhum aluno registado para os critérios selecionados.', centerX, y + 6.5, {
+      align: 'center',
     });
-
-    renderStatsAndSignatures(pdf, currentY + 4, data, marginX, contentWidth);
-    renderFooter(2);
+    y += 10;
+  } else {
+    for (let i = 0; i < data.students.length; i++) {
+      if (y + rowH > maxPageY) {
+        pdf.addPage('a4', 'portrait');
+        y = marginTop + 2;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.text(
+          `${data.metadata.escola.toUpperCase()} — ${data.metadata.classe} (${data.metadata.turma}) — Continuação`,
+          marginX,
+          y
+        );
+        y += 4;
+        renderTableHeader();
+      }
+      renderStudentRow(data.students[i]);
+    }
   }
+
+  y += 6;
+
+  // =========================================================================
+  // 4. ASSINATURAS DE HOMOLOGAÇÃO
+  // =========================================================================
+  const sigBlockHeight = 32;
+  if (y + sigBlockHeight > maxPageY) {
+    pdf.addPage('a4', 'portrait');
+    y = marginTop + 8;
+  } else {
+    y += 6;
+  }
+
+  // Bloco de Assinaturas (estilo Ficha Individual: 10pt negrito + linha 0.3mm + nome 8pt)
+  const colCenter1 = marginX + usableWidth * 0.25;
+  const colCenter2 = marginX + usableWidth * 0.75;
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(10);
+  pdf.text('O(A) Professor(a) / Director(a) de Turma', colCenter1, y, { align: 'center' });
+  pdf.text('O(A) Director(a) da Escola', colCenter2, y, { align: 'center' });
+  y += 14;
+
+  pdf.setLineWidth(0.3);
+  pdf.line(colCenter1 - 35, y, colCenter1 + 35, y);
+  pdf.line(colCenter2 - 35, y, colCenter2 + 35, y);
+  y += 4.5;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text(data.metadata.professorTitular, colCenter1, y, { align: 'center' });
+  pdf.text(data.metadata.diretorEscola, colCenter2, y, { align: 'center' });
 
   onProgress?.('Finalizando documento e descarregando...');
 
-  // Safe file naming
   const safeClass = data.metadata.classe.replace(/[^a-zA-Z0-9]/g, '_');
   const safeTurma = data.metadata.turma.replace(/[^a-zA-Z0-9]/g, '_');
   const fileName = `Lista_Alunos_${safeClass}_${safeTurma}_Ordem_AZ.pdf`;
 
   pdf.save(fileName);
   onProgress?.('Download concluído com sucesso!');
-}
-
-/**
- * Renders statistical summary box and official 3-signature block for class pauta validation
- */
-function renderStatsAndSignatures(
-  pdf: any,
-  startY: number,
-  data: TurmaStudentListResult,
-  marginX: number,
-  contentWidth: number
-): void {
-  const COLOR_TEXT = [15, 23, 42];
-  const COLOR_BORDER = [100, 116, 139];
-
-  // 1. Summary Line
-  const lineY1 = startY + 2;
-  pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-  pdf.line(marginX, lineY1, marginX + contentWidth, lineY1);
-
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(7.5);
-  pdf.setTextColor(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]);
-
-  const statsY = lineY1 + 4.5;
-  pdf.text(`Total de Alunos: ${data.stats.total}`, marginX, statsY);
-  pdf.text(`Masculinos (M): ${data.stats.meninos}`, marginX + 50, statsY);
-  pdf.text(`Femininos (F): ${data.stats.meninas}`, marginX + 100, statsY);
-  pdf.text(`Data: ${data.metadata.dataEmissao}`, marginX + contentWidth, statsY, { align: 'right' });
-
-  pdf.line(marginX, lineY1 + 6.5, marginX + contentWidth, lineY1 + 6.5);
-
-  // 2. Classic 2-Column Signature Lines
-  const signTop = lineY1 + 15;
-  const colCenter1 = marginX + contentWidth * 0.25;
-  const colCenter2 = marginX + contentWidth * 0.75;
-
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(7.5);
-  pdf.text('O(A) PROFESSOR(A) / DIRECTOR(A) DE TURMA', colCenter1, signTop, { align: 'center' });
-  pdf.text('O(A) SUBDIRECTOR(A) PEDAGÓGICO(A)', colCenter2, signTop, { align: 'center' });
-
-  const sigLineY = signTop + 12;
-  pdf.setDrawColor(15, 23, 42);
-  pdf.line(colCenter1 - 35, sigLineY, colCenter1 + 35, sigLineY);
-  pdf.line(colCenter2 - 35, sigLineY, colCenter2 + 35, sigLineY);
-
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(7.5);
-  pdf.text(data.metadata.professorTitular, colCenter1, sigLineY + 4.5, { align: 'center' });
-  pdf.text(data.metadata.subdiretorPedagogico, colCenter2, sigLineY + 4.5, { align: 'center' });
 }

@@ -21,6 +21,7 @@ import { Hero } from '../../Hero';
 import { directorStudentsData as initialStudents } from '../../../data/directorData';
 import { DirectorRegistrationModal } from './DirectorRegistrationModal';
 import { TurmaStudentListPdfModal } from '../../modals/TurmaStudentListPdfModal';
+import { normalizeClasseName, normalizeTurmaName } from '../../../utils/turmaStudentsService';
 import type { DirectorStudent, AdminStudent, AdminSchool, StudentRegistrationData, UserAccount } from '../../../types';
 import { StatCardItem } from '../../StatCardItem';
 import { SchoolAnnouncementsBanner } from '../../announcements/SchoolAnnouncementsBanner';
@@ -243,11 +244,20 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
       performanceScore: 8.5,
       presenceRate: 97.0,
     };
-    setStudents((prev) => [formatted, ...prev]);
+    setStudents((prev) => {
+      const exists = prev.some((s) => s.id === formatted.id);
+      if (exists) {
+        return prev.map((s) => (s.id === formatted.id ? { ...s, ...formatted } : s));
+      }
+      return [formatted, ...prev];
+    });
     setSelectedStudentId(formatted.id);
+    setTurmaPdfClass(normalizeClasseName(newStudent.classeEtapaModulo || formatted.gradeClass) || '4ª Classe');
+    setTurmaPdfTurma(normalizeTurmaName(formatted.turma) || 'Turma A');
 
-    // Ensure full unified persistence across localStorage and Firestore
+    // Ensure full unified persistence across localStorage and Firestore preserving all registration fields
     saveStudent({
+      ...newStudent,
       id: formatted.id,
       name: formatted.name,
       nomeCompleto: newStudent.nomeCompleto || formatted.name,
@@ -324,27 +334,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
                 <h3 className="text-xs sm:text-sm font-black text-slate-900">
                   Direção Escolar Activa: {directorSchoolQuota.schoolName}
                 </h3>
-                <span className="text-[10px] font-bold bg-cyan-50 text-[#0b3d5c] border border-cyan-200 px-2.5 py-0.5 rounded-full">
-                  Vínculo Automático no Cadastro
-                </span>
-                <span
-                  className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                    directorSchoolQuota.pendingCount > 0
-                      ? 'bg-amber-100 text-amber-900 border-amber-300'
-                      : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                  }`}
-                >
-                  {directorSchoolQuota.pendingCount > 0
-                    ? `${directorSchoolQuota.pendingCount} Pendentes`
-                    : 'Quota Concluída'}
-                </span>
               </div>
-              <p className="text-xs text-slate-600">
-                Na escola <strong className="text-slate-900">{directorSchoolQuota.schoolName}</strong> tem{' '}
-                <strong className="text-slate-900">{directorSchoolQuota.registeredCount}</strong> alunos cadastrados, dos quais{' '}
-                <strong className="text-rose-700">{directorSchoolQuota.registeredFemaleCount} são do sexo feminino</strong> e{' '}
-                <strong className="text-indigo-700">{directorSchoolQuota.registeredMaleCount} são do sexo masculino</strong>. Ao cadastrar um novo aluno, o sistema vincula-o automaticamente a esta escola.
-              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">

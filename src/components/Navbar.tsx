@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText, Archive, Zap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
-import { getPendingApplications, syncApplicationsFromServer, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
+import { getPendingApplications, syncApplicationsFromServer, isSchoolDirectorApproval, schoolsMatch, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
 import { fetchQuickRequests } from '../utils/quickServicesStorage';
 
 interface NavbarProps {
@@ -95,38 +95,32 @@ export const Navbar: React.FC<NavbarProps> = ({
     const updateCounts = () => {
       updateQuickRequests();
       syncApplicationsFromServer().then((all) => {
-        const userSchool = currentUser?.schoolName?.trim().toLowerCase();
-        
         const dirPending = all.filter((a) => {
           if (a.status !== 'pendente') return false;
-          if (a.targetApproverRole !== 'diretor' && a.type !== 'professor') return false;
-          if (currentUser?.role === 'diretor' && userSchool) {
-            const aSchool = (a.schoolName || '').trim().toLowerCase();
-            return !aSchool || aSchool === userSchool || aSchool.includes(userSchool) || userSchool.includes(aSchool);
+          if (!isSchoolDirectorApproval(a)) return false;
+          if (currentUser?.role === 'diretor' && (currentUser?.schoolName || currentUser?.schoolId)) {
+            return schoolsMatch(a.schoolName, currentUser.schoolName, a.schoolId, currentUser.schoolId);
           }
           return true;
         }).length;
 
-        // Municipal Admin DME oversees all pending homologations in the municipality
-        const admPending = all.filter((a) => a.status === 'pendente').length;
+        // Municipal Admin DME only receives School General Directors & DME Staff
+        const admPending = all.filter((a) => a.status === 'pendente' && !isSchoolDirectorApproval(a)).length;
 
         setPendingAppsCount({ director: dirPending, admin: admPending });
       }).catch(() => {
         try {
           const all = getPendingApplications();
-          const userSchool = currentUser?.schoolName?.trim().toLowerCase();
-          
           const dirPending = all.filter((a) => {
             if (a.status !== 'pendente') return false;
-            if (a.targetApproverRole !== 'diretor' && a.type !== 'professor') return false;
-            if (currentUser?.role === 'diretor' && userSchool) {
-              const aSchool = (a.schoolName || '').trim().toLowerCase();
-              return !aSchool || aSchool === userSchool || aSchool.includes(userSchool) || userSchool.includes(aSchool);
+            if (!isSchoolDirectorApproval(a)) return false;
+            if (currentUser?.role === 'diretor' && (currentUser?.schoolName || currentUser?.schoolId)) {
+              return schoolsMatch(a.schoolName, currentUser.schoolName, a.schoolId, currentUser.schoolId);
             }
             return true;
           }).length;
 
-          const admPending = all.filter((a) => a.status === 'pendente').length;
+          const admPending = all.filter((a) => a.status === 'pendente' && !isSchoolDirectorApproval(a)).length;
           setPendingAppsCount({ director: dirPending, admin: admPending });
         } catch {}
       });
@@ -144,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       window.removeEventListener('sigre_quick_request_updated', updateQuickRequests);
       clearInterval(interval);
     };
-  }, [currentUser?.role, currentUser?.schoolName]);
+  }, [currentUser?.role, currentUser?.schoolName, currentUser?.schoolId]);
 
   const isLoginLoading = (isAuthLoading && authLoadingAction === 'login') || navLoadingAction === 'login';
   const isRegisterLoading = (isAuthLoading && authLoadingAction === 'register') || navLoadingAction === 'register';

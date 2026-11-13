@@ -42,7 +42,7 @@ interface WordToken {
  * Converte a imagem da Insígnia da República de Angola para PNG DataURL
  * para incorporação nítida no ficheiro PDF.
  */
-async function loadEmblemPngDataUrl(src: string): Promise<{ dataUrl: string; ratio: number } | null> {
+export async function loadEmblemPngDataUrl(src: string): Promise<{ dataUrl: string; ratio: number } | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -441,6 +441,8 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
   document.title = '';
 
   const sheetHtml = targetEl.outerHTML;
+  const isFichaStyleA4 =
+    elementId === 'ficha-avaliacao-a4-sheet' || elementId === 'turma-lista-a4-sheet';
 
   iframeDoc.open();
   iframeDoc.write(`<!DOCTYPE html>
@@ -451,29 +453,29 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
   <style>
     @page {
       size: A4 portrait;
-      margin: ${elementId === 'ficha-avaliacao-a4-sheet' ? '12mm 16mm' : '0mm'} !important;
+      margin: ${isFichaStyleA4 ? '12mm 16mm' : '0mm'} !important;
     }
     * {
       box-sizing: border-box !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       font-family: ${
-        elementId === 'ficha-avaliacao-a4-sheet'
+        isFichaStyleA4
           ? "'Century Gothic', CenturyGothic, AppleGothic, sans-serif"
           : "'Times New Roman', Times, serif"
       } !important;
       color: #000000 !important;
     }
     html, body {
-      width: ${elementId === 'ficha-avaliacao-a4-sheet' ? '100%' : '210mm'} !important;
-      height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'auto' : '296mm'} !important;
-      max-height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'none' : '296mm'} !important;
+      width: ${isFichaStyleA4 ? '100%' : '210mm'} !important;
+      height: ${isFichaStyleA4 ? 'auto' : '296mm'} !important;
+      max-height: ${isFichaStyleA4 ? 'none' : '296mm'} !important;
       margin: 0 !important;
       padding: 0 !important;
       background: #ffffff !important;
-      overflow: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'visible' : 'hidden'} !important;
+      overflow: ${isFichaStyleA4 ? 'visible' : 'hidden'} !important;
       ${
-        elementId === 'ficha-avaliacao-a4-sheet'
+        isFichaStyleA4
           ? ''
           : `page-break-after: avoid !important;
       page-break-before: avoid !important;
@@ -482,19 +484,19 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       }
     }
     #${elementId} {
-      width: ${elementId === 'ficha-avaliacao-a4-sheet' ? '100%' : '210mm'} !important;
-      max-width: ${elementId === 'ficha-avaliacao-a4-sheet' ? '100%' : '210mm'} !important;
-      height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'auto' : '296mm'} !important;
-      max-height: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'none' : '296mm'} !important;
-      padding: ${elementId === 'ficha-avaliacao-a4-sheet' ? '0' : '15mm 20mm'} !important;
+      width: ${isFichaStyleA4 ? '100%' : '210mm'} !important;
+      max-width: ${isFichaStyleA4 ? '100%' : '210mm'} !important;
+      height: ${isFichaStyleA4 ? 'auto' : '296mm'} !important;
+      max-height: ${isFichaStyleA4 ? 'none' : '296mm'} !important;
+      padding: ${isFichaStyleA4 ? '0' : '15mm 20mm'} !important;
       margin: 0 auto !important;
       border: 0 !important;
       outline: 0 !important;
       box-shadow: none !important;
       background: #ffffff !important;
-      overflow: ${elementId === 'ficha-avaliacao-a4-sheet' ? 'visible' : 'hidden'} !important;
+      overflow: ${isFichaStyleA4 ? 'visible' : 'hidden'} !important;
       ${
-        elementId === 'ficha-avaliacao-a4-sheet'
+        isFichaStyleA4
           ? ''
           : `page-break-inside: avoid !important;
       break-inside: avoid !important;
@@ -693,21 +695,29 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
     table {
       width: 100% !important;
       border-collapse: collapse !important;
-      margin: ${elementId === 'ficha-avaliacao-a4-sheet' ? '2pt 0 5pt 0' : '6pt 0'} !important;
+      margin: ${isFichaStyleA4 ? '2pt 0 5pt 0' : '6pt 0'} !important;
+      page-break-inside: ${elementId === 'turma-lista-a4-sheet' ? 'auto' : 'avoid'} !important;
+      break-inside: ${elementId === 'turma-lista-a4-sheet' ? 'auto' : 'avoid'} !important;
+    }
+    tr {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
     th, td {
       border: 1px solid #000000 !important;
-      padding: ${elementId === 'ficha-avaliacao-a4-sheet' ? '4pt 6pt' : '3pt 5pt'} !important;
-      font-size: ${elementId === 'ficha-avaliacao-a4-sheet' ? '8pt' : '11pt'} !important;
-      font-weight: ${elementId === 'ficha-avaliacao-a4-sheet' ? '400' : 'inherit'} !important;
+      padding: ${isFichaStyleA4 ? '4pt 6pt' : '3pt 5pt'} !important;
+      font-size: ${isFichaStyleA4 ? '8pt' : '11pt'} !important;
+      font-weight: ${isFichaStyleA4 ? '400' : 'inherit'} !important;
       vertical-align: middle !important;
     }
     #ficha-avaliacao-a4-sheet p,
     #ficha-avaliacao-a4-sheet span,
     #ficha-avaliacao-a4-sheet td,
-    #ficha-avaliacao-a4-sheet div {
+    #ficha-avaliacao-a4-sheet div,
+    #turma-lista-a4-sheet p,
+    #turma-lista-a4-sheet span,
+    #turma-lista-a4-sheet td,
+    #turma-lista-a4-sheet div {
       font-size: 8pt !important;
       font-weight: 400 !important;
     }
@@ -718,16 +728,26 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
     #ficha-avaliacao-a4-sheet p.font-bold,
     #ficha-avaliacao-a4-sheet th.font-bold,
     #ficha-avaliacao-a4-sheet td.font-bold,
-    #ficha-avaliacao-a4-sheet span.font-bold {
+    #ficha-avaliacao-a4-sheet span.font-bold,
+    #turma-lista-a4-sheet h1,
+    #turma-lista-a4-sheet th,
+    #turma-lista-a4-sheet .ficha-title-10,
+    #turma-lista-a4-sheet .font-bold,
+    #turma-lista-a4-sheet p.font-bold,
+    #turma-lista-a4-sheet th.font-bold,
+    #turma-lista-a4-sheet td.font-bold,
+    #turma-lista-a4-sheet span.font-bold {
       font-weight: 700 !important;
       font-size: 10pt !important;
     }
-    #ficha-avaliacao-a4-sheet .a4-eval-section {
+    #ficha-avaliacao-a4-sheet .a4-eval-section,
+    #turma-lista-a4-sheet .a4-eval-section {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
       margin-bottom: 8pt !important;
     }
-    #ficha-avaliacao-a4-sheet .a4-page-break-after {
+    #ficha-avaliacao-a4-sheet .a4-page-break-after,
+    #turma-lista-a4-sheet .a4-page-break-after {
       page-break-after: always !important;
       break-after: page !important;
     }
@@ -737,7 +757,8 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       width: 100% !important;
       display: block !important;
     }
-    #ficha-avaliacao-a4-sheet .ficha-sig-line {
+    #ficha-avaliacao-a4-sheet .ficha-sig-line,
+    #turma-lista-a4-sheet .ficha-sig-line {
       width: 250px !important;
       border-bottom: 1px solid #000000 !important;
       margin: 0 auto !important;
@@ -745,7 +766,9 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       display: block !important;
     }
     #ficha-avaliacao-a4-sheet img,
-    #ficha-avaliacao-a4-sheet .ficha-emblem-img {
+    #ficha-avaliacao-a4-sheet .ficha-emblem-img,
+    #turma-lista-a4-sheet img,
+    #turma-lista-a4-sheet .ficha-emblem-img {
       width: 80px !important;
       height: 80px !important;
       max-height: 80px !important;

@@ -49,6 +49,7 @@ import {
   syncApplicationsFromServer,
   deleteApplication,
   clearAllHomologatedData,
+  isSchoolDirectorApproval,
   OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
 import { buildInitialDirectorDossier, saveDirector } from '../../../utils/directorStorage';
@@ -78,7 +79,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [applications, setApplications] = useState<PendingApplication[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'aprovado' | 'rejeitado'>('pendente');
-  const [roleScopeFilter, setRoleScopeFilter] = useState<'todos' | 'diretor' | 'professor' | 'funcionario' | 'membro_dme'>('todos');
+  const [roleScopeFilter, setRoleScopeFilter] = useState<'todos' | 'diretor' | 'membro_dme'>('todos');
   const [selectedSchoolFilter, setSelectedSchoolFilter] = useState<string>('todas');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
@@ -158,11 +159,12 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const loadApplications = async () => {
     try {
       const all = await syncApplicationsFromServer();
-      // In DME Quêssua Admin portal, the Administrator oversees ALL applications across the entire municipality
-      setApplications(all);
+      // DME Quêssua Admin portal only receives School General Directors & DME Staff;
+      // teachers and school staff route directly to their chosen school's Director.
+      setApplications(all.filter((a) => !isSchoolDirectorApproval(a)));
     } catch {
       const all = getPendingApplications();
-      setApplications(all);
+      setApplications(all.filter((a) => !isSchoolDirectorApproval(a)));
     }
   };
 
@@ -186,8 +188,6 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       // Role Scope filter
       if (roleScopeFilter !== 'todos') {
         if (roleScopeFilter === 'diretor' && app.type !== 'diretor') return false;
-        if (roleScopeFilter === 'professor' && app.type !== 'professor') return false;
-        if (roleScopeFilter === 'funcionario' && app.type !== 'funcionario') return false;
         if (roleScopeFilter === 'membro_dme' && app.type !== 'membro_dme' && app.scope !== 'administracao') return false;
       }
 
@@ -605,7 +605,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           </div>
         </section>
 
-        {/* Role Category Tabs (Toda a Rede Municipal, Directores, Professores, Funcionários, Membros DME) */}
+        {/* Role Category Tabs (Directores Escolares & Membros DME) */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-thin">
           <button
             type="button"
@@ -616,7 +616,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
             }`}
           >
-            <span>Toda a Rede Municipal</span>
+            <span>Todas as Homologações DME</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
               roleScopeFilter === 'todos' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
             }`}>
@@ -639,42 +639,6 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               roleScopeFilter === 'diretor' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
             }`}>
               {counts.directores}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setRoleScopeFilter('professor')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
-              roleScopeFilter === 'professor'
-                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
-                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
-            }`}
-          >
-            <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Professores & Docentes</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-              roleScopeFilter === 'professor' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-            }`}>
-              {counts.professores}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setRoleScopeFilter('funcionario')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
-              roleScopeFilter === 'funcionario'
-                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
-                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
-            }`}
-          >
-            <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Funcionários & Secretaria</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-              roleScopeFilter === 'funcionario' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-            }`}>
-              {counts.funcionarios}
             </span>
           </button>
 

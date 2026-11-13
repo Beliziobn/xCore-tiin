@@ -1467,6 +1467,13 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
 
   const unsubs: Unsubscribe[] = [];
   const norm = (s?: string) => (s || '').trim().toLowerCase();
+  const pushedMissingKeys = new Set<string>();
+  const shouldPushMissing = (col: string, key: string): boolean => {
+    const token = `${col}::${key}`;
+    if (!key || pushedMissingKeys.has(token)) return false;
+    pushedMissingKeys.add(token);
+    return true;
+  };
 
   // 1. REAL-TIME SCHOOLS UNIFICATION (ucore_admin_schools & sigre_school_registrations)
   unsubs.push(
@@ -1484,7 +1491,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const inCloud = cloudSchools.some(
             (cs) => norm(cs.id) === norm(ls.id) || norm(cs.name) === norm(ls.name)
           );
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(SCHOOLS_COL, k)) {
             saveSchoolToFirestore(ls).catch(() => {});
           }
         });
@@ -1664,7 +1671,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             const existsInCloud = cloudTeachers.some(
               (ct) => norm(ct.id) === norm(id) || norm(ct.nomeCompleto || ct.name) === norm(name)
             );
-            if (!existsInCloud) {
+            if (!existsInCloud && shouldPushMissing(TEACHERS_COL, key)) {
               saveTeacherToFirestore(regData || adminObj).catch(() => {});
             }
           }
@@ -1860,7 +1867,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             const existsInCloud = cloudStudents.some(
               (cs) => norm(cs.id) === norm(studentId) || norm(cs.nomeCompleto || cs.name) === norm(name)
             );
-            if (!existsInCloud) {
+            if (!existsInCloud && shouldPushMissing(STUDENTS_COL, key)) {
               saveStudentToFirestore(regObj).catch(() => {});
             }
           }
@@ -1964,7 +1971,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             const existsInCloud = cloudDirs.some(
               (cd) => norm(cd.id) === norm(id) || norm(cd.nomeCompleto || cd.name) === norm(name)
             );
-            if (!existsInCloud) {
+            if (!existsInCloud && shouldPushMissing(DIRECTORS_COL, key)) {
               saveDirectorToFirestore(regData || adminObj).catch(() => {});
             }
           }
@@ -1998,7 +2005,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           if (!k || isEntityTombstoned(DME_STAFF_COL, k)) return;
           map.set(k, s);
           const inCloud = cloudStaff.some((cs) => norm(cs.id || cs.email || cs.role) === k);
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(DME_STAFF_COL, k)) {
             saveDmeStaffToFirestore(s).catch(() => {});
           }
         });
@@ -2033,7 +2040,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(EFECTIVIDADE_COL, lr.id)) return;
           map.set(lr.id, lr);
           const inCloud = cloudRecords.some((cr) => cr && cr.id === lr.id);
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(EFECTIVIDADE_COL, norm(lr.id))) {
             saveEfectividadeToFirestore(lr).catch(() => {});
           }
         });
@@ -2069,7 +2076,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, lr.id)) return;
           map.set(lr.id, lr);
           const inCloud = cloudRecords.some((cr) => cr && cr.id === lr.id);
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(DECLARACAO_SERVICO_COL, norm(lr.id))) {
             saveDeclaracaoServicoToFirestore(lr).catch(() => {});
           }
         });
@@ -2106,7 +2113,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const inCloud = cloudStaff.some(
             (cs) => norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name) === k
           );
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(STAFF_COL, k)) {
             saveStaffToFirestore(ls).catch(() => {});
           }
         });
@@ -2143,7 +2150,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const k = getKey(lp);
           map.set(k, lp);
           const inCloud = cloudPautas.some((cp) => getKey(cp) === k);
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(GRADES_COL, k)) {
             saveMiniPautaToFirestore(lp).catch(() => {});
           }
         });
@@ -2182,7 +2189,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const inCloud = cloudAttendance.some(
             (ca) => ca.attendanceKind === 'student' && ca.studentId === r.studentId && ca.date === r.date
           );
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(`${ATTENDANCE_COL}_student`, k)) {
             saveAttendanceToFirestore(r, 'student').catch(() => {});
           }
         });
@@ -2194,7 +2201,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const inCloud = cloudAttendance.some(
             (ca) => ca.attendanceKind === 'teacher' && ca.teacherId === r.teacherId && ca.date === r.date
           );
-          if (!inCloud) {
+          if (!inCloud && shouldPushMissing(`${ATTENDANCE_COL}_teacher`, k)) {
             saveAttendanceToFirestore(r, 'teacher').catch(() => {});
           }
         });
@@ -2231,7 +2238,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         localAnn.forEach((la) => {
           if (!la || !la.id || isEntityTombstoned(ANNOUNCEMENTS_COL, la.id)) return;
           map.set(la.id, la);
-          if (!cloudAnn.some((ca) => ca.id === la.id)) {
+          if (!cloudAnn.some((ca) => ca.id === la.id) && shouldPushMissing(ANNOUNCEMENTS_COL, la.id)) {
             saveAnnouncementToFirestore(la).catch(() => {});
           }
         });
@@ -2256,7 +2263,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         localRooms.forEach((lr) => {
           if (!lr || !lr.id) return;
           map.set(lr.id, lr);
-          if (!cloudRooms.some((cr) => cr.id === lr.id)) {
+          if (!cloudRooms.some((cr) => cr.id === lr.id) && shouldPushMissing(ROOMS_COL, lr.id)) {
             saveRoomToFirestore(lr).catch(() => {});
           }
         });
@@ -2280,7 +2287,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         localClasses.forEach((lc) => {
           if (!lc || !lc.id) return;
           map.set(lc.id, lc);
-          if (!cloudClasses.some((cc) => cc.id === lc.id)) {
+          if (!cloudClasses.some((cc) => cc.id === lc.id) && shouldPushMissing(CLASSES_COL, lc.id)) {
             saveClassToFirestore(lc).catch(() => {});
           }
         });
@@ -2306,7 +2313,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         localGuias.forEach((lg) => {
           if (!lg || !lg.id || isEntityTombstoned(GUIAS_FERIAS_COL, lg.id)) return;
           map.set(lg.id, lg);
-          if (!cloudGuias.some((cg) => cg && cg.id === lg.id)) {
+          if (!cloudGuias.some((cg) => cg && cg.id === lg.id) && shouldPushMissing(GUIAS_FERIAS_COL, lg.id)) {
             saveGuiaFeriasToFirestore(lg).catch(() => {});
           }
         });
@@ -2334,7 +2341,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         localGuias.forEach((lg) => {
           if (!lg || !lg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, lg.id)) return;
           map.set(lg.id, lg);
-          if (!cloudGuias.some((cg) => cg && cg.id === lg.id)) {
+          if (!cloudGuias.some((cg) => cg && cg.id === lg.id) && shouldPushMissing(GUIAS_COLOCACAO_COL, lg.id)) {
             saveGuiaColocacaoToFirestore(lg).catch(() => {});
           }
         });
@@ -2362,7 +2369,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         localFichas.forEach((lf) => {
           if (!lf || !lf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, lf.id)) return;
           map.set(lf.id, lf);
-          if (!cloudFichas.some((cf) => cf && cf.id === lf.id)) {
+          if (!cloudFichas.some((cf) => cf && cf.id === lf.id) && shouldPushMissing(FICHAS_AVALIACAO_COL, lf.id)) {
             saveFichaAvaliacaoToFirestore(lf).catch(() => {});
           }
         });
@@ -2390,7 +2397,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           if (!lu || !lu.email) return;
           const k = norm(lu.email);
           map.set(k, lu);
-          if (!cloudUsers.some((cu) => norm(cu.email) === k)) {
+          if (!cloudUsers.some((cu) => norm(cu.email) === k) && shouldPushMissing(USERS_COL, k)) {
             saveUserToFirestore(lu).catch(() => {});
           }
         });

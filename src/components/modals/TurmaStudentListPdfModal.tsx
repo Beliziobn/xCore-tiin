@@ -4,30 +4,25 @@ import {
   FileDown,
   Printer,
   Search,
-  Filter,
-  Users,
-  CheckCircle2,
-  AlertCircle,
-  School,
-  GraduationCap,
-  Sparkles,
+  Database,
+  FileText,
   ArrowUpDown,
-  BookOpen,
-  Calendar,
   Check,
   Loader2,
-  Layers,
-  ChevronRight
+  ClipboardList,
+  Download,
+  Eye,
 } from 'lucide-react';
+import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import {
   getStudentsForTurma,
-  TurmaStudentListResult,
-  TurmaStudentItem,
+  getAvailableClassesAndTurmasFromStudents,
   normalizeClasseName,
   normalizeTurmaName,
+  TurmaStudentListResult,
 } from '../../utils/turmaStudentsService';
 import { exportTurmaStudentListToPDF } from '../../utils/turmaPdfExporter';
-import { ALL_SCHOOL_CLASSES, STANDARD_TURMAS } from '../../data/classesConfig';
+import { printSinglePageA4Clean } from '../../utils/declaracaoPdfGenerator';
 
 export interface TurmaStudentListPdfModalProps {
   isOpen: boolean;
@@ -44,45 +39,69 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
   initialTurma = 'Turma A',
   schoolName = '',
 }) => {
-  // 1. Unconditional Hooks
-  const [selectedClass, setSelectedClass] = useState<string>(initialClass);
-  const [selectedTurma, setSelectedTurma] = useState<string>(initialTurma);
+  // 1. Hooks incondicionais
+  const [selectedClass, setSelectedClass] = useState<string>(
+    normalizeClasseName(initialClass) || '4ª Classe'
+  );
+  const [selectedTurma, setSelectedTurma] = useState<string>(
+    normalizeTurmaName(initialTurma) || 'Turma A'
+  );
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc'); // 'asc' is A-Z
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [subView, setSubView] = useState<'preview' | 'database'>('preview');
   const [isExporting, setIsExporting] = useState(false);
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [syncVersion, setSyncVersion] = useState(0);
 
-  // Sync state when props change
   useEffect(() => {
-    if (initialClass) setSelectedClass(initialClass);
-    if (initialTurma) setSelectedTurma(initialTurma);
+    if (initialClass) setSelectedClass(normalizeClasseName(initialClass) || initialClass);
+    if (initialTurma) setSelectedTurma(normalizeTurmaName(initialTurma));
   }, [initialClass, initialTurma]);
 
-  // 2. Compute the Turma Student List
+  useEffect(() => {
+    const handleSync = () => setSyncVersion((v) => v + 1);
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  // Opções dinâmicas de classe/turma incluindo todos os novos alunos cadastrados
+  const { classes: availableClasses, turmas: availableTurmas } = useMemo(() => {
+    return getAvailableClassesAndTurmasFromStudents();
+  }, [isOpen, syncVersion]);
+
+  // 2. Obter lista oficial da turma (sempre atualizada quando modal abre ou alunos são cadastrados)
   const turmaData: TurmaStudentListResult = useMemo(() => {
     return getStudentsForTurma({
       gradeClass: selectedClass,
       turma: selectedTurma,
       schoolName,
     });
-  }, [selectedClass, selectedTurma, schoolName]);
+  }, [selectedClass, selectedTurma, schoolName, isOpen, syncVersion]);
 
-  // 3. Filter and verify A-Z sorting
+  // 3. Filtragem e ordenação (A-Z / Z-A) com numeração sequencial consistente
   const displayedStudents = useMemo(() => {
     let list = [...turmaData.students];
 
-    // Filter by search
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
         (s) =>
           s.nomeCompleto.toLowerCase().includes(q) ||
-          s.condicaoMatricula.toLowerCase().includes(q)
+          s.condicaoMatricula.toLowerCase().includes(q) ||
+          s.codigoMatricula.toLowerCase().includes(q)
       );
     }
 
-    // Sort order (default A-Z)
     list.sort((a, b) => {
       const cmp = a.nomeCompleto.localeCompare(b.nomeCompleto, 'pt-PT', { sensitivity: 'base' });
       return sortDirection === 'asc' ? cmp : -cmp;
@@ -91,76 +110,153 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
     return list;
   }, [turmaData.students, searchTerm, sortDirection]);
 
-  // 4. Download PDF handler
+  const exportableData: TurmaStudentListResult = useMemo(
+    () => ({
+      ...turmaData,
+      students: displayedStudents,
+    }),
+    [turmaData, displayedStudents]
+  );
+
+  // 4. Descarregar PDF A4 (com o mesmo padrão estrutural da Ficha Individual)
   const handleDownloadPdf = async () => {
     setIsExporting(true);
     setExportSuccess(false);
-    setExportMessage('Iniciando geração da pauta oficial em PDF...');
 
     try {
-      await exportTurmaStudentListToPDF(turmaData, {
-        onProgress: (msg) => setExportMessage(msg),
-      });
+      await exportTurmaStudentListToPDF(exportableData);
       setExportSuccess(true);
+      showToast('Lista nominal em PDF gerada com sucesso.');
       setTimeout(() => {
         setExportSuccess(false);
-        setExportMessage(null);
-      }, 4000);
+      }, 3500);
     } catch (err) {
       console.error('Erro ao gerar PDF da turma:', err);
-      setExportMessage('Erro na geração. Tentando modo alternativo...');
-      setTimeout(() => setExportMessage(null), 3500);
+      showToast('Não foi possível gerar o PDF. Tente novamente.');
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  // 5. Impressão A4 isolada usando exatamente a mesma função da Ficha Individual
+  const handlePrintA4 = () => {
+    if (subView !== 'preview') {
+      setSubView('preview');
+      setTimeout(() => printSinglePageA4Clean('turma-lista-a4-sheet'), 80);
+    } else {
+      printSinglePageA4Clean('turma-lista-a4-sheet');
+    }
   };
 
-  // Guard render AFTER all hook declarations
+  // 6. Exportar CSV na vista Base de Dados (igual à Ficha Individual)
+  const handleExportCsv = () => {
+    if (displayedStudents.length === 0) return;
+    const headers = ['Nº', 'Código', 'Nome Completo', 'Sexo', 'Idade', 'Condição'];
+    const rows = displayedStudents.map((s) => [
+      String(s.numeroOrdem).padStart(2, '0'),
+      s.codigoMatricula,
+      `"${s.nomeCompleto.replace(/"/g, '""')}"`,
+      s.genero,
+      String(s.idade),
+      s.condicaoMatricula,
+    ]);
+    const csv = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeClass = turmaData.metadata.classe.replace(/[^a-zA-Z0-9]/g, '_');
+    const safeTurma = turmaData.metadata.turma.replace(/[^a-zA-Z0-9]/g, '_');
+    link.download = `Lista_${safeClass}_${safeTurma}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Ficheiro CSV exportado com sucesso.');
+  };
+
   if (!isOpen) return null;
 
   const { metadata, stats } = turmaData;
+  const cleanTurma = metadata.turma.replace(/^Turma\s+/i, '');
+  const cleanSala = metadata.sala.replace(/^Sala\s+/i, '');
+
+  const cellNormalStyle: React.CSSProperties = {
+    border: '1px solid #000000',
+    padding: '5px 8px',
+    fontSize: '8pt',
+    fontWeight: 400,
+    lineHeight: 1.35,
+    verticalAlign: 'middle',
+  };
+
+  const cellHeaderStyle: React.CSSProperties = {
+    border: '1px solid #000000',
+    padding: '5px 8px',
+    fontSize: '10pt',
+    fontWeight: 700,
+    lineHeight: 1.35,
+    verticalAlign: 'middle',
+  };
+
+  const chapterTitleStyle: React.CSSProperties = {
+    fontSize: '10pt',
+    fontWeight: 700,
+    lineHeight: 1.35,
+    margin: '0 0 5px 0',
+    textAlign: 'left',
+  };
+
+  const pillControlClass =
+    'h-10 px-4 rounded-full border border-slate-300 bg-white text-xs sm:text-sm text-slate-900 outline-none transition-all focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10';
 
   return (
     <div
       id="turma-student-list-pdf-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-slate-950/65 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
-        {/* Header Bar */}
-        <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between gap-4 border-b border-slate-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-white">
-              <GraduationCap className="w-5 h-5" />
+      <div className="bg-[#f8f9fa] rounded-[24px] shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+        {/* Toast Feedback (mesmo padrão da Ficha Individual) */}
+        {toastMsg && (
+          <div className="no-print fixed top-6 right-6 z-60 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMsg}</span>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* EXEMPLAR HEADER: Ícone Circular + Título + Acções em Pill         */}
+        {/* ================================================================= */}
+        <div className="no-print bg-white px-5 sm:px-7 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-full bg-[#f2f4f7] border border-slate-200/80 flex items-center justify-center text-slate-800 shrink-0">
+              <ClipboardList className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                Lista Nominal de Alunos (Folha A4)
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+                Listas Nominais por Turma
               </h2>
-              <p className="text-[11px] text-slate-400">
-                {metadata.escola} • {metadata.classe} ({metadata.turma})
+              <p className="text-xs text-slate-500 truncate">
+                {metadata.escola} · {metadata.classe} ({metadata.turma}) · Ano Lectivo {metadata.anoLectivo}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
-              onClick={handlePrint}
-              className="hidden sm:inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/15 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-white/10"
-              title="Imprimir Folha A4"
+              type="button"
+              onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+              className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Alternar ordenação alfabética"
             >
-              <Printer className="w-3.5 h-3.5 text-slate-300" />
-              <span>Imprimir</span>
+              <ArrowUpDown className="w-3.5 h-3.5" />
+              <span>Ordem: {sortDirection === 'asc' ? 'A–Z' : 'Z–A'}</span>
             </button>
 
             <button
               id="btn-modal-baixar-pdf-az"
+              type="button"
               onClick={handleDownloadPdf}
               disabled={isExporting}
-              className="inline-flex items-center gap-1.5 bg-[#f75142] hover:bg-[#e04436] text-white font-bold text-xs px-4 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+              className="h-10 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
             >
               {isExporting ? (
                 <>
@@ -169,178 +265,227 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
                 </>
               ) : exportSuccess ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-200" />
+                  <Check className="w-3.5 h-3.5" />
                   <span>PDF Gerado</span>
                 </>
               ) : (
                 <>
                   <FileDown className="w-3.5 h-3.5" />
-                  <span>Baixar PDF A4</span>
+                  <span>Baixar PDF</span>
                 </>
               )}
             </button>
 
             <button
+              type="button"
+              onClick={handlePrintA4}
+              className="h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+              title="Imprimir Folha A4"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir A4</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer ml-1"
+              aria-label="Fechar janela"
+              className="w-10 h-10 rounded-full border border-slate-200 bg-[#f2f4f7] hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer ml-1"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Selection & Filter Controls (Compact Toolbar) */}
-        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 shrink-0 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1">
-              <label htmlFor="select-classe-modal" className="text-[11px] font-semibold text-slate-500">
-                Classe:
-              </label>
-              <select
-                id="select-classe-modal"
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+        {/* ================================================================= */}
+        {/* ÁREA DE CONTEÚDO COM SCROLL (MESMO SISTEMA DA FICHA INDIVIDUAL)   */}
+        {/* ================================================================= */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+          {/* BARRA DE OPÇÕES NO TOPO + SELETORES EM PILL */}
+          <div className="no-print flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            {/* Barra de opções igual à Ficha Individual: Base de Dados | Pré-visualização */}
+            <div className="flex flex-wrap items-center gap-2 bg-white p-1.5 rounded-full border border-slate-200 w-fit shadow-xs">
+              <button
+                type="button"
+                onClick={() => setSubView('database')}
+                className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                  subView === 'database'
+                    ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
               >
-                {ALL_SCHOOL_CLASSES.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </select>
+                <Database className="w-4 h-4 shrink-0" />
+                <span>Base de Dados ({displayedStudents.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSubView('preview')}
+                className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                  subView === 'preview'
+                    ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                <FileText className="w-4 h-4 shrink-0" />
+                <span>Pré-visualização</span>
+              </button>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1">
-              <label htmlFor="select-turma-modal" className="text-[11px] font-semibold text-slate-500">
-                Turma:
-              </label>
-              <select
-                id="select-turma-modal"
-                value={selectedTurma}
-                onChange={(e) => setSelectedTurma(e.target.value)}
-                className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
-              >
-                {STANDARD_TURMAS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Filtros de Classe, Turma e Pesquisa em Pill */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-full h-10 px-4">
+                <label
+                  htmlFor="select-classe-modal"
+                  className="text-xs font-semibold text-slate-500 whitespace-nowrap"
+                >
+                  Classe:
+                </label>
+                <select
+                  id="select-classe-modal"
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="text-xs sm:text-sm font-semibold text-slate-900 bg-transparent outline-none cursor-pointer"
+                >
+                  {availableClasses.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-              className="inline-flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-              title="Alternar sentido alfabético"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
-              <span>Ordem: {sortDirection === 'asc' ? 'A-Z' : 'Z-A'}</span>
-            </button>
+              <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-full h-10 px-4">
+                <label
+                  htmlFor="select-turma-modal"
+                  className="text-xs font-semibold text-slate-500 whitespace-nowrap"
+                >
+                  Turma:
+                </label>
+                <select
+                  id="select-turma-modal"
+                  value={selectedTurma}
+                  onChange={(e) => setSelectedTurma(e.target.value)}
+                  className="text-xs sm:text-sm font-semibold text-slate-900 bg-transparent outline-none cursor-pointer"
+                >
+                  {availableTurmas.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="relative flex-1 sm:w-60 min-w-[200px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  placeholder="Procurar aluno ou código..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  aria-label="Procurar aluno na lista da turma"
+                  className={`${pillControlClass} w-full pl-9 pr-4`}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-            <span className="hidden md:inline-block text-[11px] text-slate-600 font-medium">
-              Total: <strong className="text-slate-900">{stats.total}</strong> ({stats.meninos} M / {stats.meninas} F)
-            </span>
-            <div className="relative flex-1 sm:w-56">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Filtrar aluno..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1 rounded-lg border border-slate-300 bg-white text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-500"
-              />
-            </div>
-          </div>
-        </div>
+          {/* =============================================================== */}
+          {/* OPÇÃO 1: BASE DE DADOS DOS ALUNOS DA TURMA                      */}
+          {/* =============================================================== */}
+          {subView === 'database' && (
+            <section className="no-print bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                      Base de Dados — {metadata.classe} ({metadata.turma}) · {displayedStudents.length} alunos
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {stats.meninos} Masculinos ({stats.percentualM}) · {stats.meninas} Femininas ({stats.percentualF}) · Idade Média: {stats.idadeMedia}
+                    </p>
+                  </div>
+                </div>
 
-        {/* Scrollable A4 Sheet Preview */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/80 flex justify-center">
-          {/* Official A4 Paper Sheet */}
-          <div className="bg-white w-full max-w-[210mm] min-h-[297mm] shadow-lg border border-slate-300 px-6 py-8 sm:px-12 sm:py-10 text-slate-950 flex flex-col justify-between mx-auto">
-            <div>
-              {/* 1. Official Angolan School Header */}
-              <div className="text-center pb-4 border-b border-slate-800">
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-950">
-                  REPÚBLICA DE ANGOLA
-                </p>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-950">
-                  MINISTÉRIO DA EDUCAÇÃO
-                </p>
-                <p className="text-[11px] font-semibold uppercase text-slate-800 mt-0.5">
-                  {metadata.provincia} • {metadata.direccao}
-                </p>
-                <p className="text-sm font-black uppercase text-slate-950 mt-1">
-                  {metadata.escola}
-                </p>
-
-                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wide text-slate-950 mt-4 pt-2 border-t border-slate-300 inline-block px-6">
-                  LISTA NOMINAL DOS ALUNOS
-                </h3>
-
-                {/* School Turma Metadata Line */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-left text-[11px] mt-4 pt-2 border-t border-slate-400">
-                  <div>
-                    <span className="font-semibold text-slate-600">Ano Lectivo: </span>
-                    <span className="font-bold text-slate-950">{metadata.anoLectivo}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-600">Classe: </span>
-                    <span className="font-bold text-slate-950">{metadata.classe}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-600">Turma: </span>
-                    <span className="font-bold text-slate-950">{metadata.turma.replace(/^Turma\s+/i, '')}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-600">Período: </span>
-                    <span className="font-bold text-slate-950">{metadata.turno}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-600">Sala: </span>
-                    <span className="font-bold text-slate-950">{metadata.sala.replace(/^Sala\s+/i, '')}</span>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {displayedStudents.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleExportCsv}
+                      className="h-9 px-3.5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Exportar CSV</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSubView('preview')}
+                    className="h-9 px-3.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Ver Folha A4</span>
+                  </button>
                 </div>
               </div>
 
-              {/* 2. Traditional School Table */}
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-left border-collapse border border-slate-800 text-xs">
-                  <thead>
-                    <tr className="bg-slate-100 text-slate-950 text-[11px] font-bold uppercase">
-                      <th className="py-1.5 px-2 text-center w-10 border border-slate-800">Nº</th>
-                      <th className="py-1.5 px-3 border border-slate-800">Nome Completo do Aluno</th>
-                      <th className="py-1.5 px-2 text-center w-14 border border-slate-800">Sexo</th>
-                      <th className="py-1.5 px-2 text-center w-16 border border-slate-800">Idade</th>
-                      <th className="py-1.5 px-3 text-center w-36 border border-slate-800">Observação</th>
+              <div className="overflow-x-auto max-h-[460px] overflow-y-auto border border-slate-200 rounded-2xl">
+                <table className="w-full border-collapse text-xs min-w-[740px]">
+                  <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
+                    <tr>
+                      <th className="text-center px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600 w-14">
+                        Nº
+                      </th>
+                      <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                        Código
+                      </th>
+                      <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                        Nome Completo do Aluno
+                      </th>
+                      <th className="text-center px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                        Sexo
+                      </th>
+                      <th className="text-center px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                        Idade
+                      </th>
+                      <th className="text-center px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                        Observação
+                      </th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {displayedStudents.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-8 text-slate-500 border border-slate-800">
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                           Nenhum aluno encontrado para os critérios selecionados.
                         </td>
                       </tr>
                     ) : (
                       displayedStudents.map((student) => (
-                        <tr key={student.id} className="hover:bg-slate-50">
-                          <td className="py-1.5 px-2 text-center font-semibold text-slate-950 border border-slate-800">
+                        <tr key={student.id} className="hover:bg-slate-50/90 transition-colors">
+                          <td className="px-3.5 py-2.5 text-center font-mono font-semibold text-slate-700">
                             {String(student.numeroOrdem).padStart(2, '0')}
                           </td>
-                          <td className="py-1.5 px-3 font-medium text-slate-950 border border-slate-800">
+                          <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap text-slate-600">
+                            {student.codigoMatricula}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">
                             {student.nomeCompleto}
                           </td>
-                          <td className="py-1.5 px-2 text-center font-medium text-slate-950 border border-slate-800">
+                          <td className="px-3.5 py-2.5 text-center font-semibold text-slate-700">
                             {student.genero}
                           </td>
-                          <td className="py-1.5 px-2 text-center text-slate-950 border border-slate-800">
-                            {student.idade}
+                          <td className="px-3.5 py-2.5 text-center text-slate-700">
+                            {student.idade} anos
                           </td>
-                          <td className="py-1.5 px-3 text-center text-[11px] text-slate-700 border border-slate-800">
-                            {student.condicaoMatricula === 'Matriculado' ? '' : student.condicaoMatricula}
+                          <td className="px-3.5 py-2.5 text-center text-slate-700">
+                            {(student.condicaoMatricula as string) === 'Matriculado' ||
+                            student.condicaoMatricula === 'Novo'
+                              ? '—'
+                              : student.condicaoMatricula}
                           </td>
                         </tr>
                       ))
@@ -348,70 +493,413 @@ export const TurmaStudentListPdfModal: React.FC<TurmaStudentListPdfModalProps> =
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>
+          )}
 
-            {/* 3. Official School Document Footer & Signatures */}
-            <div className="pt-6 mt-6 text-xs text-slate-950">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] border-t border-b border-slate-400 py-1.5 mb-6">
-                <span>
-                  <strong>Total de Alunos:</strong> {stats.total}
-                </span>
-                <span>
-                  <strong>Masculinos (M):</strong> {stats.meninos}
-                </span>
-                <span>
-                  <strong>Femininos (F):</strong> {stats.meninas}
-                </span>
-                <span>
-                  <strong>Data:</strong> {metadata.dataEmissao}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-8 pt-4 text-center text-[11px]">
-                <div>
-                  <p className="font-bold uppercase text-slate-800 mb-8">
-                    O(A) Professor(a) / Director(a) de Turma
-                  </p>
-                  <div className="border-t border-slate-800 w-56 max-w-full mx-auto pt-1">
-                    <span className="font-semibold text-slate-900">{metadata.professorTitular}</span>
-                  </div>
+          {/* =============================================================== */}
+          {/* OPÇÃO 2: PRÉ-VISUALIZAÇÃO DO DOCUMENTO OFICIAL A4               */}
+          {/* (Estrutura, Espaçamento, Century Gothic 10pt/8pt e Insígnia)    */}
+          {/* =============================================================== */}
+          <section
+            id="turma-lista-live-preview-panel"
+            className={`${
+              subView === 'preview' ? 'block' : 'hidden print:block'
+            } bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 print:border-0 print:p-0 print:shadow-none`}
+          >
+            <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+                  <FileText className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="font-bold uppercase text-slate-800 mb-8">
-                    O(A) Subdirector(a) Pedagógico(a)
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                      Pré-visualização Oficial A4 — Lista Nominal de Alunos
+                    </h3>
+                    <span className="text-xs text-slate-500">
+                      · {metadata.classe} ({metadata.turma})
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {metadata.escola} · Fonte Century Gothic (Títulos 10pt · Texto 8pt) · {displayedStudents.length} alunos
                   </p>
-                  <div className="border-t border-slate-800 w-56 max-w-full mx-auto pt-1">
-                    <span className="font-semibold text-slate-900">{metadata.subdiretorPedagogico}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={isExporting}
+                  className="h-9 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>Baixar PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintA4}
+                  className="h-9 px-3.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir A4</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-center w-full bg-[#f8f9fa] p-4 sm:p-8 rounded-2xl border border-slate-200/70 print:bg-white print:block print:m-0 print:p-0 print:border-0">
+              <div
+                id="turma-lista-a4-sheet"
+                className="bg-white w-full max-w-[210mm] p-6 sm:p-10 md:px-[16mm] md:py-[14mm] border border-slate-200/90 print:border-0 shadow-xs print:shadow-none text-black mx-auto font-normal"
+                style={{
+                  fontFamily:
+                    "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', 'Avant Garde', sans-serif",
+                  fontSize: '8pt',
+                  fontWeight: 400,
+                  lineHeight: 1.4,
+                  color: '#000000',
+                }}
+              >
+                {/* 1. Cabeçalho Institucional + Insígnia da República de Angola */}
+                <div
+                  className="a4-eval-section"
+                  style={{
+                    textAlign: 'center',
+                    marginBottom: '12px',
+                    pageBreakInside: 'avoid',
+                    breakInside: 'avoid',
+                  }}
+                >
+                  <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                    <img
+                      src={emblemAngolaImg}
+                      alt="Insígnia da República de Angola"
+                      className="ficha-emblem-img"
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        maxHeight: '80px',
+                        objectFit: 'contain',
+                        display: 'block',
+                        margin: '0 auto',
+                      }}
+                    />
+                  </div>
+                  <p
+                    className="font-bold ficha-title-10"
+                    style={{
+                      fontSize: '10pt',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      lineHeight: 1.35,
+                      margin: '0 0 2px 0',
+                      textAlign: 'center',
+                    }}
+                  >
+                    REPÚBLICA DE ANGOLA
+                  </p>
+                  <p
+                    className="font-bold ficha-title-10"
+                    style={{
+                      fontSize: '10pt',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      lineHeight: 1.35,
+                      margin: '0 0 2px 0',
+                      textAlign: 'center',
+                    }}
+                  >
+                    GOVERNO PROVINCIAL DE MALANJE
+                  </p>
+                  <p
+                    className="font-bold ficha-title-10"
+                    style={{
+                      fontSize: '10pt',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      lineHeight: 1.35,
+                      margin: '0 0 2px 0',
+                      textAlign: 'center',
+                    }}
+                  >
+                    ADMINISTRAÇÃO MUNICIPAL DO QUÊSSUA
+                  </p>
+                  <p
+                    className="font-bold ficha-title-10"
+                    style={{
+                      fontSize: '10pt',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      lineHeight: 1.35,
+                      margin: '0 0 8px 0',
+                      textAlign: 'center',
+                    }}
+                  >
+                    DIRECÇÃO MUNICIPAL DE EDUCAÇÃO
+                  </p>
+                  <h1
+                    className="font-bold ficha-title-10"
+                    style={{
+                      fontSize: '10pt',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      lineHeight: 1.38,
+                      margin: '0 auto',
+                      maxWidth: '96%',
+                      textAlign: 'center',
+                    }}
+                  >
+                    LISTA NOMINAL DOS ALUNOS POR TURMA — ANO LECTIVO {metadata.anoLectivo}
+                  </h1>
+                </div>
+
+                {/* 2. Identificação: a), b), c) e Dados da Turma (Tabela 1px #000000) */}
+                <div
+                  className="a4-eval-section"
+                  style={{
+                    marginBottom: '12px',
+                    pageBreakInside: 'avoid',
+                    breakInside: 'avoid',
+                  }}
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      border: '1px solid #000000',
+                      tableLayout: 'fixed',
+                    }}
+                  >
+                    <tbody>
+                      <tr>
+                        <td colSpan={2} style={{ ...cellNormalStyle, textAlign: 'left' }}>
+                          <span style={{ marginRight: '6px' }}>a) Província:</span>
+                          <span>Malanje</span>
+                        </td>
+                        <td colSpan={2} style={{ ...cellNormalStyle, textAlign: 'left' }}>
+                          <span style={{ marginRight: '6px' }}>b) Município:</span>
+                          <span>Quêssua</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={4} style={{ ...cellNormalStyle, textAlign: 'left' }}>
+                          <span style={{ marginRight: '6px' }}>c) Escola / Instituição:</span>
+                          <span>{metadata.escola}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ ...cellNormalStyle, textAlign: 'left', width: '24%' }}>
+                          <span style={{ marginRight: '4px' }}>Classe:</span>
+                          <span>{metadata.classe}</span>
+                        </td>
+                        <td style={{ ...cellNormalStyle, textAlign: 'left', width: '18%' }}>
+                          <span style={{ marginRight: '4px' }}>Turma:</span>
+                          <span>{cleanTurma}</span>
+                        </td>
+                        <td style={{ ...cellNormalStyle, textAlign: 'left', width: '38%' }}>
+                          <span style={{ marginRight: '4px' }}>Período:</span>
+                          <span>{metadata.turno}</span>
+                        </td>
+                        <td style={{ ...cellNormalStyle, textAlign: 'left', width: '20%' }}>
+                          <span style={{ marginRight: '4px' }}>Sala:</span>
+                          <span>{cleanSala}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={2} style={{ ...cellNormalStyle, textAlign: 'left' }}>
+                          <span style={{ marginRight: '4px' }}>Professor(a) Titular:</span>
+                          <span>{metadata.professorTitular}</span>
+                        </td>
+                        <td colSpan={2} style={{ ...cellNormalStyle, textAlign: 'left' }}>
+                          <span style={{ marginRight: '4px' }}>Data de Emissão:</span>
+                          <span>{metadata.dataEmissao}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 3. Relação Nominal dos Alunos */}
+                <div style={{ marginBottom: '14px' }}>
+                  <p className="font-bold ficha-title-10" style={chapterTitleStyle}>
+                    Relação Nominal dos Alunos ({sortDirection === 'asc' ? 'Ordem Alfabética A–Z' : 'Ordem Z–A'})
+                  </p>
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      border: '1px solid #000000',
+                      tableLayout: 'fixed',
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th
+                          className="font-bold ficha-title-10"
+                          style={{ ...cellHeaderStyle, width: '7%', textAlign: 'center' }}
+                        >
+                          Nº
+                        </th>
+                        <th
+                          className="font-bold ficha-title-10"
+                          style={{ ...cellHeaderStyle, width: '16%', textAlign: 'center' }}
+                        >
+                          Código
+                        </th>
+                        <th
+                          className="font-bold ficha-title-10"
+                          style={{ ...cellHeaderStyle, width: '45%', textAlign: 'left' }}
+                        >
+                          Nome Completo do Aluno
+                        </th>
+                        <th
+                          className="font-bold ficha-title-10"
+                          style={{ ...cellHeaderStyle, width: '8%', textAlign: 'center' }}
+                        >
+                          Sexo
+                        </th>
+                        <th
+                          className="font-bold ficha-title-10"
+                          style={{ ...cellHeaderStyle, width: '8%', textAlign: 'center' }}
+                        >
+                          Idade
+                        </th>
+                        <th
+                          className="font-bold ficha-title-10"
+                          style={{ ...cellHeaderStyle, width: '16%', textAlign: 'center' }}
+                        >
+                          Observação
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ ...cellNormalStyle, textAlign: 'center', padding: '16px 8px' }}>
+                            Nenhum aluno encontrado para os critérios selecionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        displayedStudents.map((student) => (
+                          <tr key={student.id}>
+                            <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
+                              {String(student.numeroOrdem).padStart(2, '0')}
+                            </td>
+                            <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
+                              {student.codigoMatricula}
+                            </td>
+                            <td style={{ ...cellNormalStyle, textAlign: 'left' }}>
+                              {student.nomeCompleto}
+                            </td>
+                            <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
+                              {student.genero}
+                            </td>
+                            <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
+                              {student.idade}
+                            </td>
+                            <td style={{ ...cellNormalStyle, textAlign: 'center' }}>
+                              {(student.condicaoMatricula as string) === 'Matriculado' ||
+                              student.condicaoMatricula === 'Novo'
+                                ? ''
+                                : student.condicaoMatricula}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 4. Homologação e Assinaturas (mesmo espaçamento e estrutura da Ficha Individual) */}
+                <div
+                  className="a4-eval-section"
+                  style={{
+                    paddingTop: '8px',
+                    pageBreakInside: 'avoid',
+                    breakInside: 'avoid',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '32px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ textAlign: 'center' }}>
+                      <p
+                        className="font-bold ficha-title-10"
+                        style={{
+                          fontSize: '10pt',
+                          fontWeight: 700,
+                          margin: '0 0 32px 0',
+                          textAlign: 'center',
+                        }}
+                      >
+                        O(A) Professor(a) / Director(a) de Turma
+                      </p>
+                      <div
+                        className="ficha-sig-line"
+                        style={{
+                          width: '250px',
+                          maxWidth: '100%',
+                          borderBottom: '1px solid #000000',
+                          margin: '0 auto',
+                          height: '1px',
+                        }}
+                      />
+                      <p
+                        style={{
+                          marginTop: '5px',
+                          fontSize: '8pt',
+                          fontWeight: 400,
+                          textAlign: 'center',
+                        }}
+                      >
+                        {metadata.professorTitular}
+                      </p>
+                    </div>
+
+                    <div style={{ textAlign: 'center' }}>
+                      <p
+                        className="font-bold ficha-title-10"
+                        style={{
+                          fontSize: '10pt',
+                          fontWeight: 700,
+                          margin: '0 0 32px 0',
+                          textAlign: 'center',
+                        }}
+                      >
+                        O(A) Director(a) da Escola
+                      </p>
+                      <div
+                        className="ficha-sig-line"
+                        style={{
+                          width: '250px',
+                          maxWidth: '100%',
+                          borderBottom: '1px solid #000000',
+                          margin: '0 auto',
+                          height: '1px',
+                        }}
+                      />
+                      <p
+                        style={{
+                          marginTop: '5px',
+                          fontSize: '8pt',
+                          fontWeight: 400,
+                          textAlign: 'center',
+                        }}
+                      >
+                        {metadata.diretorEscola}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
-          <span className="text-xs text-slate-500">
-            Formato Oficial A4 • <strong>{displayedStudents.length} alunos</strong> (Ordem A-Z)
-          </span>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-            >
-              Fechar
-            </button>
-            <button
-              id="btn-baixar-pdf-footer"
-              onClick={handleDownloadPdf}
-              disabled={isExporting}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              <span>Baixar Folha A4 (PDF)</span>
-            </button>
-          </div>
+          </section>
         </div>
       </div>
     </div>

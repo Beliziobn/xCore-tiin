@@ -54,6 +54,9 @@ import {
   savePendingApplicationAsync,
   checkUserApprovalStatus,
   resolveSchoolDirectorName,
+  resolveSchoolDirectorEmail,
+  isSchoolDirectorApproval,
+  OFFICIAL_DME_ADMIN_EMAIL,
   syncApplicationsFromServer,
   getOccupiedDmeCargos,
   checkDuplicateRegistration,
@@ -1192,7 +1195,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           if (app.nivelAcademico) loggedUser.nivelAcademico = app.nivelAcademico;
           if (typeof app.anosServico === 'number') loggedUser.anosServico = app.anosServico;
           if (app.regimeTrabalho) loggedUser.regimeTrabalho = app.regimeTrabalho;
-          loggedUser.approverTargetRole = app.targetApproverRole;
+          loggedUser.approverTargetRole = isSchoolDirectorApproval(app) ? 'diretor' : 'admin';
           loggedUser.approverTargetSchoolName = app.schoolName;
         }
 
@@ -1231,8 +1234,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         if (approvalCheck.status === 'pendente' && !isMasterAdmin) {
           loggedUser.status = 'pendente';
+          const isSchoolDirTarget =
+            loggedUser.approverTargetRole === 'diretor' ||
+            (loggedUser.scope === 'escola' && loggedUser.schoolRole !== 'diretor_geral');
           setSuccessMsg(
-            `A sua candidatura como ${loggedUser.cargoTitle} continua em análise na Direção Municipal da Educação. Redirecionando para o acompanhamento...`
+            isSchoolDirTarget
+              ? `A sua candidatura como ${loggedUser.cargoTitle} continua em análise pelo(a) Director(a) da escola ${loggedUser.schoolName || ''}. Redirecionando para o acompanhamento...`
+              : `A sua candidatura como ${loggedUser.cargoTitle} continua em análise na Direção Municipal da Educação. Redirecionando para o acompanhamento...`
           );
         } else if (approvalCheck.status === 'rejeitado' && !isMasterAdmin) {
           setErrorMsg(
@@ -1349,7 +1357,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const pwdRes = updatePassword(email.trim(), password);
         const passwordVerifier = pwdRes.verifier || encodePasswordVerifier(email.trim(), password);
 
-        // Create pending application record directly targeted to dmedoquessua@gmail.com
+        // Route teacher & school-scope staff registrations to the chosen school's Director;
+        // School General Director and Municipal (DME) registrations go to Municipal Admin.
+        const isSchoolDirectorTarget =
+          institutionalScope === 'escola' && schoolRole !== 'diretor_geral';
+        const targetApproverRole: 'admin' | 'diretor' = isSchoolDirectorTarget ? 'diretor' : 'admin';
+        const targetDirectorName = isSchoolDirectorTarget
+          ? resolveSchoolDirectorName(matchedSchool, resolvedSchoolName)
+          : `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`;
+        const targetDirectorEmail = isSchoolDirectorTarget
+          ? resolveSchoolDirectorEmail(matchedSchool, resolvedSchoolName, resolvedSchoolId)
+          : OFFICIAL_DME_ADMIN_EMAIL;
+
+        // Create pending application record targeted to the appropriate approver
         if (isPending) {
           const appId = `app-${appType}-${Date.now()}`;
           await savePendingApplicationAsync({
@@ -1367,9 +1387,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             schoolName: resolvedSchoolName,
             schoolId: resolvedSchoolId,
             municipality: selectedMunicipality,
-            targetApproverRole: 'admin',
-            targetApproverEmail: 'dmedoquessua@gmail.com',
-            approverDirectorName: 'Director Municipal da Educação (dmedoquessua@gmail.com)',
+            targetApproverRole,
+            targetApproverEmail: targetDirectorEmail,
+            approverDirectorName: targetDirectorName,
             subject: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedSubject : undefined,
             gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
             status: 'pendente',
@@ -1379,10 +1399,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             passwordVerifier,
             notes:
               institutionalScope === 'administracao'
-                ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Director Municipal (dmedoquessua@gmail.com) para homologação.`
+                ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Director Municipal (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
+                : isSchoolDirectorTarget
+                ? preRegResult?.found
+                  ? `Registro docente pré-existente localizado na escola "${resolvedSchoolName}". Enviado ao(à) Director(a) da Escola (${targetDirectorName}) para homologação.`
+                  : `Inscrição de ${cargoTitle} para a unidade escolar "${resolvedSchoolName}" enviada diretamente ao(à) Director(a) desta escola (${targetDirectorName}) para homologação.`
                 : preRegResult?.found
-                ? `Registro pré-existente localizado no sistema. Ficha associada automaticamente.`
-                : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente ao Administrador Central (DME - dmedoquessua@gmail.com) para homologação ministerial.`,
+                ? `Registro de Direcção pré-existente localizado no sistema. Ficha associada automaticamente.`
+                : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada ao Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`,
           });
         }
 
@@ -1410,8 +1434,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
           isPreRegistered: institutionalScope === 'escola' ? Boolean(preRegResult?.found) : false,
           submittedAt: new Date().toLocaleString('pt-AO'),
-          approverTargetRole: 'admin',
+          approverTargetRole: targetApproverRole,
           approverTargetSchoolName: resolvedSchoolName,
+          approverTargetEmail: targetDirectorEmail,
           passwordVerifier,
         };
 
@@ -2762,9 +2787,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       <div className="notice">
                         <ShieldCheck />
                         <div>
-                          <strong>Aprovação institucional</strong>
+                          <strong>
+                            {institutionalScope === 'escola' && schoolRole !== 'diretor_geral'
+                              ? 'Aprovação pela Direção da Escola'
+                              : 'Aprovação pela Direcção Municipal'}
+                          </strong>
                           <span>
-                            O administrador da rede valida o pedido antes do primeiro acesso.
+                            {institutionalScope === 'escola' && schoolRole !== 'diretor_geral'
+                              ? (() => {
+                                  const selectedSc = registeredSchools.find((s) => s.id === selectedSchoolId);
+                                  return selectedSc
+                                    ? `O(A) Director(a) da escola ${selectedSc.name} valida o seu pedido antes do primeiro acesso.`
+                                    : 'O(A) Director(a) da escola escolhida valida o seu pedido antes do primeiro acesso.';
+                                })()
+                              : 'O Director Municipal da Educação valida o pedido antes do primeiro acesso.'}
                           </span>
                         </div>
                       </div>
@@ -3118,8 +3154,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <h2>Pedido enviado</h2>
 
                   <p>
-                    Os seus dados foram registados. Aguarde a validação do administrador
-                    da rede escolar.
+                    {submittedUserAccount?.approverTargetRole === 'diretor'
+                      ? `Os seus dados foram registados e enviados ao(à) Director(a) da escola ${submittedUserAccount.schoolName || 'selecionada'} para homologação.`
+                      : 'Os seus dados foram registados. Aguarde a validação da Direcção Municipal da Educação.'}
                   </p>
 
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>

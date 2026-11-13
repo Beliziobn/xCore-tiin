@@ -1101,9 +1101,11 @@ html.lenis.lenis-stopped {
   font-family: 'Times New Roman', Times, serif !important;
 }
 
-/* Ficha de Avaliação de Desempenho Docente (Anexo III): 100% Century Gothic, 10pt bold titles/chapters, 8pt normal text */
+/* Ficha de Avaliação de Desempenho Docente (Anexo III) & Listas por Turma: 100% Century Gothic, 10pt bold titles/chapters, 8pt normal text */
 #ficha-avaliacao-a4-sheet,
-#ficha-avaliacao-a4-sheet * {
+#ficha-avaliacao-a4-sheet *,
+#turma-lista-a4-sheet,
+#turma-lista-a4-sheet * {
   font-family: 'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', 'Avant Garde', sans-serif !important;
   color: #000000 !important;
   letter-spacing: normal !important;
@@ -1113,7 +1115,11 @@ html.lenis.lenis-stopped {
 #ficha-avaliacao-a4-sheet p,
 #ficha-avaliacao-a4-sheet span,
 #ficha-avaliacao-a4-sheet td,
-#ficha-avaliacao-a4-sheet div {
+#ficha-avaliacao-a4-sheet div,
+#turma-lista-a4-sheet p,
+#turma-lista-a4-sheet span,
+#turma-lista-a4-sheet td,
+#turma-lista-a4-sheet div {
   font-size: 8pt !important;
   font-weight: 400 !important;
 }
@@ -1125,7 +1131,15 @@ html.lenis.lenis-stopped {
 #ficha-avaliacao-a4-sheet p.font-bold,
 #ficha-avaliacao-a4-sheet td.font-bold,
 #ficha-avaliacao-a4-sheet th.font-bold,
-#ficha-avaliacao-a4-sheet span.font-bold {
+#ficha-avaliacao-a4-sheet span.font-bold,
+#turma-lista-a4-sheet h1,
+#turma-lista-a4-sheet th,
+#turma-lista-a4-sheet .ficha-title-10,
+#turma-lista-a4-sheet .font-bold,
+#turma-lista-a4-sheet p.font-bold,
+#turma-lista-a4-sheet td.font-bold,
+#turma-lista-a4-sheet th.font-bold,
+#turma-lista-a4-sheet span.font-bold {
   font-size: 10pt !important;
   font-weight: 700 !important;
 }
@@ -1247,7 +1261,8 @@ html.lenis.lenis-stopped {
     overflow: visible !important;
   }
 
-  #ficha-avaliacao-a4-sheet {
+  #ficha-avaliacao-a4-sheet,
+  #turma-lista-a4-sheet {
     width: 100% !important;
     max-width: 210mm !important;
     height: auto !important;
@@ -1260,7 +1275,8 @@ html.lenis.lenis-stopped {
     background: #ffffff !important;
   }
 
-  #ficha-avaliacao-a4-sheet .a4-page-break-after {
+  #ficha-avaliacao-a4-sheet .a4-page-break-after,
+  #turma-lista-a4-sheet .a4-page-break-after {
     page-break-after: always !important;
     break-after: page !important;
   }

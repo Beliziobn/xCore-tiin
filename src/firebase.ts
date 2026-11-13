@@ -3,8 +3,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
   doc,
   getDocFromServer,
   Firestore,
@@ -14,14 +13,32 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase app singleton
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore with durable IndexedDB local cache + multi-tab synchronization
+// Clear any orphaned Firestore WebStorage multi-tab keys that may have exhausted localStorage quota
+function purgeLegacyFirestoreWebStorage(): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('firestore_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch {}
+    });
+  } catch {}
+}
+
+// Initialize Firestore with in-memory local cache (prevents WebStorageSharedClientState QuotaExceededError b815)
 function initDurableFirestore(): Firestore {
+  purgeLegacyFirestoreWebStorage();
   const databaseId = (firebaseConfig as Record<string, any>).firestoreDatabaseId;
   try {
     const settings = {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
+      localCache: memoryLocalCache(),
     };
     return databaseId
       ? initializeFirestore(app, settings, databaseId)

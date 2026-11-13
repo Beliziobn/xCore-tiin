@@ -261,33 +261,116 @@ export function initRealtimeApplicationsSync(
   return realtimeUnsubscribe;
 }
 
+export function normalizeSchoolText(value?: string): string {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+export function schoolsMatch(
+  appSchoolName?: string,
+  directorSchoolName?: string,
+  appSchoolId?: string,
+  directorSchoolId?: string
+): boolean {
+  const normAppId = (appSchoolId || '').trim().toLowerCase();
+  const normDirId = (directorSchoolId || '').trim().toLowerCase();
+  if (normAppId && normDirId && normAppId === normDirId) {
+    return true;
+  }
+  const normAppName = normalizeSchoolText(appSchoolName);
+  const normDirName = normalizeSchoolText(directorSchoolName);
+  if (!normAppName || !normDirName) {
+    return false;
+  }
+  return normAppName === normDirName;
+}
+
 /**
- * Returns applications targeted for the school director, optionally filtered by school name.
+ * Determines whether an application must be homologated by the School Director
+ * of the chosen school (professors, school staff, students) rather than the
+ * Municipal Directorate (school general directors and DME staff).
+ */
+export function isSchoolDirectorApproval(
+  app?: Partial<Pick<PendingApplication, 'type' | 'scope' | 'schoolRole' | 'targetApproverRole'>> | null
+): boolean {
+  if (!app) return false;
+  if (app.scope === 'administracao' || app.type === 'membro_dme') return false;
+  if (app.type === 'diretor' || app.schoolRole === 'diretor_geral') return false;
+  if (
+    app.type === 'professor' ||
+    app.type === 'funcionario' ||
+    app.type === 'aluno' ||
+    app.schoolRole === 'professor' ||
+    app.schoolRole === 'subdiretor_pedagogico' ||
+    app.schoolRole === 'subdiretor_administrativo' ||
+    app.schoolRole === 'secretario_escolar'
+  ) {
+    return true;
+  }
+  return app.targetApproverRole === 'diretor';
+}
+
+/**
+ * Returns applications targeted for the school director, filtered by the director's school.
  * Teachers and school staff route here.
  */
-export function getApplicationsForDirector(schoolName?: string): PendingApplication[] {
+export function getApplicationsForDirector(
+  schoolName?: string,
+  schoolId?: string
+): PendingApplication[] {
   const all = getPendingApplications();
   return all.filter((a) => {
-    const isTarget = a.targetApproverRole === 'diretor' || a.type === 'professor' || a.type === 'funcionario';
-    if (!isTarget) return false;
-    if (!schoolName) return true;
-    const normA = (a.schoolName || '').trim().toLowerCase();
-    const normS = schoolName.trim().toLowerCase();
-    return normA === normS || normA.includes(normS) || normS.includes(normA);
+    if (!isSchoolDirectorApproval(a)) return false;
+    if (!schoolName && !schoolId) return true;
+    return schoolsMatch(a.schoolName, schoolName, a.schoolId, schoolId);
   });
 }
 
 /**
  * Returns applications visible to the central administrator (DME Quêssua).
- * The municipal director oversees ALL applications across the entire municipality,
- * while allowing filtering by role.
+ * Only School General Directors and Municipal Directorate (DME) staff route here;
+ * teacher and school-staff registrations go directly to their chosen school's Director.
  */
 export function getApplicationsForAdmin(filterType?: string): PendingApplication[] {
-  const all = getPendingApplications();
+  const all = getPendingApplications().filter((a) => !isSchoolDirectorApproval(a));
   if (filterType && filterType !== 'todos') {
     return all.filter((a) => a.type === filterType);
   }
   return all;
+}
+
+function buildNormalizedPendingApplication(app: PendingApplication): PendingApplication {
+  const routeToDirector = isSchoolDirectorApproval(app);
+  if (routeToDirector) {
+    const resolvedDirName =
+      app.approverDirectorName &&
+      !app.approverDirectorName.includes(OFFICIAL_DME_ADMIN_EMAIL) &&
+      !app.approverDirectorName.toLowerCase().includes('director municipal')
+        ? app.approverDirectorName
+        : resolveSchoolDirectorName(null, app.schoolName);
+    const resolvedDirEmail =
+      app.targetApproverEmail && app.targetApproverEmail !== OFFICIAL_DME_ADMIN_EMAIL
+        ? app.targetApproverEmail
+        : resolveSchoolDirectorEmail(null, app.schoolName, app.schoolId);
+
+    return {
+      ...app,
+      targetApproverRole: 'diretor',
+      targetApproverEmail: resolvedDirEmail,
+      approverDirectorName: resolvedDirName,
+    };
+  }
+
+  return {
+    ...app,
+    targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
+    targetApproverRole: 'admin',
+    approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
+  };
 }
 
 export function savePendingApplication(app: PendingApplication): void {
@@ -295,13 +378,7 @@ export function savePendingApplication(app: PendingApplication): void {
     // Clear any previous deletion tombstone so this registration is never blocked
     removeDeletedApplicationId(app.id, app.userId, app.email);
 
-    const normalizedApp: PendingApplication = {
-      ...app,
-      // The Director Municipal da Educação (dmedoquessua@gmail.com) oversees ALL applications across the entire municipality
-      targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
-      targetApproverRole: 'admin',
-      approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
-    };
+    const normalizedApp = buildNormalizedPendingApplication(app);
 
     const existing = getPendingApplications();
     const updated = [
@@ -331,18 +408,13 @@ export function savePendingApplication(app: PendingApplication): void {
 
 /**
  * Async version that ensures the application is physically persisted on the Firebase Firestore cloud
- * and backend server so it appears immediately on the administrator's mobile device.
+ * and backend server so it appears immediately on the responsible supervisor's device.
  */
 export async function savePendingApplicationAsync(app: PendingApplication): Promise<PendingApplication> {
   // Clear any deletion tombstone
   removeDeletedApplicationId(app.id, app.userId, app.email);
 
-  const normalizedApp: PendingApplication = {
-    ...app,
-    targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
-    targetApproverRole: 'admin',
-    approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
-  };
+  const normalizedApp = buildNormalizedPendingApplication(app);
 
   savePendingApplication(normalizedApp);
 
@@ -1116,7 +1188,30 @@ export function resolveSchoolDirectorName(
   school?: AdminSchool | null,
   fallbackSchoolName?: string
 ): string {
-  const targetName = (school?.name || fallbackSchoolName || '').trim().toLowerCase();
+  const rawTarget = school?.name || fallbackSchoolName || '';
+  const targetName = normalizeSchoolText(rawTarget);
+  const cleanTargetNoParens = normalizeSchoolText(rawTarget.replace(/\([^)]*\)/g, ''));
+
+  const isValidDirectorName = (name?: string | null): name is string => {
+    if (!name || typeof name !== 'string') return false;
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const low = trimmed.toLowerCase();
+    return (
+      !low.includes('a designar') &&
+      !low.includes('não informado') &&
+      !low.includes('nao informado') &&
+      low !== 'direção geral da escola' &&
+      low !== 'direcao geral da escola'
+    );
+  };
+
+  const matchesTargetSchool = (candidateName?: string, candidateId?: string) => {
+    if (schoolsMatch(candidateName, rawTarget, candidateId, school?.id)) return true;
+    const normCand = normalizeSchoolText(candidateName);
+    if (!normCand || !cleanTargetNoParens) return false;
+    return normCand === cleanTargetNoParens;
+  };
 
   if (targetName) {
     // 1. Check approved director applications for this school
@@ -1127,35 +1222,29 @@ export function resolveSchoolDirectorName(
           a.type === 'diretor' &&
           a.status === 'aprovado' &&
           a.schoolName &&
-          (a.schoolName.trim().toLowerCase() === targetName ||
-            a.schoolName.trim().toLowerCase().includes(targetName) ||
-            targetName.includes(a.schoolName.trim().toLowerCase()))
+          matchesTargetSchool(a.schoolName, a.schoolId) &&
+          isValidDirectorName(a.fullName)
       );
       if (approvedDir?.fullName) {
-        return approvedDir.fullName;
+        return approvedDir.fullName.trim();
       }
     } catch {
       // ignore
     }
 
     // 2. Check registered director dossiers in localStorage
-    for (const dirKey of ['ucore_admin_directors', 'ucore_registered_directors_v2']) {
+    for (const dirKey of ['ucore_admin_directors', 'sigre_admin_directors', 'ucore_registered_directors_v2']) {
       try {
         const rawDirs = localStorage.getItem(dirKey);
         if (rawDirs) {
           const parsedDirs = JSON.parse(rawDirs);
           if (Array.isArray(parsedDirs)) {
             const matchedDir = parsedDirs.find((d: any) => {
-              const dSchool = (d.schoolName || d.nomeEscola || d.registrationData?.nomeEscola || '')
-                .trim()
-                .toLowerCase();
-              return (
-                dSchool &&
-                (dSchool === targetName || dSchool.includes(targetName) || targetName.includes(dSchool))
-              );
+              const dSchool = d?.schoolName || d?.nomeEscola || d?.registrationData?.nomeEscola || '';
+              return matchesTargetSchool(dSchool, d?.schoolId);
             });
             const dName = matchedDir?.name || matchedDir?.nomeCompleto || matchedDir?.registrationData?.nomeCompleto;
-            if (dName && dName.trim()) {
+            if (isValidDirectorName(dName)) {
               return dName.trim();
             }
           }
@@ -1169,11 +1258,7 @@ export function resolveSchoolDirectorName(
     const fromSchoolObj =
       school?.directorName ||
       school?.registrationData?.director?.nome;
-    if (
-      fromSchoolObj &&
-      fromSchoolObj.trim() &&
-      !fromSchoolObj.toLowerCase().includes('a designar')
-    ) {
+    if (isValidDirectorName(fromSchoolObj)) {
       return fromSchoolObj.trim();
     }
 
@@ -1185,12 +1270,166 @@ export function resolveSchoolDirectorName(
           const parsedSchools = JSON.parse(rawSchools);
           if (Array.isArray(parsedSchools)) {
             const matchedSc = parsedSchools.find((s: any) => {
-              const sName = (s.name || s.nomeOficial || '').trim().toLowerCase();
-              return sName && (sName === targetName || sName.includes(targetName) || targetName.includes(sName));
+              const sName = s?.name || s?.nomeOficial || '';
+              return matchesTargetSchool(sName, s?.id);
             });
             const sDir = matchedSc?.directorName || matchedSc?.registrationData?.director?.nome || matchedSc?.director?.nome;
-            if (sDir && sDir.trim()) {
+            if (isValidDirectorName(sDir)) {
               return sDir.trim();
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 4b. Check detailed school registrations map (sigre_school_registrations)
+    try {
+      const rawRegs = localStorage.getItem('sigre_school_registrations');
+      if (rawRegs) {
+        const regsObj = JSON.parse(rawRegs);
+        if (regsObj && typeof regsObj === 'object') {
+          const entries = Array.isArray(regsObj) ? regsObj : Object.values(regsObj);
+          const matchedReg: any = entries.find((r: any) =>
+            matchesTargetSchool(r?.nomeOficial || r?.name, r?.id)
+          );
+          const regDirName = matchedReg?.director?.nome;
+          if (isValidDirectorName(regDirName)) {
+            return regDirName.trim();
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 5. Check registered users & active user session for a Diretor Geral of this school
+    try {
+      const rawUsers = localStorage.getItem(STORAGE_KEY_USERS);
+      if (rawUsers) {
+        const usersList = JSON.parse(rawUsers);
+        if (Array.isArray(usersList)) {
+          const matchedUser = usersList.find(
+            (u: any) =>
+              u &&
+              u.role === 'diretor' &&
+              (!u.schoolRole || u.schoolRole === 'diretor_geral') &&
+              matchesTargetSchool(u.schoolName, u.schoolId)
+          );
+          const uFull = matchedUser?.fullName || `${matchedUser?.firstName || ''} ${matchedUser?.lastName || ''}`.trim();
+          if (isValidDirectorName(uFull)) {
+            return uFull.trim();
+          }
+        }
+      }
+      const rawActive = localStorage.getItem('ucore_active_user');
+      if (rawActive) {
+        const activeUser = JSON.parse(rawActive);
+        if (
+          activeUser &&
+          activeUser.role === 'diretor' &&
+          (!activeUser.schoolRole || activeUser.schoolRole === 'diretor_geral') &&
+          matchesTargetSchool(activeUser.schoolName, activeUser.schoolId)
+        ) {
+          const aFull = activeUser.fullName || `${activeUser.firstName || ''} ${activeUser.lastName || ''}`.trim();
+          if (isValidDirectorName(aFull)) {
+            return aFull.trim();
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (isValidDirectorName(school?.directorName)) {
+    return school!.directorName!.trim();
+  }
+
+  return 'Direção Geral da Escola';
+}
+
+/**
+ * Resolves the active Director's email for a given school from approved applications,
+ * registered director dossiers, or the school record itself.
+ */
+export function resolveSchoolDirectorEmail(
+  school?: AdminSchool | null,
+  fallbackSchoolName?: string,
+  fallbackSchoolId?: string
+): string | undefined {
+  const targetName = school?.name || fallbackSchoolName || '';
+  const targetId = school?.id || fallbackSchoolId || '';
+
+  if (targetName || targetId) {
+    // 1. Check approved director applications for this school
+    try {
+      const apps = getPendingApplications();
+      const approvedDir = apps.find(
+        (a) =>
+          a.type === 'diretor' &&
+          a.status === 'aprovado' &&
+          schoolsMatch(a.schoolName, targetName, a.schoolId, targetId)
+      );
+      if (approvedDir?.email && approvedDir.email.trim()) {
+        return approvedDir.email.trim();
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Check registered director dossiers in localStorage
+    for (const dirKey of ['ucore_admin_directors', 'sigre_admin_directors', 'ucore_registered_directors_v2']) {
+      try {
+        const rawDirs = localStorage.getItem(dirKey);
+        if (rawDirs) {
+          const parsedDirs = JSON.parse(rawDirs);
+          if (Array.isArray(parsedDirs)) {
+            const matchedDir = parsedDirs.find((d: any) => {
+              const dSchool = d.schoolName || d.nomeEscola || d.registrationData?.nomeEscola || '';
+              return schoolsMatch(dSchool, targetName, d.schoolId, targetId);
+            });
+            const dEmail =
+              matchedDir?.email ||
+              matchedDir?.emailPessoal ||
+              matchedDir?.emailInstitucional ||
+              matchedDir?.registrationData?.emailPessoal;
+            if (dEmail && typeof dEmail === 'string' && dEmail.trim()) {
+              return dEmail.trim();
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Check school object passed in
+    const fromSchoolObj =
+      (school as any)?.directorEmail ||
+      school?.registrationData?.director?.email;
+    if (fromSchoolObj && typeof fromSchoolObj === 'string' && fromSchoolObj.trim()) {
+      return fromSchoolObj.trim();
+    }
+
+    // 4. Check stored schools in localStorage
+    for (const scKey of ['ucore_admin_schools', 'ucore_registered_schools_v1']) {
+      try {
+        const rawSchools = localStorage.getItem(scKey);
+        if (rawSchools) {
+          const parsedSchools = JSON.parse(rawSchools);
+          if (Array.isArray(parsedSchools)) {
+            const matchedSc = parsedSchools.find((s: any) => {
+              const sName = s.name || s.nomeOficial || '';
+              return schoolsMatch(sName, targetName, s.id, targetId);
+            });
+            const sEmail =
+              matchedSc?.directorEmail ||
+              matchedSc?.registrationData?.director?.email ||
+              matchedSc?.director?.email;
+            if (sEmail && typeof sEmail === 'string' && sEmail.trim()) {
+              return sEmail.trim();
             }
           }
         }
@@ -1200,11 +1439,7 @@ export function resolveSchoolDirectorName(
     }
   }
 
-  if (school?.directorName && school.directorName.trim()) {
-    return school.directorName.trim();
-  }
-
-  return 'Direção Geral da Escola';
+  return undefined;
 }
 
 /**

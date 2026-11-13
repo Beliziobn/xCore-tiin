@@ -47,6 +47,8 @@ import {
   savePendingApplication,
   savePendingApplicationAsync,
   resolveSchoolDirectorName,
+  isSchoolDirectorApproval,
+  schoolsMatch,
   syncApplicationsFromServer
 } from '../../../utils/authApprovalStorage';
 import { Hero } from '../../Hero';
@@ -56,6 +58,7 @@ interface DirectorApprovalsPageProps {
   isLoggedIn?: boolean;
   directorName?: string;
   schoolName?: string;
+  schoolId?: string;
   onAddTeacherGlobal?: (teacher: DirectorTeacher) => void;
   onAddStudentGlobal?: (student: AdminStudent) => void;
   showToast?: (msg: string) => void;
@@ -66,6 +69,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   isLoggedIn = true,
   directorName = 'Fert Horlan (Diretor Geral)',
   schoolName = '',
+  schoolId = '',
   onAddTeacherGlobal,
   onAddStudentGlobal,
   showToast,
@@ -110,17 +114,15 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   const [simSubject, setSimSubject] = useState('Matemática');
   const [simBi, setSimBi] = useState('');
 
-  const [schoolScopeFilter, setSchoolScopeFilter] = useState<'minha_escola' | 'todas'>('minha_escola');
-
   const loadApplications = async () => {
     try {
       const all = await syncApplicationsFromServer();
       // Filter for applications directed to School Directors (Teachers and School Staff)
-      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor' || a.type === 'funcionario');
+      const directorApps = all.filter((a) => isSchoolDirectorApproval(a));
       setApplications(directorApps);
     } catch {
       const all = getPendingApplications();
-      const directorApps = all.filter((a) => a.targetApproverRole === 'diretor' || a.type === 'professor' || a.type === 'funcionario');
+      const directorApps = all.filter((a) => isSchoolDirectorApproval(a));
       setApplications(directorApps);
     }
   };
@@ -136,23 +138,22 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
     };
   }, []);
 
+  // Applications scoped strictly to this Director's chosen school
+  const schoolScopedApps = useMemo(() => {
+    if (!schoolName && !schoolId) return applications;
+    return applications.filter((app) =>
+      schoolsMatch(app.schoolName, schoolName, app.schoolId, schoolId)
+    );
+  }, [applications, schoolName, schoolId]);
+
   // Filtered list
   const filteredApps = useMemo(() => {
-    return applications.filter((app) => {
+    return schoolScopedApps.filter((app) => {
       // Status filter
       if (statusFilter !== 'todos' && app.status !== statusFilter) return false;
 
       // Role filter
       if (roleFilter !== 'todos' && app.type !== roleFilter) return false;
-
-      // School Scope filter
-      if (schoolScopeFilter === 'minha_escola' && schoolName) {
-        const normSchool = schoolName.trim().toLowerCase();
-        const appSchool = (app.schoolName || '').trim().toLowerCase();
-        if (appSchool && !appSchool.includes(normSchool) && !normSchool.includes(appSchool)) {
-          return false;
-        }
-      }
 
       // Search query
       if (searchQuery.trim()) {
@@ -168,14 +169,14 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
 
       return true;
     });
-  }, [applications, statusFilter, roleFilter, searchQuery, schoolScopeFilter, schoolName]);
+  }, [schoolScopedApps, statusFilter, roleFilter, searchQuery]);
 
   // Counts
   const counts = useMemo(() => {
-    const total = applications.length;
-    const pendentes = applications.filter((a) => a.status === 'pendente').length;
-    const aprovados = applications.filter((a) => a.status === 'aprovado').length;
-    const rejeitados = applications.filter((a) => a.status === 'rejeitado').length;
+    const total = schoolScopedApps.length;
+    const pendentes = schoolScopedApps.filter((a) => a.status === 'pendente').length;
+    const aprovados = schoolScopedApps.filter((a) => a.status === 'aprovado').length;
+    const rejeitados = schoolScopedApps.filter((a) => a.status === 'rejeitado').length;
     const taxaAprovacao = total > 0 ? Math.round((aprovados / total) * 100) : 100;
     return {
       total,
@@ -184,7 +185,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       rejeitados,
       taxaAprovacao,
     };
-  }, [applications]);
+  }, [schoolScopedApps]);
 
   // Handle open approval modal
   const handleOpenApprove = (app: PendingApplication) => {
@@ -586,34 +587,11 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
               )}
             </div>
 
-            {/* School Scope Toggle (Minha Escola vs Todas as Escolas) */}
+            {/* Active School Badge */}
             {schoolName && (
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setSchoolScopeFilter("minha_escola")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    schoolScopeFilter === "minha_escola"
-                      ? "bg-white text-[#002133] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                  title={`Exibir apenas candidatos direcionados à ${schoolName}`}
-                >
-                  <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Minha Escola ({schoolName.length > 22 ? schoolName.slice(0, 20) + '...' : schoolName})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSchoolScopeFilter("todas")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    schoolScopeFilter === "todas"
-                      ? "bg-white text-[#002133] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                  title="Exibir todas as candidaturas docentes"
-                >
-                  <span>Todas as Escolas</span>
-                </button>
+              <div className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200/80 text-xs font-bold text-[#002133] flex items-center gap-1.5 shrink-0">
+                <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                <span>{schoolName.length > 28 ? schoolName.slice(0, 26) + '...' : schoolName}</span>
               </div>
             )}
 
@@ -628,7 +606,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                Todos ({applications.length})
+                Todos ({schoolScopedApps.length})
               </button>
               <button
                 type="button"
@@ -640,7 +618,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 }`}
               >
                 <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
-                <span>Professores ({applications.filter((a) => a.type === "professor").length})</span>
+                <span>Professores ({schoolScopedApps.filter((a) => a.type === "professor").length})</span>
               </button>
               <button
                 type="button"
@@ -652,7 +630,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
-                <span>Alunos ({applications.filter((a) => a.type === "aluno").length})</span>
+                <span>Alunos ({schoolScopedApps.filter((a) => a.type === "aluno").length})</span>
               </button>
               <button
                 type="button"
@@ -664,7 +642,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 }`}
               >
                 <Briefcase className="w-3.5 h-3.5" />
-                <span>Subdiretores & Secretaria ({applications.filter((a) => a.type === "funcionario").length})</span>
+                <span>Subdiretores & Secretaria ({schoolScopedApps.filter((a) => a.type === "funcionario").length})</span>
               </button>
             </div>
 

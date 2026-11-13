@@ -138,11 +138,15 @@ export default function App() {
   const [authLoadingAction, setAuthLoadingAction] = useState<'login' | 'register' | null>(null);
   const [currentView, setCurrentView] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem('ucore_current_view');
-      if (saved === 'ucore-home' || saved === 'ucore-parallax') {
-        return 'home';
+      const isSessionActive = sessionStorage.getItem('ucore_session_active') === 'true';
+      const hasUser = Boolean(localStorage.getItem('ucore_active_user'));
+      if (isSessionActive && hasUser) {
+        const savedSessionView = sessionStorage.getItem('ucore_session_view');
+        if (savedSessionView && savedSessionView !== 'ucore-home' && savedSessionView !== 'ucore-parallax') {
+          return savedSessionView;
+        }
       }
-      return saved || 'home';
+      return 'home';
     } catch {
       return 'home';
     }
@@ -480,7 +484,7 @@ export default function App() {
     }
   }, [teacherProfile]);
 
-  // User persistence (starts on pre-session landing page unless active session exists)
+  // Restore active user if session was already started; otherwise open on PublicLandingPage
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
       const isSessionActive = sessionStorage.getItem('ucore_session_active') === 'true';
@@ -510,14 +514,18 @@ export default function App() {
     return 'diretor'; // default to diretor as requested by user
   });
 
-  // Persist currentView and activeRole on changes
+  // Persist currentView in sessionStorage only while a session is active
   useEffect(() => {
     try {
-      localStorage.setItem('ucore_current_view', currentView);
+      if (currentUser) {
+        sessionStorage.setItem('ucore_session_view', currentView);
+      } else {
+        sessionStorage.removeItem('ucore_session_view');
+      }
     } catch {
       // ignore
     }
-  }, [currentView]);
+  }, [currentView, currentUser]);
 
   useEffect(() => {
     try {
@@ -990,6 +998,7 @@ export default function App() {
     setCurrentView('home');
     try {
       sessionStorage.removeItem('ucore_session_active');
+      sessionStorage.removeItem('ucore_session_view');
       localStorage.removeItem('ucore_active_user');
     } catch {
       // ignore
@@ -1779,7 +1788,12 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
           directorName={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'Fert Horlan (Diretor Geral)'}
-          schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
+          schoolName={
+            currentUser?.role === 'diretor'
+              ? currentUser?.schoolName || adminSchools[0]?.name || ''
+              : adminSchools[0]?.name || ''
+          }
+          schoolId={currentUser?.role === 'diretor' ? currentUser?.schoolId : adminSchools[0]?.id}
           onAddTeacherGlobal={(teacher) => {
             setAdminTeachers((prev) => [teacher, ...prev]);
             showToast(`Professor(a) "${teacher.name}" integrado(a) no quadro docente!`);

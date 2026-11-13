@@ -23,6 +23,13 @@ export const REGULAR_CLASSES = [
   '9ª Classe',
 ];
 
+export const SECUNDARIO_2_CLASSES = [
+  '10ª Classe',
+  '11ª Classe',
+  '12ª Classe',
+  '13ª Classe',
+];
+
 export const MODULO_CLASSES = [
   'Módulo 1',
   'Módulo 2',
@@ -37,6 +44,7 @@ export const PRAEER_CLASSES = [
 
 export const ALL_SCHOOL_CLASSES = [
   ...REGULAR_CLASSES,
+  ...SECUNDARIO_2_CLASSES,
   ...MODULO_CLASSES,
   ...PRAEER_CLASSES,
 ];
@@ -46,6 +54,11 @@ export const CLASS_GROUPS = [
     group: 'Ensino Regular (Iniciação à 9ª Classe)',
     category: 'regular' as const,
     items: REGULAR_CLASSES,
+  },
+  {
+    group: 'IIº Ciclo do Ensino Secundário (10ª à 13ª Classe)',
+    category: 'regular' as const,
+    items: SECUNDARIO_2_CLASSES,
   },
   {
     group: 'Módulos de Aceleração e Alfabetização',

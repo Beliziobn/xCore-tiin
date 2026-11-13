@@ -62,19 +62,37 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     currentUser.schoolRole === 'professor' ||
     matchedApp?.type === 'professor';
 
-  const isTargetAdmin = matchedApp
-    ? matchedApp.targetApproverRole === 'admin'
-    : currentUser.approverTargetRole
-    ? currentUser.approverTargetRole === 'admin'
-    : isAdminScopeMember || currentUser.schoolRole === 'diretor_geral';
+  const isSchoolStaffForDirector =
+    isTeacher ||
+    matchedApp?.type === 'funcionario' ||
+    matchedApp?.type === 'aluno' ||
+    currentUser.schoolRole === 'subdiretor_pedagogico' ||
+    currentUser.schoolRole === 'subdiretor_administrativo' ||
+    currentUser.schoolRole === 'secretario_escolar';
+
+  const isTargetAdmin =
+    isAdminScopeMember ||
+    matchedApp?.type === 'diretor' ||
+    currentUser.schoolRole === 'diretor_geral'
+      ? true
+      : isSchoolStaffForDirector
+      ? false
+      : matchedApp
+      ? matchedApp.targetApproverRole === 'admin'
+      : currentUser.approverTargetRole === 'admin';
 
   const targetSchool =
     matchedApp?.schoolName ||
     currentUser.schoolName ||
     'Complexo Escolar do Quéssua';
 
+  const rawAppDirectorName = matchedApp?.approverDirectorName;
   const schoolDirectorName = !isTargetAdmin
-    ? matchedApp?.approverDirectorName || resolveSchoolDirectorName(null, targetSchool)
+    ? rawAppDirectorName &&
+      !rawAppDirectorName.includes(OFFICIAL_DME_ADMIN_EMAIL) &&
+      !rawAppDirectorName.toLowerCase().includes('director municipal')
+      ? rawAppDirectorName
+      : resolveSchoolDirectorName(null, targetSchool)
     : `Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL})`;
 
   const approverRole = isTargetAdmin

@@ -148,10 +148,7 @@ export const CloudFooter: React.FC<CloudFooterProps> = ({
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/85">
             <div className="text-center sm:text-left space-y-0.5">
               <p className="tracking-normal font-normal">
-                © 2026 <strong className="text-white font-bold">Sigre Angola</strong>. Todos os direitos reservados.
-              </p>
-              <p className="text-[11px] text-white/70">
-                Ministério da Educação • Direcções Municipais e Gabinetes Provinciais
+                © 2026. Todos os direitos reservados.
               </p>
             </div>
 

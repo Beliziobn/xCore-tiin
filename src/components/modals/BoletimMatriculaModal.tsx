@@ -33,6 +33,7 @@ import {
   DirectorDigitalSignature,
   BoletimValidationQRCode,
 } from '../boletim/BoletimOfficialAssets';
+import { resolveSchoolDirectorName } from '../../utils/authApprovalStorage';
 
 interface BoletimMatriculaModalProps {
   isOpen: boolean;
@@ -102,6 +103,7 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
 
   const dataExtensoEmissao = formatDataExtenso(new Date().toISOString().substring(0, 10));
   const dataExtensoNasc = formatDataExtenso(student.dataNascimento);
+  const schoolDirectorName = resolveSchoolDirectorName(null, student.escola);
 
   const handlePrint = () => {
     window.print();
@@ -245,8 +247,8 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
                     O Director da Escola
                   </p>
                   <div className="w-36 border-b border-black mt-8 mb-1.5" />
-                  <span className="text-[11px] text-black italic leading-tight">
-                    Assinatura e Carimbo
+                  <span className="text-[11px] font-bold text-black leading-tight">
+                    {schoolDirectorName}
                   </span>
                 </div>
 
@@ -399,9 +401,6 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
                   <span className="block text-[14px] font-bold uppercase text-black leading-snug">
                     O(A) Encarregado(a) de Educação
                   </span>
-                  <span className="block text-[13px] text-black mt-0.5 leading-snug">
-                    {student.encarregado || 'Assinatura do Responsável'}
-                  </span>
                 </div>
               </div>
 
@@ -409,9 +408,6 @@ export const BoletimMatriculaModal: React.FC<BoletimMatriculaModalProps> = ({
                 <div className="border-t border-black pt-2 max-w-[270px] mx-auto">
                   <span className="block text-[14px] font-bold uppercase text-black leading-snug">
                     A Direcção / Secretaria da Escola
-                  </span>
-                  <span className="block text-[13px] text-black mt-0.5 leading-snug">
-                    Assinatura e Carimbo Oficial
                   </span>
                 </div>
               </div>
