@@ -20,7 +20,9 @@ import {
   deleteTeacherFromFirestore,
   clearAllTeachersFromFirestore,
   saveClassToFirestore,
+  deleteApplicationFromFirestore,
 } from './firestoreSync';
+import { purgeDeletedAccountCredentials } from './authApprovalStorage';
 
 export const STORAGE_KEY_TEACHERS = 'ucore_registered_teachers_v2';
 
@@ -529,16 +531,31 @@ export function deleteTeacher(
         localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(filteredDir));
       }
 
-      // Libertar registo vinculado em ucore_pending_applications (para liberar o nº do BI)
+      // Libertar registo vinculado em ucore_pending_applications e revogar credenciais de acesso da conta apagada
+      const removedAppIds: string[] = [];
+      let matchedAppEmail = targetEmail;
       const rawApps = localStorage.getItem('ucore_pending_applications');
       if (rawApps) {
         const appsList = JSON.parse(rawApps);
         if (Array.isArray(appsList)) {
           const filteredApps = appsList.filter((app: any) => {
             if (!app) return false;
-            if (app.id === id || app.userId === id) return false;
-            if (targetBi && (app.biNumber || '').trim().toUpperCase() === targetBi) return false;
-            if (targetEmail && (app.email || '').trim().toLowerCase() === targetEmail && app.type === 'professor') {
+            const isMatch =
+              app.id === id ||
+              app.userId === id ||
+              (targetBi && (app.biNumber || '').trim().toUpperCase() === targetBi) ||
+              (targetEmail && (app.email || '').trim().toLowerCase() === targetEmail) ||
+              (targetName && (app.fullName || '').trim().toLowerCase() === targetName && app.type === 'professor');
+            if (isMatch) {
+              if (app.id) removedAppIds.push(app.id);
+              if (app.userId) removedAppIds.push(app.userId);
+              if (app.email && !matchedAppEmail) matchedAppEmail = app.email.trim().toLowerCase();
+              purgeDeletedAccountCredentials({
+                id: app.id,
+                userId: app.userId,
+                email: app.email,
+                biNumber: app.biNumber,
+              });
               return false;
             }
             return true;
@@ -546,6 +563,15 @@ export function deleteTeacher(
           localStorage.setItem('ucore_pending_applications', JSON.stringify(filteredApps));
         }
       }
+
+      purgeDeletedAccountCredentials({
+        id,
+        email: matchedAppEmail,
+        biNumber: targetBi,
+      });
+      removedAppIds.forEach((appId) => {
+        deleteApplicationFromFirestore(appId).catch(() => {});
+      });
 
       // Remover referências de regência em ucore_director_classes
       const rawClasses = localStorage.getItem('ucore_director_classes');

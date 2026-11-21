@@ -23,7 +23,9 @@ import {
   fetchEfectividadeFromFirestore,
   fetchDeclaracaoServicoFromFirestore,
   isEntityTombstoned,
+  deleteApplicationFromFirestore,
 } from './firestoreSync';
+import { purgeDeletedAccountCredentials } from './authApprovalStorage';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
 
@@ -631,9 +633,17 @@ export function deleteSchoolAndRelatedData(schoolId: string, schoolName?: string
     if (rawDetailedDirs) {
       const dirList = JSON.parse(rawDetailedDirs);
       if (Array.isArray(dirList)) {
-        const nextDirs = dirList.filter(
-          (d: any) => !matchesTargetSchool(d.escolaId, d.nomeEscola, d.codigoEscola)
-        );
+        const nextDirs = dirList.filter((d: any) => {
+          const isMatch = matchesTargetSchool(d.escolaId, d.nomeEscola, d.codigoEscola);
+          if (isMatch) {
+            purgeDeletedAccountCredentials({
+              id: d.id,
+              email: d.emailInstitucional || d.emailPessoal || d.email,
+              biNumber: d.biNif,
+            });
+          }
+          return !isMatch;
+        });
         localStorage.setItem('ucore_registered_directors_v2', JSON.stringify(nextDirs));
       }
     }
@@ -641,11 +651,46 @@ export function deleteSchoolAndRelatedData(schoolId: string, schoolName?: string
     if (rawAdminDirs) {
       const adminDirs = JSON.parse(rawAdminDirs);
       if (Array.isArray(adminDirs)) {
-        const nextAdminDirs = adminDirs.filter(
-          (d: any) => !matchesTargetSchool(d.schoolId, d.schoolName)
-        );
+        const nextAdminDirs = adminDirs.filter((d: any) => {
+          const isMatch = matchesTargetSchool(d.schoolId, d.schoolName);
+          if (isMatch) {
+            purgeDeletedAccountCredentials({
+              id: d.id,
+              email: d.email,
+              biNumber: d.registrationData?.biNif,
+            });
+          }
+          return !isMatch;
+        });
         localStorage.setItem('ucore_admin_directors', JSON.stringify(nextAdminDirs));
       }
+    }
+
+    // 8b. Remove applications (director/teachers/staff) belonging to the deleted school and revoke their credentials
+    const rawApps = localStorage.getItem('ucore_pending_applications');
+    if (rawApps) {
+      try {
+        const appsList = JSON.parse(rawApps);
+        if (Array.isArray(appsList)) {
+          const nextApps = appsList.filter((app: any) => {
+            if (!app) return false;
+            const isMatch = matchesTargetSchool(app.schoolId, app.schoolName);
+            if (isMatch) {
+              purgeDeletedAccountCredentials({
+                id: app.id,
+                userId: app.userId,
+                email: app.email,
+                biNumber: app.biNumber,
+              });
+              if (app.id) deleteApplicationFromFirestore(app.id).catch(() => {});
+              if (app.userId) deleteApplicationFromFirestore(app.userId).catch(() => {});
+              return false;
+            }
+            return true;
+          });
+          localStorage.setItem('ucore_pending_applications', JSON.stringify(nextApps));
+        }
+      } catch {}
     }
 
     // 9. Remove rooms and classes from sigre_director_rooms and sigre_director_classes

@@ -342,6 +342,10 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
   try {
     const docId = sanitizeDocId((user.email || user.id || '').trim().toLowerCase());
     if (!docId) return;
+    removeEntityTombstone(USERS_COL, docId);
+    if (user.id) {
+      removeEntityTombstone(USERS_COL, sanitizeDocId(user.id));
+    }
     const ref = doc(db, USERS_COL, docId);
     await setDoc(ref, cleanObject({ ...user, userId: user.id || docId }), { merge: true });
   } catch (error) {
@@ -353,15 +357,37 @@ export async function fetchUserFromFirestore(userIdOrEmail: string): Promise<Use
   try {
     const key = sanitizeDocId(userIdOrEmail.trim().toLowerCase());
     if (!key) return null;
+    if (isEntityTombstoned(USERS_COL, key) || isEntityTombstoned(APPLICATIONS_COL, key)) {
+      return null;
+    }
     const ref = doc(db, USERS_COL, key);
     const snap = await getDoc(ref);
     if (snap.exists()) {
-      return snap.data() as UserAccount;
+      const data = snap.data() as UserAccount;
+      if (
+        (data?.email && isEntityTombstoned(USERS_COL, data.email)) ||
+        (data?.id && isEntityTombstoned(USERS_COL, data.id)) ||
+        (data?.id && isEntityTombstoned(APPLICATIONS_COL, data.id))
+      ) {
+        return null;
+      }
+      return data;
     }
     return null;
   } catch (error) {
     console.warn('[Firestore] Erro ao buscar usuário no Firestore:', error);
     return null;
+  }
+}
+
+export async function deleteUserFromFirestore(userIdOrEmail: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId((userIdOrEmail || '').trim().toLowerCase());
+    if (!docId) return;
+    addEntityTombstone(USERS_COL, docId);
+    await deleteDoc(doc(db, USERS_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar usuário no Firestore:', error);
   }
 }
 
@@ -2395,6 +2421,14 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, UserAccount>();
         localUsers.forEach((lu) => {
           if (!lu || !lu.email) return;
+          if (
+            isEntityTombstoned(USERS_COL, lu.email) ||
+            (lu.id && isEntityTombstoned(USERS_COL, lu.id)) ||
+            isEntityTombstoned(APPLICATIONS_COL, lu.email) ||
+            (lu.id && isEntityTombstoned(APPLICATIONS_COL, lu.id))
+          ) {
+            return;
+          }
           const k = norm(lu.email);
           map.set(k, lu);
           if (!cloudUsers.some((cu) => norm(cu.email) === k) && shouldPushMissing(USERS_COL, k)) {
@@ -2403,6 +2437,14 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
         cloudUsers.forEach((cu) => {
           if (!cu || !cu.email) return;
+          if (
+            isEntityTombstoned(USERS_COL, cu.email) ||
+            (cu.id && isEntityTombstoned(USERS_COL, cu.id)) ||
+            isEntityTombstoned(APPLICATIONS_COL, cu.email) ||
+            (cu.id && isEntityTombstoned(APPLICATIONS_COL, cu.id))
+          ) {
+            return;
+          }
           const k = norm(cu.email);
           map.set(k, { ...(map.get(k) || {}), ...cu });
         });

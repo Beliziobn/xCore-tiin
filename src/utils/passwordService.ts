@@ -185,6 +185,28 @@ export function verifyPassword(
   return false;
 }
 
+/**
+ * Permanently revokes and deletes the locally cached password for an account
+ * that was deleted by the Administrator or Director.
+ */
+export function deleteUserCredentials(email?: string): void {
+  if (!email) return;
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || normalizedEmail === 'dmedoquessua@gmail.com' || normalizedEmail === 'beliziodos20@gmail.com') {
+    return;
+  }
+  try {
+    const stored = getStoredPasswords();
+    if (normalizedEmail in stored) {
+      delete stored[normalizedEmail];
+      localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(stored));
+    }
+    localStorage.removeItem(`ucore_profile_extra_${normalizedEmail}`);
+  } catch {
+    // ignore
+  }
+}
+
 export function updatePassword(
   email: string,
   newPassword: string,

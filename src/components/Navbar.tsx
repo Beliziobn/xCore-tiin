@@ -3,6 +3,13 @@ import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calend
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications, syncApplicationsFromServer, isSchoolDirectorApproval, schoolsMatch, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
 import { fetchQuickRequests } from '../utils/quickServicesStorage';
+import {
+  loadVagaDocenteRecords,
+  recordBelongsToDirectorSchool,
+  recordBelongsToProfessor,
+  syncVagasDocentesFromFirestore,
+  formatDateTimePt,
+} from './pages/CadastroDocenteVagaSection';
 
 interface NavbarProps {
   onOpenGetStarted: () => void;
@@ -69,8 +76,113 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [navLoadingAction, setNavLoadingAction] = useState<'login' | 'register' | null>(null);
   const [pendingAppsCount, setPendingAppsCount] = useState({ director: 0, admin: 0 });
   const [pendingQuickRequestsCount, setPendingQuickRequestsCount] = useState(0);
+  const [vagasBadgeCount, setVagasBadgeCount] = useState(0);
 
   useEffect(() => {
+    const updateVagasWorkflow = () => {
+      try {
+        const allVagas = loadVagaDocenteRecords();
+        const role = (activeRole || currentUser?.role) as 'admin' | 'diretor' | 'professor' | undefined;
+        const dynamicNotifs: NotificationItem[] = [];
+
+        if (role === 'professor') {
+          const myVagas = allVagas.filter((r) => recordBelongsToProfessor(r, currentUser));
+          const decidedOrForwarded = myVagas.filter(
+            (r) =>
+              r.statusFluxo === 'Parecer Favorável' ||
+              r.statusFluxo === 'Parecer Não Favorável' ||
+              r.statusFluxo === 'Encaminhado à Direção Municipal'
+          );
+          setVagasBadgeCount(
+            myVagas.filter((r) => r.statusFluxo === 'Parecer Favorável' || r.statusFluxo === 'Parecer Não Favorável').length
+          );
+          decidedOrForwarded.slice(0, 6).forEach((r) => {
+            if (r.statusFluxo === 'Parecer Favorável') {
+              dynamicNotifs.push({
+                id: `vaga-notif-prof-${r.id}-fav`,
+                title: 'Parecer Favorável • Direção Municipal',
+                message: `O seu pedido de vaga (${r.disciplina || r.tipoSolicitacao || 'Docente'}) para ${r.escola} foi APROVADO pela Direção Municipal.`,
+                time: formatDateTimePt(r.avaliadoEm || r.criado),
+                read: false,
+                type: 'alert',
+              });
+            } else if (r.statusFluxo === 'Parecer Não Favorável') {
+              dynamicNotifs.push({
+                id: `vaga-notif-prof-${r.id}-desfav`,
+                title: 'Parecer Não Favorável • Direção Municipal',
+                message: `Pedido de vaga (${r.disciplina || 'Docente'}) indeferido. Justificativa: ${r.justificativaParecer || 'Registada no processo.'}`,
+                time: formatDateTimePt(r.avaliadoEm || r.criado),
+                read: false,
+                type: 'alert',
+              });
+            } else if (r.statusFluxo === 'Encaminhado à Direção Municipal') {
+              dynamicNotifs.push({
+                id: `vaga-notif-prof-${r.id}-enc`,
+                title: 'Pedido Encaminhado à Direção Municipal',
+                message: `O Diretor ${r.encaminhadoPorNome || 'da Escola'} validou e encaminhou o seu pedido de vaga (${r.escola}) para a DME.`,
+                time: formatDateTimePt(r.encaminhadoEm || r.criado),
+                read: false,
+                type: 'academic',
+              });
+            }
+          });
+        } else if (role === 'diretor') {
+          const schoolVagas = allVagas.filter((r) => recordBelongsToDirectorSchool(r, currentUser));
+          const awaitingTriage = schoolVagas.filter((r) => r.statusFluxo === 'Aguardando Direção da Escola');
+          setVagasBadgeCount(awaitingTriage.length);
+
+          awaitingTriage.slice(0, 5).forEach((r) => {
+            dynamicNotifs.push({
+              id: `vaga-notif-dir-${r.id}-pend`,
+              title: 'Novo Pedido de Vaga • Aguardando Triagem',
+              message: `O(A) Prof. ${r.solicitadoPorNome || r.nome} submeteu um pedido de vaga (${r.disciplina || r.tipoSolicitacao || 'Docente'}) na sua escola.`,
+              time: formatDateTimePt(r.solicitadoEm || r.criado),
+              read: false,
+              type: 'alert',
+            });
+          });
+
+          schoolVagas
+            .filter((r) => r.statusFluxo === 'Parecer Favorável' || r.statusFluxo === 'Parecer Não Favorável')
+            .slice(0, 4)
+            .forEach((r) => {
+              dynamicNotifs.push({
+                id: `vaga-notif-dir-${r.id}-dec`,
+                title: `${r.statusFluxo} • Retorno da DME`,
+                message: `A Direção Municipal emitiu ${r.statusFluxo} para o pedido de ${r.nome} (${r.disciplina || 'Docente'}).`,
+                time: formatDateTimePt(r.avaliadoEm || r.criado),
+                read: false,
+                type: 'academic',
+              });
+            });
+        } else if (role === 'admin') {
+          const forwardedToDme = allVagas.filter((r) => r.statusFluxo === 'Encaminhado à Direção Municipal');
+          setVagasBadgeCount(forwardedToDme.length);
+
+          forwardedToDme.slice(0, 6).forEach((r) => {
+            dynamicNotifs.push({
+              id: `vaga-notif-dme-${r.id}-enc`,
+              title: 'Pedido de Vaga Encaminhado pela Escola',
+              message: `${r.encaminhadoPorEscola || r.instAct} encaminhou pedido de vaga do(a) Prof. ${r.nome} para avaliação e parecer da DME.`,
+              time: formatDateTimePt(r.encaminhadoEm || r.criado),
+              read: false,
+              type: 'alert',
+            });
+          });
+        } else {
+          setVagasBadgeCount(0);
+        }
+
+        setNotifications((prev) => {
+          const readIds = new Set(prev.filter((n) => n.read).map((n) => n.id));
+          return dynamicNotifs.map((n) => ({
+            ...n,
+            read: readIds.has(n.id),
+          }));
+        });
+      } catch {}
+    };
+
     const updateQuickRequests = async () => {
       try {
         const reqs = await fetchQuickRequests();
@@ -94,6 +206,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const updateCounts = () => {
       updateQuickRequests();
+      updateVagasWorkflow();
+      syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
       syncApplicationsFromServer().then((all) => {
         const dirPending = all.filter((a) => {
           if (a.status !== 'pendente') return false;
@@ -129,16 +243,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     updateCounts();
     const handleSync = () => updateCounts();
     window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
     window.addEventListener('sigre_quick_request_created', updateQuickRequests);
     window.addEventListener('sigre_quick_request_updated', updateQuickRequests);
     const interval = setInterval(updateCounts, 3000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
       window.removeEventListener('sigre_quick_request_created', updateQuickRequests);
       window.removeEventListener('sigre_quick_request_updated', updateQuickRequests);
       clearInterval(interval);
     };
-  }, [currentUser?.role, currentUser?.schoolName, currentUser?.schoolId]);
+  }, [activeRole, currentUser?.id, currentUser?.email, currentUser?.role, currentUser?.schoolName, currentUser?.schoolId]);
 
   const isLoginLoading = (isAuthLoading && authLoadingAction === 'login') || navLoadingAction === 'login';
   const isRegisterLoading = (isAuthLoading && authLoadingAction === 'register') || navLoadingAction === 'register';
@@ -564,6 +680,39 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </>
                   )}
 
+                  {/* Fluxo de Solicitação e Aprovação de Vagas (Professor / Diretor / Direção Municipal) */}
+                  {currentUser && (
+                    <button
+                      id="dropdown-pedido-vaga-docente-btn"
+                      onClick={() => {
+                        onSelectPage('cadastro-docente');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-[#0d1c4d] hover:bg-indigo-50 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-black cursor-pointer flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2">
+                        <UserCheck className="w-3.5 h-3.5 text-[#0d1c4d]" />
+                        <span>
+                          {activeRole === 'professor'
+                            ? 'Pedido de Vaga Docente'
+                            : activeRole === 'diretor'
+                            ? 'Triagem de Vagas Docentes'
+                            : 'Avaliação & Parecer de Vagas'}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {vagasBadgeCount > 0 && (
+                          <span className="text-[9px] bg-[#f75142] text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                            {vagasBadgeCount}
+                          </span>
+                        )}
+                        <span className="text-[9px] bg-amber-300 text-slate-950 font-black px-1.5 py-0.5 rounded">
+                          Vagas
+                        </span>
+                      </span>
+                    </button>
+                  )}
+
                   {/* Serviços SIGRE Oficial (Para Diretores de Escola apenas Serviços Rápidos) */}
                   <button
                     id="dropdown-servicos-sigre-btn"
@@ -732,18 +881,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </div>
                       ) : (
                         notifications.map((item) => (
-                          <div
+                          <button
                             key={item.id}
-                            className={`py-2.5 px-2 rounded-lg transition-colors ${
+                            type="button"
+                            onClick={() => {
+                              setNotifications((prev) =>
+                                prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+                              );
+                              setShowNotifications(false);
+                              onSelectPage('cadastro-docente');
+                            }}
+                            className={`w-full text-left py-2.5 px-2 rounded-lg transition-colors cursor-pointer ${
                               item.read ? 'opacity-50 hover:bg-slate-50' : 'bg-slate-50/80 hover:bg-slate-100'
                             }`}
                           >
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-start gap-2">
                               <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
-                              <span className="text-[10px] text-slate-400 tracking-wider tabular-nums">{item.time}</span>
+                              <span className="text-[10px] text-slate-400 tracking-wider tabular-nums shrink-0">{item.time}</span>
                             </div>
                             <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.message}</p>
-                          </div>
+                          </button>
                         ))
                       )}
                     </div>
@@ -1152,6 +1309,35 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Settings className="w-4 h-4 text-[#f75142]" />
               <span>Configurações & Palavra-passe</span>
+            </button>
+          )}
+          {currentUser && (
+            <button
+              id="mobile-menu-pedido-vaga-btn"
+              onClick={() => {
+                onSelectPage('cadastro-docente');
+                setMobileMenuOpen(false);
+              }}
+              className="text-left py-2 px-3 text-[#0d1c4d] bg-indigo-50/70 hover:bg-indigo-100 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-[#0d1c4d]" />
+                <span>
+                  {activeRole === 'professor'
+                    ? 'Pedido de Vaga Docente'
+                    : activeRole === 'diretor'
+                    ? 'Triagem de Vagas Docentes'
+                    : 'Avaliação & Parecer de Vagas'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {vagasBadgeCount > 0 && (
+                  <span className="text-[9px] bg-[#f75142] text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                    {vagasBadgeCount}
+                  </span>
+                )}
+                <span className="text-[9px] bg-amber-300 text-slate-950 font-black px-1.5 py-0.5 rounded">Vagas</span>
+              </div>
             </button>
           )}
           <button

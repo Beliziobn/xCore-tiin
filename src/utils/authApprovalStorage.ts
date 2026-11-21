@@ -13,11 +13,12 @@ import {
   saveDirectorToFirestore,
   saveDmeStaffToFirestore,
   saveUserToFirestore,
+  deleteUserFromFirestore,
   deleteTeacherFromFirestore,
   deleteDirectorFromFirestore,
   deleteDmeStaffFromFirestore,
 } from './firestoreSync';
-import { encodePasswordVerifier } from './passwordService';
+import { encodePasswordVerifier, deleteUserCredentials } from './passwordService';
 
 export const UCORE_MUNICIPALITIES = [
   'Quêssua (Malanje)',
@@ -77,12 +78,118 @@ function getDeletedApplicationIds(): Set<string> {
   }
 }
 
-function addDeletedApplicationId(id: string) {
+export function addDeletedApplicationId(id: string) {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined' || !id) return;
   try {
+    const clean = id.trim().toLowerCase();
+    if (!clean || clean === OFFICIAL_DME_ADMIN_EMAIL || clean === 'beliziodos20@gmail.com') return;
     const set = getDeletedApplicationIds();
-    set.add(id.trim().toLowerCase());
+    set.add(clean);
     localStorage.setItem(STORAGE_KEY_DELETED_APPLICATIONS, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function isAccountDeleted(...identifiers: (string | undefined | null)[]): boolean {
+  const deletedSet = getDeletedApplicationIds();
+  for (const id of identifiers) {
+    if (!id) continue;
+    const clean = String(id).trim().toLowerCase();
+    if (!clean || clean === OFFICIAL_DME_ADMIN_EMAIL || clean === 'beliziodos20@gmail.com') continue;
+    if (deletedSet.has(clean)) return true;
+  }
+  return false;
+}
+
+/**
+ * Permanently revokes all credentials, user profiles, and active sessions for a deleted account
+ * across localStorage, passwordService, and Cloud Firestore.
+ */
+export function purgeDeletedAccountCredentials(params: {
+  id?: string;
+  userId?: string;
+  email?: string;
+  biNumber?: string;
+}): void {
+  const normEmail = (params.email || '').trim().toLowerCase();
+  const normId = (params.id || '').trim();
+  const normUserId = (params.userId || '').trim();
+  const normBi = (params.biNumber || '').trim().toUpperCase();
+
+  if (normEmail === OFFICIAL_DME_ADMIN_EMAIL || normEmail === 'beliziodos20@gmail.com') {
+    return;
+  }
+
+  if (normId) addDeletedApplicationId(normId);
+  if (normUserId) addDeletedApplicationId(normUserId);
+  if (normEmail) addDeletedApplicationId(normEmail);
+  if (normBi) addDeletedApplicationId(normBi);
+
+  // 1. Revoke stored password and profile extra cache
+  if (normEmail) {
+    deleteUserCredentials(normEmail);
+  }
+
+  // 2. Remove from ucore_registered_users
+  try {
+    const rawUsers = localStorage.getItem(STORAGE_KEY_USERS);
+    if (rawUsers) {
+      const users = JSON.parse(rawUsers);
+      if (Array.isArray(users)) {
+        const nextUsers = users.filter((u: any) => {
+          if (!u) return false;
+          const uId = String(u.id || '').trim();
+          const uEmail = String(u.email || '').trim().toLowerCase();
+          const uBi = String(u.biNumber || '').trim().toUpperCase();
+          if (normId && uId === normId) return false;
+          if (normUserId && uId === normUserId) return false;
+          if (normEmail && uEmail === normEmail) return false;
+          if (normBi && normBi.length >= 5 && uBi === normBi) return false;
+          return true;
+        });
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(nextUsers));
+      }
+    }
+  } catch {}
+
+  // 3. Delete from Firestore USERS_COL
+  if (normEmail) {
+    deleteUserFromFirestore(normEmail).catch(() => {});
+  }
+  if (normId) {
+    deleteUserFromFirestore(normId).catch(() => {});
+  }
+  if (normUserId && normUserId !== normId) {
+    deleteUserFromFirestore(normUserId).catch(() => {});
+  }
+
+  // 4. Terminate active session if the deleted account is currently logged in
+  try {
+    const rawActive = localStorage.getItem('ucore_active_user');
+    if (rawActive) {
+      const active = JSON.parse(rawActive);
+      if (active) {
+        const aId = String(active.id || '').trim();
+        const aEmail = String(active.email || '').trim().toLowerCase();
+        const aBi = String(active.biNumber || '').trim().toUpperCase();
+        const isCurrentDeleted =
+          (normId && aId === normId) ||
+          (normUserId && aId === normUserId) ||
+          (normEmail && aEmail === normEmail) ||
+          (normBi && normBi.length >= 5 && aBi === normBi);
+        if (isCurrentDeleted) {
+          localStorage.removeItem('ucore_active_user');
+          sessionStorage.removeItem('ucore_session_active');
+          sessionStorage.removeItem('ucore_session_view');
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('sigre-account-revoked', {
+                detail: { email: normEmail, id: normUserId || normId },
+              })
+            );
+          }
+        }
+      }
+    }
   } catch {}
 }
 
@@ -121,7 +228,14 @@ export function getPendingApplications(type?: string): PendingApplication[] {
           if (!a) return false;
           const aId = String(a.id || '').trim().toLowerCase();
           const uId = String(a.userId || '').trim().toLowerCase();
-          return !deletedIds.has(aId) && !deletedIds.has(uId);
+          const aEmail = String(a.email || '').trim().toLowerCase();
+          const aBi = String(a.biNumber || '').trim().toLowerCase();
+          return (
+            !deletedIds.has(aId) &&
+            !deletedIds.has(uId) &&
+            (!aEmail || !deletedIds.has(aEmail)) &&
+            (!aBi || !deletedIds.has(aBi))
+          );
         });
       }
     }
@@ -138,6 +252,18 @@ export function getPendingApplications(type?: string): PendingApplication[] {
 export async function syncApplicationsFromServer(): Promise<PendingApplication[]> {
   try {
     const deletedIds = getDeletedApplicationIds();
+    const isAppDeleted = (app: PendingApplication) => {
+      const aId = String(app.id || '').trim().toLowerCase();
+      const uId = String(app.userId || '').trim().toLowerCase();
+      const aEmail = String(app.email || '').trim().toLowerCase();
+      const aBi = String(app.biNumber || '').trim().toLowerCase();
+      return (
+        (aId && deletedIds.has(aId)) ||
+        (uId && deletedIds.has(uId)) ||
+        (aEmail && deletedIds.has(aEmail)) ||
+        (aBi && deletedIds.has(aBi))
+      );
+    };
     const map = new Map<string, PendingApplication>();
 
     // 1. Fetch authoritative cloud data from Firebase Firestore
@@ -146,7 +272,7 @@ export async function syncApplicationsFromServer(): Promise<PendingApplication[]
       if (Array.isArray(firestoreApps) && firestoreApps.length > 0) {
         firestoreApps.forEach((fa) => {
           const key = String(fa.id || fa.userId || fa.email).trim().toLowerCase();
-          if (!key || deletedIds.has(key)) return;
+          if (!key || isAppDeleted(fa)) return;
           map.set(key, fa);
         });
       }
@@ -163,7 +289,7 @@ export async function syncApplicationsFromServer(): Promise<PendingApplication[]
           const serverApps: PendingApplication[] = data.applications;
           serverApps.forEach((sa) => {
             const key = String(sa.id || sa.userId || sa.email).trim().toLowerCase();
-            if (!key || deletedIds.has(key)) return;
+            if (!key || isAppDeleted(sa)) return;
             if (!map.has(key)) {
               map.set(key, sa);
               // Push to Firestore if not already present
@@ -178,7 +304,7 @@ export async function syncApplicationsFromServer(): Promise<PendingApplication[]
     const localApps = getPendingApplications();
     localApps.forEach((la) => {
       const key = String(la.id || la.userId || la.email).trim().toLowerCase();
-      if (!key || deletedIds.has(key)) return;
+      if (!key || isAppDeleted(la)) return;
       const existingRemote = map.get(key);
       if (!existingRemote) {
         if (la.status === 'pendente' || la.status === 'aprovado') {
@@ -233,7 +359,14 @@ export function initRealtimeApplicationsSync(
         .filter((a) => {
           const aId = String(a.id || '').trim().toLowerCase();
           const uId = String(a.userId || '').trim().toLowerCase();
-          return !deletedIds.has(aId) && !deletedIds.has(uId);
+          const aEmail = String(a.email || '').trim().toLowerCase();
+          const aBi = String(a.biNumber || '').trim().toLowerCase();
+          return (
+            !deletedIds.has(aId) &&
+            !deletedIds.has(uId) &&
+            (!aEmail || !deletedIds.has(aEmail)) &&
+            (!aBi || !deletedIds.has(aBi))
+          );
         })
         .map((remoteApp) => {
           const k = String(remoteApp.id || remoteApp.userId || remoteApp.email).trim().toLowerCase();
@@ -1091,6 +1224,7 @@ export function checkDuplicateRegistration(
  */
 export function findRegisteredAccountByEmail(email: string): {
   exists: boolean;
+  wasDeletedByAdmin?: boolean;
   isMasterAdmin?: boolean;
   expectedVerifier?: string;
   fullName?: string;
@@ -1098,6 +1232,7 @@ export function findRegisteredAccountByEmail(email: string): {
   dmeStaff?: any;
   director?: any;
   teacher?: any;
+  registeredUser?: UserAccount;
 } {
   const normEmail = (email || '').trim().toLowerCase();
   if (!normEmail) return { exists: false };
@@ -1110,10 +1245,18 @@ export function findRegisteredAccountByEmail(email: string): {
     };
   }
 
+  // Strictly block any account whose email was deleted by the Admin/Director
+  if (isAccountDeleted(normEmail)) {
+    return { exists: false, wasDeletedByAdmin: true };
+  }
+
   // 1. Check applications (pending, approved, or rejected)
   const apps = getPendingApplications();
   const matchedApp = apps.find((a) => a.email && a.email.trim().toLowerCase() === normEmail);
   if (matchedApp) {
+    if (isAccountDeleted(matchedApp.id, matchedApp.userId, matchedApp.email, matchedApp.biNumber)) {
+      return { exists: false, wasDeletedByAdmin: true };
+    }
     return {
       exists: true,
       app: matchedApp,
@@ -1132,6 +1275,9 @@ export function findRegisteredAccountByEmail(email: string): {
           (m: any) => m && m.email && m.email.trim().toLowerCase() === normEmail
         );
         if (matchedDme) {
+          if (isAccountDeleted(matchedDme.id, matchedDme.email, matchedDme.biNumber)) {
+            return { exists: false, wasDeletedByAdmin: true };
+          }
           return { exists: true, dmeStaff: matchedDme };
         }
       }
@@ -1152,6 +1298,9 @@ export function findRegisteredAccountByEmail(email: string): {
                 (d.emailPessoal && d.emailPessoal.trim().toLowerCase() === normEmail))
           );
           if (matchedDir) {
+            if (isAccountDeleted(matchedDir.id, matchedDir.email, matchedDir.emailPessoal, matchedDir.biNif)) {
+              return { exists: false, wasDeletedByAdmin: true };
+            }
             return { exists: true, director: matchedDir };
           }
         }
@@ -1160,7 +1309,7 @@ export function findRegisteredAccountByEmail(email: string): {
   }
 
   // 4. Check registered teachers
-  for (const tKey of ['ucore_admin_teachers', 'ucore_director_teachers_v1']) {
+  for (const tKey of ['ucore_admin_teachers', 'ucore_director_teachers_v1', 'ucore_registered_teachers_v2']) {
     try {
       const rawTeachers = localStorage.getItem(tKey);
       if (rawTeachers) {
@@ -1170,12 +1319,39 @@ export function findRegisteredAccountByEmail(email: string): {
             (t: any) => t && t.email && t.email.trim().toLowerCase() === normEmail
           );
           if (matchedTeacher) {
+            if (isAccountDeleted(matchedTeacher.id, matchedTeacher.email, matchedTeacher.biNif || matchedTeacher.registrationData?.biNif)) {
+              return { exists: false, wasDeletedByAdmin: true };
+            }
             return { exists: true, teacher: matchedTeacher };
           }
         }
       }
     } catch {}
   }
+
+  // 5. Check ucore_registered_users
+  try {
+    const rawUsers = localStorage.getItem(STORAGE_KEY_USERS);
+    if (rawUsers) {
+      const usersList = JSON.parse(rawUsers);
+      if (Array.isArray(usersList)) {
+        const matchedUser = usersList.find(
+          (u: any) => u && u.email && u.email.trim().toLowerCase() === normEmail
+        );
+        if (matchedUser) {
+          if (isAccountDeleted(matchedUser.id, matchedUser.email, matchedUser.biNumber)) {
+            return { exists: false, wasDeletedByAdmin: true };
+          }
+          return {
+            exists: true,
+            registeredUser: matchedUser,
+            expectedVerifier: matchedUser.passwordVerifier,
+            fullName: `${matchedUser.firstName || ''} ${matchedUser.lastName || ''}`.trim(),
+          };
+        }
+      }
+    }
+  } catch {}
 
   return { exists: false };
 }
@@ -1458,56 +1634,81 @@ export async function deleteApplication(applicationId: string): Promise<boolean>
     const list: PendingApplication[] = raw ? JSON.parse(raw) : [];
     const target = list.find((a) => a.id === applicationId || a.userId === applicationId);
 
-    addDeletedApplicationId(applicationId);
-    if (target?.userId) addDeletedApplicationId(target.userId);
-    if (target?.email) addDeletedApplicationId(target.email);
+    // Permanently revoke account credentials, password, user record, and active session
+    purgeDeletedAccountCredentials({
+      id: applicationId,
+      userId: target?.userId,
+      email: target?.email,
+      biNumber: target?.biNumber,
+    });
 
-    const remaining = list.filter((a) => a.id !== applicationId && a.userId !== applicationId);
+    const targetEmailNorm = (target?.email || '').trim().toLowerCase();
+    const targetBiNorm = (target?.biNumber || '').trim().toUpperCase();
+
+    const remaining = list.filter((a) => {
+      if (a.id === applicationId || a.userId === applicationId) return false;
+      if (target?.userId && (a.id === target.userId || a.userId === target.userId)) return false;
+      if (targetEmailNorm && (a.email || '').trim().toLowerCase() === targetEmailNorm) return false;
+      return true;
+    });
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(remaining));
 
     // Also remove from local director, teacher, and DME staff rosters if it was approved
-    if (target?.type === 'professor') {
-      ['ucore_admin_teachers', 'ucore_director_teachers_v1'].forEach((k) => {
-        try {
-          const r = localStorage.getItem(k);
-          if (r) {
-            const arr = JSON.parse(r);
-            if (Array.isArray(arr)) {
-              const f = arr.filter((t: any) => t.id !== target.userId && t.id !== target.id && t.email !== target.email);
-              localStorage.setItem(k, JSON.stringify(f));
-            }
-          }
-        } catch {}
-      });
-    }
-
-    if (target?.type === 'diretor') {
-      ['sigre_admin_directors', 'ucore_registered_directors_v2'].forEach((k) => {
-        try {
-          const r = localStorage.getItem(k);
-          if (r) {
-            const arr = JSON.parse(r);
-            if (Array.isArray(arr)) {
-              const f = arr.filter((d: any) => d.id !== target.userId && d.id !== target.id && d.email !== target.email && d.emailPessoal !== target.email);
-              localStorage.setItem(k, JSON.stringify(f));
-            }
-          }
-        } catch {}
-      });
-    }
-
-    if (target?.type === 'membro_dme' || target?.scope === 'administracao') {
+    ['ucore_admin_teachers', 'ucore_director_teachers_v1', 'ucore_registered_teachers_v2'].forEach((k) => {
       try {
-        const r = localStorage.getItem('ucore_dme_staff_list');
+        const r = localStorage.getItem(k);
         if (r) {
           const arr = JSON.parse(r);
           if (Array.isArray(arr)) {
-            const f = arr.filter((m: any) => m.id !== target.userId && m.id !== target.id && m.email !== target.email);
-            localStorage.setItem('ucore_dme_staff_list', JSON.stringify(f));
+            const f = arr.filter((t: any) => {
+              if (!t) return false;
+              if (t.id === applicationId || (target?.userId && t.id === target.userId) || (target?.id && t.id === target.id)) return false;
+              if (targetEmailNorm && (t.email || '').trim().toLowerCase() === targetEmailNorm) return false;
+              if (targetBiNorm && targetBiNorm.length >= 5 && ((t.biNif || t.registrationData?.biNif || '').trim().toUpperCase() === targetBiNorm)) return false;
+              return true;
+            });
+            localStorage.setItem(k, JSON.stringify(f));
           }
         }
       } catch {}
-    }
+    });
+
+    ['ucore_admin_directors', 'sigre_admin_directors', 'ucore_registered_directors_v2'].forEach((k) => {
+      try {
+        const r = localStorage.getItem(k);
+        if (r) {
+          const arr = JSON.parse(r);
+          if (Array.isArray(arr)) {
+            const f = arr.filter((d: any) => {
+              if (!d) return false;
+              if (d.id === applicationId || (target?.userId && d.id === target.userId) || (target?.id && d.id === target.id)) return false;
+              if (targetEmailNorm && ((d.email || '').trim().toLowerCase() === targetEmailNorm || (d.emailPessoal || '').trim().toLowerCase() === targetEmailNorm)) return false;
+              if (targetBiNorm && targetBiNorm.length >= 5 && ((d.biNif || d.registrationData?.biNif || '').trim().toUpperCase() === targetBiNorm)) return false;
+              return true;
+            });
+            localStorage.setItem(k, JSON.stringify(f));
+          }
+        }
+      } catch {}
+    });
+
+    try {
+      const r = localStorage.getItem('ucore_dme_staff_list');
+      if (r) {
+        const arr = JSON.parse(r);
+        if (Array.isArray(arr)) {
+          const f = arr.filter(
+            (m: any) =>
+              m &&
+              m.id !== applicationId &&
+              (!target?.userId || m.id !== target.userId) &&
+              (!target?.id || m.id !== target.id) &&
+              (!targetEmailNorm || (m.email || '').trim().toLowerCase() !== targetEmailNorm)
+          );
+          localStorage.setItem('ucore_dme_staff_list', JSON.stringify(f));
+        }
+      }
+    } catch {}
 
     // Delete from Firestore cloud
     deleteApplicationFromFirestore(applicationId).catch(() => {});
@@ -1554,12 +1755,15 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
     const raw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
     const list: PendingApplication[] = raw ? JSON.parse(raw) : [];
 
-    // Collect IDs of approved applications to mark them as permanently deleted
+    // Collect IDs of approved applications to mark them as permanently deleted and revoke credentials
     const approved = list.filter((a) => a.status === 'aprovado' || a.approvedAt);
     approved.forEach((a) => {
-      if (a.id) addDeletedApplicationId(a.id);
-      if (a.userId) addDeletedApplicationId(a.userId);
-      if (a.email) addDeletedApplicationId(a.email);
+      purgeDeletedAccountCredentials({
+        id: a.id,
+        userId: a.userId,
+        email: a.email,
+        biNumber: a.biNumber,
+      });
     });
 
     // 1. Keep only pending or rejected applications locally
@@ -1567,7 +1771,7 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(remaining));
 
     // 2. Clear homologated teachers from local rosters
-    ['ucore_admin_teachers', 'ucore_director_teachers_v1'].forEach((k) => {
+    ['ucore_admin_teachers', 'ucore_director_teachers_v1', 'ucore_registered_teachers_v2'].forEach((k) => {
       try {
         const r = localStorage.getItem(k);
         if (r) {
@@ -1581,7 +1785,7 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
     });
 
     // 3. Clear homologated directors from local storage
-    ['sigre_admin_directors', 'ucore_registered_directors_v2'].forEach((k) => {
+    ['ucore_admin_directors', 'sigre_admin_directors', 'ucore_registered_directors_v2'].forEach((k) => {
       try {
         const r = localStorage.getItem(k);
         if (r) {
@@ -1610,25 +1814,6 @@ export async function clearAllHomologatedData(): Promise<{ success: boolean; cou
               !approved.some((a) => a.userId === m.id || a.id === m.id || a.email === m.email)
           );
           localStorage.setItem('ucore_dme_staff_list', JSON.stringify(fDme));
-        }
-      }
-    } catch {}
-
-    // 4. Reset active user if it was homologated
-    try {
-      const activeRaw = localStorage.getItem('ucore_active_user');
-      if (activeRaw) {
-        const activeUser = JSON.parse(activeRaw);
-        if (activeUser && (activeUser.status === 'ativo' || activeUser.approvedAt)) {
-          const wasApprovedApp = approved.some(
-            (a) => a.userId === activeUser.id || (a.email && a.email.toLowerCase() === (activeUser.email || '').toLowerCase())
-          );
-          if (wasApprovedApp) {
-            activeUser.status = 'pendente';
-            delete activeUser.approvedAt;
-            delete activeUser.approvedBy;
-            localStorage.setItem('ucore_active_user', JSON.stringify(activeUser));
-          }
         }
       }
     } catch {}

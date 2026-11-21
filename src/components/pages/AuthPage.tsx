@@ -61,6 +61,7 @@ import {
   getOccupiedDmeCargos,
   checkDuplicateRegistration,
   findRegisteredAccountByEmail,
+  isAccountDeleted,
 } from '../../utils/authApprovalStorage';
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
@@ -453,11 +454,29 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     // 2. Check registered accounts strictly by email
     const existingAccountLookup = findRegisteredAccountByEmail(cleanEmail);
 
+    // Block access if this account was deleted by the Administrator / Director and user is trying to log in
+    if (
+      mode === 'login' &&
+      !isDirectorMunicipal &&
+      !isSuperAdmin &&
+      (existingAccountLookup.wasDeletedByAdmin || isAccountDeleted(cleanEmail, uid))
+    ) {
+      setIsGoogleLoading(false);
+      setLoading(false);
+      onAuthLoadingChange?.(false);
+      setErrorMsg(
+        'Esta conta foi apagada pela Administração do Sistema. As suas credenciais anteriores foram revogadas e já não são válidas.'
+      );
+      return;
+    }
+
     // 3. Check Firestore user document by email
     let existingFirestoreUser: UserAccount | null = null;
-    try {
-      existingFirestoreUser = await fetchUserFromFirestore(cleanEmail);
-    } catch {}
+    if (!existingAccountLookup.wasDeletedByAdmin && !isAccountDeleted(cleanEmail, uid)) {
+      try {
+        existingFirestoreUser = await fetchUserFromFirestore(cleanEmail);
+      } catch {}
+    }
 
     // Check if account already exists in the system for this exact email
     const hasExistingAccount = Boolean(
@@ -1002,12 +1021,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       try {
         // 1. Sync applications and user records from cloud/server before authenticating
         await syncApplicationsFromServer().catch(() => {});
+
+        const accountLookup = findRegisteredAccountByEmail(cleanEmail);
+
+        if (accountLookup.wasDeletedByAdmin || isAccountDeleted(cleanEmail)) {
+          setLoading(false);
+          onAuthLoadingChange?.(false);
+          setErrorMsg(
+            'Esta conta foi apagada pela Administração do Sistema. As suas credenciais foram revogadas e já não têm validade para aceder à plataforma.'
+          );
+          return;
+        }
+
         let firestoreUser: UserAccount | null = null;
         try {
           firestoreUser = await fetchUserFromFirestore(cleanEmail);
         } catch {}
 
-        const accountLookup = findRegisteredAccountByEmail(cleanEmail);
+        if (
+          firestoreUser &&
+          isAccountDeleted(firestoreUser.id, firestoreUser.email, firestoreUser.biNumber)
+        ) {
+          firestoreUser = null;
+        }
+
         const hasRegisteredAccount = Boolean(accountLookup.exists || firestoreUser);
 
         if (!hasRegisteredAccount) {
