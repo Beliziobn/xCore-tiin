@@ -916,10 +916,15 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           font-family: 'Times New Roman', Times, serif !important;
           color: #000000;
         }
+        #cadastro-docente-a4-sheet,
+        #cadastro-docente-a4-sheet * {
+          font-family: 'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', sans-serif !important;
+        }
         #oficial-a4-sheet .a4-emblem-img,
         #declaracao-servico-a4-sheet .a4-emblem-img,
         #guia-ferias-a4-sheet .a4-emblem-img,
-        #guia-colocacao-a4-sheet .a4-emblem-img {
+        #guia-colocacao-a4-sheet .a4-emblem-img,
+        #cadastro-docente-a4-sheet .a4-emblem-img {
           width: 60px;
           height: auto;
           max-height: 60px;
@@ -930,7 +935,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-header-block,
         #declaracao-servico-a4-sheet .a4-header-block,
         #guia-ferias-a4-sheet .a4-header-block,
-        #guia-colocacao-a4-sheet .a4-header-block {
+        #guia-colocacao-a4-sheet .a4-header-block,
+        #cadastro-docente-a4-sheet .a4-header-block {
           text-align: center;
           font-family: 'Times New Roman', Times, serif !important;
           margin-bottom: 10pt;
@@ -940,7 +946,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-header-block p.a4-republic-title,
         #declaracao-servico-a4-sheet .a4-header-block p.a4-republic-title,
         #guia-ferias-a4-sheet .a4-header-block p.a4-republic-title,
-        #guia-colocacao-a4-sheet .a4-header-block p.a4-republic-title {
+        #guia-colocacao-a4-sheet .a4-header-block p.a4-republic-title,
+        #cadastro-docente-a4-sheet .a4-header-block p.a4-republic-title {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 14pt;
           font-weight: 700;
@@ -953,7 +960,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-header-block p.a4-inst-line,
         #declaracao-servico-a4-sheet .a4-header-block p.a4-inst-line,
         #guia-ferias-a4-sheet .a4-header-block p.a4-inst-line,
-        #guia-colocacao-a4-sheet .a4-header-block p.a4-inst-line {
+        #guia-colocacao-a4-sheet .a4-header-block p.a4-inst-line,
+        #cadastro-docente-a4-sheet .a4-header-block p.a4-inst-line {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -966,7 +974,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-title-wrap,
         #declaracao-servico-a4-sheet .a4-title-wrap,
         #guia-ferias-a4-sheet .a4-title-wrap,
-        #guia-colocacao-a4-sheet .a4-title-wrap {
+        #guia-colocacao-a4-sheet .a4-title-wrap,
+        #cadastro-docente-a4-sheet .a4-title-wrap {
           padding-top: 12pt;
           padding-bottom: 4pt;
           text-align: center;
@@ -974,7 +983,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-title-wrap h1,
         #declaracao-servico-a4-sheet .a4-title-wrap h1,
         #guia-ferias-a4-sheet .a4-title-wrap h1,
-        #guia-colocacao-a4-sheet .a4-title-wrap h1 {
+        #guia-colocacao-a4-sheet .a4-title-wrap h1,
+        #cadastro-docente-a4-sheet .a4-title-wrap h1 {
           display: inline-block;
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 14pt;
@@ -997,7 +1007,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         }
         #declaracao-servico-a4-sheet .a4-body-copy,
         #guia-ferias-a4-sheet .a4-body-copy,
-        #guia-colocacao-a4-sheet .a4-body-copy {
+        #guia-colocacao-a4-sheet .a4-body-copy,
+        #cadastro-docente-a4-sheet .a4-body-copy {
           margin-top: 12pt;
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
@@ -1016,7 +1027,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         }
         #declaracao-servico-a4-sheet .a4-body-copy p,
         #guia-ferias-a4-sheet .a4-body-copy p,
-        #guia-colocacao-a4-sheet .a4-body-copy p {
+        #guia-colocacao-a4-sheet .a4-body-copy p,
+        #cadastro-docente-a4-sheet .a4-body-copy p {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           line-height: 1.5;
@@ -1044,7 +1056,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-body-copy strong,
         #declaracao-servico-a4-sheet .a4-body-copy strong,
         #guia-ferias-a4-sheet .a4-body-copy strong,
-        #guia-colocacao-a4-sheet .a4-body-copy strong {
+        #guia-colocacao-a4-sheet .a4-body-copy strong,
+        #cadastro-docente-a4-sheet .a4-body-copy strong {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -1052,7 +1065,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-footer-block,
         #declaracao-servico-a4-sheet .a4-footer-block,
         #guia-ferias-a4-sheet .a4-footer-block,
-        #guia-colocacao-a4-sheet .a4-footer-block {
+        #guia-colocacao-a4-sheet .a4-footer-block,
+        #cadastro-docente-a4-sheet .a4-footer-block {
           margin-top: 14pt;
           padding-top: 2pt;
           border: 0;
@@ -1071,7 +1085,9 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #guia-ferias-a4-sheet .a4-date-line,
         #guia-ferias-a4-sheet .a4-date-line span,
         #guia-colocacao-a4-sheet .a4-date-line,
-        #guia-colocacao-a4-sheet .a4-date-line span {
+        #guia-colocacao-a4-sheet .a4-date-line span,
+        #cadastro-docente-a4-sheet .a4-date-line,
+        #cadastro-docente-a4-sheet .a4-date-line span {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           line-height: 1.35;
@@ -1087,7 +1103,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         }
         #declaracao-servico-a4-sheet .a4-sig-container,
         #guia-ferias-a4-sheet .a4-sig-container,
-        #guia-colocacao-a4-sheet .a4-sig-container {
+        #guia-colocacao-a4-sheet .a4-sig-container,
+        #cadastro-docente-a4-sheet .a4-sig-container {
           text-align: center;
           width: 280px;
           margin: 0 auto;
@@ -1123,7 +1140,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         }
         #declaracao-servico-a4-sheet .a4-sig-role,
         #guia-ferias-a4-sheet .a4-sig-role,
-        #guia-colocacao-a4-sheet .a4-sig-role {
+        #guia-colocacao-a4-sheet .a4-sig-role,
+        #cadastro-docente-a4-sheet .a4-sig-role {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -1134,7 +1152,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-sig-line,
         #declaracao-servico-a4-sheet .a4-sig-line,
         #guia-ferias-a4-sheet .a4-sig-line,
-        #guia-colocacao-a4-sheet .a4-sig-line {
+        #guia-colocacao-a4-sheet .a4-sig-line,
+        #cadastro-docente-a4-sheet .a4-sig-line {
           border-bottom: 1px solid #000000;
           width: 250px;
           margin: 0 auto;
@@ -1144,7 +1163,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #oficial-a4-sheet .a4-sig-name,
         #declaracao-servico-a4-sheet .a4-sig-name,
         #guia-ferias-a4-sheet .a4-sig-name,
-        #guia-colocacao-a4-sheet .a4-sig-name {
+        #guia-colocacao-a4-sheet .a4-sig-name,
+        #cadastro-docente-a4-sheet .a4-sig-name {
           font-family: 'Times New Roman', Times, serif !important;
           font-size: 12pt;
           font-weight: 700;
@@ -1231,6 +1251,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #guia-ferias-a4-sheet *,
           #guia-colocacao-a4-sheet,
           #guia-colocacao-a4-sheet *,
+          #cadastro-docente-a4-sheet,
+          #cadastro-docente-a4-sheet *,
           #ficha-avaliacao-a4-sheet,
           #ficha-avaliacao-a4-sheet * {
             font-family: 'Times New Roman', Times, serif !important;
@@ -1238,7 +1260,8 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #oficial-a4-sheet,
           #declaracao-servico-a4-sheet,
           #guia-ferias-a4-sheet,
-          #guia-colocacao-a4-sheet {
+          #guia-colocacao-a4-sheet,
+          #cadastro-docente-a4-sheet {
             display: block !important;
             box-sizing: border-box !important;
             box-shadow: none !important;

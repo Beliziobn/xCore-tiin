@@ -1,6 +1,40 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  FileText,
+  Printer,
+  FileDown,
+  Check,
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  Download,
+  AlertTriangle,
+  Eye,
+  UserPlus,
+  Database,
+  RotateCcw,
+  School,
+  ChevronDown,
+  X,
+} from 'lucide-react';
+import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
+import {
+  downloadCadastroDocenteVagaPdf,
+  printSinglePageA4Clean,
+} from '../../utils/declaracaoPdfGenerator';
+import {
+  formatColocacaoDateExtenso,
+  formatColocacaoDateShort,
+} from '../../utils/guiaColocacaoStorage';
 import type { UserAccount } from '../../types';
 import { submitQuickServiceRequest } from '../../utils/quickServicesStorage';
+
+export type VagaDocenteStatusFluxo =
+  | 'Aguardando Direção da Escola'
+  | 'Encaminhado à Direção Municipal'
+  | 'Parecer Favorável'
+  | 'Parecer Não Favorável';
 
 export interface CadastroDocenteVagaRecord {
   id: string;
@@ -22,9 +56,33 @@ export interface CadastroDocenteVagaRecord {
   dataParecer: string;
   localParecer: string;
   director: string;
+  // Campos editáveis do documento oficial (Destinatário À/Ao, Assunto, Assinatura e Rodapé)
+  destinatarioPrep?: 'À' | 'Ao';
+  destinatario?: string;
+  destinatarioLocal?: string;
+  assunto?: string;
+  saudacao?: string;
+  cargoDirector?: string;
+  rodapeEndereco?: string;
+  rodapeEmail?: string;
+  // Optional workflow fields for Navbar notifications & multi-role tracking
+  statusFluxo?: VagaDocenteStatusFluxo;
+  disciplina?: string;
+  tipoSolicitacao?: string;
+  justificativaParecer?: string;
+  solicitadoPorId?: string;
+  solicitadoPorEmail?: string;
+  solicitadoPorNome?: string;
+  solicitadoEm?: string;
+  encaminhadoPorNome?: string;
+  encaminhadoPorEscola?: string;
+  encaminhadoEm?: string;
+  avaliadoEm?: string;
 }
 
-interface CadastroDocenteDraft {
+interface CadastroDocenteFormState {
+  id?: string;
+  criado?: string;
   trat: 'Senhor' | 'Senhora';
   nome: string;
   agente: string;
@@ -43,6 +101,14 @@ interface CadastroDocenteDraft {
   dataParecer: string;
   localParecer: string;
   director: string;
+  destinatarioPrep: 'À' | 'Ao';
+  destinatario: string;
+  destinatarioLocal: string;
+  assunto: string;
+  saudacao: string;
+  cargoDirector: string;
+  rodapeEndereco: string;
+  rodapeEmail: string;
 }
 
 export interface CadastroDocenteVagaSectionProps {
@@ -52,6 +118,51 @@ export interface CadastroDocenteVagaSectionProps {
 
 const STORAGE_KEY = 'cadastro-docente-registos';
 const DRAFT_KEY = 'cadastro-docente-rascunho';
+
+const DESTINATARIOS_SUGGESTIONS = [
+  'Secretária Geral da Administração Municipal',
+  'Gabinete Provincial da Educação',
+  'Gabinete Provincial da Educação de Malanje',
+  'Gabinete de Recursos Humanos da Administração Municipal',
+  'Gabinete do Administrador Municipal',
+  'Direcção Provincial da Educação',
+];
+
+export function inferDestinatarioPrep(destinatarioText?: string): 'À' | 'Ao' {
+  const clean = (destinatarioText || '').trim().toLowerCase();
+  if (!clean) return 'À';
+  if (
+    clean.startsWith('secretária') ||
+    clean.startsWith('secretaria') ||
+    clean.startsWith('direcção') ||
+    clean.startsWith('direccao') ||
+    clean.startsWith('direção') ||
+    clean.startsWith('administração') ||
+    clean.startsWith('administracao') ||
+    clean.startsWith('repartição') ||
+    clean.startsWith('secção') ||
+    clean.startsWith('comissão')
+  ) {
+    return 'À';
+  }
+  if (
+    clean.startsWith('gabinete') ||
+    clean.includes('gabinete') ||
+    clean.startsWith('director') ||
+    clean.startsWith('diretor') ||
+    clean.startsWith('administrador') ||
+    clean.startsWith('departamento') ||
+    clean.startsWith('instituto') ||
+    clean.startsWith('ministério') ||
+    clean.startsWith('ministerio') ||
+    clean.startsWith('serviço') ||
+    clean.startsWith('servico') ||
+    clean.startsWith('chefe')
+  ) {
+    return 'Ao';
+  }
+  return 'À';
+}
 
 const MUNICIPIOS_MALANJE = [
   'Quêssua',
@@ -73,7 +184,9 @@ const MUNICIPIOS_MALANJE = [
 ];
 
 const ESCOLAS_QUESSUA_SUGGESTIONS = [
+  'Escola Primária n.º 125 – Caxeta – Quêssua',
   'Complexo Escolar N.º 16 – Missão do Quêssua',
+  'Complexo Escolar Católico n.º 166 MJE São Pedro – Quêssua',
   'Escola Primária do Quêssua',
   'Complexo Escolar do Quêssua',
   'Escola do I Ciclo do Ensino Secundário do Quêssua',
@@ -106,62 +219,140 @@ const CLASSES_OPTIONS = [
   '6.ª Classe',
 ];
 
+const CATEGORIAS_PRESET = [
+  {
+    value: 'Professor do Ensino Primário e Secundário',
+    label: 'Professor do Ensino Primário e Secundário (P.E.P.E.S)',
+  },
+  {
+    value: 'Professor do Ensino Primário Diplomado',
+    label: 'Professor do Ensino Primário Diplomado (P.E.P.D)',
+  },
+  {
+    value: 'Professor do I Ciclo do Ensino Secundário Diplomado',
+    label: 'Professor do I Ciclo do Ensino Secundário Diplomado (P.I.C.E.S.D)',
+  },
+  {
+    value: 'Professor do II Ciclo do Ensino Secundário Diplomado',
+    label: 'Professor do II Ciclo do Ensino Secundário Diplomado (P.II.C.E.S.D)',
+  },
+  {
+    value: 'Professor do Ensino Primário Auxiliar',
+    label: 'Professor do Ensino Primário Auxiliar (P.E.P.A)',
+  },
+  {
+    value: 'Outra',
+    label: 'Outra categoria',
+  },
+];
+
+const MOTIVOS_OPTIONS = [
+  'Motivos de ordem pessoal',
+  'Motivos de ordem familiar',
+  'Motivos de saúde',
+  'Outros motivos',
+];
+
 function getTodayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getInitialDraft(): CadastroDocenteDraft {
+export function formatDateTimePt(isoOrDate?: string): string {
+  if (!isoOrDate) return 'Agora';
+  try {
+    const d = new Date(isoOrDate);
+    if (isNaN(d.getTime())) return isoOrDate;
+    return d.toLocaleDateString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return isoOrDate;
+  }
+}
+
+function getFreshFormState(): CadastroDocenteFormState {
+  return {
+    trat: 'Senhor',
+    nome: '',
+    agente: '',
+    grau: '13.º Grau',
+    catSel: 'Professor do Ensino Primário e Secundário',
+    catOutra: '',
+    instAct: '',
+    munAct: 'Malanje',
+    munDest: 'Quêssua',
+    escola: '',
+    interesse: true,
+    motivo: 'Motivos de ordem pessoal',
+    proxRes: false,
+    motivoDet: '',
+    parecer: 'Favorável',
+    dataParecer: getTodayIso(),
+    localParecer: 'Quêssua',
+    director: 'Belízio Miguel dos Santos António',
+    destinatarioPrep: 'À',
+    destinatario: 'Secretária Geral da Administração Municipal',
+    destinatarioLocal: 'QUÊSSUA',
+    assunto: 'Pedido de Parecer sobre Solicitação de Vaga',
+    saudacao: 'Cordiais saudações.',
+    cargoDirector: 'O Director Municipal',
+    rodapeEndereco: 'Estrada Principal do Bairro da Carreira Tiro',
+    rodapeEmail: 'dmedoquessua@gmail.com',
+  };
+}
+
+function getInitialFormState(): CadastroDocenteFormState {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const destText =
+        parsed.destinatario || 'Secretária Geral da Administração Municipal';
+      const inferredPrep =
+        parsed.destinatarioPrep === 'Ao' || parsed.destinatarioPrep === 'À'
+          ? parsed.destinatarioPrep
+          : inferDestinatarioPrep(destText);
       return {
+        id: parsed.id,
+        criado: parsed.criado,
         trat: parsed.trat === 'Senhora' ? 'Senhora' : 'Senhor',
         nome: parsed.nome || '',
         agente: parsed.agente || '',
-        grau: parsed.grau || '',
-        catSel: parsed.catSel || '',
+        grau: parsed.grau || '13.º Grau',
+        catSel: parsed.catSel || 'Professor do Ensino Primário e Secundário',
         catOutra: parsed.catOutra || '',
         instAct: parsed.instAct || '',
-        munAct: parsed.munAct || '',
+        munAct: parsed.munAct || 'Malanje',
         munDest: parsed.munDest || 'Quêssua',
         escola: parsed.escola || '',
-        interesse: typeof parsed.interesse === 'boolean' ? parsed.interesse : false,
+        interesse: typeof parsed.interesse === 'boolean' ? parsed.interesse : true,
         motivo: parsed.motivo || 'Motivos de ordem pessoal',
         proxRes: typeof parsed.proxRes === 'boolean' ? parsed.proxRes : false,
         motivoDet: parsed.motivoDet || '',
-        parecer: parsed.parecer || 'Pendente',
+        parecer: parsed.parecer || 'Favorável',
         dataParecer: parsed.dataParecer || getTodayIso(),
         localParecer: parsed.localParecer || 'Quêssua',
         director: parsed.director || 'Belízio Miguel dos Santos António',
+        destinatarioPrep: inferredPrep,
+        destinatario: destText,
+        destinatarioLocal: parsed.destinatarioLocal || (parsed.munDest || 'QUÊSSUA').toUpperCase(),
+        assunto: parsed.assunto || 'Pedido de Parecer sobre Solicitação de Vaga',
+        saudacao: parsed.saudacao || 'Cordiais saudações.',
+        cargoDirector: parsed.cargoDirector || 'O Director Municipal',
+        rodapeEndereco:
+          parsed.rodapeEndereco || 'Estrada Principal do Bairro da Carreira Tiro',
+        rodapeEmail: parsed.rodapeEmail || 'dmedoquessua@gmail.com',
       };
     }
   } catch {
     // ignore
   }
-  return {
-    trat: 'Senhor',
-    nome: '',
-    agente: '',
-    grau: '',
-    catSel: '',
-    catOutra: '',
-    instAct: '',
-    munAct: '',
-    munDest: 'Quêssua',
-    escola: '',
-    interesse: false,
-    motivo: 'Motivos de ordem pessoal',
-    proxRes: false,
-    motivoDet: '',
-    parecer: 'Pendente',
-    dataParecer: getTodayIso(),
-    localParecer: 'Quêssua',
-    director: 'Belízio Miguel dos Santos António',
-  };
+  return getFreshFormState();
 }
 
-function loadRecords(): CadastroDocenteVagaRecord[] {
+export function loadVagaDocenteRecords(): CadastroDocenteVagaRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -172,150 +363,317 @@ function loadRecords(): CadastroDocenteVagaRecord[] {
   }
 }
 
+const loadRecords = loadVagaDocenteRecords;
+
+export function recordBelongsToProfessor(
+  record: CadastroDocenteVagaRecord,
+  user?: UserAccount | null
+): boolean {
+  if (!user) return false;
+  if (record.solicitadoPorId && user.id && record.solicitadoPorId === user.id) return true;
+  if (
+    record.solicitadoPorEmail &&
+    user.email &&
+    record.solicitadoPorEmail.trim().toLowerCase() === user.email.trim().toLowerCase()
+  ) {
+    return true;
+  }
+  const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim().toLowerCase();
+  if (fullName && record.nome?.trim().toLowerCase() === fullName) return true;
+  return false;
+}
+
+export function recordBelongsToDirectorSchool(
+  record: CadastroDocenteVagaRecord,
+  user?: UserAccount | null
+): boolean {
+  if (!user || !user.schoolName) return false;
+  const userSchool = user.schoolName.trim().toLowerCase();
+  const targetSchool = (record.escola || '').trim().toLowerCase();
+  const originSchool = (record.instAct || '').trim().toLowerCase();
+  return (
+    Boolean(userSchool) &&
+    (targetSchool.includes(userSchool) ||
+      userSchool.includes(targetSchool) ||
+      originSchool.includes(userSchool) ||
+      userSchool.includes(originSchool))
+  );
+}
+
+export async function syncVagasDocentesFromFirestore(): Promise<CadastroDocenteVagaRecord[]> {
+  return loadVagaDocenteRecords();
+}
+
 function saveRecordsToStorage(list: CadastroDocenteVagaRecord[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
+    window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
   } catch {
     // ignore
   }
 }
 
 export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProps> = ({
+  isLoggedIn = false,
   currentUser,
 }) => {
-  const [draft, setDraft] = useState<CadastroDocenteDraft>(() => getInitialDraft());
+  const isAdminOrDirector = Boolean(
+    isLoggedIn &&
+      currentUser &&
+      (currentUser.role === 'admin' || currentUser.role === 'diretor')
+  );
+
   const [records, setRecords] = useState<CadastroDocenteVagaRecord[]>(() => loadRecords());
-  const [invalidFields, setInvalidFields] = useState<Record<string, boolean>>({});
+  const [formData, setFormData] = useState<CadastroDocenteFormState>(() => getInitialFormState());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [formErrorBanner, setFormErrorBanner] = useState<string | null>(null);
   const [submittedRecord, setSubmittedRecord] = useState<CadastroDocenteVagaRecord | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [recordToDelete, setRecordToDelete] = useState<CadastroDocenteVagaRecord | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [subView, setSubView] = useState<'database' | 'preview' | 'form'>('form');
 
-  const formRef = useRef<HTMLFormElement | null>(null);
-  const doneRef = useRef<HTMLDivElement | null>(null);
+  const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
+  const schoolDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Save draft to localStorage whenever form changes
+  const todayISO = useMemo(() => getTodayIso(), []);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const reloadRecords = () => {
+    setRecords(loadRecords());
+  };
+
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
     } catch {
       // ignore
     }
-  }, [draft]);
+  }, [formData]);
 
-  // Listen to storage events across tabs
   useEffect(() => {
-    const handleStorage = () => {
-      setRecords(loadRecords());
+    reloadRecords();
+    const handleUpdated = () => reloadRecords();
+    window.addEventListener('sigre-cadastro-docente-updated', handleUpdated);
+    window.addEventListener('storage', handleUpdated);
+    return () => {
+      window.removeEventListener('sigre-cadastro-docente-updated', handleUpdated);
+      window.removeEventListener('storage', handleUpdated);
     };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  const catValue = useMemo(() => {
-    return draft.catSel === 'Outra' ? draft.catOutra.trim() : draft.catSel;
-  }, [draft.catSel, draft.catOutra]);
-
-  const isFem = draft.trat === 'Senhora';
-
-  // Count 11 required fields
-  const filledRequiredCount = useMemo(() => {
-    let count = 0;
-    if (draft.trat) count += 1;
-    if (draft.nome.trim().split(/\s+/).filter(Boolean).length >= 2) count += 1;
-    if (/^\d{6,10}$/.test(draft.agente.trim())) count += 1;
-    if (draft.grau) count += 1;
-    if (draft.catSel) count += 1;
-    if (draft.catSel !== 'Outra' || draft.catOutra.trim().length > 2) {
-      if (draft.catSel === 'Outra' && draft.catOutra.trim().length > 2) {
-        // Counted as part of valid category, wait: let's match the exact 11 fields from the HTML!
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        schoolDropdownRef.current &&
+        !schoolDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowSchoolSuggestions(false);
       }
-    }
-    return count;
-  }, [draft]);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
-  // Exact 11-field calculation from attached HTML:
-  // req = ['nome','agente','grau','catSel','instAct','munAct','munDest','escola','interesse','motivo']
-  // plus trat (+1) => total = req.length + 1 = 11 (or 12 if catSel === 'Outra')
-  const progressStats = useMemo(() => {
-    const reqList: string[] = [
-      'nome',
-      'agente',
-      'grau',
-      'catSel',
-      'instAct',
-      'munAct',
-      'munDest',
-      'escola',
-      'interesse',
-      'motivo',
-    ];
-    if (draft.catSel === 'Outra') {
-      reqList.push('catOutra');
-    }
-
-    let ok = 1; // trat is always selected ('Senhor' or 'Senhora')
-    for (const k of reqList) {
-      if (k === 'interesse') {
-        if (draft.interesse) ok += 1;
-      } else {
-        const val = String((draft as unknown as Record<string, unknown>)[k] || '').trim();
-        if (val) ok += 1;
+  // Consolidate all schools (suggestions + stored records + admin schools)
+  const allAvailableSchools = useMemo(() => {
+    const set = new Set<string>(ESCOLAS_QUESSUA_SUGGESTIONS);
+    records.forEach((r) => {
+      if (r.escola && r.escola.trim()) set.add(r.escola.trim());
+    });
+    try {
+      const saved = localStorage.getItem('ucore_admin_schools');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((s: any) => {
+            if (s?.name && s.name.trim()) set.add(s.name.trim());
+          });
+        }
       }
-    }
-    const total = reqList.length + 1;
-    const pct = Math.round((ok / total) * 100);
-    return { ok, total, pct };
-  }, [draft]);
+    } catch {}
+    return Array.from(set);
+  }, [records]);
 
-  const validateSingleField = (fieldKey: string, currentDraft: CadastroDocenteDraft): boolean => {
-    switch (fieldKey) {
-      case 'nome':
-        return currentDraft.nome.trim().split(/\s+/).filter(Boolean).length >= 2;
-      case 'agente':
-        return /^\d{6,10}$/.test(currentDraft.agente.trim());
+  const schoolSuggestions = useMemo(() => {
+    const q = (formData.escola || '').trim().toLowerCase();
+    if (!q) return allAvailableSchools;
+    return allAvailableSchools.filter((school) => school.toLowerCase().includes(q));
+  }, [formData.escola, allAvailableSchools]);
+
+  const isExactRegisteredSchool = useMemo(() => {
+    const q = (formData.escola || '').trim().toLowerCase();
+    if (!q) return false;
+    return allAvailableSchools.some((s) => s.toLowerCase() === q);
+  }, [formData.escola, allAvailableSchools]);
+
+  const resolvedCategory = useMemo(() => {
+    return formData.catSel === 'Outra'
+      ? formData.catOutra.trim() || 'Professor'
+      : formData.catSel.trim() || 'Professor do Ensino Primário e Secundário';
+  }, [formData.catSel, formData.catOutra]);
+
+  // Live preview record derived from current formData (or submittedRecord if explicitly viewing one)
+  const livePreviewRecord: CadastroDocenteVagaRecord = useMemo(() => {
+    if (submittedRecord) return submittedRecord;
+
+    const destText =
+      formData.destinatario.trim() || 'Secretária Geral da Administração Municipal';
+    const destPrep: 'À' | 'Ao' =
+      formData.destinatarioPrep === 'Ao' || formData.destinatarioPrep === 'À'
+        ? formData.destinatarioPrep
+        : inferDestinatarioPrep(destText);
+
+    return {
+      id: formData.id || 'QD-2026',
+      criado: formData.criado || todayISO,
+      trat: formData.trat || 'Senhor',
+      nome: formData.nome.trim() || 'Diogo da Costa Albino da Silva',
+      agente: formData.agente.trim() || '99072119',
+      grau: formData.grau.trim() || '13.º Grau',
+      cat: resolvedCategory,
+      instAct: formData.instAct.trim() || 'Colégio Amilcar Cabral',
+      munAct: formData.munAct.trim() || 'Malanje',
+      munDest: formData.munDest.trim() || 'Quêssua',
+      escola: formData.escola.trim() || 'Escola Primária n.º 125 – Caxeta – Quêssua',
+      interesse: formData.interesse,
+      motivo: formData.motivo.trim() || 'Motivos de ordem pessoal',
+      proxRes: formData.proxRes,
+      motivoDet: formData.motivoDet.trim(),
+      parecer: formData.parecer || 'Favorável',
+      dataParecer: formData.dataParecer.trim() || todayISO,
+      localParecer: formData.localParecer.trim() || 'Quêssua',
+      director: formData.director.trim() || 'Belízio Miguel dos Santos António',
+      destinatarioPrep: destPrep,
+      destinatario: destText,
+      destinatarioLocal:
+        formData.destinatarioLocal.trim() ||
+        (formData.munDest.trim() || 'QUÊSSUA').toUpperCase(),
+      assunto:
+        formData.assunto.trim() || 'Pedido de Parecer sobre Solicitação de Vaga',
+      saudacao: formData.saudacao.trim() || 'Cordiais saudações.',
+      cargoDirector: formData.cargoDirector.trim() || 'O Director Municipal',
+      rodapeEndereco:
+        formData.rodapeEndereco.trim() ||
+        'Estrada Principal do Bairro da Carreira Tiro',
+      rodapeEmail: formData.rodapeEmail.trim() || 'dmedoquessua@gmail.com',
+    };
+  }, [formData, submittedRecord, todayISO, resolvedCategory]);
+
+  // Real-time duplicate check by N.º de Agente
+  const duplicateWarning = useMemo(() => {
+    const ag = formData.agente.trim();
+    if (!ag) return null;
+    const found = records.find(
+      (r) => r.agente.trim() === ag && (!formData.id || r.id !== formData.id)
+    );
+    return found || null;
+  }, [formData.agente, formData.id, records]);
+
+  const validateSingleField = (
+    field: keyof CadastroDocenteFormState,
+    data: CadastroDocenteFormState
+  ): string => {
+    switch (field) {
+      case 'nome': {
+        const v = data.nome.trim();
+        if (!v || v.split(/\s+/).filter(Boolean).length < 2) {
+          return 'Escreva o nome completo (nome e apelido).';
+        }
+        return '';
+      }
+      case 'agente': {
+        const v = data.agente.trim();
+        if (!/^\d{6,10}$/.test(v)) {
+          return 'O número de agente deve ter entre 6 e 10 algarismos.';
+        }
+        return '';
+      }
       case 'grau':
-        return Boolean(currentDraft.grau);
+        return data.grau.trim() ? '' : 'Escolha o grau ou a classe.';
       case 'catSel':
-        return Boolean(currentDraft.catSel);
+        return data.catSel.trim() ? '' : 'Escolha a categoria.';
       case 'catOutra':
-        return currentDraft.catSel !== 'Outra' || currentDraft.catOutra.trim().length > 2;
+        return data.catSel === 'Outra' && data.catOutra.trim().length < 3
+          ? 'Escreva o nome da categoria.'
+          : '';
       case 'instAct':
-        return currentDraft.instAct.trim().length > 2;
+        return data.instAct.trim().length >= 3
+          ? ''
+          : 'Indique a instituição onde está colocado.';
       case 'munAct':
-        return currentDraft.munAct.trim().length > 1;
+        return data.munAct.trim().length >= 2 ? '' : 'Indique o município actual.';
       case 'munDest':
-        return currentDraft.munDest.trim().length > 1;
+        return data.munDest.trim().length >= 2 ? '' : 'Indique o município pretendido.';
       case 'escola':
-        return currentDraft.escola.trim().length > 3;
+        return data.escola.trim().length >= 3 ? '' : 'Indique a escola onde pretende vaga.';
       case 'interesse':
-        return Boolean(currentDraft.interesse);
+        return data.interesse ? '' : 'Confirme o interesse em trabalhar neste município.';
       default:
-        return true;
+        return '';
     }
   };
 
-  const updateField = <K extends keyof CadastroDocenteDraft>(
-    key: K,
-    value: CadastroDocenteDraft[K]
+  const handleFieldChange = <K extends keyof CadastroDocenteFormState>(
+    field: K,
+    value: CadastroDocenteFormState[K]
   ) => {
-    setDraft((prev) => {
-      const next = { ...prev, [key]: value };
-      if (invalidFields[key as string]) {
-        const isValidNow = validateSingleField(key as string, next);
-        if (isValidNow) {
-          setInvalidFields((old) => {
-            const copy = { ...old };
-            delete copy[key as string];
-            return copy;
-          });
-        }
+    if (submittedRecord) {
+      setSubmittedRecord(null);
+    }
+
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      // Automaticamente define "À" quando for pela Secretária/Direcção e "Ao" quando for pelo Gabinete
+      if (field === 'destinatario') {
+        next.destinatarioPrep = inferDestinatarioPrep(String(value));
+      }
+      if (
+        field === 'munDest' &&
+        (!prev.destinatarioLocal ||
+          prev.destinatarioLocal.trim().toLowerCase() === prev.munDest.trim().toLowerCase())
+      ) {
+        next.destinatarioLocal = String(value || 'QUÊSSUA').toUpperCase();
+      }
+      if (touched[field as string] || errors[field as string]) {
+        const err = validateSingleField(field, next);
+        setErrors((prevErr) => ({ ...prevErr, [field as string]: err }));
       }
       return next;
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFieldBlur = (field: keyof CadastroDocenteFormState) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateSingleField(field, formData);
+    setErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
+  const handleResetForm = () => {
+    const fresh = getFreshFormState();
+    setFormData(fresh);
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {}
+    setErrors({});
+    setTouched({});
+    setFormErrorBanner(null);
+    setSubmittedRecord(null);
+    setSubView('form');
+    showToast('Formulário de Cadastro Docente limpo.');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const fieldsToCheck = [
+    const fieldsToCheck: (keyof CadastroDocenteFormState)[] = [
       'nome',
       'agente',
       'grau',
@@ -327,1065 +685,1291 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
       'escola',
       'interesse',
     ];
-    const newInvalids: Record<string, boolean> = {};
-    let firstInvalidKey: string | null = null;
 
-    for (const key of fieldsToCheck) {
-      if (!validateSingleField(key, draft)) {
-        newInvalids[key] = true;
-        if (!firstInvalidKey) firstInvalidKey = key;
+    const newErrors: Record<string, string> = {};
+    let firstInvalidId: string | null = null;
+
+    for (const f of fieldsToCheck) {
+      const err = validateSingleField(f, formData);
+      if (err) {
+        newErrors[f] = err;
+        if (!firstInvalidId) firstInvalidId = `f-cdq-${f}`;
       }
     }
 
-    setInvalidFields(newInvalids);
-
-    if (firstInvalidKey) {
-      const el = formRef.current?.querySelector(
-        `[data-field="${firstInvalidKey}"]`
-      ) as HTMLElement | null;
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+    setErrors(newErrors);
+    if (firstInvalidId) {
+      setFormErrorBanner('Verifique os campos assinalados a vermelho antes de guardar.');
+      const el = document.getElementById(firstInvalidId);
+      if (el) el.focus();
       return;
     }
 
-    const code = 'CD' + String(Date.now()).slice(-6);
+    setFormErrorBanner(null);
+
+    const finalCat =
+      formData.catSel === 'Outra' ? formData.catOutra.trim() : formData.catSel.trim();
+
+    const recordId =
+      formData.id || `QD-${String(Date.now()).slice(-4)}-${String(records.length + 1).padStart(2, '0')}`;
+
+    const destText =
+      formData.destinatario.trim() || 'Secretária Geral da Administração Municipal';
+    const destPrep: 'À' | 'Ao' =
+      formData.destinatarioPrep === 'Ao' || formData.destinatarioPrep === 'À'
+        ? formData.destinatarioPrep
+        : inferDestinatarioPrep(destText);
+
     const newRecord: CadastroDocenteVagaRecord = {
-      id: code,
-      criado: new Date().toISOString(),
-      trat: draft.trat,
-      nome: draft.nome.trim(),
-      agente: draft.agente.trim(),
-      grau: draft.grau,
-      cat: catValue,
-      instAct: draft.instAct.trim(),
-      munAct: draft.munAct.trim(),
-      munDest: draft.munDest.trim(),
-      escola: draft.escola.trim(),
-      interesse: draft.interesse,
-      motivo: draft.motivo,
-      proxRes: draft.proxRes,
-      motivoDet: draft.motivoDet.trim(),
-      parecer: draft.parecer,
-      dataParecer: draft.dataParecer,
-      localParecer: draft.localParecer.trim(),
-      director: draft.director.trim(),
+      id: recordId,
+      criado: formData.criado || getTodayIso(),
+      trat: formData.trat,
+      nome: formData.nome.trim(),
+      agente: formData.agente.trim(),
+      grau: formData.grau.trim(),
+      cat: finalCat,
+      instAct: formData.instAct.trim(),
+      munAct: formData.munAct.trim(),
+      munDest: formData.munDest.trim(),
+      escola: formData.escola.trim(),
+      interesse: Boolean(formData.interesse),
+      motivo: formData.motivo,
+      proxRes: Boolean(formData.proxRes),
+      motivoDet: formData.motivoDet.trim(),
+      parecer: formData.parecer || 'Pendente',
+      dataParecer: formData.dataParecer || getTodayIso(),
+      localParecer: formData.localParecer.trim() || 'Quêssua',
+      director: formData.director.trim() || 'Belízio Miguel dos Santos António',
+      destinatarioPrep: destPrep,
+      destinatario: destText,
+      destinatarioLocal:
+        formData.destinatarioLocal.trim() ||
+        (formData.munDest.trim() || 'QUÊSSUA').toUpperCase(),
+      assunto:
+        formData.assunto.trim() || 'Pedido de Parecer sobre Solicitação de Vaga',
+      saudacao: formData.saudacao.trim() || 'Cordiais saudações.',
+      cargoDirector: formData.cargoDirector.trim() || 'O Director Municipal',
+      rodapeEndereco:
+        formData.rodapeEndereco.trim() ||
+        'Estrada Principal do Bairro da Carreira Tiro',
+      rodapeEmail: formData.rodapeEmail.trim() || 'dmedoquessua@gmail.com',
     };
 
-    const nextList = [newRecord, ...records];
-    setRecords(nextList);
-    saveRecordsToStorage(nextList);
+    const existingIdx = records.findIndex((r) => r.id === recordId);
+    const updatedList =
+      existingIdx >= 0
+        ? records.map((r, i) => (i === existingIdx ? newRecord : r))
+        : [newRecord, ...records];
 
-    // Also register in quickServicesStorage so Admin / Municipal Direction sees the request in Pedidos
-    void submitQuickServiceRequest({
-      serviceType: 'GUIA_COLOCACAO',
-      title: `Pedido de Vaga Docente (${newRecord.id})`,
-      requesterName: newRecord.nome,
-      requesterPhone: currentUser?.phone || '900000000',
-      requesterEmail: currentUser?.email || '',
-      requesterRoleTitle: newRecord.cat,
-      targetSchoolName: newRecord.escola || currentUser?.schoolName || 'Município do Quêssua',
-      destinationSchoolName: newRecord.escola,
-      details: {
-        employeeName: newRecord.nome,
-        employeeAgente: newRecord.agente,
-        employeeSchoolOrDepartment: `${newRecord.instAct} (${newRecord.munAct})`,
-        employeeCategory: `${newRecord.cat} — ${newRecord.grau}`,
-        destinationSchool: newRecord.escola,
-        purpose: newRecord.motivo,
-        notes: `Pedido de Vaga (${newRecord.id}) — De: ${newRecord.instAct} (${newRecord.munAct}) Para: ${newRecord.escola} (${newRecord.munDest}). ${newRecord.motivoDet || ''}`,
-      },
-    });
+    setRecords(updatedList);
+    saveRecordsToStorage(updatedList);
 
-    try {
-      localStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // ignore
+    // If not admin/director, also notify DME via QuickServices
+    if (!isAdminOrDirector) {
+      try {
+        await submitQuickServiceRequest({
+          serviceType: 'GUIA_COLOCACAO',
+          title: `Pedido de Vaga Docente — ${newRecord.trat} ${newRecord.nome}`,
+          requesterName: newRecord.nome,
+          requesterPhone: newRecord.agente,
+          requesterEmail: currentUser?.email || '',
+          requesterRoleTitle: `${newRecord.cat} (${newRecord.grau})`,
+          targetRole: 'ADMIN',
+          targetSchoolName: newRecord.escola,
+          details: {
+            employeeName: newRecord.nome,
+            employeeAgente: newRecord.agente,
+            employeeSchoolOrDepartment: `${newRecord.instAct} (${newRecord.munAct})`,
+            employeeCategory: `${newRecord.cat} · ${newRecord.grau}`,
+            destinationSchool: `${newRecord.escola} (${newRecord.munDest})`,
+            purpose: newRecord.motivo,
+            notes: `Código: ${newRecord.id} | Destinatário: ${newRecord.destinatarioPrep} ${newRecord.destinatario} | Colocação actual: ${newRecord.instAct} (${newRecord.munAct}) | Pretende vaga em: ${newRecord.escola} (${newRecord.munDest}) | Motivo: ${newRecord.motivo}${newRecord.proxRes ? ' (Próximo da residência)' : ''}${newRecord.motivoDet ? ` - ${newRecord.motivoDet}` : ''} | Parecer: ${newRecord.parecer}`,
+          },
+        });
+      } catch {
+        // local storage already saved
+      }
     }
 
     setSubmittedRecord(newRecord);
-    setTimeout(() => {
-      doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 60);
+    setSubView('preview');
+    showToast(
+      formData.id
+        ? `Cadastro Docente de ${newRecord.nome} actualizado com sucesso!`
+        : `Cadastro Docente de ${newRecord.nome} registado com sucesso (${newRecord.id})!`
+    );
   };
 
-  const handleResetForm = () => {
-    try {
-      localStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // ignore
-    }
-    setDraft({
-      trat: 'Senhor',
-      nome: '',
-      agente: '',
-      grau: '',
-      catSel: '',
-      catOutra: '',
-      instAct: '',
-      munAct: '',
-      munDest: 'Quêssua',
-      escola: '',
-      interesse: false,
-      motivo: 'Motivos de ordem pessoal',
-      proxRes: false,
-      motivoDet: '',
-      parecer: 'Pendente',
-      dataParecer: getTodayIso(),
-      localParecer: 'Quêssua',
-      director: 'Belízio Miguel dos Santos António',
+  const handleEditRecord = (r: CadastroDocenteVagaRecord) => {
+    const isPresetCat = CATEGORIAS_PRESET.some(
+      (c) => c.value !== 'Outra' && c.value === r.cat
+    );
+    const destText =
+      r.destinatario || 'Secretária Geral da Administração Municipal';
+    const destPrep: 'À' | 'Ao' =
+      r.destinatarioPrep === 'Ao' || r.destinatarioPrep === 'À'
+        ? r.destinatarioPrep
+        : inferDestinatarioPrep(destText);
+
+    setFormData({
+      id: r.id,
+      criado: r.criado,
+      trat: r.trat || 'Senhor',
+      nome: r.nome,
+      agente: r.agente,
+      grau: r.grau || '13.º Grau',
+      catSel: isPresetCat ? r.cat : 'Outra',
+      catOutra: isPresetCat ? '' : r.cat,
+      instAct: r.instAct,
+      munAct: r.munAct || 'Malanje',
+      munDest: r.munDest || 'Quêssua',
+      escola: r.escola,
+      interesse: Boolean(r.interesse),
+      motivo: r.motivo || 'Motivos de ordem pessoal',
+      proxRes: Boolean(r.proxRes),
+      motivoDet: r.motivoDet || '',
+      parecer: r.parecer || 'Pendente',
+      dataParecer: r.dataParecer || todayISO,
+      localParecer: r.localParecer || 'Quêssua',
+      director: r.director || 'Belízio Miguel dos Santos António',
+      destinatarioPrep: destPrep,
+      destinatario: destText,
+      destinatarioLocal:
+        r.destinatarioLocal || (r.munDest || 'QUÊSSUA').toUpperCase(),
+      assunto: r.assunto || 'Pedido de Parecer sobre Solicitação de Vaga',
+      saudacao: r.saudacao || 'Cordiais saudações.',
+      cargoDirector: r.cargoDirector || 'O Director Municipal',
+      rodapeEndereco:
+        r.rodapeEndereco || 'Estrada Principal do Bairro da Carreira Tiro',
+      rodapeEmail: r.rodapeEmail || 'dmedoquessua@gmail.com',
     });
-    setInvalidFields({});
     setSubmittedRecord(null);
+    setErrors({});
+    setFormErrorBanner(null);
+    setSubView('form');
+    showToast(`Registo de ${r.nome} (${r.id}) carregado para edição.`);
   };
 
-  const handleStartNewRecord = () => {
-    handleResetForm();
-    setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
-
-  const handleUpdateParecer = (
+  const handleUpdateParecerInline = (
     id: string,
-    nextParecer: 'Pendente' | 'Favorável' | 'Desfavorável'
+    newParecer: 'Pendente' | 'Favorável' | 'Desfavorável'
   ) => {
-    const nextList = records.map((rec) => {
-      if (rec.id !== id) return rec;
-      return {
-        ...rec,
-        parecer: nextParecer,
-        dataParecer: rec.dataParecer || getTodayIso(),
-      };
-    });
-    setRecords(nextList);
-    saveRecordsToStorage(nextList);
+    const next = records.map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            parecer: newParecer,
+            dataParecer: r.dataParecer || getTodayIso(),
+          }
+        : r
+    );
+    setRecords(next);
+    saveRecordsToStorage(next);
+    if (submittedRecord?.id === id) {
+      setSubmittedRecord((prev) => (prev ? { ...prev, parecer: newParecer } : null));
+    }
+    if (formData.id === id) {
+      setFormData((prev) => ({ ...prev, parecer: newParecer }));
+    }
+    showToast(`Parecer actualizado para "${newParecer}".`);
   };
 
-  const handleDeleteRecord = (id: string) => {
-    if (confirmDeleteId !== id) {
-      setConfirmDeleteId(id);
+  const handleExportCsv = () => {
+    if (!records.length) {
+      showToast('Não há fichas registadas para exportar.');
       return;
     }
-    const nextList = records.filter((rec) => rec.id !== id);
-    setRecords(nextList);
-    saveRecordsToStorage(nextList);
-    setConfirmDeleteId(null);
-  };
-
-  const exportRecordsToCsv = (rows: CadastroDocenteVagaRecord[], filename: string) => {
-    if (!rows.length) return;
-    const cols: { key: keyof CadastroDocenteVagaRecord; label: string }[] = [
-      { key: 'id', label: 'Código' },
-      { key: 'criado', label: 'Data de registo' },
-      { key: 'trat', label: 'Tratamento' },
-      { key: 'nome', label: 'Nome completo' },
-      { key: 'agente', label: 'N.º de Agente' },
-      { key: 'cat', label: 'Categoria' },
-      { key: 'grau', label: 'Grau ou classe' },
-      { key: 'instAct', label: 'Instituição actual' },
-      { key: 'munAct', label: 'Município actual' },
-      { key: 'munDest', label: 'Município pretendido' },
-      { key: 'escola', label: 'Escola pretendida' },
-      { key: 'interesse', label: 'Interesse confirmado' },
-      { key: 'motivo', label: 'Motivo' },
-      { key: 'proxRes', label: 'Próximo da residência' },
-      { key: 'motivoDet', label: 'Detalhe do motivo' },
-      { key: 'parecer', label: 'Parecer' },
-      { key: 'dataParecer', label: 'Data do parecer' },
-      { key: 'localParecer', label: 'Local do parecer' },
-      { key: 'director', label: 'Director Municipal' },
+    const headers = [
+      'Código',
+      'Data do registo',
+      'Tratamento',
+      'Nome completo',
+      'N.º de Agente',
+      'Grau ou classe',
+      'Categoria',
+      'Instituição actual',
+      'Município actual',
+      'Município pretendido',
+      'Escola com vaga',
+      'Confirma interesse',
+      'Motivo',
+      'Próximo da residência',
+      'Descrição do motivo',
+      'Parecer',
+      'Data do parecer',
+      'Local do parecer',
+      'Director Municipal',
     ];
-
-    const escCsv = (val: unknown) => {
-      const s = val === true ? 'Sim' : val === false ? 'Não' : String(val ?? '');
-      return '"' + s.replace(/"/g, '""') + '"';
+    const keys: (keyof CadastroDocenteVagaRecord)[] = [
+      'id',
+      'criado',
+      'trat',
+      'nome',
+      'agente',
+      'grau',
+      'cat',
+      'instAct',
+      'munAct',
+      'munDest',
+      'escola',
+      'interesse',
+      'motivo',
+      'proxRes',
+      'motivoDet',
+      'parecer',
+      'dataParecer',
+      'localParecer',
+      'director',
+    ];
+    const esc = (v: unknown) => {
+      const s = v === true ? 'Sim' : v === false ? 'Não' : String(v ?? '');
+      return `"${s.replace(/"/g, '""')}"`;
     };
-
-    const head = cols.map((c) => escCsv(c.label)).join(';');
-    const body = rows.map((r) => cols.map((c) => escCsv(r[c.key])).join(';')).join('\r\n');
-    const blob = new Blob(['\uFEFF' + head + '\r\n' + body], {
-      type: 'text/csv;charset=utf-8',
+    const lines = [headers.map(esc).join(';')];
+    records.forEach((r) => {
+      lines.push(keys.map((k) => esc(r[k])).join(';'));
     });
+    const blob = new Blob(['\uFEFF' + lines.join('\r\n')], {
+      type: 'text/csv;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
+    a.href = url;
+    a.download = `cadastro-docentes-quessua-${getTodayIso()}.csv`;
     document.body.appendChild(a);
     a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Lista de Cadastro Docente (CSV) exportada com sucesso.');
   };
 
-  const renderSlot = (val: string, placeholder: string) => {
-    const clean = val.trim();
-    if (clean) {
-      return <span className="cdq-slot">{clean}</span>;
-    }
-    return <span className="cdq-slot empty">{placeholder}</span>;
-  };
+  const filteredRecords = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return records;
+    return records.filter((r) =>
+      [
+        r.id,
+        r.nome,
+        r.agente,
+        r.cat,
+        r.grau,
+        r.instAct,
+        r.munAct,
+        r.escola,
+        r.munDest,
+        r.parecer,
+        r.motivo,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [records, searchQuery]);
 
-  const motivoTextoPreview = useMemo(() => {
-    if (draft.motivo === 'Outros motivos invocados' && draft.motivoDet.trim()) {
-      return draft.motivoDet.trim();
-    }
-    return draft.motivo || 'motivo do pedido';
-  }, [draft.motivo, draft.motivoDet]);
+  const pillInputClass = (hasError?: boolean) =>
+    `w-full h-11 px-4 rounded-full border bg-white text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all ${
+      hasError
+        ? 'border-[#d92d20] bg-red-50/20 focus:border-[#d92d20] focus:ring-2 focus:ring-[#d92d20]/15'
+        : 'border-slate-300 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10'
+    }`;
 
   return (
-    <div id="cadastro-docente-quessua-service" className="cdq-root">
-      <style>{`
-        .cdq-root {
-          --bg: #f2f4f8;
-          --surface: #ffffff;
-          --surface-2: #eaeef5;
-          --ink: #0e1a2b;
-          --muted: #55627a;
-          --line: #d3dae6;
-          --line-strong: #9aa7be;
-          --accent: #1b3fbf;
-          --accent-ink: #ffffff;
-          --mark: #ffc933;
-          --mark-ink: #1b1400;
-          --hero-bg: #0d1c4d;
-          --hero-ink: #f4f6ff;
-          --hero-muted: #b5c0e6;
-          --danger: #b3261e;
-          --danger-bg: #fdecea;
-          --ok: #1c7a45;
-          --ok-bg: #e6f4ec;
-          --warn: #8a5a00;
-          --warn-bg: #fff4d6;
-          --radius: 10px;
-          --font-display: "Bricolage Grotesque", system-ui, -apple-system, sans-serif;
-          --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
-          --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    <div id="cadastro-docente-module" className="w-full space-y-6 animate-in fade-in duration-150">
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div className="no-print fixed top-20 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
 
-          background: var(--bg);
-          color: var(--ink);
-          font-family: var(--font-sans);
-          font-size: 16px;
-          line-height: 1.5;
-          border-radius: 14px;
-          overflow: hidden;
-          border: 1px solid var(--line);
-          -webkit-font-smoothing: antialiased;
-        }
-
-        /* Opening band */
-        .cdq-hero {
-          background: var(--hero-bg);
-          color: var(--hero-ink);
-          border-bottom: 4px solid var(--mark);
-        }
-        .cdq-hero-inner {
-          max-width: 1120px;
-          margin: 0 auto;
-          padding: 36px 24px 40px;
-        }
-        .cdq-brand {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 0.95rem;
-          letter-spacing: 0.01em;
-          color: var(--hero-ink);
-          margin-bottom: 24px;
-        }
-        .cdq-brand-badge {
-          width: 28px;
-          height: 28px;
-          border-radius: 6px;
-          background: var(--mark);
-          color: var(--mark-ink);
-          display: grid;
-          place-items: center;
-          font-weight: 700;
-          font-size: 0.9rem;
-        }
-        .cdq-hero-grid {
-          display: grid;
-          grid-template-columns: 1.35fr 1fr;
-          gap: 40px;
-          align-items: end;
-        }
-        .cdq-eyebrow {
-          font-family: var(--font-mono);
-          font-size: 0.78rem;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: var(--hero-muted);
-          margin: 0 0 10px;
-        }
-        .cdq-hero h1 {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: clamp(1.85rem, 3.4vw, 2.75rem);
-          line-height: 1.1;
-          letter-spacing: -0.02em;
-          margin: 0 0 14px;
-          color: var(--hero-ink);
-        }
-        .cdq-hero h1 mark {
-          background: var(--mark);
-          color: var(--mark-ink);
-          padding: 0 8px 2px;
-          border-radius: 6px;
-        }
-        .cdq-lede {
-          margin: 0;
-          color: var(--hero-muted);
-          font-size: 1.02rem;
-          max-width: 56ch;
-        }
-
-        /* Flow steps on the right of hero */
-        .cdq-flow {
-          list-style: none;
-          margin: 0;
-          padding: 18px 20px;
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: var(--radius);
-          display: grid;
-          gap: 12px;
-        }
-        .cdq-flow li {
-          display: grid;
-          grid-template-columns: 26px 1fr;
-          gap: 10px;
-          align-items: baseline;
-          font-size: 0.9rem;
-          color: var(--hero-ink);
-        }
-        .cdq-flow-num {
-          font-family: var(--font-mono);
-          font-size: 0.78rem;
-          font-weight: 600;
-          width: 24px;
-          height: 24px;
-          border-radius: 999px;
-          background: rgba(255, 201, 51, 0.18);
-          color: var(--mark);
-          display: inline-grid;
-          place-items: center;
-        }
-        .cdq-flow small {
-          display: block;
-          color: var(--hero-muted);
-          font-size: 0.8rem;
-        }
-
-        /* Main layout */
-        .cdq-main {
-          max-width: 1120px;
-          margin: 0 auto;
-          padding: 32px 24px 48px;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 360px;
-          gap: 28px;
-          align-items: start;
-        }
-
-        /* Form sections */
-        .cdq-form {
-          display: grid;
-          gap: 20px;
-        }
-        .cdq-card {
-          background: var(--surface);
-          border: 1px solid var(--line);
-          border-radius: var(--radius);
-          padding: 24px;
-          margin: 0;
-          min-width: 0;
-        }
-        .cdq-card-head {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 12px;
-          padding-bottom: 14px;
-          margin-bottom: 18px;
-          border-bottom: 1px solid var(--line);
-        }
-        .cdq-card-title {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 1.15rem;
-          margin: 0;
-          letter-spacing: -0.01em;
-          color: var(--ink);
-        }
-        .cdq-card-sub {
-          font-size: 0.85rem;
-          color: var(--muted);
-          margin: 0;
-        }
-
-        .cdq-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-        }
-        .cdq-span-2 {
-          grid-column: 1 / -1;
-        }
-
-        .cdq-field {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          min-width: 0;
-        }
-        .cdq-field > label,
-        .cdq-field-label {
-          font-size: 0.88rem;
-          font-weight: 600;
-          color: var(--ink);
-        }
-        .cdq-req {
-          color: var(--danger);
-          margin-left: 2px;
-        }
-        .cdq-hint {
-          font-size: 0.8rem;
-          color: var(--muted);
-        }
-
-        .cdq-root input[type="text"],
-        .cdq-root input[type="date"],
-        .cdq-root select,
-        .cdq-root textarea {
-          width: 100%;
-          font: inherit;
-          font-size: 0.96rem;
-          color: var(--ink);
-          background: var(--surface);
-          border: 1.5px solid var(--line-strong);
-          border-radius: 8px;
-          padding: 10px 12px;
-          transition: border-color 120ms ease, box-shadow 120ms ease;
-        }
-        .cdq-root textarea {
-          resize: vertical;
-          min-height: 80px;
-        }
-        .cdq-root input[type="text"]:focus,
-        .cdq-root input[type="date"]:focus,
-        .cdq-root select:focus,
-        .cdq-root textarea:focus {
-          outline: none;
-          border-color: var(--accent);
-          box-shadow: 0 0 0 3px rgba(27, 63, 191, 0.16);
-        }
-        .cdq-mono-input {
-          font-family: var(--font-mono) !important;
-          letter-spacing: 0.03em;
-        }
-
-        .cdq-field.invalid input,
-        .cdq-field.invalid select,
-        .cdq-field.invalid textarea,
-        .cdq-field.invalid .cdq-seg {
-          border-color: var(--danger);
-          background: #fffafa;
-        }
-        .cdq-err {
-          display: none;
-          font-size: 0.8rem;
-          color: var(--danger);
-          font-weight: 500;
-        }
-        .cdq-field.invalid .cdq-err {
-          display: block;
-        }
-
-        /* Segmented control (Tratamento) */
-        .cdq-seg {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          border: 1.5px solid var(--line-strong);
-          border-radius: 8px;
-          padding: 3px;
-          background: var(--surface-2);
-          gap: 3px;
-        }
-        .cdq-seg input {
-          position: absolute;
-          opacity: 0;
-          pointer-events: none;
-        }
-        .cdq-seg label {
-          text-align: center;
-          padding: 7px 10px;
-          border-radius: 6px;
-          font-size: 0.92rem;
-          font-weight: 500;
-          cursor: pointer;
-          color: var(--muted);
-          user-select: none;
-          transition: background 120ms ease, color 120ms ease;
-        }
-        .cdq-seg input:checked + label {
-          background: var(--surface);
-          color: var(--ink);
-          font-weight: 600;
-          box-shadow: 0 1px 2px rgba(14, 26, 43, 0.08);
-        }
-        .cdq-seg input:focus-visible + label {
-          outline: 2px solid var(--accent);
-          outline-offset: 1px;
-        }
-
-        /* Radio cards for Motivo */
-        .cdq-picks {
-          display: grid;
-          gap: 8px;
-        }
-        .cdq-pick {
-          display: grid;
-          grid-template-columns: 20px 1fr;
-          gap: 10px;
-          align-items: start;
-          padding: 11px 13px;
-          border: 1.5px solid var(--line);
-          border-radius: 8px;
-          cursor: pointer;
-          background: var(--surface);
-          transition: border-color 120ms ease, background 120ms ease;
-        }
-        .cdq-pick:hover {
-          border-color: var(--line-strong);
-        }
-        .cdq-pick input {
-          margin: 3px 0 0;
-          accent-color: var(--accent);
-        }
-        .cdq-pick.checked {
-          border-color: var(--accent);
-          background: #f4f7ff;
-        }
-        .cdq-pick-title {
-          font-weight: 600;
-          font-size: 0.93rem;
-        }
-        .cdq-pick-sub {
-          font-size: 0.82rem;
-          color: var(--muted);
-          display: block;
-        }
-
-        /* Checkbox line */
-        .cdq-check {
-          display: grid;
-          grid-template-columns: 20px 1fr;
-          gap: 10px;
-          align-items: start;
-          padding: 11px 13px;
-          border-radius: 8px;
-          background: var(--surface-2);
-          font-size: 0.92rem;
-          cursor: pointer;
-        }
-        .cdq-check input {
-          margin-top: 3px;
-          accent-color: var(--accent);
-          width: 16px;
-          height: 16px;
-        }
-
-        /* Service-reserved block (Parecer) */
-        .cdq-card.service {
-          background: #fafbfd;
-          border-style: dashed;
-        }
-        .cdq-service-tag {
-          font-family: var(--font-mono);
-          font-size: 0.72rem;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          padding: 3px 8px;
-          border-radius: 999px;
-          background: var(--surface-2);
-          color: var(--muted);
-        }
-
-        /* Form actions */
-        .cdq-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          align-items: center;
-          justify-content: flex-end;
-          padding-top: 4px;
-        }
-        .cdq-btn {
-          font: inherit;
-          font-weight: 600;
-          font-size: 0.95rem;
-          padding: 11px 18px;
-          border-radius: 8px;
-          border: 1.5px solid transparent;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
-        }
-        .cdq-btn:active {
-          transform: translateY(1px);
-        }
-        .cdq-btn-primary {
-          background: var(--accent);
-          color: var(--accent-ink);
-        }
-        .cdq-btn-primary:hover {
-          background: #15339e;
-        }
-        .cdq-btn-ghost {
-          background: var(--surface);
-          color: var(--ink);
-          border-color: var(--line-strong);
-        }
-        .cdq-btn-ghost:hover {
-          background: var(--surface-2);
-        }
-
-        /* Right column: live summary */
-        .cdq-aside {
-          position: sticky;
-          top: 20px;
-          display: grid;
-          gap: 16px;
-        }
-        .cdq-letter {
-          background: var(--surface);
-          border: 1px solid var(--line);
-          border-top: 4px solid var(--hero-bg);
-          border-radius: var(--radius);
-          padding: 20px 20px 18px;
-        }
-        .cdq-letter-head {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          margin-bottom: 10px;
-        }
-        .cdq-letter-title {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 0.98rem;
-          margin: 0;
-        }
-        .cdq-letter-sub {
-          font-family: var(--font-mono);
-          font-size: 0.74rem;
-          color: var(--muted);
-        }
-        .cdq-letter-body {
-          font-size: 0.9rem;
-          line-height: 1.65;
-          color: var(--ink);
-          margin: 0;
-        }
-        .cdq-letter-body p {
-          margin: 0 0 10px;
-        }
-        .cdq-letter-body p:last-child {
-          margin-bottom: 0;
-        }
-        .cdq-slot {
-          font-weight: 600;
-          color: var(--ink);
-          background: #eef2fb;
-          padding: 1px 6px;
-          border-radius: 4px;
-        }
-        .cdq-slot.empty {
-          color: var(--muted);
-          background: var(--surface-2);
-          font-weight: 400;
-          font-style: italic;
-        }
-        .cdq-letter-foot {
-          margin-top: 14px;
-          padding-top: 12px;
-          border-top: 1px dashed var(--line);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-size: 0.8rem;
-          color: var(--muted);
-        }
-        .cdq-progress {
-          height: 6px;
-          background: var(--surface-2);
-          border-radius: 999px;
-          overflow: hidden;
-          margin-top: 8px;
-        }
-        .cdq-progress > span {
-          display: block;
-          height: 100%;
-          width: 0%;
-          background: var(--accent);
-          transition: width 160ms ease;
-        }
-
-        /* Confirmation banner */
-        .cdq-done {
-          background: var(--ok-bg);
-          border: 1.5px solid var(--ok);
-          color: #0e3d22;
-          border-radius: var(--radius);
-          padding: 18px 20px;
-          margin-bottom: 20px;
-        }
-        .cdq-done-head {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 10px;
-          margin-bottom: 6px;
-        }
-        .cdq-done-title {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 1.1rem;
-          margin: 0;
-        }
-        .cdq-done-code {
-          font-family: var(--font-mono);
-          font-size: 0.85rem;
-          background: #ffffff;
-          border: 1px solid var(--ok);
-          padding: 3px 10px;
-          border-radius: 999px;
-        }
-        .cdq-done p {
-          margin: 0 0 12px;
-          font-size: 0.92rem;
-        }
-        .cdq-done-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-
-        /* Records list below */
-        .cdq-records {
-          max-width: 1120px;
-          margin: 0 auto 40px;
-          padding: 0 24px;
-        }
-        .cdq-records-box {
-          background: var(--surface);
-          border: 1px solid var(--line);
-          border-radius: var(--radius);
-          padding: 22px 24px;
-        }
-        .cdq-records-head {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-        .cdq-records-title {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 1.15rem;
-          margin: 0;
-        }
-        .cdq-count {
-          font-family: var(--font-mono);
-          font-size: 0.82rem;
-          color: var(--muted);
-          margin-left: 8px;
-        }
-        .cdq-table-wrap {
-          overflow-x: auto;
-        }
-        .cdq-records table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 0.88rem;
-        }
-        .cdq-records th,
-        .cdq-records td {
-          text-align: left;
-          padding: 10px 10px;
-          border-bottom: 1px solid var(--line);
-          vertical-align: top;
-        }
-        .cdq-records th {
-          font-size: 0.76rem;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: var(--muted);
-          font-weight: 600;
-          background: var(--surface-2);
-        }
-        .cdq-records tr:last-child td {
-          border-bottom: none;
-        }
-        .cdq-tag {
-          display: inline-block;
-          font-family: var(--font-mono);
-          font-size: 0.74rem;
-          font-weight: 600;
-          padding: 2px 8px;
-          border-radius: 999px;
-        }
-        .cdq-tag-Pendente {
-          background: var(--warn-bg);
-          color: var(--warn);
-        }
-        .cdq-tag-Favorável {
-          background: var(--ok-bg);
-          color: var(--ok);
-        }
-        .cdq-tag-Desfavorável {
-          background: var(--danger-bg);
-          color: var(--danger);
-        }
-        .cdq-empty-rows {
-          text-align: center;
-          color: var(--muted);
-          padding: 28px 12px;
-          font-size: 0.92rem;
-        }
-        .cdq-link-btn {
-          background: none;
-          border: none;
-          color: var(--danger);
-          font: inherit;
-          font-size: 0.82rem;
-          cursor: pointer;
-          padding: 2px 6px;
-          border-radius: 4px;
-        }
-        .cdq-link-btn:hover {
-          background: var(--danger-bg);
-        }
-
-        .cdq-footer {
-          max-width: 1120px;
-          margin: 0 auto;
-          padding: 18px 24px 36px;
-          color: var(--muted);
-          font-size: 0.82rem;
-          border-top: 1px solid var(--line);
-        }
-
-        @media (max-width: 920px) {
-          .cdq-hero-grid {
-            grid-template-columns: 1fr;
-            gap: 22px;
-          }
-          .cdq-main {
-            grid-template-columns: 1fr;
-          }
-          .cdq-aside {
-            position: static;
-          }
-        }
-        @media (max-width: 600px) {
-          .cdq-grid {
-            grid-template-columns: 1fr;
-          }
-          .cdq-card {
-            padding: 18px;
-          }
-          .cdq-hero-inner {
-            padding: 28px 18px 30px;
-          }
-          .cdq-main {
-            padding: 22px 16px 36px;
-          }
-          .cdq-records {
-            padding: 0 16px;
-          }
-        }
-      `}</style>
-
-      {/* Opening Band */}
-      <header className="cdq-hero">
-        <div className="cdq-hero-inner">
-          <div className="cdq-brand">
-            <span className="cdq-brand-badge" aria-hidden="true">
-              C
-            </span>
-            <span>Cadastro Docente</span>
+      {/* ================================================================= */}
+      {/* EXEMPLAR HEADER: Circular Icon + Title + Actions + Hairline       */}
+      {/* ================================================================= */}
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-full bg-[#f2f4f7] border border-slate-200/80 flex items-center justify-center text-slate-800 shrink-0">
+            <UserPlus className="w-5 h-5" />
           </div>
-          <div className="cdq-hero-grid">
-            <div>
-              <p className="cdq-eyebrow">Município do Quêssua · Ensino</p>
-              <h1>
-                Cadastre o pedido de <mark>vaga</mark> do docente
-              </h1>
-              <p className="cdq-lede">
-                Registe os dados do professor, o local onde está colocado e a escola onde pretende
-                exercer funções. Cada ficha segue para apreciação e parecer.
-              </p>
-            </div>
-            <ol className="cdq-flow" aria-label="Etapas do pedido">
-              <li>
-                <span className="cdq-flow-num">1</span>
-                <div>
-                  <strong>Preencha a ficha</strong>
-                  <small>Identificação, colocação actual e escola pretendida.</small>
-                </div>
-              </li>
-              <li>
-                <span className="cdq-flow-num">2</span>
-                <div>
-                  <strong>A Direcção aprecia o processo</strong>
-                  <small>Verificação de vaga no estabelecimento indicado.</small>
-                </div>
-              </li>
-              <li>
-                <span className="cdq-flow-num">3</span>
-                <div>
-                  <strong>Parecer emitido</strong>
-                  <small>Registo disponível para consulta e exportação.</small>
-                </div>
-              </li>
-            </ol>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Cadastro Docente — Pedido de Vaga
+            </h1>
           </div>
         </div>
-      </header>
 
-      {/* Main 2-column content */}
-      <main className="cdq-main">
-        <div>
-          {/* Confirmation Box */}
-          {submittedRecord && (
-            <div ref={doneRef} className="cdq-done" role="status" aria-live="polite">
-              <div className="cdq-done-head">
-                <h2 className="cdq-done-title">Pedido registado</h2>
-                <span className="cdq-done-code">{submittedRecord.id}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleResetForm}
+            className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Novo Registo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadCadastroDocenteVagaPdf(livePreviewRecord)}
+            className="h-10 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>Baixar PDF</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => printSinglePageA4Clean('cadastro-docente-a4-sheet')}
+            className="h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Imprimir A4</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ================================================================= */}
+      {/* BARRA DE OPÇÕES NO TOPO: Base de Dados | Pré-visualização | Formulário */}
+      {/* ================================================================= */}
+      <div className="no-print flex flex-wrap items-center gap-2 bg-white p-2 rounded-full border border-slate-200 w-fit shadow-xs">
+        <button
+          type="button"
+          onClick={() => setSubView('database')}
+          className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+            subView === 'database'
+              ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Database className="w-4 h-4 shrink-0" />
+          <span>Base de Dados ({records.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubView('preview')}
+          className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+            subView === 'preview'
+              ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <FileText className="w-4 h-4 shrink-0" />
+          <span>Pré-visualização</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubView('form')}
+          className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+            subView === 'form'
+              ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Edit className="w-4 h-4 shrink-0" />
+          <span>Formulário</span>
+        </button>
+      </div>
+
+      {/* ================================================================= */}
+      {/* OPÇÃO 1: BASE DE DADOS DO CADASTRO DOCENTE                        */}
+      {/* ================================================================= */}
+      {subView === 'database' && (
+        <section
+          id="cadastro-docente-admin-list"
+          className="no-print bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+                <Database className="w-4 h-4" />
               </div>
-              <p>
-                A ficha de <strong>{submittedRecord.nome}</strong> foi guardada. Guarde este código
-                para acompanhar o processo.
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Base de Dados — Cadastro Docente ({records.length})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Selecione qualquer docente registado para pré-visualizar, baixar em PDF, editar ou emitir parecer
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Procurar docente, código, agente ou escola..."
+                  aria-label="Procurar registos de cadastro docente"
+                  className="w-full h-9 pl-9 pr-3.5 rounded-full border border-slate-300 bg-white text-xs text-slate-900 outline-none focus:border-slate-900"
+                />
+              </div>
+
+              {records.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="h-9 px-3.5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar CSV</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[460px] overflow-y-auto border border-slate-200 rounded-2xl">
+            <table className="w-full border-collapse text-xs min-w-[860px]">
+              <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
+                <tr>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Código
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Docente
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Categoria & Grau
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Nº Agente
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Colocação Actual → Escola Pretendida
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Parecer
+                  </th>
+                  <th className="text-left px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Data
+                  </th>
+                  <th className="text-right px-3.5 py-2.5 border-b border-slate-200 font-semibold text-slate-600">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                      Ainda não há pedidos de vaga docente registados. Preencha o formulário e escolha Guardar.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRecords.map((r) => (
+                    <tr
+                      key={r.id}
+                      className={`hover:bg-slate-50/90 transition-colors ${
+                        formData.id === r.id || submittedRecord?.id === r.id
+                          ? 'bg-slate-100/80'
+                          : ''
+                      }`}
+                    >
+                      <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap font-semibold text-slate-900">
+                        {r.id}
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-900">
+                        {r.trat} {r.nome}
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap text-slate-700 max-w-[200px] truncate">
+                        {r.cat} · {r.grau}
+                      </td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap text-slate-700">
+                        {r.agente}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-slate-700 max-w-[260px]">
+                        <div className="truncate font-medium text-slate-900">
+                          {r.escola} ({r.munDest})
+                        </div>
+                        <div className="truncate text-[11px] text-slate-500">
+                          Origem: {r.instAct} ({r.munAct})
+                        </div>
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <select
+                          aria-label={`Parecer de ${r.nome}`}
+                          value={r.parecer}
+                          onChange={(e) =>
+                            handleUpdateParecerInline(
+                              r.id,
+                              e.target.value as 'Pendente' | 'Favorável' | 'Desfavorável'
+                            )
+                          }
+                          className={`h-7 px-2.5 rounded-full text-[11px] font-bold border outline-none cursor-pointer ${
+                            r.parecer === 'Favorável'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : r.parecer === 'Desfavorável'
+                              ? 'bg-red-50 text-red-800 border-red-200'
+                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}
+                        >
+                          <option value="Pendente">Pendente</option>
+                          <option value="Favorável">Favorável</option>
+                          <option value="Desfavorável">Desfavorável</option>
+                        </select>
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap text-slate-700">
+                        {formatColocacaoDateShort(r.dataParecer || r.criado)}
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleEditRecord(r);
+                              setSubView('preview');
+                            }}
+                            className="px-2.5 py-1 rounded-full bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer inline-flex items-center gap-1"
+                            title="Ver pré-visualização oficial A4"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Ver Documento</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadCadastroDocenteVagaPdf(r)}
+                            className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1"
+                            title="Baixar PDF (1 Página A4)"
+                          >
+                            <FileDown className="w-3 h-3" />
+                            <span>PDF</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditRecord(r)}
+                            className="p-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                            title="Editar no formulário"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRecordToDelete(r)}
+                            className="p-1.5 rounded-full border border-red-200 text-[#d92d20] hover:bg-red-50 cursor-pointer"
+                            title="Eliminar registo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* ================================================================= */}
+      {/* OPÇÃO 2: PRÉ-VISUALIZAÇÃO DO DOCUMENTO SENDO PREENCHIDO (A4)      */}
+      {/* ================================================================= */}
+      <section
+        id="cadastro-docente-live-preview-panel"
+        aria-live="polite"
+        className={`${
+          subView === 'preview' ? 'block' : 'hidden print:block'
+        } bg-white rounded-[24px] border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 print:border-0 print:p-0 print:shadow-none`}
+      >
+        <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#f2f4f7] flex items-center justify-center text-slate-700">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Pré-visualização em Tempo Real — Cadastro Docente
+                </h2>
+                <span className="text-xs text-slate-500">
+                  · {livePreviewRecord.nome}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Folha A4 oficial preenchida automaticamente enquanto preenche os dados
               </p>
-              <div className="cdq-done-actions">
-                <button
-                  type="button"
-                  className="cdq-btn cdq-btn-primary"
-                  onClick={handleStartNewRecord}
-                >
-                  Registar outro docente
-                </button>
-                <button
-                  type="button"
-                  className="cdq-btn cdq-btn-ghost"
-                  onClick={() =>
-                    exportRecordsToCsv([submittedRecord], `ficha-${submittedRecord.id}.csv`)
-                  }
-                >
-                  Descarregar ficha (CSV)
-                </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quick toggle: À Secretária vs Ao Gabinete */}
+            <div
+              className="inline-flex items-center bg-[#f2f4f7] p-1 rounded-full border border-slate-200"
+              title="Alternar destinatário entre Secretária (À) e Gabinete (Ao)"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  handleFieldChange(
+                    'destinatario',
+                    'Secretária Geral da Administração Municipal'
+                  );
+                  handleFieldChange('destinatarioPrep', 'À');
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  livePreviewRecord.destinatarioPrep !== 'Ao'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                À Secretária
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const currentDest = (formData.destinatario || '').trim();
+                  const nextDest = currentDest.toLowerCase().includes('gabinete')
+                    ? currentDest
+                    : 'Gabinete Provincial da Educação';
+                  handleFieldChange('destinatario', nextDest);
+                  handleFieldChange('destinatarioPrep', 'Ao');
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  livePreviewRecord.destinatarioPrep === 'Ao'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Ao Gabinete
+              </button>
+            </div>
+
+            <div className="inline-flex items-center bg-[#f2f4f7] p-1 rounded-full border border-slate-200">
+              <button
+                type="button"
+                onClick={() => handleFieldChange('trat', 'Senhor')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  livePreviewRecord.trat !== 'Senhora'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Senhor
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFieldChange('trat', 'Senhora')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  livePreviewRecord.trat === 'Senhora'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Senhora
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => downloadCadastroDocenteVagaPdf(livePreviewRecord)}
+              className="h-9 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Baixar PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => printSinglePageA4Clean('cadastro-docente-a4-sheet')}
+              className="h-9 px-3.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir A4</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-center w-full bg-[#f8f9fa] p-3 sm:p-6 rounded-2xl border border-slate-200/70 print:bg-white print:block print:m-0 print:p-0 print:border-0">
+          <div
+            id="cadastro-docente-a4-sheet"
+            className="bg-white w-full max-w-[210mm] min-h-[297mm] p-6 sm:p-10 md:px-[22mm] md:pt-[14mm] md:pb-[14mm] border border-slate-200/90 print:border-0 shadow-xs print:shadow-none text-black mx-auto flex flex-col justify-between"
+            style={{
+              fontFamily: "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', sans-serif",
+            }}
+          >
+            {(() => {
+              const isFem = livePreviewRecord.trat === 'Senhora';
+              const profTitle = isFem ? 'Professora' : 'Professor';
+              const peloPela = isFem ? 'pela' : 'pelo';
+              const portadorLabel = isFem ? 'portadora' : 'portador';
+              const colocadoLabel = isFem ? 'colocada' : 'colocado';
+              const peloRequerente = isFem ? 'pela requerente' : 'pelo requerente';
+              const doReferidoDocente = isFem ? 'da referida docente' : 'do referido docente';
+
+              const munDest = livePreviewRecord.munDest || 'Quêssua';
+              const isQuessuaDest =
+                munDest.toLowerCase().includes('quêssua') ||
+                munDest.toLowerCase().includes('quessua');
+              const prepDateMun = isQuessuaDest ? 'do' : 'de';
+
+              const localVal = livePreviewRecord.localParecer || munDest;
+              const isQuessuaLocal =
+                localVal.toLowerCase().includes('quêssua') ||
+                localVal.toLowerCase().includes('quessua');
+              const noNaLocal = isQuessuaLocal ? 'no' : 'em';
+
+              const resolvedDestinatario =
+                livePreviewRecord.destinatario ||
+                'Secretária Geral da Administração Municipal';
+              const resolvedDestPrep: 'À' | 'Ao' =
+                livePreviewRecord.destinatarioPrep === 'Ao' ||
+                livePreviewRecord.destinatarioPrep === 'À'
+                  ? livePreviewRecord.destinatarioPrep
+                  : inferDestinatarioPrep(resolvedDestinatario);
+              const resolvedDestLocal = (
+                livePreviewRecord.destinatarioLocal || munDest
+              ).toUpperCase();
+              const resolvedAssunto =
+                livePreviewRecord.assunto ||
+                'Pedido de Parecer sobre Solicitação de Vaga';
+              const resolvedSaudacao =
+                livePreviewRecord.saudacao || 'Cordiais saudações.';
+              const resolvedCargoDirector =
+                livePreviewRecord.cargoDirector || 'O Director Municipal';
+              const resolvedRodapeEndereco =
+                livePreviewRecord.rodapeEndereco ||
+                'Estrada Principal do Bairro da Carreira Tiro';
+              const resolvedRodapeEmail =
+                livePreviewRecord.rodapeEmail || 'dmedoquessua@gmail.com';
+
+              const getInstPrep = (name: string): string => {
+                const n = (name || '').trim().toLowerCase();
+                if (
+                  n.startsWith('colégio') ||
+                  n.startsWith('colegio') ||
+                  n.startsWith('complexo') ||
+                  n.startsWith('liceu') ||
+                  n.startsWith('instituto') ||
+                  n.startsWith('centro') ||
+                  n.startsWith('magistério') ||
+                  n.startsWith('magisterio') ||
+                  n.startsWith('gabinete')
+                ) {
+                  return 'no';
+                }
+                if (
+                  n.startsWith('escola') ||
+                  n.startsWith('direcção') ||
+                  n.startsWith('direcao') ||
+                  n.startsWith('administração') ||
+                  n.startsWith('administracao') ||
+                  n.startsWith('repartição') ||
+                  n.startsWith('missão') ||
+                  n.startsWith('missao')
+                ) {
+                  return 'na';
+                }
+                return 'em';
+              };
+
+              const prepInstAct = getInstPrep(livePreviewRecord.instAct);
+              const prepEscola = getInstPrep(livePreviewRecord.escola);
+              const isDesfavoravel = livePreviewRecord.parecer === 'Desfavorável';
+              const dataExtenso =
+                formatColocacaoDateExtenso(livePreviewRecord.dataParecer) || '14 de Julho de 2026';
+
+              return (
+                <>
+                  {/* TOP & MAIN CONTENT */}
+                  <div>
+                    {/* 1. CABEÇALHO INSTITUCIONAL CENTRADO */}
+                    <div className="text-center" style={{ lineHeight: 1.32 }}>
+                      <div className="flex justify-center mb-1.5">
+                        <img
+                          src={emblemAngolaImg}
+                          alt="Insígnia da República de Angola"
+                          style={{ height: '56px', width: 'auto', objectFit: 'contain' }}
+                        />
+                      </div>
+                      <p
+                        className="m-0 uppercase"
+                        style={{ fontSize: '10.5pt', fontWeight: 400, letterSpacing: '0.01em' }}
+                      >
+                        REPÚBLICA DE ANGOLA
+                      </p>
+                      <p
+                        className="m-0 uppercase"
+                        style={{ fontSize: '10.5pt', fontWeight: 400, letterSpacing: '0.01em' }}
+                      >
+                        GOVERNO PROVINCIAL DE MALANJE
+                      </p>
+                      <p
+                        className="m-0"
+                        style={{ fontSize: '10.8pt', fontWeight: 700 }}
+                      >
+                        Administração Municipal {prepDateMun} {munDest}
+                      </p>
+                      <p
+                        className="m-0 uppercase"
+                        style={{ fontSize: '10.8pt', fontWeight: 700, letterSpacing: '0.01em' }}
+                      >
+                        DIRECÇÃO MUNICIPAL DA EDUCAÇÃO
+                      </p>
+                    </div>
+
+                    {/* 2. QUADRO DO DESTINATÁRIO COM 4 CANTONEIRAS AZUIS EM "L" (À DIREITA) */}
+                    <div className="flex justify-end mt-5 mb-6">
+                      <div
+                        className="relative"
+                        style={{
+                          width: '325px',
+                          maxWidth: '100%',
+                          padding: '13px 22px 15px 22px',
+                          fontSize: '10.5pt',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {/* Cantoneira Superior Esquerda */}
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-5 h-5 absolute top-0 left-0 pointer-events-none"
+                          aria-hidden="true"
+                        >
+                          <polygon
+                            points="1,1 22,1 17,6 6,6 6,17 1,22"
+                            fill="#4f81bd"
+                            stroke="#243f60"
+                            strokeWidth="1.3"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+
+                        {/* Cantoneira Superior Direita */}
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-5 h-5 absolute top-0 right-0 pointer-events-none"
+                          aria-hidden="true"
+                        >
+                          <polygon
+                            points="23,1 2,1 7,6 18,6 18,17 23,22"
+                            fill="#4f81bd"
+                            stroke="#243f60"
+                            strokeWidth="1.3"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+
+                        {/* Cantoneira Inferior Esquerda */}
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-5 h-5 absolute bottom-0 left-0 pointer-events-none"
+                          aria-hidden="true"
+                        >
+                          <polygon
+                            points="1,23 22,23 17,18 6,18 6,7 1,2"
+                            fill="#4f81bd"
+                            stroke="#243f60"
+                            strokeWidth="1.3"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+
+                        {/* Cantoneira Inferior Direita */}
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-5 h-5 absolute bottom-0 right-0 pointer-events-none"
+                          aria-hidden="true"
+                        >
+                          <polygon
+                            points="23,23 2,23 7,18 18,18 18,7 23,2"
+                            fill="#4f81bd"
+                            stroke="#243f60"
+                            strokeWidth="1.3"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+
+                        <p
+                          className="m-0 font-bold"
+                          style={{ textIndent: 0, fontSize: '10.5pt' }}
+                        >
+                          {resolvedDestPrep}
+                        </p>
+                        <p
+                          className="m-0 mt-3.5"
+                          style={{ textIndent: 0, fontSize: '10.2pt', fontWeight: 400 }}
+                        >
+                          {resolvedDestinatario}
+                        </p>
+                        <p
+                          className="m-0 mt-4 text-center font-bold underline uppercase"
+                          style={{ textIndent: 0, fontSize: '10.5pt', textUnderlineOffset: '2px' }}
+                        >
+                          {resolvedDestLocal}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 3. ASSUNTO E SAUDAÇÃO */}
+                    <div className="mb-5" style={{ fontSize: '10.8pt', lineHeight: 1.5 }}>
+                      <p
+                        className="m-0 font-bold"
+                        style={{ textIndent: 0 }}
+                      >
+                        {resolvedAssunto.toUpperCase().startsWith('ASSUNTO:')
+                          ? resolvedAssunto
+                          : `ASSUNTO: ${resolvedAssunto}`}
+                      </p>
+                      <p
+                        className="m-0 mt-4"
+                        style={{ textIndent: 0 }}
+                      >
+                        {resolvedSaudacao}
+                      </p>
+                    </div>
+
+                    {/* 4. CORPO DO PARECER (4 PARÁGRAFOS JUSTIFICADOS SEM INDENTAÇÃO) */}
+                    <div
+                      className="space-y-4 text-justify"
+                      style={{ fontSize: '10.8pt', lineHeight: 1.65 }}
+                    >
+                      <p className="m-0" style={{ textIndent: 0 }}>
+                        A Direcção Municipal da Educação, em atenção à solicitação e ao pedido de
+                        parecer relativos à concessão de vaga apresentados {peloPela}{' '}
+                        <strong>
+                          {profTitle} {livePreviewRecord.nome}
+                        </strong>
+                        , {portadorLabel} do n.º de Agente{' '}
+                        <strong>{livePreviewRecord.agente}</strong>, actualmente {colocadoLabel}{' '}
+                        {prepInstAct} {livePreviewRecord.instAct}, Município de{' '}
+                        {livePreviewRecord.munAct}, <strong>após análise do processo</strong>, é de
+                        parecer que:
+                      </p>
+
+                      {!isDesfavoravel ? (
+                        <p className="m-0" style={{ textIndent: 0 }}>
+                          Considerando os motivos invocados {peloRequerente} e verificando-se a
+                          existência de vaga disponível {prepEscola}{' '}
+                          <strong>{livePreviewRecord.escola}</strong>, esta Direcção Municipal da
+                          Educação é de <strong>parecer favorável</strong> ao acolhimento{' '}
+                          {doReferidoDocente} neste Município.
+                        </p>
+                      ) : (
+                        <p className="m-0" style={{ textIndent: 0 }}>
+                          Considerando os motivos invocados {peloRequerente} e após verificação do
+                          quadro de pessoal {prepEscola}{' '}
+                          <strong>{livePreviewRecord.escola}</strong>, esta Direcção Municipal da
+                          Educação é de <strong>parecer desfavorável</strong> ao acolhimento{' '}
+                          {doReferidoDocente} neste Município.
+                        </p>
+                      )}
+
+                      {!isDesfavoravel ? (
+                        <p className="m-0" style={{ textIndent: 0 }}>
+                          Assim, entendemos não existir qualquer impedimento de ordem administrativa
+                          ou funcional para a efectivação da sua transferência, pelo que remetemos o
+                          presente parecer para os devidos efeitos.
+                        </p>
+                      ) : (
+                        <p className="m-0" style={{ textIndent: 0 }}>
+                          Assim, verificando-se impedimento de ordem administrativa ou
+                          indisponibilidade de vaga para a efectivação da sua transferência,
+                          remetemos o presente parecer para os devidos efeitos.
+                        </p>
+                      )}
+
+                      <p className="m-0" style={{ textIndent: 0 }}>
+                        Sem outro assunto de momento, apresentamos os nossos melhores cumprimentos.
+                      </p>
+                    </div>
+
+                    {/* 5. DATA E ASSINATURA DO DIRECTOR MUNICIPAL */}
+                    <div
+                      className="mt-10 text-center"
+                      style={{ fontSize: '10.8pt', lineHeight: 1.55 }}
+                    >
+                      <p className="m-0 font-bold" style={{ textIndent: 0 }}>
+                        Direcção Municipal de Educação {prepDateMun} {munDest} {noNaLocal}{' '}
+                        {localVal}, aos {dataExtenso}. -
+                      </p>
+
+                      <p className="m-0 mt-1 font-bold" style={{ textIndent: 0 }}>
+                        {resolvedCargoDirector}
+                      </p>
+
+                      <div
+                        className="mx-auto"
+                        style={{
+                          width: '250px',
+                          borderBottom: '1.5px solid #000',
+                          marginTop: '34px',
+                          marginBottom: '10px',
+                        }}
+                      />
+
+                      {livePreviewRecord.director && (
+                        <p className="m-0 font-bold" style={{ textIndent: 0 }}>
+                          {livePreviewRecord.director}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 6. RODAPÉ INSTITUCIONAL (ENDEREÇO À ESQUERDA + EMBLEMA GOVERNO DE ANGOLA | malanje.gov.ao À DIREITA) */}
+                  <div className="pt-8 mt-8 flex items-end justify-between gap-4">
+                    <div
+                      className="text-left"
+                      style={{ fontSize: '7.5pt', lineHeight: 1.35, color: '#111827' }}
+                    >
+                      <p className="m-0 font-bold" style={{ textIndent: 0 }}>
+                        Direcção Municipal da Educação {prepDateMun} {munDest}
+                      </p>
+                      <p className="m-0" style={{ textIndent: 0 }}>
+                        {resolvedRodapeEndereco}
+                      </p>
+                      <p className="m-0" style={{ textIndent: 0 }}>
+                        E-mail:{' '}
+                        <strong style={{ fontSize: '9.2pt', fontWeight: 700 }}>
+                          {resolvedRodapeEmail}
+                        </strong>
+                      </p>
+                    </div>
+
+                    {/* Logótipo Institucional: GOVERNO DE ANGOLA | malanje.gov.ao */}
+                    <div className="flex items-center gap-2 shrink-0 select-none">
+                      <svg
+                        viewBox="0 0 44 40"
+                        className="h-9 w-auto shrink-0"
+                        aria-hidden="true"
+                      >
+                        {/* Perna esquerda vermelha do "A" */}
+                        <polygon points="4,38 14,3 22,3 14,38" fill="#d91c24" />
+                        {/* Perna direita preta do "A" */}
+                        <polygon points="18,3 25,3 34,38 24,38" fill="#111111" />
+                        {/* Faixa amarela inferior e estrela */}
+                        <polygon points="10,27 27,22 25,30 8,34" fill="#f5c400" />
+                        <polygon
+                          points="20,16 21.4,19.6 25.2,19.8 22.2,22.1 23.2,25.8 20,23.7 16.8,25.8 17.8,22.1 14.8,19.8 18.6,19.6"
+                          fill="#f5c400"
+                        />
+                      </svg>
+
+                      <div className="leading-none text-left">
+                        <div
+                          style={{
+                            fontSize: '5.5pt',
+                            letterSpacing: '0.18em',
+                            color: '#4b5563',
+                            fontWeight: 600,
+                          }}
+                        >
+                          GOVERNO DE
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '12.5pt',
+                            fontWeight: 800,
+                            letterSpacing: '0.03em',
+                            color: '#1f2937',
+                            lineHeight: 1.05,
+                          }}
+                        >
+                          ANGOLA
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          width: '1px',
+                          height: '26px',
+                          backgroundColor: '#d1d5db',
+                          margin: '0 4px',
+                        }}
+                      />
+
+                      <div className="leading-tight text-left">
+                        <div style={{ fontSize: '8.5pt', fontWeight: 800 }}>
+                          <span style={{ color: '#111827' }}>malanje</span>
+                          <span style={{ color: '#d91c24' }}>.gov.ao</span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '4.5pt',
+                            color: '#6b7280',
+                            lineHeight: 1.15,
+                          }}
+                        >
+                          Portal Oficial do Governo Provincial
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================= */}
+      {/* OPÇÃO 3: FORMULÁRIO NO ESTILO DO EXEMPLAR                         */}
+      {/* ================================================================= */}
+      {subView === 'form' && (
+        <div className="no-print bg-white rounded-[24px] border border-slate-200 p-6 sm:p-8 shadow-xs space-y-7">
+          {/* Duplicate Alert */}
+          {duplicateWarning && (
+            <div
+              role="alert"
+              className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3 text-amber-950"
+            >
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-xs sm:text-sm space-y-1 flex-1">
+                <p className="font-bold">
+                  Este docente já possui pedido registado ({duplicateWarning.id})
+                </p>
+                <p>
+                  Já consta <strong>{duplicateWarning.nome}</strong> (Agente nº{' '}
+                  <strong>{duplicateWarning.agente}</strong>) com pedido para a escola{' '}
+                  <strong>{duplicateWarning.escola}</strong>.
+                </p>
+                <div className="pt-1 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEditRecord(duplicateWarning)}
+                    className="px-3.5 py-1.5 bg-slate-900 text-white rounded-full text-xs font-semibold cursor-pointer"
+                  >
+                    Carregar Registo Existente
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          <form ref={formRef} className="cdq-form" noValidate onSubmit={handleSubmit}>
-            {/* 1. Identificação do docente */}
-            <fieldset className="cdq-card">
-              <div className="cdq-card-head">
-                <h2 className="cdq-card-title">Identificação do docente</h2>
-                <p className="cdq-card-sub">Como consta no processo</p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-slate-600 m-0">
+              <span className="text-[#d92d20] font-bold">*</span> Campo obrigatório
+            </p>
+            {formData.id && (
+              <span className="text-xs font-semibold text-amber-800">
+                A editar Ficha Nº {formData.id}
+              </span>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-7">
+            {/* SECÇÃO 1: Identificação do Docente */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                  1. Identificação do Docente
+                </h3>
+                <div className="h-px bg-slate-200 flex-1" />
               </div>
-              <div className="cdq-grid">
-                <div className="cdq-field" data-field="trat">
-                  <span className="cdq-field-label">
-                    Tratamento <span className="cdq-req">*</span>
-                  </span>
-                  <div className="cdq-seg" role="radiogroup" aria-label="Tratamento">
-                    <input
-                      type="radio"
-                      name="cdq-trat"
-                      id="cdq-trat-sr"
-                      value="Senhor"
-                      checked={draft.trat === 'Senhor'}
-                      onChange={() => updateField('trat', 'Senhor')}
-                    />
-                    <label htmlFor="cdq-trat-sr">Senhor</label>
-                    <input
-                      type="radio"
-                      name="cdq-trat"
-                      id="cdq-trat-sra"
-                      value="Senhora"
-                      checked={draft.trat === 'Senhora'}
-                      onChange={() => updateField('trat', 'Senhora')}
-                    />
-                    <label htmlFor="cdq-trat-sra">Senhora</label>
-                  </div>
-                </div>
 
-                <div
-                  className={`cdq-field ${invalidFields.agente ? 'invalid' : ''}`}
-                  data-field="agente"
-                >
-                  <label htmlFor="cdq-agente">
-                    N.º de Agente <span className="cdq-req">*</span>
-                  </label>
-                  <input
-                    id="cdq-agente"
-                    name="agente"
-                    type="text"
-                    inputMode="numeric"
-                    className="cdq-mono-input"
-                    placeholder="88206815"
-                    maxLength={12}
-                    value={draft.agente}
-                    onChange={(e) => updateField('agente', e.target.value)}
-                    required
-                  />
-                  <span className="cdq-err">Indique um número de agente válido (6 a 10 dígitos).</span>
-                </div>
-
-                <div
-                  className={`cdq-field cdq-span-2 ${invalidFields.nome ? 'invalid' : ''}`}
-                  data-field="nome"
-                >
-                  <label htmlFor="cdq-nome">
-                    Nome completo <span className="cdq-req">*</span>
-                  </label>
-                  <input
-                    id="cdq-nome"
-                    name="nome"
-                    type="text"
-                    placeholder="Ex.: Raimundo Alves Joveta Vunge"
-                    autoComplete="name"
-                    value={draft.nome}
-                    onChange={(e) => updateField('nome', e.target.value)}
-                    required
-                  />
-                  <span className="cdq-err">Indique o nome completo do docente.</span>
-                </div>
-
-                <div
-                  className={`cdq-field ${invalidFields.grau ? 'invalid' : ''}`}
-                  data-field="grau"
-                >
-                  <label htmlFor="cdq-grau">
-                    Grau ou classe <span className="cdq-req">*</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <div>
+                  <label
+                    htmlFor="f-cdq-trat"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Tratamento <span className="text-[#d92d20]">*</span>
                   </label>
                   <select
-                    id="cdq-grau"
-                    name="grau"
-                    value={draft.grau}
-                    onChange={(e) => updateField('grau', e.target.value)}
-                    required
+                    id="f-cdq-trat"
+                    value={formData.trat}
+                    onChange={(e) =>
+                      handleFieldChange('trat', e.target.value as 'Senhor' | 'Senhora')
+                    }
+                    className={pillInputClass(false)}
                   >
-                    <option value="">Seleccione…</option>
+                    <option value="Senhor">Senhor</option>
+                    <option value="Senhora">Senhora</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="f-cdq-agente"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Número de agente <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-cdq-agente"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={12}
+                    value={formData.agente}
+                    onChange={(e) =>
+                      handleFieldChange('agente', e.target.value.replace(/\D/g, ''))
+                    }
+                    onBlur={() => handleFieldBlur('agente')}
+                    placeholder="Ex.: 88206815"
+                    className={`${pillInputClass(Boolean(errors.agente))} font-mono`}
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Entre 6 e 10 algarismos, sem espaços.
+                  </p>
+                  {errors.agente && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.agente}</p>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label
+                    htmlFor="f-cdq-nome"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Nome completo <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <input
+                    id="f-cdq-nome"
+                    type="text"
+                    autoComplete="name"
+                    value={formData.nome}
+                    onChange={(e) => handleFieldChange('nome', e.target.value)}
+                    onBlur={() => handleFieldBlur('nome')}
+                    placeholder="Ex.: Mateus Joaquim Manuel"
+                    className={pillInputClass(Boolean(errors.nome))}
+                  />
+                  {errors.nome && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.nome}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="f-cdq-catSel"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Categoria profissional <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <select
+                    id="f-cdq-catSel"
+                    value={formData.catSel}
+                    onChange={(e) => handleFieldChange('catSel', e.target.value)}
+                    onBlur={() => handleFieldBlur('catSel')}
+                    className={pillInputClass(Boolean(errors.catSel))}
+                  >
+                    <option value="">Seleccione a categoria</option>
+                    {CATEGORIAS_PRESET.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.catSel && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.catSel}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="f-cdq-grau"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Grau ou classe <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <select
+                    id="f-cdq-grau"
+                    value={formData.grau}
+                    onChange={(e) => handleFieldChange('grau', e.target.value)}
+                    onBlur={() => handleFieldBlur('grau')}
+                    className={pillInputClass(Boolean(errors.grau))}
+                  >
+                    <option value="">Seleccione</option>
                     <optgroup label="Grau">
                       {GRAUS_OPTIONS.map((g) => (
                         <option key={g} value={g}>
@@ -1401,540 +1985,730 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                       ))}
                     </optgroup>
                   </select>
-                  <span className="cdq-err">Seleccione o grau ou a classe.</span>
+                  {errors.grau && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.grau}</p>
+                  )}
                 </div>
 
-                <div
-                  className={`cdq-field ${invalidFields.catSel ? 'invalid' : ''}`}
-                  data-field="catSel"
-                >
-                  <label htmlFor="cdq-catSel">
-                    Categoria <span className="cdq-req">*</span>
-                  </label>
-                  <select
-                    id="cdq-catSel"
-                    name="catSel"
-                    value={draft.catSel}
-                    onChange={(e) => updateField('catSel', e.target.value)}
-                    required
-                  >
-                    <option value="">Seleccione…</option>
-                    <option value="Professor do Ensino Primário e Secundário">
-                      Professor do Ensino Primário e Secundário
-                    </option>
-                    <option value="Professor Técnico Médio">Professor Técnico Médio</option>
-                    <option value="Outra">Outra categoria…</option>
-                  </select>
-                  <span className="cdq-err">Seleccione a categoria do docente.</span>
-                </div>
-
-                {draft.catSel === 'Outra' && (
-                  <div
-                    className={`cdq-field cdq-span-2 ${invalidFields.catOutra ? 'invalid' : ''}`}
-                    data-field="catOutra"
-                  >
-                    <label htmlFor="cdq-catOutra">
-                      Indique a categoria <span className="cdq-req">*</span>
+                {formData.catSel === 'Outra' && (
+                  <div className="md:col-span-2">
+                    <label
+                      htmlFor="f-cdq-catOutra"
+                      className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                    >
+                      Qual categoria? <span className="text-[#d92d20]">*</span>
                     </label>
                     <input
-                      id="cdq-catOutra"
-                      name="catOutra"
+                      id="f-cdq-catOutra"
                       type="text"
-                      placeholder="Ex.: Professor Auxiliar do 1.º Grau"
-                      value={draft.catOutra}
-                      onChange={(e) => updateField('catOutra', e.target.value)}
+                      value={formData.catOutra}
+                      onChange={(e) => handleFieldChange('catOutra', e.target.value)}
+                      onBlur={() => handleFieldBlur('catOutra')}
+                      placeholder="Escreva a categoria profissional por extenso"
+                      className={pillInputClass(Boolean(errors.catOutra))}
                     />
-                    <span className="cdq-err">Escreva a categoria profissional.</span>
+                    {errors.catOutra && (
+                      <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.catOutra}</p>
+                    )}
                   </div>
                 )}
               </div>
-            </fieldset>
+            </div>
 
-            {/* 2. Colocação actual */}
-            <fieldset className="cdq-card">
-              <div className="cdq-card-head">
-                <h2 className="cdq-card-title">Colocação actual</h2>
-                <p className="cdq-card-sub">Onde o docente exerce funções hoje</p>
+            {/* SECÇÃO 2: Colocação Actual */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                  2. Colocação Actual
+                </h3>
+                <div className="h-px bg-slate-200 flex-1" />
               </div>
-              <div className="cdq-grid">
-                <div
-                  className={`cdq-field cdq-span-2 ${invalidFields.instAct ? 'invalid' : ''}`}
-                  data-field="instAct"
-                >
-                  <label htmlFor="cdq-instAct">
-                    Instituição de colocação <span className="cdq-req">*</span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <div className="md:col-span-2">
+                  <label
+                    htmlFor="f-cdq-instAct"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Instituição onde trabalha actualmente <span className="text-[#d92d20]">*</span>
                   </label>
                   <input
-                    id="cdq-instAct"
-                    name="instAct"
+                    id="f-cdq-instAct"
                     type="text"
-                    placeholder="Ex.: Direcção Municipal da Educação de Cambundi Catembo"
-                    value={draft.instAct}
-                    onChange={(e) => updateField('instAct', e.target.value)}
-                    required
+                    value={formData.instAct}
+                    onChange={(e) => handleFieldChange('instAct', e.target.value)}
+                    onBlur={() => handleFieldBlur('instAct')}
+                    placeholder="Ex.: Direcção Municipal da Educação de Malanje ou nome da escola"
+                    className={pillInputClass(Boolean(errors.instAct))}
                   />
-                  <span className="cdq-hint">
-                    Direcção Municipal, escola ou complexo escolar onde está colocado.
-                  </span>
-                  <span className="cdq-err">Indique a instituição onde está colocado.</span>
+                  {errors.instAct && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.instAct}</p>
+                  )}
                 </div>
 
-                <div
-                  className={`cdq-field cdq-span-2 ${invalidFields.munAct ? 'invalid' : ''}`}
-                  data-field="munAct"
-                >
-                  <label htmlFor="cdq-munAct">
-                    Município actual <span className="cdq-req">*</span>
+                <div>
+                  <label
+                    htmlFor="f-cdq-munAct"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Município actual <span className="text-[#d92d20]">*</span>
                   </label>
                   <input
-                    id="cdq-munAct"
-                    name="munAct"
+                    id="f-cdq-munAct"
                     type="text"
-                    list="cdq-municipios-list"
-                    placeholder="Ex.: Cambundi Catembo"
-                    value={draft.munAct}
-                    onChange={(e) => updateField('munAct', e.target.value)}
-                    required
+                    list="cdq-municipios-datalist"
+                    value={formData.munAct}
+                    onChange={(e) => handleFieldChange('munAct', e.target.value)}
+                    onBlur={() => handleFieldBlur('munAct')}
+                    placeholder="Ex.: Malanje"
+                    className={pillInputClass(Boolean(errors.munAct))}
                   />
-                  <datalist id="cdq-municipios-list">
+                  <datalist id="cdq-municipios-datalist">
                     {MUNICIPIOS_MALANJE.map((m) => (
                       <option key={m} value={m} />
                     ))}
                   </datalist>
-                  <span className="cdq-err">Indique o município de colocação actual.</span>
+                  {errors.munAct && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.munAct}</p>
+                  )}
                 </div>
               </div>
-            </fieldset>
+            </div>
 
-            {/* 3. Vaga pretendida */}
-            <fieldset className="cdq-card">
-              <div className="cdq-card-head">
-                <h2 className="cdq-card-title">Vaga pretendida</h2>
-                <p className="cdq-card-sub">Escola de destino com vaga disponível</p>
+            {/* SECÇÃO 3: Vaga Pretendida */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                  3. Vaga Pretendida
+                </h3>
+                <div className="h-px bg-slate-200 flex-1" />
               </div>
-              <div className="cdq-grid">
-                <div
-                  className={`cdq-field ${invalidFields.munDest ? 'invalid' : ''}`}
-                  data-field="munDest"
-                >
-                  <label htmlFor="cdq-munDest">
-                    Município de destino <span className="cdq-req">*</span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <div>
+                  <label
+                    htmlFor="f-cdq-munDest"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Município onde pretende trabalhar <span className="text-[#d92d20]">*</span>
                   </label>
                   <input
-                    id="cdq-munDest"
-                    name="munDest"
+                    id="f-cdq-munDest"
                     type="text"
-                    list="cdq-municipios-list"
-                    value={draft.munDest}
-                    onChange={(e) => updateField('munDest', e.target.value)}
-                    required
+                    list="cdq-municipios-datalist"
+                    value={formData.munDest}
+                    onChange={(e) => handleFieldChange('munDest', e.target.value)}
+                    onBlur={() => handleFieldBlur('munDest')}
+                    placeholder="Ex.: Quêssua"
+                    className={pillInputClass(Boolean(errors.munDest))}
                   />
-                  <span className="cdq-err">Indique o município onde pretende exercer funções.</span>
+                  {errors.munDest && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.munDest}</p>
+                  )}
                 </div>
 
-                <div
-                  className={`cdq-field cdq-span-2 ${invalidFields.escola ? 'invalid' : ''}`}
-                  data-field="escola"
-                >
-                  <label htmlFor="cdq-escola">
-                    Escola ou complexo escolar <span className="cdq-req">*</span>
-                  </label>
-                  <input
-                    id="cdq-escola"
-                    name="escola"
-                    type="text"
-                    list="cdq-escolas-list"
-                    placeholder="Ex.: Complexo Escolar N.º 16 – Missão do Quêssua"
-                    value={draft.escola}
-                    onChange={(e) => updateField('escola', e.target.value)}
-                    required
-                  />
-                  <datalist id="cdq-escolas-list">
-                    {ESCOLAS_QUESSUA_SUGGESTIONS.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                  <span className="cdq-err">Indique a escola onde existe a vaga pretendida.</span>
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="f-cdq-escola"
+                      className="block text-[13px] font-semibold text-slate-800"
+                    >
+                      Escola com vaga pretendida <span className="text-[#d92d20]">*</span>
+                    </label>
+                    {isExactRegisteredSchool && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        <Check className="w-3 h-3" />
+                        Escola registada na rede
+                      </span>
+                    )}
+                  </div>
+
+                  <div ref={schoolDropdownRef} className="relative">
+                    <div className="relative flex items-center">
+                      <School className="w-4 h-4 text-slate-400 absolute left-4 pointer-events-none" />
+                      <input
+                        id="f-cdq-escola"
+                        type="text"
+                        autoComplete="off"
+                        value={formData.escola}
+                        onFocus={() => setShowSchoolSuggestions(true)}
+                        onChange={(e) => {
+                          handleFieldChange('escola', e.target.value);
+                          setShowSchoolSuggestions(true);
+                        }}
+                        onBlur={() => handleFieldBlur('escola')}
+                        placeholder="Ex.: Complexo Escolar N.º 16 – Missão do Quêssua"
+                        className={`${pillInputClass(Boolean(errors.escola))} pl-10 pr-20`}
+                      />
+                      <div className="absolute right-2 flex items-center gap-1">
+                        {formData.escola && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleFieldChange('escola', '');
+                              setShowSchoolSuggestions(true);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 cursor-pointer"
+                            title="Limpar escola"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowSchoolSuggestions((v) => !v)}
+                          className="p-1.5 text-slate-500 hover:text-slate-900 rounded-full hover:bg-slate-100 cursor-pointer"
+                          title="Mostrar lista de escolas"
+                        >
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform ${
+                              showSchoolSuggestions ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {showSchoolSuggestions && schoolSuggestions.length > 0 && (
+                      <div className="absolute z-30 mt-1.5 w-full bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto py-1.5">
+                        {schoolSuggestions.map((sc) => (
+                          <button
+                            key={sc}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleFieldChange('escola', sc);
+                              setShowSchoolSuggestions(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-xs sm:text-sm text-slate-800 hover:bg-slate-100 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <School className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{sc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {errors.escola && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.escola}</p>
+                  )}
                 </div>
 
-                <div
-                  className={`cdq-field cdq-span-2 ${invalidFields.interesse ? 'invalid' : ''}`}
-                  data-field="interesse"
-                >
-                  <label className="cdq-check" htmlFor="cdq-interesse">
+                <div className="md:col-span-2">
+                  <label className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 cursor-pointer">
                     <input
-                      id="cdq-interesse"
-                      name="interesse"
+                      id="f-cdq-interesse"
                       type="checkbox"
-                      checked={draft.interesse}
-                      onChange={(e) => updateField('interesse', e.target.checked)}
-                      required
+                      checked={formData.interesse}
+                      onChange={(e) => handleFieldChange('interesse', e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-slate-900 cursor-pointer"
                     />
-                    <span>
-                      Manifesto o interesse em exercer as minhas funções neste Município.{' '}
-                      <span className="cdq-req">*</span>
+                    <span className="text-xs sm:text-sm text-slate-800">
+                      Confirmo que o docente manifesta o interesse em exercer as suas funções no
+                      município e na escola indicados acima.{' '}
+                      <span className="text-[#d92d20] font-bold">*</span>
                     </span>
                   </label>
-                  <span className="cdq-err">
-                    Confirme a manifestação de interesse para prosseguir.
-                  </span>
+                  {errors.interesse && (
+                    <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.interesse}</p>
+                  )}
                 </div>
               </div>
-            </fieldset>
+            </div>
 
-            {/* 4. Motivo do pedido */}
-            <fieldset className="cdq-card">
-              <div className="cdq-card-head">
-                <h2 className="cdq-card-title">Motivo do pedido</h2>
-                <p className="cdq-card-sub">Motivos invocados pelo requerente</p>
+            {/* SECÇÃO 4: Motivo do Pedido */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                  4. Motivo do Pedido
+                </h3>
+                <div className="h-px bg-slate-200 flex-1" />
               </div>
-              <div className="cdq-grid">
-                <div className="cdq-field cdq-span-2" data-field="motivo">
-                  <span className="cdq-field-label">
-                    Natureza do motivo <span className="cdq-req">*</span>
-                  </span>
-                  <div className="cdq-picks" role="radiogroup" aria-label="Natureza do motivo">
-                    <label
-                      className={`cdq-pick ${
-                        draft.motivo === 'Motivos de ordem pessoal' ? 'checked' : ''
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <div>
+                  <label
+                    htmlFor="f-cdq-motivo"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Natureza do motivo <span className="text-[#d92d20]">*</span>
+                  </label>
+                  <select
+                    id="f-cdq-motivo"
+                    value={formData.motivo}
+                    onChange={(e) => handleFieldChange('motivo', e.target.value)}
+                    className={pillInputClass(false)}
+                  >
+                    {MOTIVOS_OPTIONS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center">
+                  <label className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 cursor-pointer w-full">
+                    <input
+                      type="checkbox"
+                      checked={formData.proxRes}
+                      onChange={(e) => handleFieldChange('proxRes', e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-slate-900 cursor-pointer"
+                    />
+                    <span className="text-xs sm:text-sm text-slate-800">
+                      A escola pretendida fica próxima da residência do docente
+                    </span>
+                  </label>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label
+                    htmlFor="f-cdq-motivoDet"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Descrição adicional do motivo (opcional)
+                  </label>
+                  <input
+                    id="f-cdq-motivoDet"
+                    type="text"
+                    value={formData.motivoDet}
+                    onChange={(e) => handleFieldChange('motivoDet', e.target.value)}
+                    placeholder="Se desejar, acrescente uma breve explicação que ajude na apreciação do pedido."
+                    className={pillInputClass(false)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECÇÃO 5: Destinatário, Parecer e Emissão da Direcção Municipal */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+                  5. Destinatário, Parecer e Emissão do Documento
+                </h3>
+                <div className="h-px bg-slate-200 flex-1" />
+              </div>
+
+              {/* Atalhos Rápidos de Destinatário: Pela Secretária (À) vs Pelo Gabinete (Ao) */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 m-0">
+                      Quadro do Destinatário (Regra Automática: Secretária = &ldquo;À&rdquo; · Gabinete = &ldquo;Ao&rdquo;)
+                    </p>
+                    <p className="text-[11px] text-slate-500 m-0">
+                      Seleccione abaixo ou edite livremente o órgão destinatário; o vocativo ajusta automaticamente entre &ldquo;À&rdquo; e &ldquo;Ao&rdquo;.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleFieldChange(
+                          'destinatario',
+                          'Secretária Geral da Administração Municipal'
+                        );
+                        handleFieldChange('destinatarioPrep', 'À');
+                      }}
+                      className={`h-8 px-3.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                        formData.destinatarioPrep === 'À' &&
+                        formData.destinatario
+                          .toLowerCase()
+                          .includes('secret')
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="cdq-motivo"
-                        value="Motivos de ordem pessoal"
-                        checked={draft.motivo === 'Motivos de ordem pessoal'}
-                        onChange={() => updateField('motivo', 'Motivos de ordem pessoal')}
-                      />
-                      <div>
-                        <span className="cdq-pick-title">Motivos de ordem pessoal</span>
-                        <span className="cdq-pick-sub">Razões do próprio docente.</span>
-                      </div>
-                    </label>
-                    <label
-                      className={`cdq-pick ${
-                        draft.motivo === 'Motivos de ordem pessoal e familiar' ? 'checked' : ''
+                      Pela Secretária (À)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleFieldChange(
+                          'destinatario',
+                          'Gabinete Provincial da Educação'
+                        );
+                        handleFieldChange('destinatarioPrep', 'Ao');
+                      }}
+                      className={`h-8 px-3.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                        formData.destinatarioPrep === 'Ao' &&
+                        formData.destinatario
+                          .toLowerCase()
+                          .includes('gabinete provincial')
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="cdq-motivo"
-                        value="Motivos de ordem pessoal e familiar"
-                        checked={draft.motivo === 'Motivos de ordem pessoal e familiar'}
-                        onChange={() =>
-                          updateField('motivo', 'Motivos de ordem pessoal e familiar')
-                        }
-                      />
-                      <div>
-                        <span className="cdq-pick-title">Motivos de ordem pessoal e familiar</span>
-                        <span className="cdq-pick-sub">
-                          Razões que envolvem a família do docente.
-                        </span>
-                      </div>
-                    </label>
-                    <label
-                      className={`cdq-pick ${
-                        draft.motivo === 'Outros motivos invocados' ? 'checked' : ''
+                      Pelo Gabinete Provincial (Ao)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleFieldChange(
+                          'destinatario',
+                          'Gabinete do Administrador Municipal'
+                        );
+                        handleFieldChange('destinatarioPrep', 'Ao');
+                      }}
+                      className={`h-8 px-3.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                        formData.destinatarioPrep === 'Ao' &&
+                        formData.destinatario
+                          .toLowerCase()
+                          .includes('administrador')
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="cdq-motivo"
-                        value="Outros motivos invocados"
-                        checked={draft.motivo === 'Outros motivos invocados'}
-                        onChange={() => updateField('motivo', 'Outros motivos invocados')}
-                      />
-                      <div>
-                        <span className="cdq-pick-title">Outros motivos invocados</span>
-                        <span className="cdq-pick-sub">Descreva no campo abaixo.</span>
-                      </div>
-                    </label>
+                      Pelo Gabinete Municipal (Ao)
+                    </button>
                   </div>
                 </div>
 
-                <div className="cdq-field cdq-span-2">
-                  <label className="cdq-check" htmlFor="cdq-proxRes">
-                    <input
-                      id="cdq-proxRes"
-                      name="proxRes"
-                      type="checkbox"
-                      checked={draft.proxRes}
-                      onChange={(e) => updateField('proxRes', e.target.checked)}
-                    />
-                    <span>
-                      Pretendo exercer funções em estabelecimento de ensino próximo da minha
-                      residência.
-                    </span>
-                  </label>
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1">
+                  <div>
+                    <label
+                      htmlFor="f-cdq-destinatarioPrep"
+                      className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                    >
+                      Vocativo (À / Ao)
+                    </label>
+                    <select
+                      id="f-cdq-destinatarioPrep"
+                      value={formData.destinatarioPrep}
+                      onChange={(e) =>
+                        handleFieldChange(
+                          'destinatarioPrep',
+                          e.target.value as 'À' | 'Ao'
+                        )
+                      }
+                      className={pillInputClass(false)}
+                    >
+                      <option value="À">À (Secretária / Direcção)</option>
+                      <option value="Ao">Ao (Gabinete / Administrador)</option>
+                    </select>
+                  </div>
 
-                <div className="cdq-field cdq-span-2">
-                  <label htmlFor="cdq-motivoDet">Descrição do motivo (opcional)</label>
-                  <textarea
-                    id="cdq-motivoDet"
-                    name="motivoDet"
-                    placeholder="Acrescente informação relevante para a apreciação do pedido…"
-                    value={draft.motivoDet}
-                    onChange={(e) => updateField('motivoDet', e.target.value)}
+                  <div className="md:col-span-2">
+                    <label
+                      htmlFor="f-cdq-destinatario"
+                      className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                    >
+                      Órgão / Entidade Destinatária
+                    </label>
+                    <input
+                      id="f-cdq-destinatario"
+                      type="text"
+                      list="cdq-destinatarios-datalist"
+                      value={formData.destinatario}
+                      onChange={(e) =>
+                        handleFieldChange('destinatario', e.target.value)
+                      }
+                      placeholder="Ex.: Secretária Geral da Administração Municipal ou Gabinete Provincial da Educação"
+                      className={pillInputClass(false)}
+                    />
+                    <datalist id="cdq-destinatarios-datalist">
+                      {DESTINATARIOS_SUGGESTIONS.map((d) => (
+                        <option key={d} value={d} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="f-cdq-destinatarioLocal"
+                      className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                    >
+                      Localidade no Quadro
+                    </label>
+                    <input
+                      id="f-cdq-destinatarioLocal"
+                      type="text"
+                      value={formData.destinatarioLocal}
+                      onChange={(e) =>
+                        handleFieldChange('destinatarioLocal', e.target.value)
+                      }
+                      placeholder="Ex.: QUÊSSUA"
+                      className={`${pillInputClass(false)} uppercase font-semibold`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <div>
+                  <label
+                    htmlFor="f-cdq-assunto"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Assunto do documento
+                  </label>
+                  <input
+                    id="f-cdq-assunto"
+                    type="text"
+                    value={formData.assunto}
+                    onChange={(e) => handleFieldChange('assunto', e.target.value)}
+                    placeholder="Ex.: Pedido de Parecer sobre Solicitação de Vaga"
+                    className={pillInputClass(false)}
                   />
                 </div>
-              </div>
-            </fieldset>
 
-            {/* 5. Parecer da Direcção (uso do serviço) */}
-            <fieldset className="cdq-card service">
-              <div className="cdq-card-head">
-                <h2 className="cdq-card-title">Parecer da Direcção</h2>
-                <span className="cdq-service-tag">Reservado ao serviço</span>
-              </div>
-              <div className="cdq-grid">
-                <div className="cdq-field">
-                  <label htmlFor="cdq-parecer">Parecer</label>
+                <div>
+                  <label
+                    htmlFor="f-cdq-saudacao"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Saudação inicial
+                  </label>
+                  <input
+                    id="f-cdq-saudacao"
+                    type="text"
+                    value={formData.saudacao}
+                    onChange={(e) => handleFieldChange('saudacao', e.target.value)}
+                    placeholder="Ex.: Cordiais saudações."
+                    className={pillInputClass(false)}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="f-cdq-parecer"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Parecer oficial
+                  </label>
                   <select
-                    id="cdq-parecer"
-                    name="parecer"
-                    value={draft.parecer}
+                    id="f-cdq-parecer"
+                    value={formData.parecer}
                     onChange={(e) =>
-                      updateField(
+                      handleFieldChange(
                         'parecer',
                         e.target.value as 'Pendente' | 'Favorável' | 'Desfavorável'
                       )
                     }
+                    className={pillInputClass(false)}
                   >
-                    <option value="Pendente">Pendente de apreciação</option>
-                    <option value="Favorável">Parecer favorável</option>
-                    <option value="Desfavorável">Parecer desfavorável</option>
+                    <option value="Favorável">Favorável</option>
+                    <option value="Desfavorável">Desfavorável</option>
+                    <option value="Pendente">Pendente (por apreciar)</option>
                   </select>
                 </div>
 
-                <div className="cdq-field">
-                  <label htmlFor="cdq-dataParecer">Data do parecer</label>
+                <div>
+                  <label
+                    htmlFor="f-cdq-dataParecer"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Data do parecer / emissão
+                  </label>
                   <input
-                    id="cdq-dataParecer"
-                    name="dataParecer"
+                    id="f-cdq-dataParecer"
                     type="date"
-                    value={draft.dataParecer}
-                    onChange={(e) => updateField('dataParecer', e.target.value)}
+                    value={formData.dataParecer}
+                    onChange={(e) => handleFieldChange('dataParecer', e.target.value)}
+                    className={pillInputClass(false)}
                   />
                 </div>
 
-                <div className="cdq-field">
-                  <label htmlFor="cdq-localParecer">Local</label>
+                <div>
+                  <label
+                    htmlFor="f-cdq-localParecer"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Local de emissão
+                  </label>
                   <input
-                    id="cdq-localParecer"
-                    name="localParecer"
+                    id="f-cdq-localParecer"
                     type="text"
-                    value={draft.localParecer}
-                    onChange={(e) => updateField('localParecer', e.target.value)}
+                    value={formData.localParecer}
+                    onChange={(e) => handleFieldChange('localParecer', e.target.value)}
+                    placeholder="Ex.: Quêssua"
+                    className={pillInputClass(false)}
                   />
                 </div>
 
-                <div className="cdq-field">
-                  <label htmlFor="cdq-director">Director Municipal</label>
+                <div>
+                  <label
+                    htmlFor="f-cdq-cargoDirector"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Cargo na assinatura
+                  </label>
                   <input
-                    id="cdq-director"
-                    name="director"
+                    id="f-cdq-cargoDirector"
                     type="text"
-                    value={draft.director}
-                    onChange={(e) => updateField('director', e.target.value)}
+                    value={formData.cargoDirector}
+                    onChange={(e) => handleFieldChange('cargoDirector', e.target.value)}
+                    placeholder="Ex.: O Director Municipal"
+                    className={pillInputClass(false)}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label
+                    htmlFor="f-cdq-director"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Nome do Director Municipal da Educação
+                  </label>
+                  <input
+                    id="f-cdq-director"
+                    type="text"
+                    value={formData.director}
+                    onChange={(e) => handleFieldChange('director', e.target.value)}
+                    placeholder="Ex.: Belízio Miguel dos Santos António"
+                    className={pillInputClass(false)}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="f-cdq-rodapeEndereco"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Endereço institucional (rodapé)
+                  </label>
+                  <input
+                    id="f-cdq-rodapeEndereco"
+                    type="text"
+                    value={formData.rodapeEndereco}
+                    onChange={(e) => handleFieldChange('rodapeEndereco', e.target.value)}
+                    placeholder="Ex.: Estrada Principal do Bairro da Carreira Tiro"
+                    className={pillInputClass(false)}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="f-cdq-rodapeEmail"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    E-mail institucional (rodapé)
+                  </label>
+                  <input
+                    id="f-cdq-rodapeEmail"
+                    type="email"
+                    value={formData.rodapeEmail}
+                    onChange={(e) => handleFieldChange('rodapeEmail', e.target.value)}
+                    placeholder="Ex.: dmedoquessua@gmail.com"
+                    className={pillInputClass(false)}
                   />
                 </div>
               </div>
-            </fieldset>
+            </div>
 
-            <div className="cdq-actions">
-              <button type="button" className="cdq-btn cdq-btn-ghost" onClick={handleResetForm}>
-                Limpar campos
+            {formErrorBanner && (
+              <div
+                role="alert"
+                className="bg-red-50 border border-red-200 rounded-2xl p-3.5 text-xs sm:text-sm text-[#d92d20] font-semibold flex items-center gap-2.5"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{formErrorBanner}</span>
+              </div>
+            )}
+
+            {/* Form Footer Buttons */}
+            <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleResetForm}
+                className="h-11 px-5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs sm:text-sm font-semibold text-slate-700 inline-flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Limpar Formulário</span>
               </button>
-              <button type="submit" className="cdq-btn cdq-btn-primary">
-                Registar pedido de vaga
-              </button>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSubView('preview')}
+                  className="h-11 px-5 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs sm:text-sm font-semibold text-slate-800 inline-flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Pré-visualizar A4</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => downloadCadastroDocenteVagaPdf(livePreviewRecord)}
+                  className="h-11 px-5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs cursor-pointer"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span>Baixar PDF</span>
+                </button>
+
+                <button
+                  type="submit"
+                  className="h-11 px-6 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>
+                    {formData.id ? 'Actualizar Cadastro Docente' : 'Guardar Cadastro Docente'}
+                  </span>
+                </button>
+              </div>
             </div>
           </form>
         </div>
+      )}
 
-        {/* Right sticky summary */}
-        <aside className="cdq-aside" aria-label="Resumo em tempo real">
-          <div className="cdq-letter">
-            <div className="cdq-letter-head">
-              <h2 className="cdq-letter-title">Resumo do pedido</h2>
-              <span className="cdq-letter-sub">Assim ficará redigido o parecer</span>
-            </div>
-            <div className="cdq-letter-body">
-              <p>
-                A Direcção Municipal da Educação aprecia a solicitação de vaga apresentada{' '}
-                {isFem ? 'pela' : 'pelo'} {renderSlot(draft.trat, 'Senhor(a)')}{' '}
-                {renderSlot(draft.nome, 'nome completo')}, {isFem ? 'portadora' : 'portador'} do n.º
-                de Agente {renderSlot(draft.agente, '000000')}, actualmente{' '}
-                {renderSlot(catValue, 'categoria')}, {renderSlot(draft.grau, 'grau')},{' '}
-                {isFem ? 'colocada' : 'colocado'} em{' '}
-                {renderSlot(draft.instAct, 'instituição actual')}, Município de{' '}
-                {renderSlot(draft.munAct, 'município actual')}.
-              </p>
-              <p>
-                {draft.interesse
-                  ? 'Manifesta o interesse em exercer as suas funções no Município de '
-                  : 'Pretende exercer funções no Município de '}
-                {renderSlot(draft.munDest, 'destino')}, na{' '}
-                {renderSlot(draft.escola, 'escola com vaga')}.{' '}
-                {renderSlot(motivoTextoPreview, 'motivo do pedido')}
-                {draft.proxRes
-                  ? ', nomeadamente o interesse em exercer funções em estabelecimento de ensino próximo da sua residência'
-                  : ''}
-                .
-              </p>
-            </div>
-            <div className="cdq-letter-foot">
-              <span>
-                {progressStats.ok} de {progressStats.total} campos obrigatórios preenchidos
-              </span>
-            </div>
-            <div className="cdq-progress" aria-hidden="true">
-              <span style={{ width: `${progressStats.pct}%` }} />
-            </div>
-          </div>
-        </aside>
-      </main>
-
-      {/* Saved records */}
-      <section className="cdq-records" aria-labelledby="cdq-records-heading">
-        <div className="cdq-records-box">
-          <div className="cdq-records-head">
-            <div>
-              <h2 className="cdq-records-title" id="cdq-records-heading" style={{ display: 'inline' }}>
-                Registos recebidos
-              </h2>
-              <span className="cdq-count">
-                {records.length === 1 ? '1 ficha' : `${records.length} fichas`}
-              </span>
-            </div>
-            <div>
-              {records.length > 0 && (
-                <button
-                  type="button"
-                  className="cdq-btn cdq-btn-ghost"
-                  onClick={() => exportRecordsToCsv(records, 'cadastro-docente-quessua.csv')}
-                >
-                  Exportar tudo (CSV)
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="cdq-table-wrap">
-            {records.length === 0 ? (
-              <div className="cdq-empty-rows">
-                Ainda não existem fichas registadas neste dispositivo.
+      {/* Delete Confirmation Modal */}
+      {recordToDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="no-print fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-[#d92d20] shrink-0">
+                <Trash2 className="w-5 h-5" />
               </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Código</th>
-                    <th>Docente</th>
-                    <th>Categoria e grau</th>
-                    <th>Colocação actual</th>
-                    <th>Escola pretendida</th>
-                    <th>Motivo</th>
-                    <th>Parecer</th>
-                    <th>Registo</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((r) => {
-                    const dataStr = r.criado
-                      ? new Date(r.criado).toLocaleDateString('pt-AO')
-                      : '';
-                    const isConfirming = confirmDeleteId === r.id;
-                    return (
-                      <tr key={r.id}>
-                        <td className="cdq-mono-input">{r.id}</td>
-                        <td>
-                          <strong>
-                            {r.trat} {r.nome}
-                          </strong>
-                          <br />
-                          <small className="cdq-mono-input" style={{ color: 'var(--muted)' }}>
-                            Agente {r.agente}
-                          </small>
-                        </td>
-                        <td>
-                          {r.cat}
-                          <br />
-                          <small style={{ color: 'var(--muted)' }}>{r.grau}</small>
-                        </td>
-                        <td>
-                          {r.instAct}
-                          <br />
-                          <small style={{ color: 'var(--muted)' }}>{r.munAct}</small>
-                        </td>
-                        <td>
-                          {r.escola}
-                          <br />
-                          <small style={{ color: 'var(--muted)' }}>{r.munDest}</small>
-                        </td>
-                        <td>
-                          {r.motivo}
-                          {r.proxRes ? (
-                            <>
-                              <br />
-                              <small style={{ color: 'var(--muted)' }}>Próx. da residência</small>
-                            </>
-                          ) : null}
-                          {r.motivoDet ? (
-                            <>
-                              <br />
-                              <small style={{ color: 'var(--muted)' }}>{r.motivoDet}</small>
-                            </>
-                          ) : null}
-                        </td>
-                        <td>
-                          <select
-                            aria-label="Alterar parecer"
-                            value={r.parecer}
-                            onChange={(e) =>
-                              handleUpdateParecer(
-                                r.id,
-                                e.target.value as 'Pendente' | 'Favorável' | 'Desfavorável'
-                              )
-                            }
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '0.8rem',
-                              borderRadius: '6px',
-                            }}
-                          >
-                            <option value="Pendente">Pendente</option>
-                            <option value="Favorável">Favorável</option>
-                            <option value="Desfavorável">Desfavorável</option>
-                          </select>
-                        </td>
-                        <td>
-                          <small style={{ color: 'var(--muted)' }}>{dataStr}</small>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="cdq-link-btn"
-                            onClick={() => handleDeleteRecord(r.id)}
-                          >
-                            {isConfirming ? 'Confirmar' : 'Eliminar'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Eliminar Ficha de Cadastro Docente
+                </h3>
+                <p className="text-xs text-slate-500">Código {recordToDelete.id}</p>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Tem a certeza de que pretende eliminar o pedido de vaga de{' '}
+              <strong className="text-slate-900">{recordToDelete.nome}</strong> (Agente nº{' '}
+              <strong className="text-slate-900">{recordToDelete.agente}</strong>)?
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setRecordToDelete(null)}
+                className="h-10 px-4 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = recordToDelete;
+                  setRecordToDelete(null);
+                  const next = records.filter((r) => r.id !== target.id);
+                  setRecords(next);
+                  saveRecordsToStorage(next);
+                  if (formData.id === target.id) {
+                    handleResetForm();
+                  }
+                  showToast(`Registo de ${target.nome} eliminado.`);
+                }}
+                className="h-10 px-5 rounded-full bg-[#d92d20] hover:bg-red-700 text-white text-xs font-semibold cursor-pointer"
+              >
+                Sim, Eliminar
+              </button>
+            </div>
           </div>
         </div>
-      </section>
-
-      <footer className="cdq-footer">
-        Os dados recolhidos servem apenas para a apreciação do pedido de vaga. Consulte a Direcção
-        Municipal da Educação para rectificar ou eliminar uma ficha.
-      </footer>
+      )}
     </div>
   );
 };
+
+export default CadastroDocenteVagaSection;

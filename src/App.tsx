@@ -1264,6 +1264,13 @@ export default function App() {
       if (activeRole === 'professor' && pageId === 'estatisticas') {
         targetView = 'professor-estatisticas';
       }
+      if (
+        pageId === 'cadastro-docente' ||
+        pageId === 'pedido-vaga' ||
+        pageId === 'pedidos-vaga'
+      ) {
+        targetView = 'cadastro-docente';
+      }
 
       if (
         (activeRole === 'diretor' || currentUser.role === 'diretor') &&
@@ -1291,6 +1298,16 @@ export default function App() {
         );
         return;
       }
+    }
+
+    if (
+      pageId === 'cadastro-docente' ||
+      pageId === 'pedido-vaga' ||
+      pageId === 'pedidos-vaga'
+    ) {
+      setCurrentView('cadastro-docente');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
     }
 
     // Quick Services & User Requests Routing (Serviços Rápidos & Efectividade)
@@ -1479,7 +1496,13 @@ export default function App() {
       pageId === 'mapa-efectividade' ||
       pageId === 'efectividade-branco'
     ) {
-      setCurrentView(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'declaracao-efectividade');
+      if (activeRole === 'diretor') {
+        setCurrentView('diretor-servicos-rapidos');
+      } else if (activeRole === 'professor') {
+        setCurrentView('cadastro-docente');
+      } else {
+        setCurrentView('declaracao-efectividade');
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -1850,7 +1873,8 @@ export default function App() {
             showToast(`Professor(a) "${teacher.name}" integrado(a) no quadro docente!`);
           }}
           onAddStudentGlobal={(student) => {
-            setAdminStudents((prev) => [student, ...prev]);
+            setAdminStudents((prev) => [student, ...prev.filter((s) => s.id !== student.id)]);
+            void saveStudentToFirestore(student);
             showToast(`Aluno(a) "${student.name}" matriculado(a) na escola com sucesso!`);
           }}
           showToast={showToast}
@@ -1862,14 +1886,42 @@ export default function App() {
         <DirectorStatisticsPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          schools={adminSchools}
+          teachers={adminTeachers}
+          students={adminStudents}
+          onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
+          onNavigateToRooms={() => {
+            setCurrentView('diretor-salas');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToTeachers={() => {
+            setCurrentView('diretor-professores');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateToStudents={() => {
+            setCurrentView('diretor-alunos');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       );
     }
     if (currentView === 'diretor-professores') {
+      const directorSchoolName =
+        currentUser?.schoolName ||
+        adminSchools.find((s) => s.id === currentUser?.schoolId)?.name ||
+        adminSchools[0]?.name ||
+        '';
+      const directorFullName = currentUser?.firstName
+        ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
+        : 'Director Escolar';
       return (
         <DirectorTeachersPage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
+          schoolName={directorSchoolName}
+          directorName={directorFullName}
+          onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
           onNavigateToAttendance={() => {
             setCurrentView('diretor-presenca');
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1879,8 +1931,18 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           onAddTeacherGlobal={(teacher) => {
-            setAdminTeachers((prev) => [teacher, ...prev]);
-            showToast(`Professor(a) "${teacher.name}" cadastrado(a) pela Direção Escolar com sucesso!`);
+            const enrichedTeacher = {
+              ...teacher,
+              school: teacher.school || directorSchoolName,
+            };
+            setAdminTeachers((prev) => [
+              enrichedTeacher,
+              ...prev.filter((t) => t.id !== enrichedTeacher.id),
+            ]);
+            void saveTeacherToFirestore(enrichedTeacher);
+            showToast(
+              `Professor(a) "${enrichedTeacher.name}" cadastrado(a) e sincronizado(a) no relatório SIGE da escola e da Direção Municipal!`
+            );
           }}
         />
       );
@@ -1893,7 +1955,8 @@ export default function App() {
           schools={adminSchools}
           currentUser={currentUser}
           onAddStudentGlobal={(student) => {
-            setAdminStudents((prev) => [student, ...prev]);
+            setAdminStudents((prev) => [student, ...prev.filter((s) => s.id !== student.id)]);
+            void saveStudentToFirestore(student);
             showToast(`Aluno(a) "${student.name}" matriculado(a) pela Direção Escolar com sucesso!`);
           }}
         />
@@ -2259,6 +2322,27 @@ export default function App() {
       );
     }
 
+    // Fluxo de Solicitação e Aprovação de Vagas (Cadastro Docente & Vagas)
+    if (
+      currentView === 'cadastro-docente' ||
+      currentView === 'pedido-vaga' ||
+      currentView === 'pedidos-vaga'
+    ) {
+      return (
+        <DeclaracaoEfectividadePage
+          onOpenGetStarted={() => handleOpenAuth('login')}
+          isLoggedIn={isSessionStarted}
+          currentUser={currentUser}
+          initialTab="cadastro-docente"
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setCurrentPage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      );
+    }
+
     // Declaração de Efectividade / Serviços SIGRE (Modelo Oficial em Branco)
     if (
       currentView === 'declaracao-efectividade' ||
@@ -2267,7 +2351,7 @@ export default function App() {
       currentView === 'efectividade' ||
       currentView === 'mapa-efectividade'
     ) {
-      // Na conta dos directores de escola o único serviço SIGRE disponível é Serviços Rápidos
+      // Na conta dos directores de escola abre Serviços SIGRE (Serviços Rápidos + Triagem de Pedidos de Vaga)
       if (isSessionStarted && currentUser?.role === 'diretor') {
         return (
           <DeclaracaoEfectividadePage
@@ -2275,6 +2359,23 @@ export default function App() {
             isLoggedIn={isSessionStarted}
             currentUser={currentUser}
             initialTab="pedidos"
+            onNavigateHome={() => {
+              setCurrentView('home');
+              setCurrentPage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        );
+      }
+
+      // Na conta dos professores abre Serviços SIGRE na aba Pedido de Vaga Docente
+      if (isSessionStarted && currentUser?.role === 'professor') {
+        return (
+          <DeclaracaoEfectividadePage
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            isLoggedIn={isSessionStarted}
+            currentUser={currentUser}
+            initialTab="cadastro-docente"
             onNavigateHome={() => {
               setCurrentView('home');
               setCurrentPage('home');
@@ -3149,7 +3250,7 @@ export default function App() {
         }}
       />
 
-      {/* Excel Export Modal for Admin */}
+      {/* Excel Export Modal (Nível Macro Municipal & Nível Micro Direção de Escola) */}
       <ExcelExportModal
         isOpen={isExcelExportModalOpen}
         onClose={() => setIsExcelExportModalOpen(false)}
@@ -3157,6 +3258,7 @@ export default function App() {
         teachers={adminTeachers}
         directors={adminDirectors}
         students={adminStudents}
+        currentUser={currentUser}
         onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
       />
 

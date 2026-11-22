@@ -84,7 +84,8 @@ function renderJustifiedParagraph(
   maxWidth: number,
   firstLineIndent: number,
   lineHeightMm: number,
-  fontSizePt: number = 12
+  fontSizePt: number = 12,
+  fontFamily: 'times' | 'helvetica' = 'times'
 ): number {
   doc.setFontSize(fontSizePt);
   doc.setTextColor(0, 0, 0);
@@ -117,7 +118,7 @@ function renderJustifiedParagraph(
 
   // Measure each word
   const tokens: WordToken[] = rawTokens.map((t) => {
-    doc.setFont('times', t.bold ? 'bold' : 'normal');
+    doc.setFont(fontFamily, t.bold ? 'bold' : 'normal');
     return {
       word: t.word,
       bold: t.bold,
@@ -125,7 +126,7 @@ function renderJustifiedParagraph(
     };
   });
 
-  doc.setFont('times', 'normal');
+  doc.setFont(fontFamily, 'normal');
   const minSpaceWidth = doc.getTextWidth(' ');
 
   // Break tokens into lines
@@ -182,7 +183,7 @@ function renderJustifiedParagraph(
     let cursorX = startX + line.indent;
     for (let i = 0; i < line.words.length; i++) {
       const w = line.words[i];
-      doc.setFont('times', w.bold ? 'bold' : 'normal');
+      doc.setFont(fontFamily, w.bold ? 'bold' : 'normal');
       doc.text(w.word, cursorX, currentY);
       cursorX += w.width + (i < gapsCount ? spaceStep : 0);
     }
@@ -443,6 +444,8 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
   const sheetHtml = targetEl.outerHTML;
   const isFichaStyleA4 =
     elementId === 'ficha-avaliacao-a4-sheet' || elementId === 'turma-lista-a4-sheet';
+  const isCenturyGothicA4 =
+    isFichaStyleA4 || elementId === 'cadastro-docente-a4-sheet';
 
   iframeDoc.open();
   iframeDoc.write(`<!DOCTYPE html>
@@ -460,11 +463,10 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       font-family: ${
-        isFichaStyleA4
+        isCenturyGothicA4
           ? "'Century Gothic', CenturyGothic, AppleGothic, sans-serif"
           : "'Times New Roman', Times, serif"
       } !important;
-      color: #000000 !important;
     }
     html, body {
       width: ${isFichaStyleA4 ? '100%' : '210mm'} !important;
@@ -473,6 +475,7 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       margin: 0 !important;
       padding: 0 !important;
       background: #ffffff !important;
+      color: #000000 !important;
       overflow: ${isFichaStyleA4 ? 'visible' : 'hidden'} !important;
       ${
         isFichaStyleA4
@@ -495,6 +498,11 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       box-shadow: none !important;
       background: #ffffff !important;
       overflow: ${isFichaStyleA4 ? 'visible' : 'hidden'} !important;
+      ${
+        elementId === 'cadastro-docente-a4-sheet'
+          ? 'display: flex !important; flex-direction: column !important; justify-content: space-between !important;'
+          : ''
+      }
       ${
         isFichaStyleA4
           ? ''
@@ -1718,6 +1726,455 @@ export async function downloadGuiaColocacaoPdf(
     .replace(/^_+|_+$/g, '');
 
   doc.save(`Guia_Colocacao_${safeName}.pdf`);
+}
+
+export interface CadastroDocentePdfData {
+  id: string;
+  criado?: string;
+  trat: 'Senhor' | 'Senhora';
+  nome: string;
+  agente: string;
+  grau: string;
+  cat: string;
+  instAct: string;
+  munAct: string;
+  munDest: string;
+  escola: string;
+  interesse: boolean;
+  motivo: string;
+  proxRes: boolean;
+  motivoDet: string;
+  parecer: 'Pendente' | 'Favorável' | 'Desfavorável';
+  dataParecer: string;
+  localParecer: string;
+  director: string;
+  destinatarioPrep?: 'À' | 'Ao';
+  destinatario?: string;
+  destinatarioLocal?: string;
+  assunto?: string;
+  saudacao?: string;
+  cargoDirector?: string;
+  rodapeEndereco?: string;
+  rodapeEmail?: string;
+}
+
+/**
+ * Gera e descarrega o Parecer sobre Solicitação de Vaga Docente (Cadastro Docente)
+ * em formato PDF nativo, garantido em 1 única página A4, com cabeçalho institucional,
+ * quadro de destinatário com 4 cantoneiras azuis em L, corpo justificado sem recuo
+ * e rodapé institucional com endereço e logótipo GOVERNO DE ANGOLA | malanje.gov.ao.
+ */
+export async function downloadCadastroDocenteVagaPdf(
+  record: CadastroDocentePdfData
+): Promise<void> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const pageWidth = 210;
+  const marginX = 22;
+  const usableWidth = pageWidth - marginX * 2;
+  const centerX = pageWidth / 2;
+  const firstLineIndent = 0;
+  const lineHeightMm = 6.2;
+  const paragraphGapMm = 4.8;
+
+  let y = 16;
+
+  // 1. Insígnia da República de Angola
+  const emblemData = await loadEmblemPngDataUrl(emblemAngolaImg);
+  if (emblemData) {
+    const emblemHeight = 16;
+    const emblemWidth = emblemHeight * emblemData.ratio;
+    doc.addImage(
+      emblemData.dataUrl,
+      'PNG',
+      centerX - emblemWidth / 2,
+      y,
+      emblemWidth,
+      emblemHeight
+    );
+    y += emblemHeight + 4.5;
+  } else {
+    y += 10;
+  }
+
+  const munDest = record.munDest?.trim() || 'Quêssua';
+  const isQuessuaDest =
+    munDest.toLowerCase().includes('quêssua') || munDest.toLowerCase().includes('quessua');
+  const prepDateMun = isQuessuaDest ? 'do' : 'de';
+
+  const localVal = record.localParecer?.trim() || munDest;
+  const isQuessuaLocal =
+    localVal.toLowerCase().includes('quêssua') || localVal.toLowerCase().includes('quessua');
+  const noNaLocal = isQuessuaLocal ? 'no' : 'em';
+
+  // Cabeçalho Institucional Centrado
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.text('REPÚBLICA DE ANGOLA', centerX, y, { align: 'center' });
+  y += 4.6;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.text('GOVERNO PROVINCIAL DE MALANJE', centerX, y, { align: 'center' });
+  y += 4.8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.8);
+  doc.text(`Administração Municipal ${prepDateMun} ${munDest}`, centerX, y, {
+    align: 'center',
+  });
+  y += 4.8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.8);
+  doc.text('DIRECÇÃO MUNICIPAL DA EDUCAÇÃO', centerX, y, {
+    align: 'center',
+  });
+  y += 9;
+
+  // 2. Quadro do Destinatário (À Direita) com 4 Cantoneiras Azuis em "L"
+  const boxW = 86;
+  const boxH = 31;
+  const boxX = pageWidth - marginX - boxW;
+  const boxY = y;
+
+  const drawBlueLCorner = (
+    cx: number,
+    cy: number,
+    dirX: 1 | -1,
+    dirY: 1 | -1
+  ) => {
+    const arm = 5.5;
+    const thick = 1.4;
+    doc.setFillColor(79, 129, 189); // #4f81bd
+    doc.setDrawColor(36, 63, 96); // #243f60
+    doc.setLineWidth(0.32);
+
+    // Desenha os dois braços da cantoneira em L
+    const x1 = dirX === 1 ? cx : cx - arm;
+    const y1 = dirY === 1 ? cy : cy - thick;
+    doc.rect(x1, y1, arm, thick, 'FD');
+
+    const x2 = dirX === 1 ? cx : cx - thick;
+    const y2 = dirY === 1 ? cy : cy - arm;
+    doc.rect(x2, y2, thick, arm, 'FD');
+  };
+
+  drawBlueLCorner(boxX, boxY, 1, 1);
+  drawBlueLCorner(boxX + boxW, boxY, -1, 1);
+  drawBlueLCorner(boxX, boxY + boxH, 1, -1);
+  drawBlueLCorner(boxX + boxW, boxY + boxH, -1, -1);
+
+  const destBodyText =
+    record.destinatario?.trim() || 'Secretária Geral da Administração Municipal';
+  const cleanDestLower = destBodyText.toLowerCase();
+  const destPrepLabel: 'À' | 'Ao' =
+    record.destinatarioPrep === 'Ao' || record.destinatarioPrep === 'À'
+      ? record.destinatarioPrep
+      : cleanDestLower.startsWith('gabinete') ||
+        (cleanDestLower.includes('gabinete') && !cleanDestLower.startsWith('secret')) ||
+        cleanDestLower.startsWith('administrador') ||
+        cleanDestLower.startsWith('director') ||
+        cleanDestLower.startsWith('departamento')
+      ? 'Ao'
+      : 'À';
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.text(destPrepLabel, boxX + 6, boxY + 7.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(destBodyText, boxX + 6, boxY + 17);
+
+  const destMunUpper = (record.destinatarioLocal?.trim() || munDest).toUpperCase();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  const destCenterX = boxX + boxW / 2;
+  doc.text(destMunUpper, destCenterX, boxY + 26.5, { align: 'center' });
+  const destW = doc.getTextWidth(destMunUpper);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.35);
+  doc.line(destCenterX - destW / 2, boxY + 27.3, destCenterX + destW / 2, boxY + 27.3);
+
+  y = boxY + boxH + 11;
+
+  // 3. Assunto e Saudação
+  const rawAssunto =
+    record.assunto?.trim() || 'Pedido de Parecer sobre Solicitação de Vaga';
+  const assuntoText = rawAssunto.toUpperCase().startsWith('ASSUNTO:')
+    ? rawAssunto
+    : `ASSUNTO: ${rawAssunto}`;
+  const saudacaoText = record.saudacao?.trim() || 'Cordiais saudações.';
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.8);
+  doc.text(assuntoText, marginX, y);
+  y += 9;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.8);
+  doc.text(saudacaoText, marginX, y);
+  y += 9;
+
+  // 4. Corpo do Parecer (4 Parágrafos Justificados sem Indentação)
+  const isFem = record.trat === 'Senhora';
+  const profTitle = isFem ? 'Professora' : 'Professor';
+  const peloPela = isFem ? 'pela' : 'pelo';
+  const portadorLabel = isFem ? 'portadora' : 'portador';
+  const colocadoLabel = isFem ? 'colocada' : 'colocado';
+  const peloRequerente = isFem ? 'pela requerente' : 'pelo requerente';
+  const doReferidoDocente = isFem ? 'da referida docente' : 'do referido docente';
+
+  const getInstPrep = (name: string): string => {
+    const n = (name || '').trim().toLowerCase();
+    if (
+      n.startsWith('colégio') ||
+      n.startsWith('colegio') ||
+      n.startsWith('complexo') ||
+      n.startsWith('liceu') ||
+      n.startsWith('instituto') ||
+      n.startsWith('centro') ||
+      n.startsWith('magistério') ||
+      n.startsWith('magisterio') ||
+      n.startsWith('gabinete')
+    ) {
+      return 'no';
+    }
+    if (
+      n.startsWith('escola') ||
+      n.startsWith('direcção') ||
+      n.startsWith('direcao') ||
+      n.startsWith('administração') ||
+      n.startsWith('administracao') ||
+      n.startsWith('repartição') ||
+      n.startsWith('missão') ||
+      n.startsWith('missao')
+    ) {
+      return 'na';
+    }
+    return 'em';
+  };
+
+  const instActVal = record.instAct?.trim() || 'Colégio Amilcar Cabral';
+  const munActVal = record.munAct?.trim() || 'Malanje';
+  const escolaVal = record.escola?.trim() || 'Escola Primária n.º 125 – Caxeta – Quêssua';
+  const nomeVal = record.nome?.trim() || 'Diogo da Costa Albino da Silva';
+  const agenteVal = record.agente?.trim() || '99072119';
+
+  const prepInstAct = getInstPrep(instActVal);
+  const prepEscola = getInstPrep(escolaVal);
+  const isDesfavoravel = record.parecer === 'Desfavorável';
+
+  const dataExt =
+    formatColocacaoDateExtenso(record.dataParecer) ||
+    formatAngolanDateExtenso(record.dataParecer) ||
+    '14 de Julho de 2026';
+
+  const p1: TextSegment[] = [
+    {
+      text: `A Direcção Municipal da Educação, em atenção à solicitação e ao pedido de parecer relativos à concessão de vaga apresentados ${peloPela} `,
+    },
+    { text: `${profTitle} ${nomeVal}`, bold: true },
+    { text: `, ${portadorLabel} do n.º de Agente ` },
+    { text: agenteVal, bold: true },
+    { text: `, actualmente ${colocadoLabel} ${prepInstAct} ${instActVal}, Município de ${munActVal}, ` },
+    { text: 'após análise do processo', bold: true },
+    { text: ', é de parecer que:' },
+  ];
+
+  const p2: TextSegment[] = !isDesfavoravel
+    ? [
+        {
+          text: `Considerando os motivos invocados ${peloRequerente} e verificando-se a existência de vaga disponível ${prepEscola} `,
+        },
+        { text: escolaVal, bold: true },
+        { text: ', esta Direcção Municipal da Educação é de ' },
+        { text: 'parecer favorável', bold: true },
+        { text: ` ao acolhimento ${doReferidoDocente} neste Município.` },
+      ]
+    : [
+        {
+          text: `Considerando os motivos invocados ${peloRequerente} e após verificação do quadro de pessoal ${prepEscola} `,
+        },
+        { text: escolaVal, bold: true },
+        { text: ', esta Direcção Municipal da Educação é de ' },
+        { text: 'parecer desfavorável', bold: true },
+        { text: ` ao acolhimento ${doReferidoDocente} neste Município.` },
+      ];
+
+  const p3: TextSegment[] = !isDesfavoravel
+    ? [
+        {
+          text: 'Assim, entendemos não existir qualquer impedimento de ordem administrativa ou funcional para a efectivação da sua transferência, pelo que remetemos o presente parecer para os devidos efeitos.',
+        },
+      ]
+    : [
+        {
+          text: 'Assim, verificando-se impedimento de ordem administrativa ou indisponibilidade de vaga para a efectivação da sua transferência, remetemos o presente parecer para os devidos efeitos.',
+        },
+      ];
+
+  const p4: TextSegment[] = [
+    {
+      text: 'Sem outro assunto de momento, apresentamos os nossos melhores cumprimentos.',
+    },
+  ];
+
+  y = renderJustifiedParagraph(
+    doc,
+    p1,
+    marginX,
+    y,
+    usableWidth,
+    firstLineIndent,
+    lineHeightMm,
+    10.8,
+    'helvetica'
+  );
+  y += paragraphGapMm;
+  y = renderJustifiedParagraph(
+    doc,
+    p2,
+    marginX,
+    y,
+    usableWidth,
+    firstLineIndent,
+    lineHeightMm,
+    10.8,
+    'helvetica'
+  );
+  y += paragraphGapMm;
+  y = renderJustifiedParagraph(
+    doc,
+    p3,
+    marginX,
+    y,
+    usableWidth,
+    firstLineIndent,
+    lineHeightMm,
+    10.8,
+    'helvetica'
+  );
+  y += paragraphGapMm;
+  y = renderJustifiedParagraph(
+    doc,
+    p4,
+    marginX,
+    y,
+    usableWidth,
+    firstLineIndent,
+    lineHeightMm,
+    10.8,
+    'helvetica'
+  );
+
+  // 5. Data e Assinatura do Director Municipal
+  y += 12;
+  const dateLine = `Direcção Municipal de Educação ${prepDateMun} ${munDest} ${noNaLocal} ${localVal}, aos ${dataExt}. -`;
+  const cargoDirText = record.cargoDirector?.trim() || 'O Director Municipal';
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.8);
+  doc.text(dateLine, centerX, y, { align: 'center' });
+  y += 6.2;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.8);
+  doc.text(cargoDirText, centerX, y, { align: 'center' });
+
+  y += 15;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.45);
+  doc.line(centerX - 34, y, centerX + 34, y);
+
+  const dirName = record.director?.trim() || 'Belízio Miguel dos Santos António';
+  if (dirName) {
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.8);
+    doc.text(dirName, centerX, y, { align: 'center' });
+  }
+
+  // 6. Rodapé Institucional no Fundo da Página A4
+  const footerY = 274;
+  const footerAddrText =
+    record.rodapeEndereco?.trim() || 'Estrada Principal do Bairro da Carreira Tiro';
+  const footerEmailText = record.rodapeEmail?.trim() || 'dmedoquessua@gmail.com';
+
+  doc.setTextColor(17, 24, 39);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text(`Direcção Municipal da Educação ${prepDateMun} ${munDest}`, marginX, footerY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(footerAddrText, marginX, footerY + 3.6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('E-mail: ', marginX, footerY + 7.5);
+  const emailLabelW = doc.getTextWidth('E-mail: ');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.2);
+  doc.text(footerEmailText, marginX + emailLabelW, footerY + 7.5);
+
+  // Emblema Institucional Inferior Direito: GOVERNO DE ANGOLA | malanje.gov.ao
+  const logoRightX = pageWidth - marginX;
+  const badgeStartX = logoRightX - 52;
+
+  // "A" estilizado vermelho/preto/amarelo
+  doc.setFillColor(217, 28, 36); // Vermelho
+  doc.triangle(badgeStartX, footerY + 8, badgeStartX + 3.5, footerY - 1, badgeStartX + 5.5, footerY + 8, 'F');
+  doc.setFillColor(17, 17, 17); // Preto
+  doc.triangle(badgeStartX + 4.2, footerY - 1, badgeStartX + 6.5, footerY - 1, badgeStartX + 9.2, footerY + 8, 'F');
+  doc.setFillColor(245, 196, 0); // Amarelo
+  doc.rect(badgeStartX + 2.2, footerY + 4.4, 5.2, 1.3, 'F');
+
+  // Texto GOVERNO DE ANGOLA
+  doc.setTextColor(75, 85, 99);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.2);
+  doc.text('GOVERNO DE', badgeStartX + 11, footerY + 2.2);
+
+  doc.setTextColor(31, 41, 55);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11.5);
+  doc.text('ANGOLA', badgeStartX + 11, footerY + 7.2);
+
+  // Linha divisória vertical
+  doc.setDrawColor(209, 213, 219);
+  doc.setLineWidth(0.3);
+  doc.line(badgeStartX + 30.5, footerY + 0.2, badgeStartX + 30.5, footerY + 8);
+
+  // malanje.gov.ao
+  doc.setTextColor(17, 24, 39);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.2);
+  doc.text('malanje', badgeStartX + 32.5, footerY + 4.5);
+  const malanjeW = doc.getTextWidth('malanje');
+  doc.setTextColor(217, 28, 36);
+  doc.text('.gov.ao', badgeStartX + 32.5 + malanjeW, footerY + 4.5);
+
+  doc.setTextColor(107, 114, 128);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(4.3);
+  doc.text('Portal Oficial do Governo Provincial', badgeStartX + 32.5, footerY + 7.2);
+
+  const safeName = (record.nome || record.id || 'Docente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  doc.save(`Solicitacao_Vaga_Docente_${safeName}.pdf`);
 }
 
 /**

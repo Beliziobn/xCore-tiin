@@ -4,6 +4,7 @@ import {
   getFirestore,
   initializeFirestore,
   memoryLocalCache,
+  setLogLevel,
   doc,
   getDocFromServer,
   Firestore,
@@ -12,6 +13,12 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase app singleton
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Suppress internal @firebase/firestore transport timeout warnings in console.error
+// while preserving explicit application & permission error handling via handleFirestoreError
+try {
+  setLogLevel('silent');
+} catch {}
 
 // Clear any orphaned Firestore WebStorage multi-tab keys that may have exhausted localStorage quota
 function purgeLegacyFirestoreWebStorage(): void {
@@ -32,13 +39,15 @@ function purgeLegacyFirestoreWebStorage(): void {
   } catch {}
 }
 
-// Initialize Firestore with in-memory local cache (prevents WebStorageSharedClientState QuotaExceededError b815)
+// Initialize Firestore with in-memory local cache and automatic long-polling fallback
+// (prevents WebStorageSharedClientState QuotaExceededError b815 and WebChannel 10s proxy timeouts)
 function initDurableFirestore(): Firestore {
   purgeLegacyFirestoreWebStorage();
   const databaseId = (firebaseConfig as Record<string, any>).firestoreDatabaseId;
   try {
     const settings = {
       localCache: memoryLocalCache(),
+      experimentalAutoDetectLongPolling: true,
     };
     return databaseId
       ? initializeFirestore(app, settings, databaseId)
