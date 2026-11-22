@@ -1751,6 +1751,8 @@ export interface CadastroDocentePdfData {
   destinatarioPrep?: 'À' | 'Ao';
   destinatario?: string;
   destinatarioLocal?: string;
+  notaNumero?: string;
+  notaSufixo?: string;
   assunto?: string;
   saudacao?: string;
   cargoDirector?: string;
@@ -1904,9 +1906,23 @@ export async function downloadCadastroDocenteVagaPdf(
   doc.setLineWidth(0.35);
   doc.line(destCenterX - destW / 2, boxY + 27.3, destCenterX + destW / 2, boxY + 27.3);
 
-  y = boxY + boxH + 11;
+  y = boxY + boxH + 10;
 
-  // 3. Assunto e Saudação
+  // 3. Nota Nº, Assunto e Saudação
+  const notaNumClean = (record.notaNumero || '').trim();
+  const rawNotaSuf = (record.notaSufixo || '/DMEQuéssua - 2026').trim() || '/DMEQuéssua - 2026';
+  const notaSuf = rawNotaSuf.startsWith('/') ? rawNotaSuf : `/${rawNotaSuf}`;
+  const notaHeaderText = !notaNumClean
+    ? `Nota Nº____${notaSuf}`
+    : notaNumClean.toLowerCase().startsWith('nota')
+    ? notaNumClean
+    : `Nota Nº ${notaNumClean}${notaSuf}`;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.8);
+  doc.text(notaHeaderText, marginX, y);
+  y += 7.5;
+
   const rawAssunto =
     record.assunto?.trim() || 'Pedido de Parecer sobre Solicitação de Vaga';
   const assuntoText = rawAssunto.toUpperCase().startsWith('ASSUNTO:')
@@ -1917,12 +1933,12 @@ export async function downloadCadastroDocenteVagaPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.8);
   doc.text(assuntoText, marginX, y);
-  y += 9;
+  y += 8.5;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10.8);
   doc.text(saudacaoText, marginX, y);
-  y += 9;
+  y += 8.5;
 
   // 4. Corpo do Parecer (4 Parágrafos Justificados sem Indentação)
   const isFem = record.trat === 'Senhora';

@@ -56,10 +56,12 @@ export interface CadastroDocenteVagaRecord {
   dataParecer: string;
   localParecer: string;
   director: string;
-  // Campos editáveis do documento oficial (Destinatário À/Ao, Assunto, Assinatura e Rodapé)
+  // Campos editáveis do documento oficial (Destinatário À/Ao, Nota Nº, Assunto, Assinatura e Rodapé)
   destinatarioPrep?: 'À' | 'Ao';
   destinatario?: string;
   destinatarioLocal?: string;
+  notaNumero?: string;
+  notaSufixo?: string;
   assunto?: string;
   saudacao?: string;
   cargoDirector?: string;
@@ -104,6 +106,8 @@ interface CadastroDocenteFormState {
   destinatarioPrep: 'À' | 'Ao';
   destinatario: string;
   destinatarioLocal: string;
+  notaNumero: string;
+  notaSufixo: string;
   assunto: string;
   saudacao: string;
   cargoDirector: string;
@@ -272,6 +276,19 @@ export function formatDateTimePt(isoOrDate?: string): string {
   }
 }
 
+export function formatNotaHeader(notaNumero?: string, notaSufixo?: string): string {
+  const num = (notaNumero || '').trim();
+  const rawSuf = (notaSufixo || '/DMEQuéssua - 2026').trim() || '/DMEQuéssua - 2026';
+  const suf = rawSuf.startsWith('/') ? rawSuf : `/${rawSuf}`;
+  if (!num) {
+    return `Nota Nº____${suf}`;
+  }
+  if (num.toLowerCase().startsWith('nota')) {
+    return num;
+  }
+  return `Nota Nº ${num}${suf}`;
+}
+
 function getFreshFormState(): CadastroDocenteFormState {
   return {
     trat: 'Senhor',
@@ -295,6 +312,8 @@ function getFreshFormState(): CadastroDocenteFormState {
     destinatarioPrep: 'À',
     destinatario: 'Secretária Geral da Administração Municipal',
     destinatarioLocal: 'QUÊSSUA',
+    notaNumero: '',
+    notaSufixo: '/DMEQuéssua - 2026',
     assunto: 'Pedido de Parecer sobre Solicitação de Vaga',
     saudacao: 'Cordiais saudações.',
     cargoDirector: 'O Director Municipal',
@@ -338,6 +357,8 @@ function getInitialFormState(): CadastroDocenteFormState {
         destinatarioPrep: inferredPrep,
         destinatario: destText,
         destinatarioLocal: parsed.destinatarioLocal || (parsed.munDest || 'QUÊSSUA').toUpperCase(),
+        notaNumero: parsed.notaNumero || '',
+        notaSufixo: parsed.notaSufixo || '/DMEQuéssua - 2026',
         assunto: parsed.assunto || 'Pedido de Parecer sobre Solicitação de Vaga',
         saudacao: parsed.saudacao || 'Cordiais saudações.',
         cargoDirector: parsed.cargoDirector || 'O Director Municipal',
@@ -557,6 +578,8 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
       destinatarioLocal:
         formData.destinatarioLocal.trim() ||
         (formData.munDest.trim() || 'QUÊSSUA').toUpperCase(),
+      notaNumero: formData.notaNumero.trim(),
+      notaSufixo: formData.notaSufixo.trim() || '/DMEQuéssua - 2026',
       assunto:
         formData.assunto.trim() || 'Pedido de Parecer sobre Solicitação de Vaga',
       saudacao: formData.saudacao.trim() || 'Cordiais saudações.',
@@ -745,6 +768,8 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
       destinatarioLocal:
         formData.destinatarioLocal.trim() ||
         (formData.munDest.trim() || 'QUÊSSUA').toUpperCase(),
+      notaNumero: formData.notaNumero.trim(),
+      notaSufixo: formData.notaSufixo.trim() || '/DMEQuéssua - 2026',
       assunto:
         formData.assunto.trim() || 'Pedido de Parecer sobre Solicitação de Vaga',
       saudacao: formData.saudacao.trim() || 'Cordiais saudações.',
@@ -783,7 +808,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
             employeeCategory: `${newRecord.cat} · ${newRecord.grau}`,
             destinationSchool: `${newRecord.escola} (${newRecord.munDest})`,
             purpose: newRecord.motivo,
-            notes: `Código: ${newRecord.id} | Destinatário: ${newRecord.destinatarioPrep} ${newRecord.destinatario} | Colocação actual: ${newRecord.instAct} (${newRecord.munAct}) | Pretende vaga em: ${newRecord.escola} (${newRecord.munDest}) | Motivo: ${newRecord.motivo}${newRecord.proxRes ? ' (Próximo da residência)' : ''}${newRecord.motivoDet ? ` - ${newRecord.motivoDet}` : ''} | Parecer: ${newRecord.parecer}`,
+            notes: `Código: ${newRecord.id} | Nota: ${formatNotaHeader(newRecord.notaNumero, newRecord.notaSufixo)} | Destinatário: ${newRecord.destinatarioPrep} ${newRecord.destinatario} | Colocação actual: ${newRecord.instAct} (${newRecord.munAct}) | Pretende vaga em: ${newRecord.escola} (${newRecord.munDest}) | Motivo: ${newRecord.motivo}${newRecord.proxRes ? ' (Próximo da residência)' : ''}${newRecord.motivoDet ? ` - ${newRecord.motivoDet}` : ''} | Parecer: ${newRecord.parecer}`,
           },
         });
       } catch {
@@ -836,6 +861,8 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
       destinatario: destText,
       destinatarioLocal:
         r.destinatarioLocal || (r.munDest || 'QUÊSSUA').toUpperCase(),
+      notaNumero: r.notaNumero || '',
+      notaSufixo: r.notaSufixo || '/DMEQuéssua - 2026',
       assunto: r.assunto || 'Pedido de Parecer sobre Solicitação de Vaga',
       saudacao: r.saudacao || 'Cordiais saudações.',
       cargoDirector: r.cargoDirector || 'O Director Municipal',
@@ -1601,8 +1628,17 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                       </div>
                     </div>
 
-                    {/* 3. ASSUNTO E SAUDAÇÃO */}
+                    {/* 3. NOTA Nº, ASSUNTO E SAUDAÇÃO */}
                     <div className="mb-5" style={{ fontSize: '10.8pt', lineHeight: 1.5 }}>
+                      <p
+                        className="m-0 mb-3 font-bold"
+                        style={{ textIndent: 0 }}
+                      >
+                        {formatNotaHeader(
+                          livePreviewRecord.notaNumero,
+                          livePreviewRecord.notaSufixo
+                        )}
+                      </p>
                       <p
                         className="m-0 font-bold"
                         style={{ textIndent: 0 }}
@@ -2436,6 +2472,45 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="f-cdq-notaNumero"
+                      className="block text-[13px] font-semibold text-slate-800"
+                    >
+                      Número da Nota (Nota Nº)
+                    </label>
+                    <span className="text-[11px] font-mono font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                      {formatNotaHeader(formData.notaNumero, formData.notaSufixo)}
+                    </span>
+                  </div>
+                  <input
+                    id="f-cdq-notaNumero"
+                    type="text"
+                    value={formData.notaNumero}
+                    onChange={(e) => handleFieldChange('notaNumero', e.target.value)}
+                    placeholder="Deixe em branco para ____ ou digite o nº (ex.: 014)"
+                    className={pillInputClass(false)}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="f-cdq-notaSufixo"
+                    className="block text-[13px] font-semibold text-slate-800 mb-1.5"
+                  >
+                    Referência / Ano da Nota
+                  </label>
+                  <input
+                    id="f-cdq-notaSufixo"
+                    type="text"
+                    value={formData.notaSufixo}
+                    onChange={(e) => handleFieldChange('notaSufixo', e.target.value)}
+                    placeholder="Ex.: /DMEQuéssua - 2026"
+                    className={pillInputClass(false)}
+                  />
+                </div>
+
                 <div>
                   <label
                     htmlFor="f-cdq-assunto"
