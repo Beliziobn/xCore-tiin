@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   FileSpreadsheet,
@@ -11,10 +11,14 @@ import {
   Table,
   Layers,
   ArrowDownToLine,
+  SlidersHorizontal,
+  FileCheck,
   Globe,
+  ExternalLink,
   ShieldCheck,
+  Sparkles
 } from 'lucide-react';
-import type { AdminSchool, AdminTeacher, AdminDirector, AdminStudent, UserAccount } from '../../types';
+import type { AdminSchool, AdminTeacher, AdminDirector, AdminStudent } from '../../types';
 import {
   exportConsolidatedExcel,
   exportTeachersExcel,
@@ -22,8 +26,6 @@ import {
   exportStudentsExcel,
   exportSchoolsExcel,
   getUnifiedSystemDataset,
-  filterDatasetForSchoolDirector,
-  getOfficialSigeFileName,
   exportOfficialSigeExcel,
   exportStandaloneSigeHtml,
 } from '../../utils/excelExport';
@@ -37,7 +39,6 @@ interface ExcelExportModalProps {
   teachers?: AdminTeacher[];
   directors?: AdminDirector[];
   students?: AdminStudent[];
-  currentUser?: UserAccount | null;
   onOpenGoogleSheets?: () => void;
 }
 
@@ -48,56 +49,15 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   teachers,
   directors,
   students,
-  currentUser,
   onOpenGoogleSheets,
 }) => {
   const [downloadingType, setDownloadingType] = useState<string | null>(null);
   const [isSigeDataEntryOpen, setIsSigeDataEntryOpen] = useState(false);
   const [isSigeViewerOpen, setIsSigeViewerOpen] = useState(false);
-  const [syncTick, setSyncTick] = useState(0);
-
-  useEffect(() => {
-    const handleSync = () => setSyncTick((t) => t + 1);
-    window.addEventListener('ucore-teachers-updated', handleSync);
-    window.addEventListener('ucore-students-updated', handleSync);
-    window.addEventListener('sigre-vagas-docentes-updated', handleSync);
-    window.addEventListener('sigre-data-synced', handleSync);
-    return () => {
-      window.removeEventListener('ucore-teachers-updated', handleSync);
-      window.removeEventListener('ucore-students-updated', handleSync);
-      window.removeEventListener('sigre-vagas-docentes-updated', handleSync);
-      window.removeEventListener('sigre-data-synced', handleSync);
-    };
-  }, []);
-
-  const isSchoolDirector = currentUser?.role === 'diretor';
-
-  const dataset = useMemo(() => {
-    const raw = getUnifiedSystemDataset({ schools, teachers, directors, students });
-    if (isSchoolDirector) {
-      return filterDatasetForSchoolDirector(raw, currentUser?.schoolId, currentUser?.schoolName);
-    }
-    return raw;
-  }, [schools, teachers, directors, students, isSchoolDirector, currentUser?.schoolId, currentUser?.schoolName, isOpen, syncTick]);
 
   if (!isOpen) return null;
 
-  const resolvedSchoolName =
-    currentUser?.schoolName ||
-    dataset.schools[0]?.name ||
-    'Escola';
-
-  const officialExcelFileName = getOfficialSigeFileName(dataset, {
-    isSchoolDirector,
-    schoolName: resolvedSchoolName,
-    extension: 'xlsx',
-  });
-
-  const officialHtmlFileName = getOfficialSigeFileName(dataset, {
-    isSchoolDirector,
-    schoolName: resolvedSchoolName,
-    extension: 'html',
-  });
+  const dataset = getUnifiedSystemDataset({ schools, teachers, directors, students });
 
   const totalTeachers = dataset.teachers.length;
   const totalDirectors = dataset.directors.length;
@@ -108,7 +68,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   const handleExportOfficialSige = async () => {
     setDownloadingType('sige_official');
     try {
-      await exportOfficialSigeExcel(dataset, officialExcelFileName);
+      await exportOfficialSigeExcel(dataset);
     } finally {
       setDownloadingType(null);
     }
@@ -117,7 +77,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   const handleExportHtmlSige = () => {
     setDownloadingType('sige_html');
     setTimeout(() => {
-      exportStandaloneSigeHtml(dataset, officialHtmlFileName);
+      exportStandaloneSigeHtml(dataset);
       setDownloadingType(null);
     }, 250);
   };
@@ -175,16 +135,17 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                  {isSchoolDirector
-                    ? `Exportação Institucional da Escola — ${resolvedSchoolName}`
-                    : 'Central de Exportação de Dados (Consolidado Municipal)'}
+                  Central de Exportação de Dados
                 </h2>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#0b3d5c]/10 text-[#0b3d5c] border border-[#0b3d5c]/20">
-                  {isSchoolDirector ? 'Nível Micro · Isolamento da Escola' : 'Nível Macro · 100% da Rede Municipal'}
+                <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-semibold tracking-wider uppercase">
+                  Multi-Abas
                 </span>
               </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Relatórios oficiais homologados para o Ministério e listagens operacionais em formato Excel (.xlsx).
+              </p>
             </div>
           </div>
 
@@ -209,19 +170,13 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0b3d5c]/10 text-[#0b3d5c] text-[11px] font-bold tracking-wide mb-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-[#0b3d5c]" />
-                    <span>
-                      {isSchoolDirector
-                        ? `Visão Institucional Dedicada • ${resolvedSchoolName}`
-                        : 'Visão Consolidada • Direção Municipal de Educação (GEPE)'}
-                    </span>
+                    <span>Destaque Oficial • Ministério da Educação (GEPE)</span>
                   </div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight break-all">
-                    {officialExcelFileName}
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Relatório Oficial de Estatística SIGE 2026/2027 (.xlsx)
                   </h3>
                   <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                    {isSchoolDirector
-                      ? `Recorte exato da Fonte Única da Verdade para a unidade "${resolvedSchoolName}". Espelha o mesmo layout oficial de colunas e abas do SIGE 2026/2027, exibindo exclusivamente alunos, professores, turmas e estatísticas desta escola.`
-                      : 'Consolida 100% dos dados de todas as escolas sob jurisdição municipal em tempo real (efetivo total de alunos, corpo docente completo, infraestruturas e pedidos de vagas aprovados).'}
+                    Instrumento estatístico agregado por subsistema, nível, classe, idade e género (MF/F). Pronto para submissão oficial ao Gabinete de Estudos, Planeamento e Estatística.
                   </p>
                 </div>
               </div>
@@ -280,6 +235,67 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                     </>
                   )}
                 </button>
+              </div>
+
+              {/* Linha Discreta: Conformidade + Badges das Abas + Filtros */}
+              <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                {/* Conformidade em Callout Verde Sutil */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50/70 border border-emerald-200/60 rounded-xl text-xs text-emerald-900">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="text-[11px] leading-relaxed">
+                    <strong>Conformidade GEPE:</strong> Agregação numérica estrita sem dados pessoais nominais (zero nomes, sem BI ou processos individuais).
+                  </span>
+                </div>
+
+                {/* Badges das 9 Abas */}
+                <div className="flex flex-wrap items-center gap-1.5 text-[10.5px]">
+                  <span className="text-slate-400 font-semibold uppercase text-[9.5px] mr-1">Abas integradas:</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">Capa</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">1. Alunos</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">2. Professores</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">3. Infraestruturas</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">4. Aproveitamento</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">5. Repetentes</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">6. NEE</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium border border-slate-200">7. Não Docente</span>
+                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded-md font-bold border border-emerald-200">9. Consolidado</span>
+                  <span className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md font-medium border border-slate-200">Escolas s/ Dados</span>
+                </div>
+
+                {/* Filtros ativos e utilidades secundárias */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-500">
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span className="font-medium text-slate-600">Filtros automáticos activos nas abas de dados</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSigeDataEntryOpen(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#0b3d5c] hover:bg-[#0b3d5c]/5 rounded-lg border border-[#0b3d5c]/20 transition-colors"
+                    >
+                      <SlidersHorizontal className="w-3 h-3" />
+                      <span>Editor / Validador JSON</span>
+                    </button>
+                    <a
+                      href="/Instrumento_Complementar_SIGE_2026_2027.xlsx"
+                      download="Instrumento_Complementar_SIGE_2026_2027.xlsx"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors no-underline"
+                    >
+                      <ArrowDownToLine className="w-3 h-3 text-slate-500" />
+                      <span>Modelo Vazio</span>
+                    </a>
+                    <a
+                      href="/saida.xlsx"
+                      download="Instrumento_Complementar_SIGE_PREENCHIDO.xlsx"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition-colors no-underline"
+                    >
+                      <FileCheck className="w-3 h-3 text-emerald-600" />
+                      <span>Exemplo Preenchido</span>
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -519,7 +535,6 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
         teachers={teachers}
         directors={directors}
         students={students}
-        currentUser={currentUser}
         onOpenGoogleSheets={onOpenGoogleSheets}
       />
     </div>

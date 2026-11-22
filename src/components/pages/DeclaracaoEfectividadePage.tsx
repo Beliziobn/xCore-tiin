@@ -40,13 +40,7 @@ import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
 import { GuiaFeriasSection } from './GuiaFeriasSection';
 import { GuiaColocacaoSection } from './GuiaColocacaoSection';
 import { FichaAvaliacaoSection } from './FichaAvaliacaoSection';
-import {
-  CadastroDocenteVagaSection,
-  loadVagaDocenteRecords,
-  recordBelongsToDirectorSchool,
-  recordBelongsToProfessor,
-  syncVagasDocentesFromFirestore,
-} from './CadastroDocenteVagaSection';
+import { CadastroDocenteVagaSection } from './CadastroDocenteVagaSection';
 import type { UserAccount } from '../../types';
 import {
   CadastramentoEfectividadeRecord,
@@ -200,33 +194,19 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   const isDirector = Boolean(
     isLoggedIn && currentUser && currentUser.role === 'diretor'
   );
-  const isProfessor = Boolean(
-    isLoggedIn && currentUser && currentUser.role === 'professor'
-  );
   const [activeTab, setActiveTab] = useState<ActiveTab>(
-    initialTab === 'cadastro-docente'
-      ? 'cadastro-docente'
-      : isProfessor
-      ? 'cadastro-docente'
-      : isDirector
-      ? 'pedidos'
-      : initialTab
+    isDirector ? 'pedidos' : initialTab
   );
 
   useEffect(() => {
-    if (initialTab === 'cadastro-docente') {
-      setActiveTab('cadastro-docente');
-    } else if (isProfessor) {
-      setActiveTab('cadastro-docente');
-    } else if (isDirector) {
+    if (isDirector) {
       setActiveTab('pedidos');
     } else if (initialTab) {
       setActiveTab(initialTab);
     }
-  }, [initialTab, isDirector, isProfessor]);
+  }, [initialTab, isDirector]);
 
   const [quickRequestsCount, setQuickRequestsCount] = useState<number>(0);
-  const [vagasBadgeCount, setVagasBadgeCount] = useState<number>(0);
   const [records, setRecords] = useState<CadastramentoEfectividadeRecord[]>(() =>
     getStoredEfectividadeRecords()
   );
@@ -284,34 +264,6 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         }
       })
       .catch(() => {});
-
-    const computeVagasCount = () => {
-      const allVagas = loadVagaDocenteRecords();
-      if (isDirector) {
-        setVagasBadgeCount(
-          allVagas.filter(
-            (v) =>
-              v.statusFluxo === 'Aguardando Direção da Escola' &&
-              recordBelongsToDirectorSchool(v, currentUser?.schoolName)
-          ).length
-        );
-      } else if (isProfessor) {
-        setVagasBadgeCount(
-          allVagas.filter(
-            (v) =>
-              (v.statusFluxo === 'Parecer Favorável' ||
-                v.statusFluxo === 'Parecer Não Favorável') &&
-              recordBelongsToProfessor(v, currentUser)
-          ).length
-        );
-      } else {
-        setVagasBadgeCount(
-          allVagas.filter((v) => v.statusFluxo === 'Encaminhado à Direção Municipal').length
-        );
-      }
-    };
-    computeVagasCount();
-    syncVagasDocentesFromFirestore().then(() => computeVagasCount()).catch(() => {});
   };
 
   useEffect(() => {
@@ -331,7 +283,6 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     window.addEventListener('sigre-database-restored', handler);
     window.addEventListener('sigre_quick_request_created', quickHandler);
     window.addEventListener('sigre_quick_request_updated', quickHandler);
-    window.addEventListener('sigre-vagas-docentes-updated', quickHandler);
     window.addEventListener('storage', handler);
 
     const pollInterval = setInterval(() => {
@@ -350,11 +301,10 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       window.removeEventListener('sigre-database-restored', handler);
       window.removeEventListener('sigre_quick_request_created', quickHandler);
       window.removeEventListener('sigre_quick_request_updated', quickHandler);
-      window.removeEventListener('sigre-vagas-docentes-updated', quickHandler);
       window.removeEventListener('storage', handler);
       clearInterval(pollInterval);
     };
-  }, [isDirector, isProfessor, currentUser?.schoolName, currentUser?.email]);
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -1382,14 +1332,10 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* Group 1: Tipos de Serviço */}
             <div>
               <p className="text-xs font-medium text-slate-500 px-3 mb-1.5">
-                {isDirector
-                  ? 'Serviço SIGRE da Direção'
-                  : isProfessor
-                  ? 'Serviços SIGRE do Docente'
-                  : 'Tipos de serviço'}
+                {isDirector ? 'Serviço SIGRE da Direção' : 'Tipos de serviço'}
               </p>
               <div className="space-y-1">
-                {!isDirector && !isProfessor && (
+                {!isDirector && (
                   <>
                     <button
                       type="button"
@@ -1459,6 +1405,20 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                       <ClipboardCheck className="w-4 h-4 text-slate-700 shrink-0" />
                       <span className="truncate">Ficha de Avaliação</span>
                     </button>
+
+                    <button
+                      id="tab-cadastro-docente"
+                      type="button"
+                      onClick={() => setActiveTab('cadastro-docente')}
+                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                        activeTab === 'cadastro-docente'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <UserPlus className="w-4 h-4 text-slate-700 shrink-0" />
+                      <span className="truncate">Cadastro Docente</span>
+                    </button>
                   </>
                 )}
 
@@ -1478,67 +1438,37 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                   </button>
                 )}
 
-                {/* Cadastro Docente / Fluxo de Solicitação e Aprovação de Vagas (Visível para Professor, Diretor e Direção Municipal) */}
-                <button
-                  id="tab-cadastro-docente"
-                  type="button"
-                  onClick={() => setActiveTab('cadastro-docente')}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
-                    activeTab === 'cadastro-docente'
-                      ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <UserPlus className="w-4 h-4 text-slate-700 shrink-0" />
-                    <span className="truncate">
-                      {isProfessor
-                        ? 'Pedido de Vaga Docente'
-                        : isDirector
-                        ? 'Pedidos de Vaga (Triagem)'
-                        : 'Cadastro Docente (Vagas)'}
-                    </span>
-                  </span>
-                  {vagasBadgeCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black shrink-0 animate-pulse">
-                      {vagasBadgeCount}
-                    </span>
+                <div className={isDirector ? '' : 'pt-2 mt-2 border-t border-slate-100'}>
+                  {!isDirector && (
+                    <p className="text-[11px] font-medium text-slate-400 px-3 mb-1">
+                      Solicitações de Usuários
+                    </p>
                   )}
-                </button>
-
-                {!isProfessor && (
-                  <div className={isDirector ? '' : 'pt-2 mt-2 border-t border-slate-100'}>
-                    {!isDirector && (
-                      <p className="text-[11px] font-medium text-slate-400 px-3 mb-1">
-                        Solicitações de Usuários
-                      </p>
-                    )}
-                    <button
-                      id="tab-servicos-rapidos-pedidos"
-                      type="button"
-                      onClick={() => setActiveTab('pedidos')}
-                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
-                        activeTab === 'pedidos'
-                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span className="flex items-center gap-3 min-w-0">
-                        <Zap className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
-                        <span className="truncate">Serviços Rápidos</span>
+                  <button
+                    id="tab-servicos-rapidos-pedidos"
+                    type="button"
+                    onClick={() => setActiveTab('pedidos')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'pedidos'
+                        ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3 min-w-0">
+                      <Zap className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                      <span className="truncate">Serviços Rápidos</span>
+                    </span>
+                    {quickRequestsCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black shrink-0 animate-pulse">
+                        {quickRequestsCount}
                       </span>
-                      {quickRequestsCount > 0 ? (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black shrink-0 animate-pulse">
-                          {quickRequestsCount}
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
-                          {isDirector ? 'Ativo' : 'Pedidos'}
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                )}
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
+                        {isDirector ? 'Ativo' : 'Pedidos'}
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </aside>

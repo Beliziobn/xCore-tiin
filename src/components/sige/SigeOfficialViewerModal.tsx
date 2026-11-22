@@ -3,21 +3,27 @@ import {
   X,
   FileSpreadsheet,
   ArrowDownToLine,
+  CheckCircle2,
+  Filter,
   RotateCcw,
+  Sparkles,
+  School,
+  Users,
+  GraduationCap,
+  Building2,
+  ShieldCheck,
   Search,
+  ExternalLink,
+  Globe,
+  Printer
 } from 'lucide-react';
-import type { AdminSchool, AdminTeacher, AdminDirector, AdminStudent, UserAccount } from '../../types';
-import {
-  getUnifiedSystemDataset,
-  filterDatasetForSchoolDirector,
-  getOfficialSigeFileName,
-} from '../../utils/excelExport';
+import type { AdminSchool, AdminTeacher, AdminDirector, AdminStudent } from '../../types';
+import { getUnifiedSystemDataset } from '../../utils/excelExport';
 import {
   aggregateSigeDataset,
   exportOfficialSigeExcel,
   exportStandaloneSigeHtml,
-  buildSigeConsolidadoRows,
-  buildSigeVagasAprovadasRows,
+  buildSigeConsolidadoRows
 } from '../../utils/sigeAggregation';
 import type { SigeAggregatedReport } from '../../utils/sigeAggregation';
 
@@ -28,7 +34,6 @@ interface SigeOfficialViewerModalProps {
   teachers?: AdminTeacher[];
   directors?: AdminDirector[];
   students?: AdminStudent[];
-  currentUser?: UserAccount | null;
   onOpenGoogleSheets?: () => void;
 }
 
@@ -41,7 +46,6 @@ type TabType =
   | 'rep'
   | 'nee'
   | 'naodoc'
-  | 'vagas'
   | 'consol';
 
 const ALUNOS_IDADE_COLUNAS = [
@@ -120,7 +124,6 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
   teachers,
   directors,
   students,
-  currentUser,
   onOpenGoogleSheets,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('capa');
@@ -135,42 +138,13 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
   React.useEffect(() => {
     const handleUpdate = () => setRefreshTick((t) => t + 1);
     window.addEventListener('ucore-teachers-updated', handleUpdate);
-    window.addEventListener('ucore-students-updated', handleUpdate);
-    window.addEventListener('sigre-vagas-docentes-updated', handleUpdate);
-    window.addEventListener('sigre-data-synced', handleUpdate);
-    return () => {
-      window.removeEventListener('ucore-teachers-updated', handleUpdate);
-      window.removeEventListener('ucore-students-updated', handleUpdate);
-      window.removeEventListener('sigre-vagas-docentes-updated', handleUpdate);
-      window.removeEventListener('sigre-data-synced', handleUpdate);
-    };
+    return () => window.removeEventListener('ucore-teachers-updated', handleUpdate);
   }, []);
 
-  const isSchoolDirector = currentUser?.role === 'diretor';
-
-  // Compute dataset and official report (Macro for Municipal vs Micro for School Director)
+  // Compute dataset and official report
   const dataset = useMemo(() => {
-    const raw = getUnifiedSystemDataset({ schools, teachers, directors, students });
-    if (isSchoolDirector) {
-      return filterDatasetForSchoolDirector(raw, currentUser?.schoolId, currentUser?.schoolName);
-    }
-    return raw;
-  }, [schools, teachers, directors, students, isSchoolDirector, currentUser?.schoolId, currentUser?.schoolName, isOpen, refreshTick]);
-
-  const resolvedSchoolName =
-    currentUser?.schoolName ||
-    dataset.schools[0]?.name ||
-    'Escola';
-
-  const officialExcelFileName = useMemo(
-    () =>
-      getOfficialSigeFileName(dataset, {
-        isSchoolDirector,
-        schoolName: resolvedSchoolName,
-        extension: 'xlsx',
-      }),
-    [dataset, isSchoolDirector, resolvedSchoolName]
-  );
+    return getUnifiedSystemDataset({ schools, teachers, directors, students });
+  }, [schools, teachers, directors, students, isOpen, refreshTick]);
 
   const report: SigeAggregatedReport = useMemo(() => {
     return aggregateSigeDataset(dataset);
@@ -194,14 +168,10 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
     return buildSigeConsolidadoRows(report);
   }, [report]);
 
-  const vagasAprovadasRows = useMemo(() => {
-    return buildSigeVagasAprovadasRows(dataset);
-  }, [dataset, refreshTick]);
-
   const handleExportExcel = async () => {
     setIsExportingExcel(true);
     try {
-      await exportOfficialSigeExcel(dataset, officialExcelFileName);
+      await exportOfficialSigeExcel(dataset);
     } finally {
       setIsExportingExcel(false);
     }
@@ -210,12 +180,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
   const handleExportHtml = () => {
     setIsExportingHtml(true);
     setTimeout(() => {
-      const htmlName = getOfficialSigeFileName(dataset, {
-        isSchoolDirector,
-        schoolName: resolvedSchoolName,
-        extension: 'html',
-      });
-      exportStandaloneSigeHtml(dataset, htmlName);
+      exportStandaloneSigeHtml(dataset);
       setIsExportingHtml(false);
     }, 250);
   };
@@ -388,14 +353,11 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
               SIGE
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-semibold tracking-tight leading-tight flex items-center gap-2 flex-wrap">
-                <span>Instrumento Complementar 2026/2027</span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-white/15 border border-white/25 text-cyan-100">
-                  {isSchoolDirector ? `Nível Micro · ${resolvedSchoolName}` : 'Nível Macro · Consolidado Municipal'}
-                </span>
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight leading-tight flex items-center gap-2">
+                Instrumento Complementar 2026/2027
               </h1>
               <p className="text-xs text-cyan-100 font-normal opacity-90">
-                Ficheiro Oficial: <strong className="text-white">{officialExcelFileName}</strong>
+                Estatística Oficial · Município de {report.meta.municipio} · {report.meta.provincia}
               </p>
             </div>
           </div>
@@ -408,7 +370,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
               Emissão {report.meta.dataEmissao}
             </span>
             <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/25 border border-emerald-400/40 text-emerald-200">
-              ✓ Fonte Única da Verdade
+              ✓ Apenas dados agregados
             </span>
 
             {/* Action buttons */}
@@ -416,10 +378,10 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
               onClick={handleExportExcel}
               disabled={isExportingExcel}
               className="px-3 py-1.5 bg-white text-[#0b3d5c] hover:bg-slate-100 font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title={`Baixar ${officialExcelFileName}`}
+              title="Baixar planilha Excel oficial com cabeçalhos azul-petróleo, zebrado, abas oficiais e design idêntico ao painel"
             >
               <ArrowDownToLine className="w-3.5 h-3.5 text-[#0b3d5c]" />
-              <span>{isExportingExcel ? 'A gerar Excel...' : 'Exportar Dados Excel (.xlsx)'}</span>
+              <span>{isExportingExcel ? 'A gerar Excel...' : 'Baixar Excel (.xlsx)'}</span>
             </button>
 
             {onOpenGoogleSheets && (
@@ -459,7 +421,6 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
               { id: 'rep', label: '5 · Repetentes' },
               { id: 'nee', label: '6 · NEE' },
               { id: 'naodoc', label: '7 · Pessoal Não Docente' },
-              { id: 'vagas', label: '8 · Vagas Aprovadas' },
               { id: 'consol', label: '9 · Consolidado' },
             ].map(tab => (
               <button
@@ -515,9 +476,7 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                 <div className="bg-gradient-to-br from-[#f0fdfa] to-[#ecfeff] border border-cyan-200 rounded-xl p-4 shadow-2xs">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-800">Unidades escolares</span>
                   <div className="text-2xl font-bold text-[#0b3d5c] mt-1">{report.totaisGerais.totalEscolas}</div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {isSchoolDirector ? `Unidade: ${resolvedSchoolName}` : 'Escolas activas na rede'}
-                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Escolas activas na rede</p>
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
@@ -591,25 +550,19 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
                   />
                 </div>
 
-                {/* Filtro por Escola Cadastrada no Sistema (Isolado para Diretor de Escola) */}
-                {isSchoolDirector ? (
-                  <div className="px-3 py-1.5 text-xs bg-cyan-50 border border-cyan-300 font-bold rounded-lg text-[#0b3d5c] flex items-center gap-1.5">
-                    <span>Unidade Isolada: {resolvedSchoolName}</span>
-                  </div>
-                ) : (
-                  <select
-                    value={selectedEscola}
-                    onChange={e => setSelectedEscola(e.target.value)}
-                    className="px-2.5 py-1.5 text-xs bg-cyan-50/70 border border-cyan-300 font-semibold rounded-lg text-[#0b3d5c] cursor-pointer focus:outline-hidden focus:border-[#0891b2]"
-                  >
-                    <option value="">Todas as Escolas Cadastradas ({availableSchoolNames.length})</option>
-                    {availableSchoolNames.map(scName => (
-                      <option key={scName} value={scName}>
-                        {scName}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                {/* Filtro por Escola Cadastrada no Sistema */}
+                <select
+                  value={selectedEscola}
+                  onChange={e => setSelectedEscola(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs bg-cyan-50/70 border border-cyan-300 font-semibold rounded-lg text-[#0b3d5c] cursor-pointer focus:outline-hidden focus:border-[#0891b2]"
+                >
+                  <option value="">Todas as Escolas Cadastradas ({availableSchoolNames.length})</option>
+                  {availableSchoolNames.map(scName => (
+                    <option key={scName} value={scName}>
+                      {scName}
+                    </option>
+                  ))}
+                </select>
 
                 <select
                   value={selectedNatureza}
@@ -1541,70 +1494,8 @@ export const SigeOfficialViewerModal: React.FC<SigeOfficialViewerModalProps> = (
               </div>
 
               <div className="p-3.5 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-700">
-                <strong>Consolidado municipal:</strong> Os totais reflectem a soma das folhas 1–8. No template oficial
+                <strong>Consolidado municipal:</strong> Os totais reflectem a soma das folhas 1–7. No template oficial
                 Excel estas somas são fórmulas que apontam para as células de cada secção.
-              </div>
-            </div>
-          )}
-
-          {/* ════ ABA 8: VAGAS APROVADAS ════ */}
-          {activeTab === 'vagas' && (
-            <div className="space-y-4">
-              <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                  <div>
-                    <h2 className="text-xs font-bold text-[#0b3d5c] uppercase tracking-wider">
-                      8 — Pedidos de Vagas Docentes Aprovados (Parecer Favorável da Direção Municipal)
-                    </h2>
-                    <p className="text-[11px] text-slate-500">
-                      Solicitações submetidas pelos professores, validadas pela Direção da Escola e aprovadas pela Direção Municipal
-                    </p>
-                  </div>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {vagasAprovadasRows.length} linha(s)
-                  </span>
-                </div>
-                <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
-                  <table className="w-full text-xs text-left border-collapse">
-                    <thead className="sticky top-0 bg-[#0b3d5c] text-white uppercase text-[10px] font-semibold tracking-wider z-10">
-                      <tr>
-                        {Object.keys(vagasAprovadasRows[0] || {}).map((col) => (
-                          <th key={col} className="p-2.5 border-r border-[#082a40] last:border-r-0">
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {vagasAprovadasRows
-                        .filter((r) => {
-                          const txt = Object.values(r).join(' ');
-                          return filterRecord(txt, undefined, r['NÍVEL DE ENSINO'], r['ESCOLA / UNIDADE']);
-                        })
-                        .map((row, idx) => (
-                          <tr
-                            key={idx}
-                            className={idx % 2 === 0 ? 'bg-white hover:bg-sky-50/70' : 'bg-slate-50/60 hover:bg-sky-50/70'}
-                          >
-                            {Object.entries(row).map(([k, val]) => (
-                              <td
-                                key={k}
-                                className={`p-2.5 border-r border-slate-100 last:border-r-0 ${
-                                  k === 'ESCOLA / UNIDADE'
-                                    ? 'font-bold text-[#0b3d5c]'
-                                    : k === 'PARECER DIREÇÃO MUNICIPAL'
-                                    ? 'font-bold text-emerald-700'
-                                    : 'text-slate-700'
-                                }`}
-                              >
-                                {String(val ?? '')}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
               </div>
             </div>
           )}

@@ -8,11 +8,9 @@ import type {
   StudentRegistrationData
 } from '../types';
 import type { SystemDataset } from './excelExport';
-import { getOfficialSigeFileName } from './excelExport';
 import { initialAdminSchools } from '../data/adminData';
 import { getStoredTeachers } from './teacherStorage';
 import { getStoredStudents } from './studentStorage';
-import { schoolsMatch } from './authApprovalStorage';
 import { validateGenderCount, validateAproveitamento } from './sigeRulesEngine';
 import { aggregateSigeDatasetWithSchoolAttribution } from './sigeSchoolAggregation';
 
@@ -232,65 +230,6 @@ export function buildSigeCapaRows(report: SigeAggregatedReport): Record<string, 
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Total de Pessoal Não Docente (Apoio/Admin)', 'VALOR / DADO ESTATÍSTICO': t.totalNaoDocentes.mf, 'NOTA DE VALIDAÇÃO': 'Feminino: ' + t.totalNaoDocentes.f },
     { 'CAMPO OFICIAL DO INSTRUMENTO': 'Conformidade de Privacidade SIGE', 'VALOR / DADO ESTATÍSTICO': 'ESTRITAMENTE AGREGADO', 'NOTA DE VALIDAÇÃO': 'Zero nomes, Zero BI, Zero e-mails pessoais' },
   ];
-}
-
-/**
- * Folha 8-B: 8 - VAGAS_APROVADAS (Pedidos de Vaga Docente Homologados com Parecer Favorável)
- */
-export function buildSigeVagasAprovadasRows(dataset: SystemDataset): Record<string, any>[] {
-  try {
-    const raw = localStorage.getItem('ucore_cadastro_docente_quessua_v1');
-    const records: any[] = raw ? JSON.parse(raw) : [];
-    const schools = dataset.schools || [];
-    const isSingleSchool = schools.length === 1;
-    const singleSchool = schools[0];
-
-    const approved = records.filter((r) => {
-      const isFav = r.statusFluxo === 'Parecer Favorável' || r.parecer === 'Favorável';
-      if (!isFav) return false;
-      if (isSingleSchool && singleSchool) {
-        return (
-          schoolsMatch(r.escola, singleSchool.name, undefined, singleSchool.id) ||
-          schoolsMatch(r.instAct, singleSchool.name, undefined, singleSchool.id)
-        );
-      }
-      return true;
-    });
-
-    if (approved.length === 0) {
-      return [
-        {
-          'Nº ORDEM': 1,
-          'CÓDIGO DO PROCESSO': '—',
-          'ESCOLA DE ORIGEM': isSingleSchool && singleSchool ? singleSchool.name : 'Rede Municipal de Quêssua',
-          'ESCOLA COM VAGA APROVADA': isSingleSchool && singleSchool ? singleSchool.name : 'Rede Municipal de Quêssua',
-          'FINALIDADE DA VAGA': 'Sem pedidos de vaga aprovados até ao momento',
-          'NÍVEL DE ENSINO': '—',
-          'DISCIPLINA / ÁREA': '—',
-          'CATEGORIA DOCENTE': '—',
-          'PARECER DME': 'Aguardando Homologações',
-          'DATA DO PARECER': '—',
-          'ÓRGÃO DECISOR': 'Direcção Municipal da Educação',
-        },
-      ];
-    }
-
-    return approved.map((r, idx) => ({
-      'Nº ORDEM': idx + 1,
-      'CÓDIGO DO PROCESSO': r.id || `VAGA-${idx + 1}`,
-      'ESCOLA DE ORIGEM': r.instAct || 'Rede Municipal',
-      'ESCOLA COM VAGA APROVADA': r.escola || 'Rede Municipal',
-      'FINALIDADE DA VAGA': r.tipoSolicitacao || 'Reforço de Quadro Docente',
-      'NÍVEL DE ENSINO': r.nivelEnsino || 'Ensino Primário',
-      'DISCIPLINA / ÁREA': r.disciplina || 'Ensino Geral',
-      'CATEGORIA DOCENTE': r.cat || 'Professor do Ensino Primário e Secundário',
-      'PARECER DME': 'Parecer Favorável',
-      'DATA DO PARECER': r.dataParecer || (r.avaliadoEm ? new Date(r.avaliadoEm).toLocaleDateString('pt-PT') : 'Homologado'),
-      'ÓRGÃO DECISOR': r.avaliadoPorNome || r.director || 'Direcção Municipal da Educação',
-    }));
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -773,17 +712,8 @@ export async function exportOfficialSigeExcel(
   dataset: SystemDataset,
   customFileName?: string
 ): Promise<void> {
-  const isSingleSchool = Boolean(dataset.schools && dataset.schools.length === 1);
-  const resolvedFileName =
-    customFileName ||
-    getOfficialSigeFileName(dataset, {
-      isSchoolDirector: isSingleSchool,
-      schoolName: isSingleSchool ? dataset.schools[0]?.name : undefined,
-      extension: 'xlsx',
-    });
-
   try {
-    await exportStyledSigeExcel(dataset, resolvedFileName);
+    await exportStyledSigeExcel(dataset, customFileName);
   } catch (err) {
     console.warn('Falha na exportação com estilos ExcelJS, a recorrer ao fallback XLSX:', err);
     const report = aggregateSigeDataset(dataset);
@@ -799,7 +729,9 @@ export async function exportOfficialSigeExcel(
     if (wsAlunos['!ref']) wsAlunos['!autofilter'] = { ref: wsAlunos['!ref'] };
     XLSX.utils.book_append_sheet(wb, wsAlunos, '1 - ALUNOS MATRICULADOS');
 
-    XLSX.writeFile(wb, resolvedFileName);
+    const dateTag = new Date().toISOString().substring(0, 10);
+    const filename = customFileName || `SIGE_2026_2027_Estatistica_Oficial_${report.meta.municipio}_${dateTag}.xlsx`;
+    XLSX.writeFile(wb, filename);
   }
 }
 
@@ -823,7 +755,6 @@ export function buildOfficialSigeSheetDefinitions(dataset: SystemDataset) {
   const repRows = buildSigeAlunosRepetentesRows(report);
   const neeRows = buildSigeNeeRows(report);
   const naoDocRows = buildSigePessoalNaoDocenteRows(report);
-  const vagasAprovadasRows = buildSigeVagasAprovadasRows(dataset);
   const consolidadoRows = buildSigeConsolidadoRows(report);
   const escolasSemDadosRows = buildSigeEscolasSemDadosRows(dataset);
 
@@ -845,7 +776,6 @@ export function buildOfficialSigeSheetDefinitions(dataset: SystemDataset) {
     toDef('5 - ALUNOS REPETENTES', repRows),
     toDef('6 - NEE', neeRows),
     toDef('7 - PESSOAL_NAO_DOCENTE', naoDocRows),
-    toDef('8 - VAGAS_APROVADAS', vagasAprovadasRows),
     toDef('9 - CONSOLIDADO', consolidadoRows),
     toDef('ESCOLAS SEM DADOS', escolasSemDadosRows)
   ];

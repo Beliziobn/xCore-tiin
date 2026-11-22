@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { getOfficialSigeFileName, type SystemDataset } from './excelExport';
+import type { SystemDataset } from './excelExport';
 import {
   aggregateSigeDataset,
   buildSigeCapaRows,
@@ -10,7 +10,6 @@ import {
   buildSigeAlunosRepetentesRows,
   buildSigeNeeRows,
   buildSigePessoalNaoDocenteRows,
-  buildSigeVagasAprovadasRows,
   buildSigeConsolidadoRows,
   buildSigeEscolasSemDadosRows,
   type SigeAggregatedReport
@@ -470,26 +469,16 @@ export async function exportOfficialSigeExcel(
   const naoDocRows = buildSigePessoalNaoDocenteRows(report);
   addStyledDataSheet(wb, '7 - PESSOAL_NAO_DOCENTE', naoDocRows, SIGE_COLORS.petroleumMedium);
 
-  // 9. 8 - VAGAS_APROVADAS
-  const vagasRows = buildSigeVagasAprovadasRows(dataset);
-  addStyledDataSheet(wb, '8 - VAGAS_APROVADAS', vagasRows, SIGE_COLORS.petroleumMedium);
-
-  // 10. 9 - CONSOLIDADO
+  // 9. 9 - CONSOLIDADO
   const consolidadoRows = buildSigeConsolidadoRows(report);
   addStyledDataSheet(wb, '9 - CONSOLIDADO', consolidadoRows, SIGE_COLORS.petroleumDark);
 
-  // 11. ESCOLAS SEM DADOS
+  // 10. ESCOLAS SEM DADOS
   const escolasSemDadosRows = buildSigeEscolasSemDadosRows(dataset);
   addStyledDataSheet(wb, 'ESCOLAS SEM DADOS', escolasSemDadosRows, SIGE_COLORS.textMuted);
 
-  const isSchoolScoped = (dataset.schools?.length || 0) === 1;
-  const filename =
-    customFileName ||
-    getOfficialSigeFileName(dataset, {
-      isSchoolDirector: isSchoolScoped,
-      schoolName: isSchoolScoped ? dataset.schools[0]?.name : undefined,
-      extension: 'xlsx',
-    });
+  const dateTag = new Date().toISOString().substring(0, 10);
+  const filename = customFileName || `SIGE_2026_2027_Estatistica_Oficial_${report.meta.municipio}_${dateTag}.xlsx`;
 
   // Gerar Buffer e accionar download no browser
   const buffer = await wb.xlsx.writeBuffer();
@@ -510,7 +499,7 @@ export async function exportOfficialSigeExcel(
 /**
  * ============================================================================
  * EXPORTAÇÃO DE RELATÓRIO WEB OFICIAL STANDALONE (.HTML)
- * Ficheiro autónomo que abre em qualquer navegador com as abas, filtros
+ * Ficheiro autónomo que abre em qualquer navegador com as 9 abas, filtros
  * e o mesmo design visual exacto do painel interactivo!
  * ============================================================================
  */
@@ -519,14 +508,8 @@ export function exportStandaloneSigeHtml(
   customFileName?: string
 ): void {
   const report = aggregateSigeDataset(dataset);
-  const isSchoolScoped = (dataset.schools?.length || 0) === 1;
-  const filename =
-    customFileName ||
-    getOfficialSigeFileName(dataset, {
-      isSchoolDirector: isSchoolScoped,
-      schoolName: isSchoolScoped ? dataset.schools[0]?.name : undefined,
-      extension: 'html',
-    });
+  const dateTag = new Date().toISOString().substring(0, 10);
+  const filename = customFileName || `SIGE_2026_2027_Relatorio_Oficial_${report.meta.municipio}_${dateTag}.html`;
 
   const htmlContent = generateStandaloneHtmlDocument(report, dataset);
   const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -551,7 +534,6 @@ function generateStandaloneHtmlDocument(report: SigeAggregatedReport, dataset: S
   const repRows = buildSigeAlunosRepetentesRows(report);
   const neeRows = buildSigeNeeRows(report);
   const naoDocRows = buildSigePessoalNaoDocenteRows(report);
-  const vagasRows = buildSigeVagasAprovadasRows(dataset);
   const consolidadoRows = buildSigeConsolidadoRows(report);
   const t = report.totaisGerais;
 
@@ -811,7 +793,6 @@ function generateStandaloneHtmlDocument(report: SigeAggregatedReport, dataset: S
     <button class="tab-btn" onclick="switchTab('rep')">5 · Repetentes</button>
     <button class="tab-btn" onclick="switchTab('nee')">6 · NEE</button>
     <button class="tab-btn" onclick="switchTab('naodoc')">7 · Pessoal Não Docente</button>
-    <button class="tab-btn" onclick="switchTab('vagas')">8 · Vagas Aprovadas</button>
     <button class="tab-btn" onclick="switchTab('consol')">9 · Consolidado</button>
   </nav>
 
@@ -895,11 +876,6 @@ function generateStandaloneHtmlDocument(report: SigeAggregatedReport, dataset: S
     <!-- 7 · NAO DOCENTE -->
     <div id="pane-naodoc" class="tab-pane">
       <div class="table-container"><table>${renderTableRows(naoDocRows)}</table></div>
-    </div>
-
-    <!-- 8 · VAGAS APROVADAS -->
-    <div id="pane-vagas" class="tab-pane">
-      <div class="table-container"><table>${renderTableRows(vagasRows)}</table></div>
     </div>
 
     <!-- 9 · CONSOLIDADO -->

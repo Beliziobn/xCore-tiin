@@ -10,7 +10,6 @@ import type {
 } from '../types';
 import { getStoredTeachers } from './teacherStorage';
 import { getStoredStudents } from './studentStorage';
-import { schoolsMatch } from './authApprovalStorage';
 import { initialAdminSchools, initialAdminDirectors, initialAdminTeachers, initialAdminStudents } from '../data/adminData';
 
 /**
@@ -23,299 +22,59 @@ export interface SystemDataset {
   students: AdminStudent[];
 }
 
-function normStr(val?: string): string {
-  return (val || '').trim().toLowerCase();
-}
-
 /**
- * Generates the official standardized SIGE 2026/2027 file name according to the user profile:
- * - Nível Macro (Diretor Municipal): Relatório_Oficial_Estatistica_SIGE_2026_2027.xlsx
- * - Nível Micro (Diretor de Escola): Relatório_Estatistico_Escola_[Nome_da_Escola]_SIGE_2026_2027.xlsx
- */
-export function getOfficialSigeFileName(
-  dataset?: Partial<SystemDataset>,
-  options?: {
-    isSchoolDirector?: boolean;
-    schoolName?: string;
-    extension?: 'xlsx' | 'html';
-  }
-): string {
-  const ext = options?.extension || 'xlsx';
-  const isSchoolScope =
-    Boolean(options?.isSchoolDirector) ||
-    Boolean(options?.schoolName && options.schoolName.trim().length > 0);
-
-  if (isSchoolScope) {
-    const rawSchoolName = (
-      options?.schoolName ||
-      dataset?.schools?.[0]?.name ||
-      'Instituicao_Escolar'
-    ).trim();
-    const safeSchoolName = rawSchoolName
-      .replace(/[\\/:*?"<>|–—-]+/g, '_')
-      .replace(/\s+/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '');
-    return `Relatório_Estatistico_Escola_${safeSchoolName || 'Unidade_Escolar'}_SIGE_2026_2027.${ext}`;
-  }
-
-  return `Relatório_Oficial_Estatistica_SIGE_2026_2027.${ext}`;
-}
-
-/**
- * Gathers the most up-to-date and complete dataset from the unified central database (Fonte Única da Verdade).
- * Any teacher, student, or class/turma registered at the school level is automatically merged into the dataset.
+ * Gathers the most up-to-date and complete dataset from all sources
  */
 export function getUnifiedSystemDataset(override?: Partial<SystemDataset>): SystemDataset {
   // 1. Escolas
-  let schools: AdminSchool[] = override?.schools ? [...override.schools] : [];
-  if (schools.length === 0) {
+  let schools = override?.schools;
+  if (!schools || schools.length === 0) {
     try {
       const saved = localStorage.getItem('ucore_admin_schools');
-      schools = saved ? JSON.parse(saved) : [...initialAdminSchools];
+      schools = saved ? JSON.parse(saved) : initialAdminSchools;
     } catch {
-      schools = [...initialAdminSchools];
+      schools = initialAdminSchools;
     }
   }
 
-  // 2. Professores (unificando adminTeachers + teacherStorage + ucore_director_teachers_v1)
-  let baseTeachers: AdminTeacher[] = override?.teachers ? [...override.teachers] : [];
-  if (baseTeachers.length === 0) {
+  // 2. Professores (combining adminTeachers + rich detailed teachers in teacherStorage)
+  let teachers = override?.teachers;
+  if (!teachers || teachers.length === 0) {
     try {
       const saved = localStorage.getItem('ucore_admin_teachers');
-      baseTeachers = saved ? JSON.parse(saved) : [...initialAdminTeachers];
+      teachers = saved ? JSON.parse(saved) : initialAdminTeachers;
     } catch {
-      baseTeachers = [...initialAdminTeachers];
+      teachers = initialAdminTeachers;
     }
   }
-
-  const unifiedTeachers: AdminTeacher[] = [...baseTeachers];
-  const seenTeacherIds = new Set(unifiedTeachers.map((t) => t.id));
-  const seenTeacherKeys = new Set(
-    unifiedTeachers.map((t) => `${normStr(t.name)}::${normStr(t.schoolName || t.registrationData?.nomeEscola)}`)
-  );
-
-  // Merge rich teachers from teacherStorage (ucore_registered_teachers_v2)
-  try {
-    const storedDetailedTeachers = getStoredTeachers();
-    storedDetailedTeachers.forEach((dt) => {
-      const tSchool = dt.nomeEscola || '';
-      const key = `${normStr(dt.nomeCompleto)}::${normStr(tSchool)}`;
-      const existingIdx = unifiedTeachers.findIndex(
-        (ut) =>
-          ut.id === dt.id ||
-          `${normStr(ut.name)}::${normStr(ut.schoolName || ut.registrationData?.nomeEscola)}` === key
-      );
-      if (existingIdx >= 0) {
-        unifiedTeachers[existingIdx] = {
-          ...unifiedTeachers[existingIdx],
-          name: dt.nomeCompleto || unifiedTeachers[existingIdx].name,
-          schoolName: tSchool || unifiedTeachers[existingIdx].schoolName,
-          phone: dt.telefone || unifiedTeachers[existingIdx].phone,
-          subject: dt.disciplinas || unifiedTeachers[existingIdx].subject,
-          category: dt.funcaoCategoria || unifiedTeachers[existingIdx].category,
-          registrationData: dt,
-        };
-      } else {
-        unifiedTeachers.push({
-          id: dt.id,
-          name: dt.nomeCompleto,
-          phone: dt.telefone || '+244 923 000 000',
-          subject: dt.disciplinas || 'Ensino Geral',
-          gradeClass: dt.niveisLecciona?.[0]?.detalhe || dt.niveisLecciona?.[0]?.nome || 'Ensino Primário',
-          room: 'Sala 01',
-          turma: 'Turma A',
-          schoolName: tSchool,
-          location: dt.municipioEscola || 'Quêssua',
-          category: dt.funcaoCategoria || 'Professor Efectivo',
-          presenceRate: 98.5,
-          registrationData: dt,
-        });
-        seenTeacherIds.add(dt.id);
-        seenTeacherKeys.add(key);
-      }
-    });
-  } catch {}
-
-  // Merge teachers registered in DirectorTeachersPage (ucore_director_teachers_v1)
-  try {
-    const rawDirTeachers = localStorage.getItem('ucore_director_teachers_v1');
-    if (rawDirTeachers) {
-      const dirTeachers = JSON.parse(rawDirTeachers);
-      if (Array.isArray(dirTeachers)) {
-        dirTeachers.forEach((dt: any) => {
-          if (!dt || !dt.name) return;
-          const tSchool = dt.schoolName || dt.registrationData?.nomeEscola || schools[0]?.name || '';
-          const key = `${normStr(dt.name)}::${normStr(tSchool)}`;
-          if (!seenTeacherIds.has(dt.id) && !seenTeacherKeys.has(key)) {
-            unifiedTeachers.push({
-              id: dt.id || `prof-${Date.now()}`,
-              name: dt.name,
-              phone: dt.phone || '+244 923 000 000',
-              subject: dt.subject || 'Ensino Geral',
-              gradeClass: dt.gradeClass || 'Ensino Primário',
-              room: dt.room || 'Sala 01',
-              turma: dt.turma || 'Turma A',
-              schoolName: tSchool,
-              location: dt.location || 'Quêssua',
-              category: 'Professor Primário Efetivo',
-              presenceRate: dt.presenceRate ?? 98.5,
-              assignedTurmas: dt.assignedTurmas,
-              registrationData: dt.registrationData,
-            });
-            if (dt.id) seenTeacherIds.add(dt.id);
-            seenTeacherKeys.add(key);
-          }
-        });
-      }
-    }
-  } catch {}
 
   // 3. Diretores
-  let directors: AdminDirector[] = override?.directors ? [...override.directors] : [];
-  if (directors.length === 0) {
+  let directors = override?.directors;
+  if (!directors || directors.length === 0) {
     try {
       const saved = localStorage.getItem('ucore_admin_directors');
-      directors = saved ? JSON.parse(saved) : [...initialAdminDirectors];
+      directors = saved ? JSON.parse(saved) : initialAdminDirectors;
     } catch {
-      directors = [...initialAdminDirectors];
+      directors = initialAdminDirectors;
     }
   }
 
-  // 4. Alunos (unificando adminStudents + studentStorage)
-  let baseStudents: AdminStudent[] = override?.students ? [...override.students] : [];
-  if (baseStudents.length === 0) {
+  // 4. Alunos
+  let students = override?.students;
+  if (!students || students.length === 0) {
     try {
       const saved = localStorage.getItem('ucore_admin_students');
-      baseStudents = saved ? JSON.parse(saved) : [...initialAdminStudents];
+      students = saved ? JSON.parse(saved) : initialAdminStudents;
     } catch {
-      baseStudents = [...initialAdminStudents];
+      students = initialAdminStudents;
     }
   }
-
-  const unifiedStudents: AdminStudent[] = [...baseStudents];
-  const seenStudentIds = new Set(unifiedStudents.map((s) => s.id));
-  const seenStudentKeys = new Set(
-    unifiedStudents.map((s) => `${normStr(s.name)}::${normStr(s.schoolName || s.registrationData?.escola)}`)
-  );
-
-  try {
-    const storedDetailedStudents = getStoredStudents();
-    storedDetailedStudents.forEach((ds) => {
-      const sName = ds.nomeCompleto || ds.name || '';
-      const sSchool = ds.escola || ds.nomeEscola || '';
-      if (!sName) return;
-      const key = `${normStr(sName)}::${normStr(sSchool)}`;
-      if (!seenStudentIds.has(ds.id || '') && !seenStudentKeys.has(key)) {
-        unifiedStudents.push({
-          id: ds.id || `std-${Date.now()}`,
-          name: sName,
-          gender: ds.genero === 'F' ? 'F' : 'M',
-          age: ds.idadeCalculada ?? ds.idade,
-          birthDate: ds.dataNascimento,
-          gradeClass: ds.classeEtapaModulo || ds.classe || '1ª Classe',
-          room: ds.sala || 'Sala 01',
-          turma: ds.turma || 'Turma A',
-          guardianName: ds.encarregado || 'Encarregado de Educação',
-          location: ds.municipio || 'Quêssua',
-          presenceRate: ds.attendanceRate ?? 96,
-          performanceScore: ds.averageGrade ?? 15,
-          schoolName: sSchool,
-          schoolId: ds.schoolId,
-          hasDocuments: ds.possuiDocumento ?? (ds.tipoDocumento !== 'sem Documento'),
-          documentType: ds.documentType || ds.tipoDocumento || 'Cédula Pessoal',
-          attendanceRate: ds.attendanceRate ?? 96,
-          averageGrade: ds.averageGrade ?? 15,
-          status: ds.statusAcademico || 'Aprovado',
-          registrationData: ds,
-        });
-        if (ds.id) seenStudentIds.add(ds.id);
-        seenStudentKeys.add(key);
-      }
-    });
-  } catch {}
 
   return {
     schools: schools || [],
-    teachers: unifiedTeachers || [],
+    teachers: teachers || [],
     directors: directors || [],
-    students: unifiedStudents || [],
-  };
-}
-
-/**
- * Isolamento de Dados (Privacidade — Nível Micro / Diretor de Escola):
- * Filtra o dataset unificado exclusivamente para a escola associada ao login do Diretor de Escola.
- * O Diretor da Escola A nunca visualiza nem exporta dados da Escola B.
- * Garante Fonte Única da Verdade: o relatório da escola é um recorte exato do relatório municipal.
- */
-export function filterDatasetForSchoolDirector(
-  dataset: SystemDataset,
-  schoolId?: string,
-  schoolName?: string
-): SystemDataset {
-  const cleanId = (schoolId || '').trim();
-  const cleanName = (schoolName || '').trim();
-
-  if (!cleanId && !cleanName) {
-    const firstSchool = dataset.schools[0];
-    if (!firstSchool) return dataset;
-    return filterDatasetForSchoolDirector(dataset, firstSchool.id, firstSchool.name);
-  }
-
-  let matchedSchools = dataset.schools.filter((sc) =>
-    schoolsMatch(sc.name, cleanName, sc.id, cleanId) ||
-    (sc.codigoSIGE && cleanId && normStr(sc.codigoSIGE) === normStr(cleanId))
-  );
-
-  if (matchedSchools.length === 0 && cleanName) {
-    matchedSchools = [
-      {
-        id: cleanId || 'sch-local-dir',
-        name: cleanName,
-        directorName: 'Direção da Escola',
-        location: 'Quêssua, Malanje',
-        studentsWithDocs: 0,
-        studentsWithoutDocs: 0,
-        teachersCount: 0,
-        roomsCount: 8,
-        classesCount: 6,
-        turmasCount: 8,
-        performanceRate: 86,
-        attendanceRate: 95,
-        category: 'Ensino Primário',
-        natureza: 'Pública',
-        phone: '+244 923 000 000',
-        email: 'escola@quessua.med.gov.ao',
-      },
-    ];
-  }
-
-  const targetSchool = matchedSchools[0];
-  const targetName = targetSchool?.name || cleanName;
-  const targetId = targetSchool?.id || cleanId;
-
-  const filteredTeachers = dataset.teachers.filter((t) => {
-    const tSchoolName = t.schoolName || t.registrationData?.nomeEscola || '';
-    const tSchoolId = t.registrationData?.escolaId || '';
-    return schoolsMatch(tSchoolName, targetName, tSchoolId, targetId);
-  });
-
-  const filteredStudents = dataset.students.filter((s) => {
-    const sSchoolName = s.schoolName || s.registrationData?.escola || s.registrationData?.nomeEscola || '';
-    const sSchoolId = s.schoolId || s.registrationData?.schoolId || '';
-    return schoolsMatch(sSchoolName, targetName, sSchoolId, targetId);
-  });
-
-  const filteredDirectors = dataset.directors.filter((d) =>
-    schoolsMatch(d.schoolName, targetName, undefined, targetId)
-  );
-
-  return {
-    schools: matchedSchools.slice(0, 1),
-    teachers: filteredTeachers,
-    directors: filteredDirectors,
-    students: filteredStudents,
+    students: students || [],
   };
 }
 

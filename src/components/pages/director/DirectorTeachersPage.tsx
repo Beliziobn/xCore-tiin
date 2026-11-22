@@ -20,8 +20,7 @@ import {
   GraduationCap,
   Eye,
   Trash2,
-  AlertCircle,
-  FileSpreadsheet
+  AlertCircle
 } from 'lucide-react';
 import { Hero } from '../../Hero';
 import { directorTeachersData as initialTeachers } from '../../../data/directorData';
@@ -55,7 +54,6 @@ interface DirectorTeachersPageProps {
   onAddTeacherGlobal?: (teacher: AdminTeacher) => void;
   onNavigateToAttendance?: () => void;
   onNavigateToApprovals?: () => void;
-  onOpenExcelExport?: () => void;
   schoolName?: string;
   directorName?: string;
 }
@@ -66,7 +64,6 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   onAddTeacherGlobal,
   onNavigateToAttendance,
   onNavigateToApprovals,
-  onOpenExcelExport,
   schoolName = '',
   directorName = 'Carl Mendes',
 }) => {
@@ -495,31 +492,16 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
             )}
           </button>
 
-          <div className="sm:ml-auto flex flex-wrap items-center gap-2">
-            {onOpenExcelExport && (
-              <button
-                id="btn-director-teachers-export-sige"
-                type="button"
-                onClick={onOpenExcelExport}
-                className="px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 bg-[#0b3d5c] hover:bg-[#072a40] text-white shadow-xs"
-                title="Exportar Relatório Estatístico SIGE 2026/2027 desta Escola (.xlsx)"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-cyan-200" />
-                <span>Exportar Dados Excel (SIGE)</span>
-              </button>
-            )}
-
-            {onNavigateToApprovals && (
-              <button
-                id="btn-goto-full-approvals"
-                onClick={onNavigateToApprovals}
-                className="px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xs"
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-200" />
-                <span>Central de Inscrições da Escola</span>
-              </button>
-            )}
-          </div>
+          {onNavigateToApprovals && (
+            <button
+              id="btn-goto-full-approvals"
+              onClick={onNavigateToApprovals}
+              className="sm:ml-auto px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xs"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-200" />
+              <span>Central de Inscrições da Escola</span>
+            </button>
+          )}
         </div>
 
         {/* SEÇÃO DE DISTRIBUIÇÃO E REDEFINIÇÃO DE TURMAS DOS PROFESSORES */}
