@@ -52,7 +52,7 @@ export interface CadastroDocenteVagaRecord {
   motivo: string;
   proxRes: boolean;
   motivoDet: string;
-  parecer: 'Pendente' | 'Favorável' | 'Desfavorável';
+  parecer: 'Favorável' | 'Não favorável' | 'Desfavorável' | 'Pendente';
   dataParecer: string;
   localParecer: string;
   director: string;
@@ -99,7 +99,7 @@ interface CadastroDocenteFormState {
   motivo: string;
   proxRes: boolean;
   motivoDet: string;
-  parecer: 'Pendente' | 'Favorável' | 'Desfavorável';
+  parecer: 'Favorável' | 'Não favorável';
   dataParecer: string;
   localParecer: string;
   director: string;
@@ -364,7 +364,12 @@ function getInitialFormState(): CadastroDocenteFormState {
         motivo: parsed.motivo || 'Motivos de ordem pessoal',
         proxRes: typeof parsed.proxRes === 'boolean' ? parsed.proxRes : false,
         motivoDet: parsed.motivoDet || '',
-        parecer: parsed.parecer || 'Favorável',
+        parecer:
+          parsed.parecer === 'Não favorável' ||
+          parsed.parecer === 'Desfavorável' ||
+          parsed.parecer === 'Não Favorável'
+            ? 'Não favorável'
+            : 'Favorável',
         dataParecer: parsed.dataParecer || getTodayIso(),
         localParecer: parsed.localParecer || 'Quêssua',
         director: parsed.director || 'Belízio Miguel dos Santos António',
@@ -773,7 +778,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
       motivo: formData.motivo,
       proxRes: Boolean(formData.proxRes),
       motivoDet: formData.motivoDet.trim(),
-      parecer: formData.parecer || 'Pendente',
+      parecer: formData.parecer || 'Favorável',
       dataParecer: formData.dataParecer || getTodayIso(),
       localParecer: formData.localParecer.trim() || 'Quêssua',
       director: formData.director.trim() || 'Belízio Miguel dos Santos António',
@@ -867,7 +872,10 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
       motivo: r.motivo || 'Motivos de ordem pessoal',
       proxRes: Boolean(r.proxRes),
       motivoDet: r.motivoDet || '',
-      parecer: r.parecer || 'Pendente',
+      parecer:
+        r.parecer === 'Não favorável' || r.parecer === 'Desfavorável'
+          ? 'Não favorável'
+          : 'Favorável',
       dataParecer: r.dataParecer || todayISO,
       localParecer: r.localParecer || 'Quêssua',
       director: r.director || 'Belízio Miguel dos Santos António',
@@ -893,7 +901,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
 
   const handleUpdateParecerInline = (
     id: string,
-    newParecer: 'Pendente' | 'Favorável' | 'Desfavorável'
+    newParecer: 'Favorável' | 'Não favorável'
   ) => {
     const next = records.map((r) =>
       r.id === id
@@ -1099,7 +1107,10 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
 
         <button
           type="button"
-          onClick={() => setSubView('form')}
+          onClick={() => {
+            setSubmittedRecord(null);
+            setSubView('form');
+          }}
           className={`h-10 px-5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
             subView === 'form'
               ? 'bg-[#f2f4f7] text-slate-950 font-bold'
@@ -1230,24 +1241,25 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <select
                           aria-label={`Parecer de ${r.nome}`}
-                          value={r.parecer}
+                          value={
+                            r.parecer === 'Não favorável' || r.parecer === 'Desfavorável'
+                              ? 'Não favorável'
+                              : 'Favorável'
+                          }
                           onChange={(e) =>
                             handleUpdateParecerInline(
                               r.id,
-                              e.target.value as 'Pendente' | 'Favorável' | 'Desfavorável'
+                              e.target.value as 'Favorável' | 'Não favorável'
                             )
                           }
                           className={`h-7 px-2.5 rounded-full text-[11px] font-bold border outline-none cursor-pointer ${
-                            r.parecer === 'Favorável'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : r.parecer === 'Desfavorável'
+                            r.parecer === 'Não favorável' || r.parecer === 'Desfavorável'
                               ? 'bg-red-50 text-red-800 border-red-200'
-                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                           }`}
                         >
-                          <option value="Pendente">Pendente</option>
                           <option value="Favorável">Favorável</option>
-                          <option value="Desfavorável">Desfavorável</option>
+                          <option value="Não favorável">Não favorável</option>
                         </select>
                       </td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap text-slate-700">
@@ -1271,8 +1283,9 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                             type="button"
                             onClick={() => {
                               setSubmittedRecord(r);
-                              setTimeout(() => {
-                                downloadCadastroDocenteVagaPdf(r);
+                              setTimeout(async () => {
+                                await downloadCadastroDocenteVagaPdf(r);
+                                setSubmittedRecord(null);
                               }, 60);
                             }}
                             className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1"
@@ -1511,7 +1524,9 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
 
               const prepInstAct = getInstPrep(livePreviewRecord.instAct);
               const prepEscola = getInstPrep(livePreviewRecord.escola);
-              const isDesfavoravel = livePreviewRecord.parecer === 'Desfavorável';
+              const isDesfavoravel =
+                livePreviewRecord.parecer === 'Não favorável' ||
+                livePreviewRecord.parecer === 'Desfavorável';
               const dataExtenso =
                 formatColocacaoDateExtenso(livePreviewRecord.dataParecer) || '14 de Julho de 2026';
 
@@ -1704,6 +1719,17 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                         >
                           {livePreviewRecord.nome}
                         </strong>
+                        {(livePreviewRecord.cat || livePreviewRecord.grau) && (
+                          <>
+                            , com a categoria de{' '}
+                            <strong>
+                              {[livePreviewRecord.cat, livePreviewRecord.grau]
+                                .map((v) => (v || '').trim())
+                                .filter(Boolean)
+                                .join(', ')}
+                            </strong>
+                          </>
+                        )}
                         , {portadorLabel} do n.º de Agente{' '}
                         <strong>{livePreviewRecord.agente}</strong>, actualmente {colocadoLabel}{' '}
                         {prepInstAct} {livePreviewRecord.instAct}, Município de{' '}
@@ -1724,7 +1750,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                           Considerando os motivos invocados {peloRequerente} e após verificação do
                           quadro de pessoal {prepEscola}{' '}
                           <strong>{livePreviewRecord.escola}</strong>, esta Direcção Municipal da
-                          Educação é de <strong>parecer desfavorável</strong> ao acolhimento{' '}
+                          Educação é de <strong>parecer não favorável</strong> ao acolhimento{' '}
                           {doReferidoDocente} neste Município.
                         </p>
                       )}
@@ -1754,8 +1780,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                       style={{ fontSize: '10.8pt', lineHeight: 1.55 }}
                     >
                       <p className="m-0 font-bold" style={{ textIndent: 0 }}>
-                        Direcção Municipal de Educação {prepDateMun} {munDest} {noNaLocal}{' '}
-                        {localVal}, aos {dataExtenso}. -
+                        {localVal}, aos {dataExtenso}.
                       </p>
 
                       <p className="m-0 mt-1 font-bold" style={{ textIndent: 0 }}>
@@ -2612,14 +2637,13 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                     onChange={(e) =>
                       handleFieldChange(
                         'parecer',
-                        e.target.value as 'Pendente' | 'Favorável' | 'Desfavorável'
+                        e.target.value as 'Favorável' | 'Não favorável'
                       )
                     }
                     className={pillInputClass(false)}
                   >
                     <option value="Favorável">Favorável</option>
-                    <option value="Desfavorável">Desfavorável</option>
-                    <option value="Pendente">Pendente (por apreciar)</option>
+                    <option value="Não favorável">Não favorável</option>
                   </select>
                 </div>
 

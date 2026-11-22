@@ -2112,7 +2112,7 @@ export interface CadastroDocentePdfData {
   motivo: string;
   proxRes: boolean;
   motivoDet: string;
-  parecer: 'Pendente' | 'Favorável' | 'Desfavorável';
+  parecer: 'Favorável' | 'Não favorável' | 'Desfavorável' | 'Pendente';
   dataParecer: string;
   localParecer: string;
   director: string;
@@ -2379,10 +2379,14 @@ export async function downloadCadastroDocenteVagaPdf(
   const escolaVal = record.escola?.trim() || 'Escola Primária n.º 125 – Caxeta – Quêssua';
   const nomeVal = record.nome?.trim() || 'Diogo da Costa Albino da Silva';
   const agenteVal = record.agente?.trim() || '99072119';
+  const catVal = record.cat?.trim() || 'Professor do Ensino Primário e Secundário';
+  const grauVal = record.grau?.trim() || '13.º Grau';
+  const catGrauVal = [catVal, grauVal].filter(Boolean).join(', ');
 
   const prepInstAct = getInstPrep(instActVal);
   const prepEscola = getInstPrep(escolaVal);
-  const isDesfavoravel = record.parecer === 'Desfavorável';
+  const isDesfavoravel =
+    record.parecer === 'Não favorável' || record.parecer === 'Desfavorável';
 
   const dataExt =
     formatColocacaoDateExtenso(record.dataParecer) ||
@@ -2394,6 +2398,12 @@ export async function downloadCadastroDocenteVagaPdf(
       text: `A Direcção Municipal da Educação, em atenção à solicitação e ao pedido de parecer relativos à concessão de vaga apresentados ${peloPela} `,
     },
     { text: nomeVal, bold: true, color: [192, 0, 0] },
+    ...(catGrauVal
+      ? [
+          { text: ', com a categoria de ' },
+          { text: catGrauVal, bold: true },
+        ]
+      : []),
     { text: `, ${portadorLabel} do n.º de Agente ` },
     { text: agenteVal, bold: true },
     { text: `, actualmente ${colocadoLabel} ${prepInstAct} ${instActVal}, Município de ${munActVal}, ` },
@@ -2417,7 +2427,7 @@ export async function downloadCadastroDocenteVagaPdf(
         },
         { text: escolaVal, bold: true },
         { text: ', esta Direcção Municipal da Educação é de ' },
-        { text: 'parecer desfavorável', bold: true },
+        { text: 'parecer não favorável', bold: true },
         { text: ` ao acolhimento ${doReferidoDocente} neste Município.` },
       ];
 
@@ -2489,7 +2499,7 @@ export async function downloadCadastroDocenteVagaPdf(
 
   // 5. Data e Assinatura do Director Municipal
   y += 12;
-  const dateLine = `Direcção Municipal de Educação ${prepDateMun} ${munDest} ${noNaLocal} ${localVal}, aos ${dataExt}. -`;
+  const dateLine = `${localVal}, aos ${dataExt}.`;
   const cargoDirText = record.cargoDirector?.trim() || 'O Director Municipal';
 
   doc.setFont('helvetica', 'bold');
