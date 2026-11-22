@@ -396,7 +396,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {request.serviceType === 'DECLARACAO_EFECTIVIDADE' && (
               <div className="doc-text-12 space-y-2.5 text-justify text-black">
                 <p style={{ textIndent: '1.25cm' }}>
-                  Para os devidos efeitos legais e administrativos, e por ter sido solicitada {interessadoInteressada}, o Director Municipal da Educação do Município do Quêssua, Província de Malanje, <strong>DECLARA</strong> que {artigoTratamento} <strong>{details.employeeName || request.requesterName}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong>{details.employeeBi || 'Conforme Registo'}</strong> e {inscritoInscrita} sob o número de agente público <strong>{details.employeeAgente || 'REG-DME-2026'}</strong>, é {funcionarioFuncionaria} do Sector da Educação, onde se encontra {colocadoColocada} {prepEscola} <strong>{schoolOrDept}</strong>, {enquadradoEnquadrada} na categoria e função de <strong>{adaptedCategory}</strong>.
+                  Para os devidos efeitos legais e administrativos, e por ter sido solicitada {interessadoInteressada}, o Director Municipal da Educação do Município do Quêssua, Província de Malanje, <strong>DECLARA</strong> que {artigoTratamento} <strong className="a4-cadastrado-nome" style={{ color: '#c00000' }}>{details.employeeName || request.requesterName}</strong>, {portadorPortadora} do Bilhete de Identidade n.º <strong>{details.employeeBi || 'Conforme Registo'}</strong> e {inscritoInscrita} sob o número de agente público <strong>{details.employeeAgente || 'REG-DME-2026'}</strong>, é {funcionarioFuncionaria} do Sector da Educação, onde se encontra {colocadoColocada} {prepEscola} <strong>{schoolOrDept}</strong>, {enquadradoEnquadrada} na categoria e função de <strong>{adaptedCategory}</strong>.
                 </p>
 
                 <p style={{ textIndent: '1.25cm' }}>
@@ -422,7 +422,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                 <div className="bg-slate-50 print:bg-white p-3 print:p-0 rounded-xl border border-slate-200 print:border-0 grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>
                     <span className="text-slate-600 print:text-black block">{isFeminino ? 'Aluna:' : 'Aluno:'}</span>
-                    <strong className="text-black">{details.studentName || 'Nome do Estudante'}</strong>
+                    <strong className="a4-cadastrado-nome text-[#c00000]" style={{ color: '#c00000' }}>{details.studentName || 'Nome do Estudante'}</strong>
                   </div>
                   <div>
                     <span className="text-slate-600 print:text-black block">Classe / Turma:</span>
@@ -517,7 +517,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                 <div className="bg-slate-50 print:bg-white p-3 print:p-0 rounded-xl border border-slate-200 print:border-0 space-y-1.5">
                   <div>
                     <span className="text-slate-600 print:text-black">{isFeminino ? 'Nome da Aluna:' : 'Nome do Aluno:'}</span>{' '}
-                    <strong className="text-black">{details.studentName || request.requesterName}</strong>
+                    <strong className="a4-cadastrado-nome text-[#c00000]" style={{ color: '#c00000' }}>{details.studentName || request.requesterName}</strong>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div>
@@ -552,7 +552,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <span className="text-slate-600 print:text-black">{isFeminino ? 'Aluna:' : 'Aluno:'}</span>{' '}
-                      <strong className="text-black">{details.studentName || request.requesterName}</strong>
+                      <strong className="a4-cadastrado-nome text-[#c00000]" style={{ color: '#c00000' }}>{details.studentName || request.requesterName}</strong>
                     </div>
                     <div>
                       <span className="text-slate-600 print:text-black">N.º Matrícula / BI:</span>{' '}

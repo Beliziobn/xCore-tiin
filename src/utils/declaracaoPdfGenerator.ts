@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { toCanvas } from 'html-to-image';
 import emblemAngolaImg from '../assets/images/Emblem_of_Angola.svg.webp';
 import type { CadastramentoEfectividadeRecord } from './efectividadeStorage';
 import type { DeclaracaoServicoRecord } from './declaracaoServicoStorage';
@@ -30,12 +31,16 @@ import {
 export interface TextSegment {
   text: string;
   bold?: boolean;
+  color?: [number, number, number];
 }
 
 interface WordToken {
   word: string;
   bold: boolean;
   width: number;
+  wordWidth: number;
+  color?: [number, number, number];
+  trailingPunct?: string;
 }
 
 /**
@@ -73,6 +78,269 @@ export async function loadEmblemPngDataUrl(src: string): Promise<{ dataUrl: stri
 }
 
 /**
+ * Converte todas as imagens (<img>) de um elemento clonado para DataURL PNG inline,
+ * garantindo que html-to-image renderize insígnias e assinaturas sem falhas nem atrasos.
+ */
+async function prepareImagesInClone(container: HTMLElement): Promise<void> {
+  const imgs = Array.from(container.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map(async (img) => {
+      const src = img.getAttribute('src') || img.src;
+      if (!src || src.startsWith('data:')) return;
+      const converted = await loadEmblemPngDataUrl(src);
+      if (converted?.dataUrl) {
+        img.src = converted.dataUrl;
+      }
+      try {
+        await img.decode?.();
+      } catch {
+        // Ignore decode errors
+      }
+    })
+  );
+}
+
+/**
+ * Captura exactamente a folha A4 da Pré-visualização no DOM (#oficial-a4-sheet,
+ * #declaracao-servico-a4-sheet, #guia-ferias-a4-sheet, #guia-colocacao-a4-sheet,
+ * #cadastro-docente-a4-sheet, #official-modal-print-sheet) em alta resolução (A4 210x297mm),
+ * preservando 100% do estilo visual, fontes, cores, margens e posicionamentos da preview.
+ */
+async function captureSinglePageA4DomToPdf(
+  elementId: string,
+  filename: string,
+  expectedName?: string
+): Promise<boolean> {
+  if (typeof document === 'undefined') return false;
+  let sourceEl = document.getElementById(elementId);
+  if (!sourceEl) return false;
+
+  const cleanExpected = (expectedName || '').trim();
+  if (
+    cleanExpected &&
+    !cleanExpected.startsWith('[') &&
+    !sourceEl.textContent?.includes(cleanExpected)
+  ) {
+    // Wait briefly in case React state was just updated from a table row click
+    await new Promise((r) => setTimeout(r, 75));
+    sourceEl = document.getElementById(elementId);
+    if (!sourceEl || !sourceEl.textContent?.includes(cleanExpected)) {
+      return false;
+    }
+  }
+
+  const stage = document.createElement('div');
+  stage.style.position = 'fixed';
+  stage.style.left = '-10000px';
+  stage.style.top = '0';
+  stage.style.width = '794px';
+  stage.style.minHeight = '1123px';
+  stage.style.background = '#ffffff';
+  stage.style.zIndex = '-9999';
+  stage.style.pointerEvents = 'none';
+
+  try {
+    const clone = sourceEl.cloneNode(true) as HTMLElement;
+    clone.style.width = '794px';
+    clone.style.maxWidth = '794px';
+    clone.style.minWidth = '794px';
+    clone.style.minHeight = '1123px';
+    clone.style.margin = '0';
+    clone.style.border = 'none';
+    clone.style.outline = 'none';
+    clone.style.boxShadow = 'none';
+    clone.style.borderRadius = '0';
+    clone.style.backgroundColor = '#ffffff';
+    clone.style.boxSizing = 'border-box';
+
+    if (elementId === 'cadastro-docente-a4-sheet') {
+      clone.style.padding = '14mm 22mm';
+      clone.style.display = 'flex';
+      clone.style.flexDirection = 'column';
+      clone.style.justifyContent = 'space-between';
+    } else if (elementId === 'declaracao-servico-a4-sheet') {
+      clone.style.padding = '18mm 20mm';
+      clone.style.display = 'flex';
+      clone.style.flexDirection = 'column';
+      clone.style.justifyContent = 'space-between';
+    } else if (
+      elementId === 'guia-ferias-a4-sheet' ||
+      elementId === 'guia-colocacao-a4-sheet'
+    ) {
+      clone.style.padding = '14mm 20mm';
+    } else {
+      clone.style.padding = '15mm 20mm';
+    }
+
+    stage.appendChild(clone);
+    document.body.appendChild(stage);
+
+    await prepareImagesInClone(clone);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    const captureH = Math.max(1123, clone.scrollHeight, clone.offsetHeight);
+    const canvas = await toCanvas(clone, {
+      width: 794,
+      height: captureH,
+      pixelRatio: 2.5,
+      skipFonts: true,
+      backgroundColor: '#ffffff',
+    });
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    if (captureH <= 1128) {
+      doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+    } else {
+      const ratio = 794 / captureH;
+      const drawH = 297;
+      const drawW = drawH * ratio;
+      const offsetX = (210 - drawW) / 2;
+      doc.addImage(imgData, 'PNG', offsetX, 0, drawW, drawH, undefined, 'FAST');
+    }
+
+    doc.save(filename);
+    return true;
+  } catch (err) {
+    console.warn('Fallback to vector PDF generation:', err);
+    return false;
+  } finally {
+    if (stage.parentNode) {
+      stage.parentNode.removeChild(stage);
+    }
+  }
+}
+
+/**
+ * Captura a Ficha de Avaliação de Desempenho Docente (#ficha-avaliacao-a4-sheet)
+ * respeitando as quebras de página (.a4-page-break-after) com 100% de fidelidade visual.
+ */
+async function captureMultiPageFichaDomToPdf(
+  elementId: string,
+  filename: string,
+  expectedName?: string
+): Promise<boolean> {
+  if (typeof document === 'undefined') return false;
+  let sourceEl = document.getElementById(elementId);
+  if (!sourceEl) return false;
+
+  const cleanExpected = (expectedName || '').trim();
+  if (
+    cleanExpected &&
+    !cleanExpected.startsWith('[') &&
+    !sourceEl.textContent?.includes(cleanExpected)
+  ) {
+    await new Promise((r) => setTimeout(r, 75));
+    sourceEl = document.getElementById(elementId);
+    if (!sourceEl || !sourceEl.textContent?.includes(cleanExpected)) {
+      return false;
+    }
+  }
+
+  const children = Array.from(sourceEl.children) as HTMLElement[];
+  if (children.length === 0) return false;
+
+  const pageGroups: HTMLElement[][] = [];
+  let currentGroup: HTMLElement[] = [];
+  for (const child of children) {
+    currentGroup.push(child);
+    if (child.classList.contains('a4-page-break-after')) {
+      pageGroups.push(currentGroup);
+      currentGroup = [];
+    }
+  }
+  if (currentGroup.length > 0) {
+    pageGroups.push(currentGroup);
+  }
+
+  const stage = document.createElement('div');
+  stage.style.position = 'fixed';
+  stage.style.left = '-10000px';
+  stage.style.top = '0';
+  stage.style.width = '794px';
+  stage.style.background = '#ffffff';
+  stage.style.zIndex = '-9999';
+  stage.style.pointerEvents = 'none';
+  document.body.appendChild(stage);
+
+  try {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+    });
+
+    for (let pIdx = 0; pIdx < pageGroups.length; pIdx++) {
+      if (pIdx > 0) doc.addPage();
+
+      const pageContainer = document.createElement('div');
+      pageContainer.id = elementId;
+      pageContainer.style.width = '794px';
+      pageContainer.style.maxWidth = '794px';
+      pageContainer.style.minHeight = '1123px';
+      pageContainer.style.padding = '14mm 16mm';
+      pageContainer.style.margin = '0';
+      pageContainer.style.border = 'none';
+      pageContainer.style.boxShadow = 'none';
+      pageContainer.style.backgroundColor = '#ffffff';
+      pageContainer.style.boxSizing = 'border-box';
+      pageContainer.style.fontFamily =
+        "'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', 'Avant Garde', sans-serif";
+      pageContainer.style.fontSize = '8pt';
+      pageContainer.style.color = '#000000';
+
+      for (const sec of pageGroups[pIdx]) {
+        const clonedSec = sec.cloneNode(true) as HTMLElement;
+        pageContainer.appendChild(clonedSec);
+      }
+
+      stage.innerHTML = '';
+      stage.appendChild(pageContainer);
+
+      await prepareImagesInClone(pageContainer);
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+      const captureH = Math.max(1123, pageContainer.scrollHeight, pageContainer.offsetHeight);
+      const canvas = await toCanvas(pageContainer, {
+        width: 794,
+        height: captureH,
+        pixelRatio: 2.5,
+        skipFonts: true,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      if (captureH <= 1128) {
+        doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+      } else {
+        const ratio = 794 / captureH;
+        const drawH = 297;
+        const drawW = drawH * ratio;
+        const offsetX = (210 - drawW) / 2;
+        doc.addImage(imgData, 'PNG', offsetX, 0, drawW, drawH, undefined, 'FAST');
+      }
+    }
+
+    doc.save(filename);
+    return true;
+  } catch (err) {
+    console.warn('Fallback to vector Ficha PDF generation:', err);
+    return false;
+  } finally {
+    if (stage.parentNode) {
+      stage.parentNode.removeChild(stage);
+    }
+  }
+}
+
+/**
  * Renderiza um parágrafo justificado em Times New Roman (12pt) com suporte a
  * trechos em negrito e recuo na primeira linha (1.25cm = 12.5mm).
  */
@@ -90,8 +358,13 @@ function renderJustifiedParagraph(
   doc.setFontSize(fontSizePt);
   doc.setTextColor(0, 0, 0);
 
-  // Tokenize segments into words while preserving bold state and attaching punctuation properly
-  const rawTokens: { word: string; bold: boolean }[] = [];
+  // Tokenize segments into words while preserving bold state, color, and attaching punctuation properly
+  const rawTokens: {
+    word: string;
+    bold: boolean;
+    color?: [number, number, number];
+    trailingPunct?: string;
+  }[] = [];
 
   for (const seg of segments) {
     if (!seg.text) continue;
@@ -108,10 +381,11 @@ function renderJustifiedParagraph(
         rawTokens.length > 0 &&
         /^[,.;:!?)]+$/.test(part)
       ) {
-        // Attach punctuation directly to the previous token
-        rawTokens[rawTokens.length - 1].word += part;
+        // Attach punctuation separately so a colored word doesn't color its trailing comma
+        const prev = rawTokens[rawTokens.length - 1];
+        prev.trailingPunct = (prev.trailingPunct || '') + part;
       } else {
-        rawTokens.push({ word: part, bold: isBold });
+        rawTokens.push({ word: part, bold: isBold, color: seg.color });
       }
     }
   }
@@ -119,10 +393,19 @@ function renderJustifiedParagraph(
   // Measure each word
   const tokens: WordToken[] = rawTokens.map((t) => {
     doc.setFont(fontFamily, t.bold ? 'bold' : 'normal');
+    const wordWidth = doc.getTextWidth(t.word);
+    let punctWidth = 0;
+    if (t.trailingPunct) {
+      doc.setFont(fontFamily, 'normal');
+      punctWidth = doc.getTextWidth(t.trailingPunct);
+    }
     return {
       word: t.word,
       bold: t.bold,
-      width: doc.getTextWidth(t.word),
+      color: t.color,
+      trailingPunct: t.trailingPunct,
+      wordWidth,
+      width: wordWidth + punctWidth,
     };
   });
 
@@ -184,9 +467,20 @@ function renderJustifiedParagraph(
     for (let i = 0; i < line.words.length; i++) {
       const w = line.words[i];
       doc.setFont(fontFamily, w.bold ? 'bold' : 'normal');
+      if (w.color) {
+        doc.setTextColor(w.color[0], w.color[1], w.color[2]);
+      } else {
+        doc.setTextColor(0, 0, 0);
+      }
       doc.text(w.word, cursorX, currentY);
+      if (w.trailingPunct) {
+        doc.setFont(fontFamily, 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text(w.trailingPunct, cursorX + w.wordWidth, currentY);
+      }
       cursorX += w.width + (i < gapsCount ? spaceStep : 0);
     }
+    doc.setTextColor(0, 0, 0);
 
     currentY += lineHeightMm;
   }
@@ -203,6 +497,20 @@ export async function downloadDeclaracaoEfectividadePdf(
   record: CadastramentoEfectividadeRecord,
   genderOverride?: 'Senhor' | 'Senhora' | null
 ): Promise<void> {
+  const safeName = (record.nome || 'Funcionario')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const filename = `Declaracao_Efectividade_${safeName}.pdf`;
+
+  const captured = await captureSinglePageA4DomToPdf(
+    'oficial-a4-sheet',
+    filename,
+    record.nome
+  );
+  if (captured) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -317,7 +625,7 @@ export async function downloadDeclaracaoEfectividadePdf(
     {
       text: `Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do Quêssua declara, para os fins a que se destina, que ${artigoTratamento} `,
     },
-    { text: record.nome, bold: true },
+    { text: record.nome, bold: true, color: [192, 0, 0] },
     { text: `, ${filhoFilha} de ` },
     { text: record.pai, bold: true },
     { text: ' e de ' },
@@ -392,14 +700,7 @@ export async function downloadDeclaracaoEfectividadePdf(
   doc.setFontSize(12);
   doc.text(directorNome, centerX, y, { align: 'center' });
 
-  // Nome limpo para guardar o ficheiro PDF
-  const safeName = (record.nome || 'Funcionario')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  doc.save(`Declaracao_Efectividade_${safeName}.pdf`);
+  doc.save(filename);
 }
 
 /**
@@ -447,12 +748,20 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
   const isCenturyGothicA4 =
     isFichaStyleA4 || elementId === 'cadastro-docente-a4-sheet';
 
+  // Copiar todos os <link rel="stylesheet"> e <style> da página para manter 100% do estilo Tailwind e CSS da preview
+  const parentStylesHtml = Array.from(
+    document.querySelectorAll('link[rel="stylesheet"], style')
+  )
+    .map((node) => node.outerHTML)
+    .join('\n');
+
   iframeDoc.open();
   iframeDoc.write(`<!DOCTYPE html>
 <html lang="pt">
 <head>
   <meta charset="utf-8" />
   <title></title>
+  ${parentStylesHtml}
   <style>
     @page {
       size: A4 portrait;
@@ -491,7 +800,17 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       max-width: ${isFichaStyleA4 ? '100%' : '210mm'} !important;
       height: ${isFichaStyleA4 ? 'auto' : '296mm'} !important;
       max-height: ${isFichaStyleA4 ? 'none' : '296mm'} !important;
-      padding: ${isFichaStyleA4 ? '0' : '15mm 20mm'} !important;
+      padding: ${
+        isFichaStyleA4
+          ? '0'
+          : elementId === 'cadastro-docente-a4-sheet'
+          ? '14mm 22mm'
+          : elementId === 'declaracao-servico-a4-sheet'
+          ? '18mm 20mm'
+          : elementId === 'guia-ferias-a4-sheet' || elementId === 'guia-colocacao-a4-sheet'
+          ? '14mm 20mm'
+          : '15mm 20mm'
+      } !important;
       margin: 0 auto !important;
       border: 0 !important;
       outline: 0 !important;
@@ -499,7 +818,7 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       background: #ffffff !important;
       overflow: ${isFichaStyleA4 ? 'visible' : 'hidden'} !important;
       ${
-        elementId === 'cadastro-docente-a4-sheet'
+        elementId === 'cadastro-docente-a4-sheet' || elementId === 'declaracao-servico-a4-sheet'
           ? 'display: flex !important; flex-direction: column !important; justify-content: space-between !important;'
           : ''
       }
@@ -512,7 +831,7 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       break-after: avoid !important;`
       }
     }
-    .a4-emblem-img, img {
+    .a4-emblem-img {
       width: 60px !important;
       height: auto !important;
       max-height: 60px !important;
@@ -784,6 +1103,18 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       display: block !important;
       margin: 0 auto 6pt auto !important;
     }
+    .a4-cadastrado-nome,
+    #oficial-a4-sheet .a4-cadastrado-nome,
+    #official-modal-print-sheet .a4-cadastrado-nome,
+    #declaracao-servico-a4-sheet .a4-cadastrado-nome,
+    #guia-ferias-a4-sheet .a4-cadastrado-nome,
+    #guia-colocacao-a4-sheet .a4-cadastrado-nome,
+    #ficha-avaliacao-a4-sheet .a4-cadastrado-nome,
+    #ficha-avaliacao-a4-sheet span.a4-cadastrado-nome,
+    #cadastro-docente-a4-sheet .a4-cadastrado-nome {
+      color: #c00000 !important;
+      font-weight: 700 !important;
+    }
   </style>
 </head>
 <body>
@@ -833,6 +1164,25 @@ export async function downloadQuickServiceDocumentPdf(
   request: QuickServiceRequest,
   genderOverride?: 'M' | 'F' | null
 ): Promise<void> {
+  const details = request.details || {};
+  const targetPersonName =
+    request.serviceType === 'DECLARACAO_EFECTIVIDADE'
+      ? details.employeeName || request.requesterName
+      : details.studentName || request.requesterName;
+
+  const safeNameEarly = (targetPersonName || 'Requerente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  const capturedModal = await captureSinglePageA4DomToPdf(
+    'official-modal-print-sheet',
+    `Documento_Oficial_${safeNameEarly}.pdf`,
+    targetPersonName
+  );
+  if (capturedModal) return;
+
   const { extractStudentGradesFromPautas, verifyStudentEnrollmentInSchool } = await import(
     './quickServicesStorage'
   );
@@ -848,17 +1198,11 @@ export async function downloadQuickServiceDocumentPdf(
   const usableWidth = pageWidth - marginX * 2;
   const centerX = pageWidth / 2;
 
-  const details = request.details || {};
   const issueDate = new Date().toLocaleDateString('pt-PT', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   });
-
-  const targetPersonName =
-    request.serviceType === 'DECLARACAO_EFECTIVIDADE'
-      ? details.employeeName || request.requesterName
-      : details.studentName || request.requesterName;
 
   const isFeminino =
     genderOverride === 'F'
@@ -984,7 +1328,7 @@ export async function downloadQuickServiceDocumentPdf(
       },
       { text: 'DECLARA', bold: true },
       { text: ` que ${artigoTratamento} ` },
-      { text: details.employeeName || request.requesterName, bold: true },
+      { text: details.employeeName || request.requesterName, bold: true, color: [192, 0, 0] },
       { text: `, ${portadorPortadora} do Bilhete de Identidade n.º ` },
       { text: details.employeeBi || 'Conforme Registo', bold: true },
       { text: ` e ${inscritoInscrita} sob o número de agente público ` },
@@ -1279,6 +1623,20 @@ export async function downloadQuickServiceDocumentPdf(
 export async function downloadDeclaracaoServicoPdf(
   record: DeclaracaoServicoRecord
 ): Promise<void> {
+  const safeName = (record.nome || record.ref || 'Funcionario')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const filename = `Declaracao_Servico_${safeName}.pdf`;
+
+  const captured = await captureSinglePageA4DomToPdf(
+    'declaracao-servico-a4-sheet',
+    filename,
+    record.nome
+  );
+  if (captured) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -1354,7 +1712,7 @@ export async function downloadDeclaracaoServicoPdf(
 
   const p1: TextSegment[] = [
     { text: `Para os devidos efeitos achados convenientes, declara-se que ${isFem ? 'a senhora ' : 'o senhor '}` },
-    { text: record.nome, bold: true },
+    { text: record.nome, bold: true, color: [192, 0, 0] },
     { text: `, ${filiacao}, natural de ${record.naturalidade}, Província de ${record.provNat}, ${isFem ? 'nascida' : 'nascido'} aos ${fmtDateDeclaracaoServico(record.nascimento)}, ${isFem ? 'portadora' : 'portador'} do BI nº ` },
     { text: record.bi, bold: true },
     { text: `, emitido aos ${fmtDateDeclaracaoServico(record.biData)}, ${record.profissao} do ${record.grau}, ${isFem ? 'colocada' : 'colocado'} no Município de ${record.municipio}, local de trabalho: ` },
@@ -1416,13 +1774,7 @@ export async function downloadDeclaracaoServicoPdf(
     doc.text(record.director, centerX, y, { align: 'center' });
   }
 
-  const safeName = (record.nome || record.ref || 'Funcionario')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  doc.save(`Declaracao_Servico_${safeName}.pdf`);
+  doc.save(filename);
 }
 
 /**
@@ -1432,6 +1784,20 @@ export async function downloadDeclaracaoServicoPdf(
 export async function downloadGuiaFeriasPdf(
   record: GuiaFeriasRecord
 ): Promise<void> {
+  const safeName = (record.nome || record.ng || 'Funcionario')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const filename = `Guia_Ferias_${safeName}.pdf`;
+
+  const captured = await captureSinglePageA4DomToPdf(
+    'guia-ferias-a4-sheet',
+    filename,
+    record.nome
+  );
+  if (captured) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -1514,7 +1880,7 @@ export async function downloadGuiaFeriasPdf(
     { text: ') referente ao ano económico de ' },
     { text: record.ano || '2026', bold: true },
     { text: `, ${record.trat || 'o Senhor'} ` },
-    { text: record.nome || '[Nome Completo]', bold: true },
+    { text: record.nome || '[Nome Completo]', bold: true, color: [192, 0, 0] },
     { text: `, ${record.cat || 'P.E.P.E.S.'} ${record.grau || '10º Grau'}, sob o agente nº ` },
     { text: record.agente || '[Nº de Agente]', bold: true },
     { text: ', com a função de ' },
@@ -1573,13 +1939,7 @@ export async function downloadGuiaFeriasPdf(
     doc.text(record.dir, centerX, y, { align: 'center' });
   }
 
-  const safeName = (record.nome || record.ng || 'Funcionario')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  doc.save(`Guia_Ferias_${safeName}.pdf`);
+  doc.save(filename);
 }
 
 /**
@@ -1589,6 +1949,20 @@ export async function downloadGuiaFeriasPdf(
 export async function downloadGuiaColocacaoPdf(
   record: GuiaColocacaoRecord
 ): Promise<void> {
+  const safeName = (record.nome || record.num || 'Professor')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const filename = `Guia_Colocacao_${safeName}.pdf`;
+
+  const captured = await captureSinglePageA4DomToPdf(
+    'guia-colocacao-a4-sheet',
+    filename,
+    record.nome
+  );
+  if (captured) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -1664,7 +2038,7 @@ export async function downloadGuiaColocacaoPdf(
     },
     { text: record.escola?.trim() || '[escola de destino]', bold: true },
     { text: `, ${tratLabel} ` },
-    { text: record.nome?.trim() || '[nome completo]', bold: true },
+    { text: record.nome?.trim() || '[nome completo]', bold: true, color: [192, 0, 0] },
     { text: ', com a categoria de ' },
     { text: catGrau, bold: true },
     { text: ', titular de agente nº ' },
@@ -1719,13 +2093,7 @@ export async function downloadGuiaColocacaoPdf(
     doc.text(record.dir, centerX, y, { align: 'center' });
   }
 
-  const safeName = (record.nome || record.num || 'Professor')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  doc.save(`Guia_Colocacao_${safeName}.pdf`);
+  doc.save(filename);
 }
 
 export interface CadastroDocentePdfData {
@@ -1769,6 +2137,20 @@ export interface CadastroDocentePdfData {
 export async function downloadCadastroDocenteVagaPdf(
   record: CadastroDocentePdfData
 ): Promise<void> {
+  const safeName = (record.nome || record.id || 'Docente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const filename = `Solicitacao_Vaga_Docente_${safeName}.pdf`;
+
+  const captured = await captureSinglePageA4DomToPdf(
+    'cadastro-docente-a4-sheet',
+    filename,
+    record.nome
+  );
+  if (captured) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -1909,18 +2291,31 @@ export async function downloadCadastroDocenteVagaPdf(
   y = boxY + boxH + 10;
 
   // 3. Nota Nº, Assunto e Saudação
-  const notaNumClean = (record.notaNumero || '').trim();
+  const notaNumClean = (record.notaNumero || '')
+    .trim()
+    .replace(/^nota\s*n[º°.]?\s*/i, '')
+    .trim();
   const rawNotaSuf = (record.notaSufixo || '/DMEQuéssua - 2026').trim() || '/DMEQuéssua - 2026';
   const notaSuf = rawNotaSuf.startsWith('/') ? rawNotaSuf : `/${rawNotaSuf}`;
-  const notaHeaderText = !notaNumClean
-    ? `Nota Nº____${notaSuf}`
-    : notaNumClean.toLowerCase().startsWith('nota')
-    ? notaNumClean
-    : `Nota Nº ${notaNumClean}${notaSuf}`;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.8);
-  doc.text(notaHeaderText, marginX, y);
+  if (!notaNumClean) {
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Nota Nº____${notaSuf}`, boxX, y);
+  } else {
+    const prefixText = 'Nota Nº ';
+    doc.setTextColor(0, 0, 0);
+    doc.text(prefixText, boxX, y);
+    const prefixW = doc.getTextWidth(prefixText);
+
+    doc.setTextColor(0, 82, 204);
+    doc.text(notaNumClean, boxX + prefixW, y);
+    const numW = doc.getTextWidth(notaNumClean);
+
+    doc.setTextColor(0, 0, 0);
+    doc.text(notaSuf, boxX + prefixW + numW, y);
+  }
   y += 7.5;
 
   const rawAssunto =
@@ -1998,7 +2393,7 @@ export async function downloadCadastroDocenteVagaPdf(
     {
       text: `A Direcção Municipal da Educação, em atenção à solicitação e ao pedido de parecer relativos à concessão de vaga apresentados ${peloPela} `,
     },
-    { text: `${profTitle} ${nomeVal}`, bold: true },
+    { text: nomeVal, bold: true, color: [192, 0, 0] },
     { text: `, ${portadorLabel} do n.º de Agente ` },
     { text: agenteVal, bold: true },
     { text: `, actualmente ${colocadoLabel} ${prepInstAct} ${instActVal}, Município de ${munActVal}, ` },
@@ -2184,13 +2579,7 @@ export async function downloadCadastroDocenteVagaPdf(
   doc.setFontSize(4.3);
   doc.text('Portal Oficial do Governo Provincial', badgeStartX + 32.5, footerY + 7.2);
 
-  const safeName = (record.nome || record.id || 'Docente')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  doc.save(`Solicitacao_Vaga_Docente_${safeName}.pdf`);
+  doc.save(filename);
 }
 
 /**
@@ -2200,6 +2589,20 @@ export async function downloadCadastroDocenteVagaPdf(
 export async function downloadFichaAvaliacaoPdf(
   record: FichaAvaliacaoRecord
 ): Promise<void> {
+  const safeName = (record.nome || record.agente || 'Docente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const filename = `Ficha_Avaliacao_${safeName}.pdf`;
+
+  const captured = await captureMultiPageFichaDomToPdf(
+    'ficha-avaliacao-a4-sheet',
+    filename,
+    record.nome
+  );
+  if (captured) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -2346,10 +2749,17 @@ export async function downloadFichaAvaliacaoPdf(
     doc.rect(marginX, y, usableWidth, idRowH);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
     doc.text(row.label, marginX + 3, y + 4.6);
     const lw = doc.getTextWidth(row.label) + 2.5;
     if (row.value) {
+      if (row.label === 'Nome Completo:') {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(192, 0, 0);
+      }
       doc.text(row.value, marginX + 3 + lw, y + 4.6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
     }
     y += idRowH;
   }
@@ -2729,13 +3139,7 @@ export async function downloadFichaAvaliacaoPdf(
     });
   }
 
-  const safeName = (record.nome || record.agente || 'Docente')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  doc.save(`Ficha_Avaliacao_Docente_${safeName}.pdf`);
+  doc.save(filename);
 }
 
 

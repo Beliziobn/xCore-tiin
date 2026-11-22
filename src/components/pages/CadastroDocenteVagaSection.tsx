@@ -289,6 +289,20 @@ export function formatNotaHeader(notaNumero?: string, notaSufixo?: string): stri
   return `Nota Nº ${num}${suf}`;
 }
 
+export function getNotaHeaderParts(
+  notaNumero?: string,
+  notaSufixo?: string
+): { prefix: string; numeroPreenchido: string; suffix: string } {
+  const num = (notaNumero || '').trim();
+  const rawSuf = (notaSufixo || '/DMEQuéssua - 2026').trim() || '/DMEQuéssua - 2026';
+  const suf = rawSuf.startsWith('/') ? rawSuf : `/${rawSuf}`;
+  if (!num) {
+    return { prefix: 'Nota Nº____', numeroPreenchido: '', suffix: suf };
+  }
+  const cleanNum = num.replace(/^nota\s*n[º°.]?\s*/i, '').trim() || num;
+  return { prefix: 'Nota Nº ', numeroPreenchido: cleanNum, suffix: suf };
+}
+
 function getFreshFormState(): CadastroDocenteFormState {
   return {
     trat: 'Senhor',
@@ -1196,7 +1210,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                       <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap font-semibold text-slate-900">
                         {r.id}
                       </td>
-                      <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-900">
+                      <td className="px-3.5 py-2.5 whitespace-nowrap font-bold text-[#c00000]">
                         {r.trat} {r.nome}
                       </td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap text-slate-700 max-w-[200px] truncate">
@@ -1255,7 +1269,12 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                           </button>
                           <button
                             type="button"
-                            onClick={() => downloadCadastroDocenteVagaPdf(r)}
+                            onClick={() => {
+                              setSubmittedRecord(r);
+                              setTimeout(() => {
+                                downloadCadastroDocenteVagaPdf(r);
+                              }, 60);
+                            }}
                             className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1"
                             title="Baixar PDF (1 Página A4)"
                           >
@@ -1309,7 +1328,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                 <h2 className="text-sm sm:text-base font-bold text-slate-900">
                   Pré-visualização em Tempo Real — Cadastro Docente
                 </h2>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs font-bold text-[#c00000]">
                   · {livePreviewRecord.nome}
                 </span>
               </div>
@@ -1632,12 +1651,28 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                     <div className="mb-5" style={{ fontSize: '10.8pt', lineHeight: 1.5 }}>
                       <p
                         className="m-0 mb-3 font-bold"
-                        style={{ textIndent: 0 }}
+                        style={{ textIndent: 0, marginLeft: '370px' }}
                       >
-                        {formatNotaHeader(
-                          livePreviewRecord.notaNumero,
-                          livePreviewRecord.notaSufixo
-                        )}
+                        {(() => {
+                          const notaParts = getNotaHeaderParts(
+                            livePreviewRecord.notaNumero,
+                            livePreviewRecord.notaSufixo
+                          );
+                          return (
+                            <>
+                              {notaParts.prefix}
+                              {notaParts.numeroPreenchido && (
+                                <span
+                                  className="a4-nota-numero-azul"
+                                  style={{ color: '#0052cc' }}
+                                >
+                                  {notaParts.numeroPreenchido}
+                                </span>
+                              )}
+                              {notaParts.suffix}
+                            </>
+                          );
+                        })()}
                       </p>
                       <p
                         className="m-0 font-bold"
@@ -1663,8 +1698,11 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                       <p className="m-0" style={{ textIndent: 0 }}>
                         A Direcção Municipal da Educação, em atenção à solicitação e ao pedido de
                         parecer relativos à concessão de vaga apresentados {peloPela}{' '}
-                        <strong>
-                          {profTitle} {livePreviewRecord.nome}
+                        <strong
+                          className="a4-cadastrado-nome"
+                          style={{ color: '#c00000' }}
+                        >
+                          {livePreviewRecord.nome}
                         </strong>
                         , {portadorLabel} do n.º de Agente{' '}
                         <strong>{livePreviewRecord.agente}</strong>, actualmente {colocadoLabel}{' '}
@@ -2481,7 +2519,23 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                       Número da Nota (Nota Nº)
                     </label>
                     <span className="text-[11px] font-mono font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                      {formatNotaHeader(formData.notaNumero, formData.notaSufixo)}
+                      {(() => {
+                        const notaParts = getNotaHeaderParts(
+                          formData.notaNumero,
+                          formData.notaSufixo
+                        );
+                        return (
+                          <>
+                            {notaParts.prefix}
+                            {notaParts.numeroPreenchido && (
+                              <span className="font-bold" style={{ color: '#0052cc' }}>
+                                {notaParts.numeroPreenchido}
+                              </span>
+                            )}
+                            {notaParts.suffix}
+                          </>
+                        );
+                      })()}
                     </span>
                   </div>
                   <input

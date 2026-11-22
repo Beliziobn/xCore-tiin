@@ -690,7 +690,7 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                         <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap font-semibold text-slate-900">
                           {r.ng}/{r.ang}
                         </td>
-                        <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-900">
+                        <td className="px-3.5 py-2.5 whitespace-nowrap font-bold text-[#c00000]">
                           {r.nome}
                         </td>
                         <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap text-slate-700">
@@ -728,7 +728,12 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => downloadGuiaFeriasPdf(r)}
+                              onClick={() => {
+                                setSubmittedRecord(r);
+                                setTimeout(() => {
+                                  downloadGuiaFeriasPdf(r);
+                                }, 60);
+                              }}
                               className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1"
                               title="Baixar PDF (1 Página A4)"
                             >
@@ -783,7 +788,7 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                 <h2 className="text-sm sm:text-base font-bold text-slate-900">
                   Pré-visualização em Tempo Real — Guia de Férias
                 </h2>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs font-bold text-[#c00000]">
                   · {livePreviewRecord.nome}
                 </span>
               </div>
@@ -900,7 +905,7 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                         gozo de <strong>{livePreviewRecord.tipolic}</strong> (
                         <strong>{livePreviewRecord.dias} dias</strong>) referente ao ano
                         económico de <strong>{livePreviewRecord.ano}</strong>,{' '}
-                        {livePreviewRecord.trat} <strong>{livePreviewRecord.nome}</strong>,{' '}
+                        {livePreviewRecord.trat} <strong className="a4-cadastrado-nome" style={{ color: '#c00000' }}>{livePreviewRecord.nome}</strong>,{' '}
                         {livePreviewRecord.cat} {livePreviewRecord.grau}, sob o agente nº{' '}
                         <strong>{livePreviewRecord.agente}</strong>, com a função de{' '}
                         <strong>{livePreviewRecord.funcao}</strong>, colocado(a) na{' '}

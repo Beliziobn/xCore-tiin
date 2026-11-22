@@ -686,6 +686,35 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         ? selectedRecordForView
         : liveEfectividadeRecord);
     if (!targetRecord) return;
+    if (recordOverride) {
+      setFormData({
+        id: recordOverride.id,
+        nome: recordOverride.nome,
+        tratamento: recordOverride.tratamento,
+        nascimento: recordOverride.nascimento,
+        pai: recordOverride.pai,
+        mae: recordOverride.mae,
+        naturalidade: recordOverride.naturalidade,
+        provNat: recordOverride.provNat,
+        bi: recordOverride.bi,
+        biEmissao: recordOverride.biEmissao,
+        sector: recordOverride.sector,
+        funcao: recordOverride.funcao,
+        municipio: recordOverride.municipio,
+        agente: recordOverride.agente,
+        escola: recordOverride.escola,
+        categoria: recordOverride.categoria,
+        grau: recordOverride.grau,
+        finalidade: recordOverride.finalidade,
+        governoProv: recordOverride.governoProv,
+        administracao: recordOverride.administracao,
+        direccao: recordOverride.direccao,
+        director: recordOverride.director,
+        local: recordOverride.local,
+        dataEmissao: recordOverride.dataEmissao,
+      });
+      await new Promise((r) => setTimeout(r, 65));
+    }
     try {
       await downloadDeclaracaoEfectividadePdf(
         targetRecord,
@@ -820,7 +849,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
               <p>
                 Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do
                 Quêssua declara, para os fins a que se destina, que {artigoTratamento}{' '}
-                <strong>{record.nome}</strong>, {filhoFilha} de <strong>{record.pai}</strong> e de{' '}
+                <strong className="a4-cadastrado-nome" style={{ color: '#c00000' }}>{record.nome}</strong>, {filhoFilha} de <strong>{record.pai}</strong> e de{' '}
                 <strong>{record.mae}</strong>, natural de <strong>{record.naturalidade}</strong>,
                 Província {prepProvincia} <strong>{record.provNat}</strong>, {nascidoNascida} aos{' '}
                 <strong>{nascimentoExtenso}</strong>, {portadorPortadora} do Bilhete de Identidade
@@ -910,15 +939,28 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         #guia-ferias-a4-sheet,
         #guia-ferias-a4-sheet *,
         #guia-colocacao-a4-sheet,
-        #guia-colocacao-a4-sheet *,
-        #ficha-avaliacao-a4-sheet,
-        #ficha-avaliacao-a4-sheet * {
+        #guia-colocacao-a4-sheet * {
           font-family: 'Times New Roman', Times, serif !important;
           color: #000000;
         }
         #cadastro-docente-a4-sheet,
-        #cadastro-docente-a4-sheet * {
+        #cadastro-docente-a4-sheet *,
+        #ficha-avaliacao-a4-sheet,
+        #ficha-avaliacao-a4-sheet * {
           font-family: 'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', sans-serif !important;
+        }
+        #oficial-a4-sheet .a4-cadastrado-nome,
+        #declaracao-servico-a4-sheet .a4-cadastrado-nome,
+        #guia-ferias-a4-sheet .a4-cadastrado-nome,
+        #guia-colocacao-a4-sheet .a4-cadastrado-nome,
+        #ficha-avaliacao-a4-sheet .a4-cadastrado-nome,
+        #cadastro-docente-a4-sheet .a4-cadastrado-nome,
+        .a4-cadastrado-nome {
+          color: #c00000 !important;
+        }
+        #cadastro-docente-a4-sheet .a4-nota-numero-azul,
+        .a4-nota-numero-azul {
+          color: #0052cc !important;
         }
         #oficial-a4-sheet .a4-emblem-img,
         #declaracao-servico-a4-sheet .a4-emblem-img,
@@ -1250,12 +1292,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           #guia-ferias-a4-sheet,
           #guia-ferias-a4-sheet *,
           #guia-colocacao-a4-sheet,
-          #guia-colocacao-a4-sheet *,
+          #guia-colocacao-a4-sheet * {
+            font-family: 'Times New Roman', Times, serif !important;
+          }
           #cadastro-docente-a4-sheet,
           #cadastro-docente-a4-sheet *,
           #ficha-avaliacao-a4-sheet,
           #ficha-avaliacao-a4-sheet * {
-            font-family: 'Times New Roman', Times, serif !important;
+            font-family: 'Century Gothic', CenturyGothic, AppleGothic, 'URW Gothic L', sans-serif !important;
           }
           #oficial-a4-sheet,
           #declaracao-servico-a4-sheet,
@@ -1695,7 +1739,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                                 <td className="px-3 py-2.5 text-center font-mono text-slate-400 tabular-nums">
                                   {String(idx + 1).padStart(2, '0')}
                                 </td>
-                                <td className="px-3.5 py-2.5 font-semibold text-slate-900 whitespace-nowrap">
+                                <td className="px-3.5 py-2.5 font-bold text-[#c00000] whitespace-nowrap">
                                   {item.nome}
                                 </td>
                                 <td className="px-3.5 py-2.5 font-mono text-slate-700 whitespace-nowrap">
@@ -1779,7 +1823,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                           <h2 className="text-sm sm:text-base font-bold text-slate-900">
                             Pré-visualização em Tempo Real — Declaração de Efectividade
                           </h2>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs font-bold text-[#c00000]">
                             · {liveEfectividadeRecord.nome}
                           </span>
                         </div>
@@ -2696,7 +2740,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                                 {String(index + 1).padStart(2, '0')}
                               </td>
                               <td className="py-3 px-4">
-                                <div className="font-bold text-slate-900 text-sm">{item.nome}</div>
+                                <div className="font-bold text-[#c00000] text-sm">{item.nome}</div>
                                 <div className="text-[11px] text-slate-500">{item.funcao}</div>
                               </td>
                               <td className="py-3 px-3 font-mono font-semibold text-slate-800">
@@ -2805,7 +2849,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                     </button>
                     <div>
                       <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                        Ficha Oficial de {selectedRecordForView.nome}
+                        Ficha Oficial de <span className="text-[#c00000]">{selectedRecordForView.nome}</span>
                       </h2>
                       <p className="text-xs text-slate-500">
                         B.I.: {selectedRecordForView.bi} · Agente: {selectedRecordForView.agente}

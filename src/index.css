@@ -1124,6 +1124,19 @@ html.lenis.lenis-stopped {
   font-weight: 400 !important;
 }
 
+#oficial-a4-sheet .a4-cadastrado-nome,
+#official-modal-print-sheet .a4-cadastrado-nome,
+#declaracao-servico-a4-sheet .a4-cadastrado-nome,
+#guia-ferias-a4-sheet .a4-cadastrado-nome,
+#guia-colocacao-a4-sheet .a4-cadastrado-nome,
+#ficha-avaliacao-a4-sheet .a4-cadastrado-nome,
+#ficha-avaliacao-a4-sheet span.a4-cadastrado-nome,
+#cadastro-docente-a4-sheet .a4-cadastrado-nome,
+.a4-cadastrado-nome {
+  color: #c00000 !important;
+  font-weight: 700 !important;
+}
+
 #ficha-avaliacao-a4-sheet h1,
 #ficha-avaliacao-a4-sheet th,
 #ficha-avaliacao-a4-sheet .ficha-title-10,

@@ -661,7 +661,7 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
                       <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap font-semibold text-slate-900">
                         {r.num || '—'}/{r.ano}
                       </td>
-                      <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-900">
+                      <td className="px-3.5 py-2.5 whitespace-nowrap font-bold text-[#c00000]">
                         {r.nome}
                       </td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap text-slate-700">
@@ -692,7 +692,12 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => downloadGuiaColocacaoPdf(r)}
+                            onClick={() => {
+                              setSubmittedRecord(r);
+                              setTimeout(() => {
+                                downloadGuiaColocacaoPdf(r);
+                              }, 60);
+                            }}
                             className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1"
                             title="Baixar PDF (1 Página A4)"
                           >
@@ -746,7 +751,7 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
                 <h2 className="text-sm sm:text-base font-bold text-slate-900">
                   Pré-visualização em Tempo Real — Guia de Colocação
                 </h2>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs font-bold text-[#c00000]">
                   · {livePreviewRecord.nome}
                 </span>
               </div>
@@ -868,7 +873,7 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
                         Por esta Direcção, se faz constar às autoridades a quem o conhecimento
                         desta competir que, segue viagem desta Direcção para{' '}
                         <strong>{livePreviewRecord.escola}</strong>, {tratTexto}{' '}
-                        <strong>{livePreviewRecord.nome}</strong>, com a categoria de{' '}
+                        <strong className="a4-cadastrado-nome" style={{ color: '#c00000' }}>{livePreviewRecord.nome}</strong>, com a categoria de{' '}
                         <strong>{catGrau}</strong>, titular de agente nº{' '}
                         <strong>{livePreviewRecord.agente}</strong>, para reiniciar as suas
                         funções de professor.

@@ -836,7 +836,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                       <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap font-semibold text-slate-900">
                         {r.ref}
                       </td>
-                      <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-900">
+                      <td className="px-3.5 py-2.5 whitespace-nowrap font-bold text-[#c00000]">
                         {r.nome}
                       </td>
                       <td className="px-3.5 py-2.5 font-mono text-xs whitespace-nowrap text-slate-700">
@@ -868,7 +868,12 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                           </button>
                           <button
                             type="button"
-                            onClick={() => downloadDeclaracaoServicoPdf(r)}
+                            onClick={() => {
+                              setSubmittedRecord(r);
+                              setTimeout(() => {
+                                downloadDeclaracaoServicoPdf(r);
+                              }, 60);
+                            }}
                             className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1"
                             title="Baixar PDF (1 Página A4)"
                           >
@@ -922,7 +927,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                 <h2 className="text-sm sm:text-base font-bold text-slate-900">
                   Pré-visualização em Tempo Real — Declaração de Serviço
                 </h2>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs font-bold text-[#c00000]">
                   · {livePreviewRecord.nome}
                 </span>
               </div>
@@ -1041,7 +1046,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
                       <p style={{ lineHeight: 1.75, marginBottom: '18pt' }}>
                         Para os devidos efeitos achados convenientes, declara-se que{' '}
                         {f ? 'a senhora ' : 'o senhor '}
-                        <strong>{livePreviewRecord.nome}</strong>, {fil}, natural de{' '}
+                        <strong className="a4-cadastrado-nome" style={{ color: '#c00000' }}>{livePreviewRecord.nome}</strong>, {fil}, natural de{' '}
                         {livePreviewRecord.naturalidade}, Província de {livePreviewRecord.provNat},{' '}
                         {f ? 'nascida' : 'nascido'} aos{' '}
                         {fmtDateDeclaracaoServico(livePreviewRecord.nascimento)},{' '}
