@@ -34,6 +34,7 @@ import {
   formatAvaliacaoNumber,
   computeFichaAvaliacaoMetrics,
   getStoredFichaAvaliacaoRecords,
+  syncFichaAvaliacaoFromServer,
   saveFichaAvaliacaoRecord,
   deleteFichaAvaliacaoRecord,
   findDuplicateFichaAvaliacao,
@@ -183,10 +184,15 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
 
   useEffect(() => {
     reloadRecords();
+    syncFichaAvaliacaoFromServer().then(() => reloadRecords()).catch(() => {});
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-ficha-avaliacao-updated', handleUpdated);
+    window.addEventListener('sigre-data-synced', handleUpdated);
+    window.addEventListener('storage', handleUpdated);
     return () => {
       window.removeEventListener('sigre-ficha-avaliacao-updated', handleUpdated);
+      window.removeEventListener('sigre-data-synced', handleUpdated);
+      window.removeEventListener('storage', handleUpdated);
     };
   }, []);
 

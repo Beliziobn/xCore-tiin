@@ -71,6 +71,19 @@ const BANNED_ENTITY_IDS = new Set([
   'efec-1792963605316-86',
 ]);
 
+let firestoreQuotaExhausted = false;
+
+export function isFirestoreQuotaExhausted(): boolean {
+  return firestoreQuotaExhausted;
+}
+
+export function markFirestoreQuotaIfExhausted(err: any): void {
+  const msg = String(err?.message || err?.code || err || '').toLowerCase();
+  if (msg.includes('resource-exhausted') || msg.includes('quota') || msg.includes('exceeded')) {
+    firestoreQuotaExhausted = true;
+  }
+}
+
 export function isBannedSchoolOrEntity(item: any): boolean {
   if (!item) return false;
   if (typeof item === 'string') {
@@ -81,9 +94,8 @@ export function isBannedSchoolOrEntity(item: any): boolean {
       s.includes('modelo central') ||
       s.includes('só ciência da educação') ||
       s.includes('so ciencia da educacao') ||
-      s.includes('só da educação') ||
-      s.includes('socienciadaeduca') ||
-      s.includes('scinciadaeducao') ||
+      s === 'só da educação' ||
+      s === 'so da educacao' ||
       s.includes('sige-113013')
     );
   }
@@ -107,11 +119,6 @@ export function isBannedSchoolOrEntity(item: any): boolean {
     item.sector,
     item.unidadeOrganica,
     item.escolaDestino,
-    item.email,
-    item.emailDireccao,
-    item.emailInstitucional,
-    item.emailPessoal,
-    item.director?.email,
     item.registrationData?.id,
     item.registrationData?.schoolId,
     item.registrationData?.escolaId,
@@ -119,8 +126,6 @@ export function isBannedSchoolOrEntity(item: any): boolean {
     item.registrationData?.nomeEscola,
     item.registrationData?.escola,
     item.registrationData?.codigoSIGE,
-    item.registrationData?.emailDireccao,
-    item.registrationData?.email,
   ];
 
   for (const val of fieldsToCheck) {
@@ -168,7 +173,11 @@ export function getEntityTombstones(): Set<string> {
     const raw = localStorage.getItem(DELETED_ENTITIES_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
-    return new Set(Array.isArray(parsed) ? parsed : []);
+    return new Set(
+      (Array.isArray(parsed) ? parsed : []).filter(
+        (k: any) => typeof k === 'string' && !k.toLowerCase().includes('socienciadaeduca2018')
+      )
+    );
   } catch {
     return new Set();
   }
@@ -177,22 +186,27 @@ export function getEntityTombstones(): Set<string> {
 export function addEntityTombstone(col: string, id: string, skipRemotePropagation: boolean = false): void {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined' || !id) return;
   try {
+    const rawClean = String(id).trim().toLowerCase();
+    if (!rawClean || rawClean.includes('socienciadaeduca2018')) return;
     const cleanId = sanitizeDocId(id).toLowerCase();
     if (!cleanId) return;
     const tombKey = `${col}::${cleanId}`;
     const set = getEntityTombstones();
     const isNew = !set.has(tombKey);
     set.add(tombKey);
+    set.add(`${col}:${rawClean}`);
     localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
 
     if (!skipRemotePropagation) {
-      const tombDocId = sanitizeDocId(tombKey);
-      if (tombDocId) {
-        setDoc(
-          doc(db, TOMBSTONES_COL, tombDocId),
-          { key: tombKey, col, id: cleanId, deletedAt: new Date().toISOString() },
-          { merge: true }
-        ).catch(() => {});
+      if (!firestoreQuotaExhausted) {
+        const tombDocId = sanitizeDocId(tombKey);
+        if (tombDocId) {
+          setDoc(
+            doc(db, TOMBSTONES_COL, tombDocId),
+            { key: tombKey, col, id: cleanId, deletedAt: new Date().toISOString() },
+            { merge: true }
+          ).catch((e) => markFirestoreQuotaIfExhausted(e));
+        }
       }
       if (isNew) {
         fetch(`/api/network/entity/${encodeURIComponent(col)}/${encodeURIComponent(id)}`, {
@@ -207,14 +221,30 @@ export function removeEntityTombstone(col: string, id: string): void {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined' || !id) return;
   try {
     const set = getEntityTombstones();
+    const rawClean = String(id).trim().toLowerCase();
     const cleanId = sanitizeDocId(id).toLowerCase();
-    const key = `${col}::${cleanId}`;
-    if (set.has(key)) {
-      set.delete(key);
+    const keysToDelete = [
+      `${col}::${cleanId}`,
+      `${col}:${cleanId}`,
+      `${col}::${rawClean}`,
+      `${col}:${rawClean}`,
+      cleanId,
+      rawClean,
+    ];
+    let removed = false;
+    keysToDelete.forEach((k) => {
+      if (set.has(k)) {
+        set.delete(k);
+        removed = true;
+      }
+    });
+    if (removed) {
       localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
-      const tombDocId = sanitizeDocId(key);
-      if (tombDocId) {
-        deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch(() => {});
+      if (!firestoreQuotaExhausted) {
+        const tombDocId = sanitizeDocId(`${col}::${cleanId}`);
+        if (tombDocId) {
+          deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch((e) => markFirestoreQuotaIfExhausted(e));
+        }
       }
     }
   } catch {}
@@ -224,8 +254,17 @@ export function isEntityTombstoned(col: string, id: string): boolean {
   if (!id) return false;
   if (isBannedSchoolOrEntity(id)) return true;
   const set = getEntityTombstones();
+  const rawClean = String(id).trim().toLowerCase();
   const cleanId = sanitizeDocId(id).toLowerCase();
-  return set.has(`${col}::${cleanId}`) || set.has(`*::${cleanId}`);
+  return (
+    set.has(`${col}::${cleanId}`) ||
+    set.has(`${col}:${cleanId}`) ||
+    set.has(`${col}::${rawClean}`) ||
+    set.has(`${col}:${rawClean}`) ||
+    set.has(`*::${cleanId}`) ||
+    set.has(`*:${rawClean}`) ||
+    set.has(rawClean)
+  );
 }
 
 // ============================================================================

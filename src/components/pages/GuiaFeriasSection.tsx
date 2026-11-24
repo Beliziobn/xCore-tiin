@@ -23,6 +23,7 @@ import {
   formatDateExtenso,
   calculateFimDate,
   getStoredGuiaFeriasRecords,
+  syncGuiaFeriasFromServer,
   saveGuiaFeriasRecord,
   deleteGuiaFeriasRecord,
   findDuplicateGuiaFerias,
@@ -179,10 +180,15 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
 
   useEffect(() => {
     reloadRecords();
+    syncGuiaFeriasFromServer().then(() => reloadRecords()).catch(() => {});
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-guia-ferias-updated', handleUpdated);
+    window.addEventListener('sigre-data-synced', handleUpdated);
+    window.addEventListener('storage', handleUpdated);
     return () => {
       window.removeEventListener('sigre-guia-ferias-updated', handleUpdated);
+      window.removeEventListener('sigre-data-synced', handleUpdated);
+      window.removeEventListener('storage', handleUpdated);
     };
   }, []);
 

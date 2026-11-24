@@ -17,6 +17,7 @@ import {
   deleteTeacherFromFirestore,
   deleteDirectorFromFirestore,
   deleteDmeStaffFromFirestore,
+  isBannedSchoolOrEntity,
 } from './firestoreSync';
 import { encodePasswordVerifier, deleteUserCredentials } from './passwordService';
 
@@ -349,38 +350,54 @@ export function initRealtimeApplicationsSync(
     try {
       const deletedIds = getDeletedApplicationIds();
       const localApps = getPendingApplications();
-      const localMap = new Map<string, PendingApplication>();
+      const mergedMap = new Map<string, PendingApplication>();
       localApps.forEach((la) => {
+        if (isBannedSchoolOrEntity(la)) return;
+        const aId = String(la.id || '').trim().toLowerCase();
+        const uId = String(la.userId || '').trim().toLowerCase();
+        const aEmail = String(la.email || '').trim().toLowerCase();
+        const aBi = String(la.biNumber || '').trim().toLowerCase();
+        if (
+          deletedIds.has(aId) ||
+          deletedIds.has(uId) ||
+          (aEmail && deletedIds.has(aEmail)) ||
+          (aBi && deletedIds.has(aBi))
+        ) {
+          return;
+        }
         const k = String(la.id || la.userId || la.email).trim().toLowerCase();
-        if (k) localMap.set(k, la);
+        if (k) mergedMap.set(k, la);
       });
 
-      const validApps = firestoreApps
-        .filter((a) => {
-          const aId = String(a.id || '').trim().toLowerCase();
-          const uId = String(a.userId || '').trim().toLowerCase();
-          const aEmail = String(a.email || '').trim().toLowerCase();
-          const aBi = String(a.biNumber || '').trim().toLowerCase();
-          return (
-            !deletedIds.has(aId) &&
-            !deletedIds.has(uId) &&
-            (!aEmail || !deletedIds.has(aEmail)) &&
-            (!aBi || !deletedIds.has(aBi))
-          );
-        })
-        .map((remoteApp) => {
-          const k = String(remoteApp.id || remoteApp.userId || remoteApp.email).trim().toLowerCase();
-          const localApp = localMap.get(k);
-          if (localApp) {
-            const localUpdated = (localApp as any).updatedAt ? new Date((localApp as any).updatedAt).getTime() : 0;
-            const remoteUpdated = (remoteApp as any).updatedAt ? new Date((remoteApp as any).updatedAt).getTime() : 0;
-            if (localUpdated > remoteUpdated) {
-              return { ...remoteApp, ...localApp };
-            }
+      firestoreApps.forEach((remoteApp) => {
+        if (isBannedSchoolOrEntity(remoteApp)) return;
+        const aId = String(remoteApp.id || '').trim().toLowerCase();
+        const uId = String(remoteApp.userId || '').trim().toLowerCase();
+        const aEmail = String(remoteApp.email || '').trim().toLowerCase();
+        const aBi = String(remoteApp.biNumber || '').trim().toLowerCase();
+        if (
+          deletedIds.has(aId) ||
+          deletedIds.has(uId) ||
+          (aEmail && deletedIds.has(aEmail)) ||
+          (aBi && deletedIds.has(aBi))
+        ) {
+          return;
+        }
+        const k = String(remoteApp.id || remoteApp.userId || remoteApp.email).trim().toLowerCase();
+        if (!k) return;
+        const localApp = mergedMap.get(k);
+        if (localApp) {
+          const localUpdated = (localApp as any).updatedAt ? new Date((localApp as any).updatedAt).getTime() : 0;
+          const remoteUpdated = (remoteApp as any).updatedAt ? new Date((remoteApp as any).updatedAt).getTime() : 0;
+          if (localUpdated > remoteUpdated) {
+            mergedMap.set(k, { ...remoteApp, ...localApp });
+            return;
           }
-          return remoteApp;
-        });
+        }
+        mergedMap.set(k, remoteApp);
+      });
 
+      const validApps = Array.from(mergedMap.values());
       localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(validApps));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sigre-data-synced'));

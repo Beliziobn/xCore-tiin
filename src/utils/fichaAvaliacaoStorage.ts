@@ -238,58 +238,66 @@ export function getStoredFichaAvaliacaoRecords(): FichaAvaliacaoRecord[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      if (isEntityTombstoned('fichas_avaliacao', 'ficha-avaliacao-default-1')) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-        return [];
-      }
-      const today = getTodayIsoAvaliacao();
-      const defaultRecord: FichaAvaliacaoRecord = {
-        id: 'ficha-avaliacao-default-1',
-        criado: new Date().toISOString(),
-        provincia: 'Malanje',
-        municipio: 'Quêssua',
-        escola: 'Complexo Escolar Metodista n.º 294 MJE – Missão do Quêssua – Quêssua',
-        nome: 'Gilson José Cassengue',
-        categoria: 'P.E.P.E.S. Auxiliar do 3º Grau',
-        agente: '88212320',
-        dataAval: today,
-        de: '2025-09-01',
-        ate: '2026-07-31',
-        notas: [
-          [18, 18, 19],
-          [17, 18, 18],
-          [19, 19, 20],
-          [17, 17, 18],
-          [19, 19, 19],
-        ],
-        qualTrim: ['Bom', 'Bom', 'Muito Bom', 'Bom'],
-        finalQual: 'Bom',
-        c1: 'Demonstrou elevado domínio científico e pedagógico durante o I Trimestre.',
-        c2: 'Manteve excelente assiduidade, pontualidade e acompanhamento contínuo dos alunos.',
-        c3: 'Concluiu o programa curricular com aproveitamento positivo e forte espírito de equipa.',
-        cf: 'Docente dedicado, assíduo e comprometido com a qualidade do processo de ensino e aprendizagem.',
-        avNome: 'Belízio Miguel dos Santos António',
-        avFuncao: 'Director Municipal da Educação',
-        avData: today,
-        conc: 'Sim',
-        avdData: today,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([defaultRecord]));
-      return [defaultRecord];
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (r: any) =>
         r &&
         r.id &&
+        r.id !== 'ficha-avaliacao-default-1' &&
         !isEntityTombstoned('fichas_avaliacao', r.id) &&
         !isBannedSchoolOrEntity(r)
     );
   } catch {
     return [];
   }
+}
+
+export async function syncFichaAvaliacaoFromServer(): Promise<FichaAvaliacaoRecord[]> {
+  if (typeof window === 'undefined') return [];
+  const local = getStoredFichaAvaliacaoRecords();
+  try {
+    const res = await fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fichasAvaliacao: local }),
+    });
+    if (!res.ok) return local;
+    const data = await res.json();
+    if (Array.isArray(data.fichasAvaliacao)) {
+      const mergedMap = new Map<string, FichaAvaliacaoRecord>();
+      local.forEach((r) => {
+        if (
+          r &&
+          r.id &&
+          r.id !== 'ficha-avaliacao-default-1' &&
+          !isEntityTombstoned('fichas_avaliacao', r.id) &&
+          !isBannedSchoolOrEntity(r)
+        ) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      data.fichasAvaliacao.forEach((r: FichaAvaliacaoRecord) => {
+        if (
+          r &&
+          r.id &&
+          r.id !== 'ficha-avaliacao-default-1' &&
+          !isEntityTombstoned('fichas_avaliacao', r.id) &&
+          !isBannedSchoolOrEntity(r)
+        ) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      const merged = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
+      return merged;
+    }
+  } catch {
+    // ignore offline
+  }
+  return local;
 }
 
 export function saveFichaAvaliacaoRecord(

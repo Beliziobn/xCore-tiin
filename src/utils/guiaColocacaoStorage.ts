@@ -128,43 +128,66 @@ export function getStoredGuiaColocacaoRecords(): GuiaColocacaoRecord[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      if (isEntityTombstoned('guias_colocacao', 'guia-colocacao-default-1')) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-        return [];
-      }
-      const defaultRecord: GuiaColocacaoRecord = {
-        id: 'guia-colocacao-default-1',
-        num: '045',
-        ano: '2026',
-        trat: 'M',
-        nome: 'Gilson José Cassengue',
-        cat: 'P.E.P.E.S.',
-        grau: 'Auxiliar 3º Grau',
-        agente: '88212320',
-        escola: 'Escola Primária nº 9 – 1 de Junho',
-        local: 'Quêssua',
-        data: getTodayIsoColocacao(),
-        dir: 'Belízio Miguel dos Santos António',
-        prov: 'Malanje',
-        mun: 'Quêssua',
-        criado: new Date().toISOString(),
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([defaultRecord]));
-      return [defaultRecord];
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (r: any) =>
         r &&
         r.id &&
+        r.id !== 'guia-colocacao-default-1' &&
         !isEntityTombstoned('guias_colocacao', r.id) &&
         !isBannedSchoolOrEntity(r)
     );
   } catch {
     return [];
   }
+}
+
+export async function syncGuiaColocacaoFromServer(): Promise<GuiaColocacaoRecord[]> {
+  if (typeof window === 'undefined') return [];
+  const local = getStoredGuiaColocacaoRecords();
+  try {
+    const res = await fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guiasColocacao: local }),
+    });
+    if (!res.ok) return local;
+    const data = await res.json();
+    if (Array.isArray(data.guiasColocacao)) {
+      const mergedMap = new Map<string, GuiaColocacaoRecord>();
+      local.forEach((r) => {
+        if (
+          r &&
+          r.id &&
+          r.id !== 'guia-colocacao-default-1' &&
+          !isEntityTombstoned('guias_colocacao', r.id) &&
+          !isBannedSchoolOrEntity(r)
+        ) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      data.guiasColocacao.forEach((r: GuiaColocacaoRecord) => {
+        if (
+          r &&
+          r.id &&
+          r.id !== 'guia-colocacao-default-1' &&
+          !isEntityTombstoned('guias_colocacao', r.id) &&
+          !isBannedSchoolOrEntity(r)
+        ) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      const merged = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
+      return merged;
+    }
+  } catch {
+    // ignore offline
+  }
+  return local;
 }
 
 export function saveGuiaColocacaoRecord(

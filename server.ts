@@ -156,6 +156,7 @@ async function startServer() {
       item.escolaId,
       item.targetSchoolId,
       item.codigoSige,
+      item.codigoSIGE,
       item.name,
       item.nome,
       item.nomeCompleto,
@@ -169,18 +170,14 @@ async function startServer() {
       item.escolaDestino,
       item.escolaOrigem,
       item.targetSchoolName,
-      item.email,
-      item.emailOficial,
-      item.directorEmail,
-      item.targetDirectorEmail,
       item.directorName,
       item.guardianName,
       item.parentName,
       item.registrationData?.identificacao?.nomeOficial,
       item.registrationData?.identificacao?.codigoSige,
-      item.registrationData?.identificacao?.emailOficial,
+      item.registrationData?.nomeOficial,
+      item.registrationData?.codigoSIGE,
       item.registrationData?.director?.nome,
-      item.registrationData?.director?.email,
     ];
 
     for (const val of candidateFields) {
@@ -189,8 +186,6 @@ async function startServer() {
       if (
         norm.includes("so ciencia da educacao") ||
         norm === "so da educacao" ||
-        norm.includes("socienciadaeduca") ||
-        norm.includes("scinciadaeducao") ||
         norm.includes("sige-113013") ||
         norm.includes("modelo central") ||
         ELIMINATED_EXACT_IDS.has(norm)
@@ -205,9 +200,7 @@ async function startServer() {
         const nt = normalizeAscii(tok);
         return (
           !nt.includes("so ciencia da educacao") &&
-          nt !== "so da educacao" &&
-          !nt.includes("socienciadaeduca") &&
-          !nt.includes("scinciadaeducao")
+          nt !== "so da educacao"
         );
       });
     }
@@ -217,30 +210,36 @@ async function startServer() {
 
   function isItemTombstoned(col: string, item: any, tombstonesSet: Set<string>): boolean {
     if (!item || typeof item !== "object" || tombstonesSet.size === 0) return false;
-    const candidates = [
+    const baseCandidates = [
       item.id,
       item.userId,
       item.bi,
       item.biNif,
+      item.biNumber,
       item.numeroDocumento,
       item.agente,
       item.numeroAgente,
       item.ref,
       item.protocol,
       item.email,
-      item.name,
-      item.nome,
-      item.nomeCompleto,
-      item.fullName,
-      item.nomeOficial,
-    ]
+    ];
+    if (col === "schools") {
+      baseCandidates.push(item.name, item.nomeOficial);
+    }
+
+    const candidates = baseCandidates
       .filter(Boolean)
       .map((v) => String(v).trim().toLowerCase());
 
     for (const c of candidates) {
+      const sanitizedC = c.replace(/[\/\\.#$[\]]/g, "_");
       if (
         tombstonesSet.has(`${col}:${c}`) ||
+        tombstonesSet.has(`${col}::${c}`) ||
+        tombstonesSet.has(`${col}:${sanitizedC}`) ||
+        tombstonesSet.has(`${col}::${sanitizedC}`) ||
         tombstonesSet.has(`*:${c}`) ||
+        tombstonesSet.has(`*::${c}`) ||
         tombstonesSet.has(c)
       ) {
         return true;
@@ -261,13 +260,17 @@ async function startServer() {
 
   function normalizeStoreObject(parsed: any): NetworkRegistryStore {
     const rawTombstones: string[] = Array.isArray(parsed?.tombstones)
-      ? parsed.tombstones.map((t: any) => String(t || "").trim().toLowerCase()).filter(Boolean)
+      ? parsed.tombstones
+          .map((t: any) => String(t || "").trim().toLowerCase())
+          .filter((t: string) => Boolean(t) && !t.includes("socienciadaeduca2018"))
       : [];
     for (const eid of ELIMINATED_EXACT_IDS) {
       rawTombstones.push(eid);
     }
     rawTombstones.push("schools:só ciência da educação");
     rawTombstones.push("schools:so ciencia da educacao");
+    rawTombstones.push("schools::só ciência da educação");
+    rawTombstones.push("schools::so ciencia da educacao");
     const tombstones = Array.from(new Set(rawTombstones));
     const tombstonesSet = new Set(tombstones);
 
@@ -339,6 +342,460 @@ async function startServer() {
 
   const networkStore: NetworkRegistryStore = loadNetworkStore();
 
+  const OFFICIAL_QUESSUA_SCHOOL_NAMES = [
+    "Complexo Escolar Católico n.º 166 MJE São Pedro – Quêssua",
+    "Complexo Escolar Católico n.º 269 MJE – Lar Nazaré – Quêssua",
+    "Complexo Escolar Católico n.º 274 MJE – Nossa Senhora de Guadalupe – Quêssua",
+    "Complexo Escolar Católico n.º 282 MJE – Kudyelela – Quêssua",
+    "Complexo Escolar Católico n.º 290 MJE – Paz e Amor – Quêssua",
+    "Complexo Escolar Católico n.º 293 MJE – São Francisco de Assis – Quêssua",
+    "Complexo Escolar Metodista n.º 294 MJE – Missão do Quêssua – Quêssua",
+    "Complexo Escolar Metodista Sião n.º 288 MJE – Episcopal Africana – Quêssua",
+    "Complexo Escolar Metodista Sião n.º 289 MJE – Monte Sinai – Quêssua",
+    "Complexo Escolar Missionário n.º 263 MJE – Bom Deus – Quêssua",
+    "Complexo Escolar n.º 285 MJE – Cambondo – Quêssua",
+    "Complexo Escolar n.º 291 MJE – Quissol – Quêssua",
+    "Complexo Escolar n.º 292 MJE – Samora Machel – Quêssua",
+    "Escola Primária Metodista n.º 209 MJE – São Paulo – Quêssua",
+    "Escola Primária Metodista Sião n.º 207 MJE – Rei Salomão – Quêssua",
+    "Escola Primária Católica n.º 202 MJE – Edith Almeida De Sousa – Quêssua",
+    "Escola Primária Católica n.º 208 MJE – Santa Teresinha – Quêssua",
+    "Escola Primária Católica n.º 210 MJE – Vila Matilde – Quêssua",
+    "Escola Primária IEPA n.º 163 MJE – Rev. Ferreira Francisco – Quêssua",
+    "Escola Primária n.º 115 MJE – Cabuabuata – Quêssua",
+    "Escola Primária n.º 199 MJE – Campo da Vitória – Quêssua",
+    "Escola Primária n.º 200 MJE – Comandante Gika – Quêssua",
+    "Escola Primária n.º 201 MJE – Dr. António Agostinho Neto – Quêssua",
+    "Escola Primária n.º 203 MJE – Luzia Inglês Van – Quêssua",
+    "Escola Primária n.º 204 MJE – Major Kanhangulo – Quêssua",
+    "Escola Primária n.º 205 MJE – Quizanga – Quêssua",
+    "Escola Primária n.º 206 MJE – Quizanga da Barraca – Quêssua",
+    "Escola Primária n.º 125 – Cazeta – Quêssua",
+    "Liceu Nº 314 MJE - 4 de Janeiro – Quêssua",
+    "Instituto Técnico Agrário do Quêssua-27009 - MJE",
+  ];
+
+  function buildDefaultSchoolRecord(schoolName: string, schoolId?: string, directorName?: string, directorEmail?: string, directorPhone?: string): any {
+    const cleanName = schoolName.trim().replace(/\s+/g, " ");
+    const norm = normalizeAscii(cleanName);
+    const hashNum = Math.abs(norm.split("").reduce((acc, ch) => ((acc << 5) - acc + ch.charCodeAt(0)) | 0, 100000));
+    const id = schoolId || `sch-quessua-${hashNum}`;
+    const codeMatch = cleanName.match(/n\.?º?\s*(\d+)/i) || cleanName.match(/(\d{3,5})/);
+    const codigoSIGE = codeMatch ? `SIGE-${codeMatch[1].padStart(6, "0")}` : `SIGE-${String(hashNum).slice(0, 6)}`;
+    const isComplex = norm.includes("complexo");
+    const isLiceu = norm.includes("liceu") || norm.includes("instituto");
+    const category = isLiceu ? "IIº Ciclo" : isComplex ? "Polivalente" : "Ensino Primário";
+    const dirName = directorName || "Diretor a Designar";
+
+    let zone = "Quêssua";
+    if (norm.includes("cambondo")) zone = "Cambondo";
+    else if (norm.includes("cabuabuata")) zone = "Cabuabuata";
+    else if (norm.includes("quissol")) zone = "Quissol";
+    else if (norm.includes("quizanga")) zone = "Quizanga";
+    else if (norm.includes("cazeta") || norm.includes("caxeta")) zone = "Cazeta";
+    else if (norm.includes("vila matilde")) zone = "Vila Matilde";
+    else if (norm.includes("campo da vitoria")) zone = "Campo da Vitória";
+
+    return {
+      id,
+      name: cleanName,
+      directorName: dirName,
+      teachersCount: 0,
+      classesCount: isComplex ? 9 : isLiceu ? 4 : 6,
+      roomsCount: isComplex ? 12 : isLiceu ? 14 : 8,
+      turmasCount: isComplex ? 16 : isLiceu ? 14 : 10,
+      location: `${zone} - Quêssua`,
+      studentsWithDocs: 0,
+      studentsWithoutDocs: 0,
+      declaredStudentsCount: isComplex ? 480 : isLiceu ? 520 : 320,
+      performanceRate: 88,
+      attendanceRate: 94,
+      category,
+      natureza: "Pública",
+      codigoSIGE,
+      phone: directorPhone || "+244 923 000 000",
+      email: directorEmail || "escola.quessua@ucore.edu.ao",
+      registrationData: {
+        id,
+        nomeOficial: cleanName,
+        codigoSIGE,
+        endereco: {
+          rua: "Rua Principal",
+          bairro: zone,
+          comuna: "Quêssua Sede",
+          municipio: "Quêssua",
+          provincia: "Malanje",
+        },
+        coordenadas: { latitude: "-9.47214", longitude: "16.48391" },
+        contactoTelefonico: directorPhone || "+244 923 000 000",
+        emailDireccao: directorEmail || "escola.quessua@ucore.edu.ao",
+        director: {
+          nome: dirName,
+          contacto: directorPhone || "+244 923 000 000",
+          email: directorEmail || "director@ucore.edu.ao",
+        },
+        anoCriacao: 1985,
+        natureza: "Pública",
+        oferta: {
+          preEscolar: {
+            activo: isComplex,
+            creche: false,
+            jardim1: false,
+            jardim2: false,
+            centroInfantil: false,
+            cicCec: false,
+            iniciacao: isComplex,
+          },
+          primario: {
+            activo: !isLiceu,
+            regular1a6: !isLiceu,
+            adultosModulos: false,
+            praeerEtapas: false,
+          },
+          secundario: {
+            activo: isComplex || isLiceu,
+            ciclo1Geral: isComplex,
+            ciclo1TecnicoProfissional: false,
+            ciclo1AdultosEJA: false,
+            ciclo2Geral: isLiceu,
+            ciclo2TecnicoProfissional: norm.includes("instituto"),
+            ciclo2FormacaoProfessores: false,
+          },
+          ensinoEspecial: {
+            activo: false,
+            preEscolarIniciacao: false,
+            primarioEspecial: false,
+            ciclo1Especial: false,
+            ciclo2Especial: false,
+            tiposDeficiencia: [],
+          },
+        },
+        infraestrutura: {
+          salasDefinitivas: isComplex ? 10 : isLiceu ? 12 : 6,
+          salasProvisorias: 2,
+          salasImprovisadas: 0,
+          salasAoArLivre: 0,
+          totalSalas: isComplex ? 12 : isLiceu ? 14 : 8,
+          turmasFuncionamento: isComplex ? 16 : isLiceu ? 14 : 10,
+          turnos: ["Manhã", "Tarde"],
+          temBiblioteca: true,
+          temCantinaRefeitorio: true,
+          temAguaPotavel: true,
+          tipoAgua: "Furo Artesiano e Rede Pública",
+          temElectricidade: true,
+          tipoElectricidade: "Rede Elétrica",
+          acessibilidadeDeficiencia: true,
+          detalhesAcessibilidade: "Rampas de acesso",
+        },
+        pessoal: {
+          totalEducadoresInfancia: isComplex ? 2 : 0,
+          totalAuxiliaresAccaoEducativa: 2,
+          totalDocentesProfessores: 0,
+          totalAlfabetizadores: 0,
+          totalPessoalNaoDocente: 4,
+          docentesComFormacaoPedagogica: 0,
+          docentesSemFormacaoPedagogica: 0,
+          totalAlunosDeclarados: isComplex ? 480 : isLiceu ? 520 : 320,
+        },
+        situacao: {
+          emPlenoFuncionamento: true,
+          escolaNovaCriada: false,
+          regimeComplexoEscolar: isComplex,
+          observacoesDificuldades: "Em pleno funcionamento.",
+        },
+        validacao: {
+          documentoCriacaoNumero: "Despacho Executivo Municipal n.º 41/2021",
+          dataDocumentoCriacao: "2021-02-15",
+          orgaoEmissor: "Direcção Municipal de Educação do Quêssua",
+          dataUltimaActualizacao: new Date().toISOString(),
+          responsavelPreenchimentoNome: "Direcção Municipal de Educação",
+          responsavelPreenchimentoCargo: "Gabinete de Estatística e Planeamento",
+        },
+        historicoAlteracoes: [],
+      },
+    };
+  }
+
+  function reconcileNetworkStore() {
+    const tombstonesSet = new Set(networkStore.tombstones || []);
+
+    // 1. Build unified school map keyed by normalized school name
+    const schoolByNormName = new Map<string, any>();
+    const schoolById = new Map<string, any>();
+
+    const registerSchoolCandidate = (sc: any) => {
+      if (!sc || typeof sc !== "object") return;
+      const rawName = String(sc.name || sc.nomeOficial || sc.registrationData?.nomeOficial || "").trim().replace(/\s+/g, " ");
+      if (!rawName) return;
+      if (isEliminatedSchoolOrRecord(sc) || isItemTombstoned("schools", sc, tombstonesSet)) return;
+      const normName = normalizeAscii(rawName);
+      if (!normName || normName.includes("direccao municipal") || normName.includes("direcao municipal")) return;
+
+      const existing = schoolByNormName.get(normName) || (sc.id ? schoolById.get(String(sc.id).toLowerCase()) : undefined);
+      if (existing) {
+        const merged = {
+          ...existing,
+          ...sc,
+          id: existing.id?.startsWith("sch-179") ? existing.id : (sc.id || existing.id),
+          name: existing.name || rawName,
+          directorName:
+            sc.directorName && sc.directorName !== "Diretor a Designar" && sc.directorName !== "Fert Horlan"
+              ? sc.directorName
+              : existing.directorName,
+          registrationData: sc.registrationData || existing.registrationData,
+        };
+        schoolByNormName.set(normName, merged);
+        if (merged.id) schoolById.set(String(merged.id).toLowerCase(), merged);
+      } else {
+        const full = sc.registrationData ? { ...sc, name: rawName } : { ...buildDefaultSchoolRecord(rawName, sc.id, sc.directorName, sc.email, sc.phone), ...sc, name: rawName };
+        schoolByNormName.set(normName, full);
+        if (full.id) schoolById.set(String(full.id).toLowerCase(), full);
+      }
+    };
+
+    // First register existing schools in networkStore.schools
+    (networkStore.schools || []).forEach(registerSchoolCandidate);
+
+    // Register schools referenced in applications (preserving their exact schoolId!)
+    (networkStore.applications || []).forEach((appItem) => {
+      if (!appItem || !appItem.schoolName) return;
+      const sName = String(appItem.schoolName).trim().replace(/\s+/g, " ");
+      const normS = normalizeAscii(sName);
+      if (!normS || normS.includes("direccao municipal") || normS.includes("direcao municipal")) return;
+      const isApprovedDir = (appItem.type === "diretor" || appItem.schoolRole === "diretor_geral") && appItem.status === "aprovado";
+      const existing = schoolByNormName.get(normS);
+      if (existing) {
+        if (appItem.schoolId && String(existing.id || "").startsWith("sch-quessua-")) {
+          existing.id = appItem.schoolId;
+          if (existing.registrationData) existing.registrationData.id = appItem.schoolId;
+        }
+        if (isApprovedDir && appItem.fullName) {
+          existing.directorName = appItem.fullName;
+          if (existing.registrationData?.director) {
+            existing.registrationData.director.nome = appItem.fullName;
+            if (appItem.email) existing.registrationData.director.email = appItem.email;
+            if (appItem.phone) existing.registrationData.director.contacto = appItem.phone;
+          }
+        }
+      } else {
+        const candidate = buildDefaultSchoolRecord(
+          sName,
+          appItem.schoolId,
+          isApprovedDir ? appItem.fullName : undefined,
+          isApprovedDir ? appItem.email : undefined,
+          isApprovedDir ? appItem.phone : undefined
+        );
+        registerSchoolCandidate(candidate);
+      }
+    });
+
+    // Register all 30 official Quêssua schools so every device has the complete municipal network
+    OFFICIAL_QUESSUA_SCHOOL_NAMES.forEach((officialName) => {
+      const normS = normalizeAscii(officialName);
+      if (!schoolByNormName.has(normS)) {
+        registerSchoolCandidate(buildDefaultSchoolRecord(officialName));
+      }
+    });
+
+    // Also register any additional Quêssua schools referenced in directors or teachers
+    (networkStore.directors || []).forEach((dir) => {
+      if (dir?.schoolName) {
+        const normS = normalizeAscii(dir.schoolName);
+        const existing = schoolByNormName.get(normS);
+        if (existing && (dir.name || dir.nomeCompleto)) {
+          existing.directorName = dir.name || dir.nomeCompleto;
+          if (existing.registrationData?.director) {
+            existing.registrationData.director.nome = dir.name || dir.nomeCompleto;
+          }
+        } else if (!existing) {
+          registerSchoolCandidate(buildDefaultSchoolRecord(dir.schoolName, dir.schoolId, dir.name || dir.nomeCompleto, dir.email, dir.phone));
+        }
+      }
+    });
+
+    // 2. Reconcile all applications into users, directors, teachers, staff, and dmeStaff
+    if (!Array.isArray(networkStore.users)) networkStore.users = [];
+    if (!Array.isArray(networkStore.directors)) networkStore.directors = [];
+    if (!Array.isArray(networkStore.teachers)) networkStore.teachers = [];
+    if (!Array.isArray(networkStore.staff)) networkStore.staff = [];
+    if (!Array.isArray(networkStore.dmeStaff)) networkStore.dmeStaff = [];
+
+    (networkStore.applications || []).forEach((appItem) => {
+      if (!appItem || isEliminatedSchoolOrRecord(appItem) || isItemTombstoned("applications", appItem, tombstonesSet)) return;
+      const userId = String(appItem.userId || appItem.id || "").trim();
+      const email = String(appItem.email || "").trim().toLowerCase();
+      const fullName = String(appItem.fullName || `${appItem.firstName || ""} ${appItem.lastName || ""}`).trim();
+      if (!userId && !email) return;
+
+      // Ensure UserAccount exists and has up-to-date status & credentials
+      const userStatus =
+        appItem.status === "aprovado" ? "ativo" : appItem.status === "rejeitado" ? "rejeitado" : "pendente";
+      const mappedRole =
+        appItem.type === "membro_dme" || appItem.scope === "administracao"
+          ? "admin"
+          : appItem.type === "diretor" || appItem.schoolRole === "diretor_geral"
+          ? "diretor"
+          : "professor";
+
+      const existingUser = networkStore.users!.find(
+        (u) =>
+          (userId && String(u.id || "").trim().toLowerCase() === userId.toLowerCase()) ||
+          (email && String(u.email || "").trim().toLowerCase() === email)
+      );
+
+      const userAccountObj = {
+        ...(existingUser || {}),
+        id: userId || existingUser?.id || `usr_${Date.now()}`,
+        firstName: appItem.firstName || existingUser?.firstName || fullName.split(" ")[0] || "Utilizador",
+        lastName: appItem.lastName || existingUser?.lastName || fullName.split(" ").slice(1).join(" ") || "",
+        email: email || existingUser?.email || "",
+        phone: appItem.phone || existingUser?.phone || "+244 923 000 000",
+        role: mappedRole,
+        status: userStatus,
+        scope: appItem.scope || existingUser?.scope || (mappedRole === "admin" ? "administracao" : "escolar"),
+        adminRole: appItem.adminRole || existingUser?.adminRole,
+        schoolRole: appItem.schoolRole || existingUser?.schoolRole,
+        roleTitle: appItem.roleRequested || existingUser?.roleTitle,
+        schoolId: appItem.schoolId || existingUser?.schoolId,
+        schoolName: appItem.schoolName || existingUser?.schoolName,
+        municipality: appItem.municipality || existingUser?.municipality || "Quêssua (Malanje)",
+        biNumber: appItem.biNumber || existingUser?.biNumber,
+        passwordVerifier: appItem.passwordVerifier || existingUser?.passwordVerifier,
+        createdAt: appItem.submittedAt || existingUser?.createdAt || new Date().toISOString(),
+        approvedAt: appItem.approvedAt || existingUser?.approvedAt,
+        approvedBy: appItem.approvedBy || existingUser?.approvedBy,
+      };
+
+      if (!isItemTombstoned("users", userAccountObj, tombstonesSet)) {
+        networkStore.users = upsertByKey(networkStore.users!, [userAccountObj], (u) =>
+          String(u.id || u.email || "").trim().toLowerCase()
+        );
+      }
+
+      if (appItem.status === "aprovado" && fullName) {
+        if (appItem.type === "diretor" || appItem.schoolRole === "diretor_geral") {
+          const dirEntry = {
+            id: userId || appItem.id,
+            name: fullName,
+            nomeCompleto: fullName,
+            schoolName: appItem.schoolName || "Unidade Escolar Municipal",
+            nomeEscola: appItem.schoolName || "Unidade Escolar Municipal",
+            schoolId: appItem.schoolId,
+            email: appItem.email,
+            phone: appItem.phone || "+244 923 000 000",
+            biNif: appItem.biNumber,
+            status: "Ativo",
+            appointmentYear: 2026,
+            performanceRating: 95,
+            location: appItem.municipality || "Quêssua",
+            approvedAt: appItem.approvedAt || new Date().toISOString(),
+          };
+          if (!isItemTombstoned("directors", dirEntry, tombstonesSet)) {
+            networkStore.directors = upsertByKey(networkStore.directors, [dirEntry], (d) =>
+              String(d.id || d.email || d.name || "").trim().toLowerCase()
+            );
+          }
+        } else if (appItem.type === "membro_dme" || appItem.scope === "administracao") {
+          const dmeEntry = {
+            id: userId || appItem.id,
+            name: fullName,
+            role: appItem.adminRole || "chefe_reparticao",
+            cargoTitle: appItem.roleRequested || "Quadro Técnico da Direcção Municipal",
+            department: "Direcção Municipal da Educação de Quêssua",
+            email: appItem.email,
+            phone: appItem.phone || "+244 923 000 000",
+            biNumber: appItem.biNumber,
+            status: "Ativo",
+            approvedAt: appItem.approvedAt || new Date().toISOString(),
+          };
+          if (!isItemTombstoned("dme_staff", dmeEntry, tombstonesSet)) {
+            networkStore.dmeStaff = upsertByKey(networkStore.dmeStaff!, [dmeEntry], (m) =>
+              String(m.id || m.email || m.name || "").trim().toLowerCase()
+            );
+          }
+        } else {
+          // Professor, Subdiretor Pedagógico, Subdiretor Administrativo, Secretário Escolar, Outro Funcionário
+          const roleCategory =
+            appItem.schoolRole === "subdiretor_pedagogico"
+              ? "Subdirector Pedagógico"
+              : appItem.schoolRole === "subdiretor_administrativo"
+              ? "Subdirector Administrativo"
+              : appItem.schoolRole === "secretario_escolar"
+              ? "Secretário Escolar"
+              : appItem.roleRequested || "Docente / Professor";
+
+          const teacherOrStaffEntry = {
+            id: userId || appItem.id,
+            name: fullName,
+            nomeCompleto: fullName,
+            schoolName: appItem.schoolName || "Complexo Escolar do Quêssua",
+            nomeEscola: appItem.schoolName || "Complexo Escolar do Quêssua",
+            schoolId: appItem.schoolId,
+            subject: appItem.subject || (appItem.type === "professor" ? "Língua Portuguesa" : roleCategory),
+            gradeClass: appItem.gradeClass || (appItem.type === "professor" ? "Ensino Primário" : "Direcção / Administração"),
+            category: roleCategory,
+            funcao: roleCategory,
+            email: appItem.email,
+            phone: appItem.phone || "+244 923 000 000",
+            biNif: appItem.biNumber,
+            bi: appItem.biNumber,
+            status: "Ativo",
+            presenceRate: 100,
+            location: "Quêssua",
+            qualification: appItem.nivelAcademico || "Licenciado",
+            approvedAt: appItem.approvedAt || new Date().toISOString(),
+          };
+
+          if (!isItemTombstoned("teachers", teacherOrStaffEntry, tombstonesSet)) {
+            networkStore.teachers = upsertByKey(networkStore.teachers, [teacherOrStaffEntry], (t) =>
+              String(t.id || t.email || t.name || "").trim().toLowerCase()
+            );
+          }
+          if (appItem.type === "funcionario" || (appItem.schoolRole && appItem.schoolRole !== "professor")) {
+            if (!isItemTombstoned("staff", teacherOrStaffEntry, tombstonesSet)) {
+              networkStore.staff = upsertByKey(networkStore.staff!, [teacherOrStaffEntry], (st) =>
+                String(st.id || st.email || st.name || "").trim().toLowerCase()
+              );
+            }
+          }
+        }
+      }
+    });
+
+    // 3. Recompute teachersCount per school from networkStore.teachers + networkStore.efectividade
+    const finalSchools = Array.from(schoolByNormName.values()).map((sc) => {
+      const normS = normalizeAscii(sc.name || sc.nomeOficial);
+      const matchingTeachers = (networkStore.teachers || []).filter((t) => {
+        const ts = normalizeAscii(t.schoolName || t.nomeEscola || t.registrationData?.nomeEscola);
+        return ts && (ts === normS || ts.includes(normS) || normS.includes(ts));
+      });
+      const matchingEfectividade = (networkStore.efectividade || []).filter((e) => {
+        const es = normalizeAscii(e.escola || e.schoolName);
+        return es && (es === normS || es.includes(normS) || normS.includes(es));
+      });
+      const computedTeachersCount = Math.max(
+        sc.teachersCount || 0,
+        matchingTeachers.length,
+        matchingEfectividade.length
+      );
+      return {
+        ...sc,
+        teachersCount: computedTeachersCount,
+        registrationData: sc.registrationData
+          ? {
+              ...sc.registrationData,
+              pessoal: {
+                ...(sc.registrationData.pessoal || {}),
+                totalDocentesProfessores: computedTeachersCount || sc.registrationData.pessoal?.totalDocentesProfessores || 18,
+              },
+            }
+          : sc.registrationData,
+      };
+    });
+
+    networkStore.schools = finalSchools;
+  }
+
   function applyStoreSanitization() {
     const cleaned = normalizeStoreObject(networkStore);
     networkStore.schools = cleaned.schools;
@@ -360,6 +817,7 @@ async function startServer() {
     networkStore.users = cleaned.users;
     networkStore.quickRequests = cleaned.quickRequests;
     networkStore.tombstones = cleaned.tombstones;
+    reconcileNetworkStore();
   }
 
   function addServerTombstone(...keys: (string | undefined | null)[]) {
@@ -370,9 +828,29 @@ async function startServer() {
     for (const k of keys) {
       if (!k) continue;
       const clean = String(k).trim().toLowerCase();
-      if (clean) set.add(clean);
+      if (clean && !clean.includes("socienciadaeduca2018")) set.add(clean);
     }
     networkStore.tombstones = Array.from(set);
+  }
+
+  function removeServerTombstone(col: string, ...keys: (string | undefined | null)[]) {
+    if (!Array.isArray(networkStore.tombstones) || networkStore.tombstones.length === 0) return;
+    const toRemove = new Set<string>();
+    for (const k of keys) {
+      if (!k) continue;
+      const clean = String(k).trim().toLowerCase();
+      if (!clean || ELIMINATED_EXACT_IDS.has(clean) || clean.includes("so ciencia da educacao") || clean.includes("só ciência da educação")) continue;
+      const sanitized = clean.replace(/[\/\\.#$[\]]/g, "_");
+      toRemove.add(clean);
+      toRemove.add(sanitized);
+      toRemove.add(`${col}:${clean}`);
+      toRemove.add(`${col}::${clean}`);
+      toRemove.add(`${col}:${sanitized}`);
+      toRemove.add(`${col}::${sanitized}`);
+    }
+    if (toRemove.size > 0) {
+      networkStore.tombstones = networkStore.tombstones.filter((t) => !toRemove.has(String(t).trim().toLowerCase()));
+    }
   }
 
   function persistNetworkStore() {
@@ -704,17 +1182,17 @@ async function startServer() {
       (sc) =>
         sc &&
         (sc.name || sc.nomeOficial) &&
-        !String(sc.name || sc.nomeOficial)
-          .trim()
-          .toLowerCase()
-          .includes("modelo central")
+        !isEliminatedSchoolOrRecord(sc)
     );
 
     if (validIncoming.length > 0) {
+      validIncoming.forEach((sc) => {
+        removeServerTombstone("schools", sc.id, sc.name, sc.nomeOficial, sc.codigoSIGE);
+      });
       networkStore.schools = upsertByKey(
         networkStore.schools,
         validIncoming,
-        (sc) => String(sc.id || sc.name || sc.nomeOficial || "").trim().toLowerCase()
+        (sc) => normalizeAscii(sc.name || sc.nomeOficial || sc.id || "")
       );
       persistNetworkStore();
     }
@@ -732,8 +1210,10 @@ async function startServer() {
 
     addServerTombstone(
       targetId ? `schools:${targetId}` : null,
+      targetId ? `schools::${targetId}` : null,
       targetId || null,
       targetName ? `schools:${targetName}` : null,
+      targetName ? `schools::${targetName}` : null,
       targetName || null
     );
 
@@ -794,75 +1274,25 @@ async function startServer() {
         }
       } catch {}
 
+      validIncoming.forEach((appItem) => {
+        removeServerTombstone("applications", appItem.id, appItem.userId, appItem.email);
+        removeServerTombstone("users", appItem.id, appItem.userId, appItem.email);
+        if (appItem.type === "diretor") {
+          removeServerTombstone("directors", appItem.id, appItem.userId, appItem.email);
+        } else if (appItem.type === "professor") {
+          removeServerTombstone("teachers", appItem.id, appItem.userId, appItem.email);
+        } else if (appItem.type === "membro_dme") {
+          removeServerTombstone("dme_staff", appItem.id, appItem.userId, appItem.email);
+        } else if (appItem.type === "funcionario") {
+          removeServerTombstone("staff", appItem.id, appItem.userId, appItem.email);
+        }
+      });
+
       networkStore.applications = upsertByKey(
         networkStore.applications,
         validIncoming,
         (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
       );
-
-      // Handle approved roles synchronization
-      validIncoming.forEach((appItem) => {
-        if (!appItem) return;
-
-        // If approved director, update schools and directors
-        if (appItem.type === "diretor" && appItem.status === "aprovado" && appItem.fullName) {
-          if (appItem.schoolName) {
-            const normSchool = String(appItem.schoolName).trim().toLowerCase();
-            networkStore.schools = networkStore.schools.map((sc) => {
-              const scName = String(sc.name || sc.nomeOficial || "").trim().toLowerCase();
-              if (scName && (scName === normSchool || scName.includes(normSchool) || normSchool.includes(scName))) {
-                return {
-                  ...sc,
-                  directorName: appItem.fullName,
-                  registrationData: sc.registrationData
-                    ? {
-                        ...sc.registrationData,
-                        director: {
-                          ...(sc.registrationData.director || {}),
-                          nome: appItem.fullName,
-                          email: appItem.email || sc.registrationData.director?.email,
-                          contacto: appItem.phone || sc.registrationData.director?.contacto,
-                        },
-                      }
-                    : sc.registrationData,
-                };
-              }
-              return sc;
-            });
-          }
-
-          const dirEntry = {
-            id: appItem.userId || appItem.id,
-            name: appItem.fullName,
-            schoolName: appItem.schoolName || "",
-            email: appItem.email,
-            phone: appItem.phone,
-            status: "Ativo",
-            approvedAt: appItem.approvedAt || new Date().toISOString(),
-          };
-          networkStore.directors = upsertByKey(networkStore.directors, [dirEntry], (d) =>
-            String(d.id || d.email || d.name).trim().toLowerCase()
-          );
-        }
-
-        // If approved teacher, update networkStore.teachers
-        if (appItem.type === "professor" && appItem.status === "aprovado" && appItem.fullName) {
-          const teacherEntry = {
-            id: appItem.userId || appItem.id,
-            name: appItem.fullName,
-            schoolName: appItem.schoolName || "Complexo Escolar do Quêssua",
-            subject: appItem.subject || "Língua Portuguesa",
-            gradeClass: appItem.gradeClass || "4ª Classe",
-            email: appItem.email,
-            phone: appItem.phone,
-            status: "Ativo",
-            approvedAt: appItem.approvedAt || new Date().toISOString(),
-          };
-          networkStore.teachers = upsertByKey(networkStore.teachers, [teacherEntry], (t) =>
-            String(t.id || t.email || t.name).trim().toLowerCase()
-          );
-        }
-      });
 
       persistNetworkStore();
     }
@@ -873,6 +1303,9 @@ async function startServer() {
       schools: networkStore.schools,
       teachers: networkStore.teachers,
       directors: networkStore.directors,
+      staff: networkStore.staff,
+      dmeStaff: networkStore.dmeStaff,
+      users: networkStore.users,
       updatedAt: networkStore.updatedAt,
     });
   });
@@ -888,9 +1321,12 @@ async function startServer() {
 
     addServerTombstone(
       targetId ? `applications:${targetId}` : null,
+      targetId ? `applications::${targetId}` : null,
       targetId || null,
       targetApp?.userId ? `applications:${String(targetApp.userId).toLowerCase()}` : null,
-      targetApp?.email ? `applications:${String(targetApp.email).toLowerCase()}` : null
+      targetApp?.userId ? `applications::${String(targetApp.userId).toLowerCase()}` : null,
+      targetApp?.email ? `applications:${String(targetApp.email).toLowerCase()}` : null,
+      targetApp?.email ? `applications::${String(targetApp.email).toLowerCase()}` : null
     );
 
     networkStore.applications = (networkStore.applications || []).filter((a) => {
@@ -979,8 +1415,10 @@ async function startServer() {
 
     addServerTombstone(
       `${prefix}:${targetId}`,
+      `${prefix}::${targetId}`,
       targetId,
       extraKey ? `${prefix}:${extraKey}` : null,
+      extraKey ? `${prefix}::${extraKey}` : null,
       extraKey || null
     );
 
@@ -1168,7 +1606,7 @@ async function startServer() {
         networkStore.schools = upsertByKey(
           networkStore.schools,
           validSchools,
-          (sc) => String(sc.id || sc.name || sc.nomeOficial || "").trim().toLowerCase()
+          (sc) => normalizeAscii(sc.name || sc.nomeOficial || sc.id || "")
         );
         changed = true;
       }

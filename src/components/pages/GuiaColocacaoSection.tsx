@@ -30,6 +30,7 @@ import {
   formatColocacaoDateShort,
   formatCategoriaGrauColocacao,
   getStoredGuiaColocacaoRecords,
+  syncGuiaColocacaoFromServer,
   saveGuiaColocacaoRecord,
   deleteGuiaColocacaoRecord,
   findDuplicateGuiaColocacao,
@@ -157,10 +158,15 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
 
   useEffect(() => {
     reloadRecords();
+    syncGuiaColocacaoFromServer().then(() => reloadRecords()).catch(() => {});
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-guia-colocacao-updated', handleUpdated);
+    window.addEventListener('sigre-data-synced', handleUpdated);
+    window.addEventListener('storage', handleUpdated);
     return () => {
       window.removeEventListener('sigre-guia-colocacao-updated', handleUpdated);
+      window.removeEventListener('sigre-data-synced', handleUpdated);
+      window.removeEventListener('storage', handleUpdated);
     };
   }, []);
 

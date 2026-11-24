@@ -454,7 +454,38 @@ export function recordBelongsToDirectorSchool(
 }
 
 export async function syncVagasDocentesFromFirestore(): Promise<CadastroDocenteVagaRecord[]> {
-  return loadVagaDocenteRecords();
+  if (typeof window === 'undefined') return [];
+  const local = loadVagaDocenteRecords();
+  try {
+    const res = await fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cadastroDocente: local }),
+    });
+    if (!res.ok) return local;
+    const data = await res.json();
+    if (Array.isArray(data.cadastroDocente)) {
+      const mergedMap = new Map<string, CadastroDocenteVagaRecord>();
+      local.forEach((r) => {
+        if (r && r.id && !isEntityTombstoned('cadastro_docente', r.id) && !isBannedSchoolOrEntity(r)) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      data.cadastroDocente.forEach((r: CadastroDocenteVagaRecord) => {
+        if (r && r.id && !isEntityTombstoned('cadastro_docente', r.id) && !isBannedSchoolOrEntity(r)) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      const merged = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
+      window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
+      return merged;
+    }
+  } catch {
+    // ignore offline
+  }
+  return local;
 }
 
 function saveRecordsToStorage(list: CadastroDocenteVagaRecord[]): void {
@@ -517,6 +548,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
 
   useEffect(() => {
     reloadRecords();
+    syncVagasDocentesFromFirestore().then(() => reloadRecords()).catch(() => {});
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-cadastro-docente-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);

@@ -385,40 +385,46 @@ export default function App() {
       try {
         const savedStudents = localStorage.getItem('ucore_admin_students');
         if (savedStudents) {
-          setAdminStudents(JSON.parse(savedStudents));
+          setAdminStudents((prev) => (JSON.stringify(prev) === savedStudents ? prev : JSON.parse(savedStudents)));
         }
         const savedTeachers = localStorage.getItem('ucore_admin_teachers');
         if (savedTeachers) {
-          setAdminTeachers(JSON.parse(savedTeachers));
+          setAdminTeachers((prev) => (JSON.stringify(prev) === savedTeachers ? prev : JSON.parse(savedTeachers)));
         }
         const savedSchools = localStorage.getItem('ucore_admin_schools');
         if (savedSchools) {
-          setAdminSchools(JSON.parse(savedSchools));
+          setAdminSchools((prev) => (JSON.stringify(prev) === savedSchools ? prev : JSON.parse(savedSchools)));
         }
         const savedDirectors = localStorage.getItem('ucore_admin_directors');
         if (savedDirectors) {
-          setAdminDirectors(JSON.parse(savedDirectors));
+          setAdminDirectors((prev) => (JSON.stringify(prev) === savedDirectors ? prev : JSON.parse(savedDirectors)));
         }
         const savedTeacherStudents = localStorage.getItem('ucore_teacher_students');
         if (savedTeacherStudents) {
-          setTeacherStudents(JSON.parse(savedTeacherStudents));
+          setTeacherStudents((prev) =>
+            JSON.stringify(prev) === savedTeacherStudents ? prev : JSON.parse(savedTeacherStudents)
+          );
         }
       } catch {
         // ignore
       }
     };
-    syncApplicationsFromServer().catch(() => {});
+    const triggerFullNetworkSync = () => {
+      syncApplicationsFromServer().catch(() => {});
+      syncSchoolsFromServer().catch(() => {});
+    };
+    triggerFullNetworkSync();
     const unsubApps = initRealtimeApplicationsSync();
     const unsubQuick = initRealtimeQuickRequestsSync();
     const unsubUnifiedDb = initUnifiedRealtimeDatabaseSync();
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
-    const pollInterval = setInterval(() => {
-      syncApplicationsFromServer().catch(() => {});
-    }, 5000);
+    window.addEventListener('focus', triggerFullNetworkSync);
+    const pollInterval = setInterval(triggerFullNetworkSync, 4000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('ucore-teachers-updated', handleSync);
+      window.removeEventListener('focus', triggerFullNetworkSync);
       clearInterval(pollInterval);
       if (typeof unsubApps === 'function') unsubApps();
       if (typeof unsubQuick === 'function') unsubQuick();

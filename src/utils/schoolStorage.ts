@@ -16,16 +16,6 @@ import {
   deleteTeacherFromFirestore,
   deleteStudentFromFirestore,
   deleteDirectorFromFirestore,
-  fetchSchoolsFromFirestore,
-  fetchTeachersFromFirestore,
-  fetchStudentsFromFirestore,
-  fetchStaffFromFirestore,
-  fetchEfectividadeFromFirestore,
-  fetchDeclaracaoServicoFromFirestore,
-  fetchGuiasFeriasFromFirestore,
-  fetchGuiasColocacaoFromFirestore,
-  fetchFichasAvaliacaoFromFirestore,
-  fetchCadastroDocenteFromFirestore,
   isEntityTombstoned,
   isBannedSchoolOrEntity,
   getEntityTombstones,
@@ -847,7 +837,14 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     return [];
   }
 
-  const norm = (str?: string) => (str || '').trim().toLowerCase();
+  const norm = (str?: string) =>
+    (str || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+
   const safeParseArr = (key: string): any[] => {
     try {
       const raw = localStorage.getItem(key);
@@ -861,7 +858,6 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
   try {
     const localSchools: AdminSchool[] = safeParseArr(STORAGE_KEY_SCHOOLS).filter((s) => !isBannedSchoolOrEntity(s));
-    const localRegSchools = safeParseArr('sigre_school_registrations').filter((r) => !isBannedSchoolOrEntity(r));
     const localDirs = safeParseArr('ucore_admin_directors').filter((d) => !isBannedSchoolOrEntity(d));
     const localRegDirs = safeParseArr('ucore_registered_directors_v2').filter((d) => !isBannedSchoolOrEntity(d));
     const localDmeStaff = safeParseArr('ucore_dme_staff_list').filter((s) => !isBannedSchoolOrEntity(s));
@@ -877,39 +873,19 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     const localEfectividade = safeParseArr('sigre_cadastramento_efectividade_v2').filter((e) => !isBannedSchoolOrEntity(e));
     const localDeclaracao = safeParseArr('sigre_declaracao_servico_v1').filter((d) => !isBannedSchoolOrEntity(d));
     const localGuiasFerias = safeParseArr('sigre_guias_ferias_records_v1').filter((g) => !isBannedSchoolOrEntity(g));
-    const localGuiasColocacao = safeParseArr('sigre_guias_colocacao_records_v1').filter((g) => !isBannedSchoolOrEntity(g));
-    const localFichasAvaliacao = safeParseArr('sigre_fichas_avaliacao_records_v1').filter((f) => !isBannedSchoolOrEntity(f));
+    const localGuiasColocacao = safeParseArr('sigre_guias_colocacao_records_v1').filter(
+      (g) => !isBannedSchoolOrEntity(g) && g?.id !== 'guia-colocacao-default-1'
+    );
+    const localFichasAvaliacao = safeParseArr('sigre_fichas_avaliacao_records_v1').filter(
+      (f) => !isBannedSchoolOrEntity(f) && f?.id !== 'ficha-avaliacao-default-1'
+    );
     const localCadastroDocente = safeParseArr('cadastro-docente-registos').filter((c) => !isBannedSchoolOrEntity(c));
     const localMiniPautas = safeParseArr('sigre_teacher_mini_pautas_v5_blank').filter((m) => !isBannedSchoolOrEntity(m));
     const localRooms = safeParseArr('ucore_director_rooms').filter((r) => !isBannedSchoolOrEntity(r));
     const localClasses = safeParseArr('ucore_director_classes').filter((c) => !isBannedSchoolOrEntity(c));
     const localUsers = safeParseArr('ucore_registered_users').filter((u) => !isBannedSchoolOrEntity(u));
+    const localQuickRequests = safeParseArr('sigre_quick_services_local_cache').filter((q) => !isBannedSchoolOrEntity(q));
     const localTombstones = Array.from(getEntityTombstones());
-
-    // 0. Pull authoritative collections from Firestore in parallel
-    const [
-      firestoreSchools,
-      firestoreTeachers,
-      firestoreStudents,
-      firestoreStaff,
-      firestoreEfectividade,
-      firestoreDeclaracao,
-      firestoreGuiasFerias,
-      firestoreGuiasColocacao,
-      firestoreFichasAvaliacao,
-      firestoreCadastroDocente,
-    ] = await Promise.all([
-      fetchSchoolsFromFirestore().catch(() => []),
-      fetchTeachersFromFirestore().catch(() => []),
-      fetchStudentsFromFirestore().catch(() => []),
-      fetchStaffFromFirestore().catch(() => []),
-      fetchEfectividadeFromFirestore().catch(() => []),
-      fetchDeclaracaoServicoFromFirestore().catch(() => []),
-      fetchGuiasFeriasFromFirestore().catch(() => []),
-      fetchGuiasColocacaoFromFirestore().catch(() => []),
-      fetchFichasAvaliacaoFromFirestore().catch(() => []),
-      fetchCadastroDocenteFromFirestore().catch(() => []),
-    ]);
 
     const res = await fetch('/api/network/sync', {
       method: 'POST',
@@ -932,6 +908,7 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         rooms: localRooms,
         classes: localClasses,
         users: localUsers,
+        quickRequests: localQuickRequests,
         tombstones: localTombstones,
       }),
     });
@@ -943,18 +920,24 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     const data = await res.json();
     let changed = false;
 
-    // 0B. Merge Tombstones from Server first so deleted entities never resurrect
+    // 0. Merge Tombstones from Server first (supporting both "::" and ":" formats) so deleted entities never resurrect
     if (Array.isArray(data.tombstones) && data.tombstones.length > 0) {
       data.tombstones.forEach((tk: string) => {
-        if (typeof tk === 'string' && tk.includes('::')) {
+        if (typeof tk !== 'string' || !tk) return;
+        if (tk.includes('::')) {
           const [col, id] = tk.split('::');
+          if (col && id) addEntityTombstone(col, id, true);
+        } else if (tk.includes(':')) {
+          const idx = tk.indexOf(':');
+          const col = tk.slice(0, idx);
+          const id = tk.slice(idx + 1);
           if (col && id) addEntityTombstone(col, id, true);
         }
       });
     }
 
     // 1. Merge Schools
-    if ((Array.isArray(data.schools) && data.schools.length > 0) || firestoreSchools.length > 0) {
+    if (Array.isArray(data.schools) && data.schools.length > 0) {
       const mergedMap = new Map<string, AdminSchool>();
       localSchools.forEach((s) => {
         if (s && s.name && !isModeloCentralSchool(s.name)) {
@@ -963,27 +946,33 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
           }
         }
       });
-      if (Array.isArray(data.schools)) {
-        data.schools.forEach((s: AdminSchool) => {
-          if (s && s.name && !isModeloCentralSchool(s.name)) {
-            if (!isEntityTombstoned('schools', s.id) && !isEntityTombstoned('schools', s.name)) {
-              const existing = mergedMap.get(norm(s.name));
-              mergedMap.set(norm(s.name), existing ? { ...existing, ...s, registrationData: s.registrationData || existing.registrationData } : s);
-            }
-          }
-        });
-      }
-      firestoreSchools.forEach((s: AdminSchool) => {
+      data.schools.forEach((s: AdminSchool) => {
         if (s && s.name && !isModeloCentralSchool(s.name)) {
           if (!isEntityTombstoned('schools', s.id) && !isEntityTombstoned('schools', s.name)) {
-            const existing = mergedMap.get(norm(s.name));
-            mergedMap.set(norm(s.name), existing ? { ...existing, ...s, registrationData: s.registrationData || existing.registrationData } : s);
+            const key = norm(s.name);
+            const existing = mergedMap.get(key);
+            mergedMap.set(
+              key,
+              existing
+                ? {
+                    ...existing,
+                    ...s,
+                    directorName:
+                      s.directorName && s.directorName !== 'Diretor a Designar' && s.directorName !== 'Fert Horlan'
+                        ? s.directorName
+                        : existing.directorName || s.directorName,
+                    teachersCount: Math.max(s.teachersCount || 0, existing.teachersCount || 0),
+                    registrationData: s.registrationData || existing.registrationData,
+                  }
+                : s
+            );
           }
         }
       });
       const mergedSchools = Array.from(mergedMap.values());
       if (JSON.stringify(mergedSchools) !== JSON.stringify(localSchools)) {
         localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(mergedSchools));
+        localStorage.setItem('ucore_registered_schools_v1', JSON.stringify(mergedSchools));
         const regs = mergedSchools.map((sc) => sc.registrationData).filter(Boolean);
         if (regs.length > 0) {
           localStorage.setItem('sigre_school_registrations', JSON.stringify(regs));
@@ -993,18 +982,18 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     }
 
     // 2. Merge Directors
-    if (Array.isArray(data.directors) && data.directors.length > 0) {
+    if (Array.isArray(data.directors)) {
       const dirMap = new Map<string, any>();
       localDirs.forEach((d: any) => {
-        const k = norm(d?.id || d?.name || d?.nomeCompleto);
-        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.name || d.nomeCompleto)) {
+        const k = norm(d?.id || d?.email || d?.name || d?.nomeCompleto);
+        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.email || d.id)) {
           dirMap.set(k, d);
         }
       });
       data.directors.forEach((d: any) => {
         if (!d) return;
-        const k = norm(d.id || d.name || d.nomeCompleto);
-        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.name || d.nomeCompleto)) {
+        const k = norm(d.id || d.email || d.name || d.nomeCompleto);
+        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.email || d.id)) {
           dirMap.set(k, { ...(dirMap.get(k) || {}), ...d });
         }
       });
@@ -1015,11 +1004,8 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       }
     }
 
-    // 3. Merge Teachers (Server + Firestore -> ucore_admin_teachers, ucore_registered_teachers_v2, ucore_director_teachers_v1)
-    const incomingTeachers = [
-      ...(Array.isArray(data.teachers) ? data.teachers : []),
-      ...firestoreTeachers,
-    ];
+    // 3. Merge Teachers (Server -> ucore_admin_teachers, ucore_registered_teachers_v2, ucore_director_teachers_v1)
+    const incomingTeachers = Array.isArray(data.teachers) ? data.teachers : [];
     if (incomingTeachers.length > 0) {
       const adminTMap = new Map<string, any>();
       const regTMap = new Map<string, any>();
@@ -1027,19 +1013,19 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
       localTeachers.forEach((t: any) => {
         const k = norm(t?.id || t?.name);
-        if (k && !isEntityTombstoned('teachers', t.id) && !isEntityTombstoned('teachers', t.name)) {
+        if (k && !isEntityTombstoned('teachers', t.id)) {
           adminTMap.set(k, t);
         }
       });
       localRegTeachers.forEach((t: any) => {
         const k = norm(t?.id || t?.nomeCompleto);
-        if (k && !isEntityTombstoned('teachers', t.id) && !isEntityTombstoned('teachers', t.nomeCompleto)) {
+        if (k && !isEntityTombstoned('teachers', t.id)) {
           regTMap.set(k, t);
         }
       });
       localDirTeachers.forEach((t: any) => {
         const k = norm(t?.id || t?.name);
-        if (k && !isEntityTombstoned('teachers', t.id) && !isEntityTombstoned('teachers', t.name)) {
+        if (k && !isEntityTombstoned('teachers', t.id)) {
           dirTMap.set(k, t);
         }
       });
@@ -1049,7 +1035,7 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         const id = String(item.id || '').trim();
         const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
         if (!id && !name) return;
-        if (isEntityTombstoned('teachers', id) || isEntityTombstoned('teachers', name)) return;
+        if (isEntityTombstoned('teachers', id)) return;
         const schoolName = String(item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua').trim();
         if (isModeloCentralSchool(schoolName)) return;
 
@@ -1125,11 +1111,8 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       }
     }
 
-    // 4. Merge Students (Server + Firestore -> ucore_admin_students, ucore_registered_students_v2, ucore_director_students, ucore_teacher_students)
-    const incomingStudents = [
-      ...(Array.isArray(data.students) ? data.students : []),
-      ...firestoreStudents,
-    ];
+    // 4. Merge Students
+    const incomingStudents = Array.isArray(data.students) ? data.students : [];
     if (incomingStudents.length > 0) {
       const adminSMap = new Map<string, any>();
       const regSMap = new Map<string, any>();
@@ -1138,25 +1121,25 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
       localStudents.forEach((s: any) => {
         const k = norm(s?.id || `${s?.name}::${s?.schoolName}`);
-        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.name)) {
+        if (k && !isEntityTombstoned('students', s.id)) {
           adminSMap.set(k, s);
         }
       });
       localRegStudents.forEach((s: any) => {
         const k = norm(s?.id || `${s?.nomeCompleto || s?.name}::${s?.escola}`);
-        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.nomeCompleto || s.name)) {
+        if (k && !isEntityTombstoned('students', s.id)) {
           regSMap.set(k, s);
         }
       });
       localDirStudents.forEach((s: any) => {
         const k = norm(s?.id || s?.name);
-        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.name)) {
+        if (k && !isEntityTombstoned('students', s.id)) {
           dirSMap.set(k, s);
         }
       });
       localTeacherStudents.forEach((s: any) => {
         const k = norm(s?.id || s?.name);
-        if (k && !isEntityTombstoned('students', s.id) && !isEntityTombstoned('students', s.name)) {
+        if (k && !isEntityTombstoned('students', s.id)) {
           teachSMap.set(k, s);
         }
       });
@@ -1166,7 +1149,7 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         const id = String(item.id || '').trim();
         const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
         if (!id && !name) return;
-        if (isEntityTombstoned('students', id) || isEntityTombstoned('students', name)) return;
+        if (isEntityTombstoned('students', id)) return;
         const schoolName = String(item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial').trim();
         if (isModeloCentralSchool(schoolName)) return;
 
@@ -1311,130 +1294,161 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       }
     }
 
-    // 5. Merge Staff, Efectividade, Declaração de Serviço, Guias, Fichas, Cadastro Docente & Applications
-    const incomingStaff = [...(Array.isArray(data.staff) ? data.staff : []), ...firestoreStaff];
-    if (incomingStaff.length > 0) {
+    // 5. Merge Staff, Efectividade, Declaração de Serviço, Guias, Fichas, Cadastro Docente, Applications, Users & QuickRequests
+    if (Array.isArray(data.staff)) {
       const stMap = new Map<string, any>();
       localStaff.forEach((s: any) => {
         const k = norm(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('staff', k)) stMap.set(k, s);
+        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('staff', s.id || k)) stMap.set(k, s);
       });
-      incomingStaff.forEach((s: any) => {
+      data.staff.forEach((s: any) => {
         const k = norm(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('staff', k)) stMap.set(k, { ...(stMap.get(k) || {}), ...s });
+        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('staff', s.id || k)) {
+          stMap.set(k, { ...(stMap.get(k) || {}), ...s });
+        }
       });
       const mergedStaff = Array.from(stMap.values());
       if (JSON.stringify(mergedStaff) !== JSON.stringify(localStaff)) {
         localStorage.setItem('ucore_registered_staff_v1', JSON.stringify(mergedStaff));
+        localStorage.setItem('sigre_admin_other_staff_v1', JSON.stringify(mergedStaff));
         changed = true;
       }
     }
 
-    const incomingEf = [...(Array.isArray(data.efectividade) ? data.efectividade : []), ...firestoreEfectividade];
-    if (incomingEf.length > 0) {
+    if (Array.isArray(data.efectividade)) {
       const efMap = new Map<string, any>();
       localEfectividade.forEach((e: any) => {
         if (e?.id && !isBannedSchoolOrEntity(e) && !isEntityTombstoned('efectividade', e.id)) efMap.set(e.id, e);
       });
-      incomingEf.forEach((e: any) => {
-        if (e?.id && !isBannedSchoolOrEntity(e) && !isEntityTombstoned('efectividade', e.id)) efMap.set(e.id, { ...(efMap.get(e.id) || {}), ...e });
+      data.efectividade.forEach((e: any) => {
+        if (e?.id && !isBannedSchoolOrEntity(e) && !isEntityTombstoned('efectividade', e.id)) {
+          efMap.set(e.id, { ...(efMap.get(e.id) || {}), ...e });
+        }
       });
       const mergedEf = Array.from(efMap.values());
       if (JSON.stringify(mergedEf) !== JSON.stringify(localEfectividade)) {
         localStorage.setItem('sigre_cadastramento_efectividade_v2', JSON.stringify(mergedEf));
+        window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { records: mergedEf } }));
         changed = true;
       }
     }
 
-    const incomingDecl = [...(Array.isArray(data.declaracaoServico) ? data.declaracaoServico : []), ...firestoreDeclaracao];
-    if (incomingDecl.length > 0) {
+    if (Array.isArray(data.declaracaoServico)) {
       const decMap = new Map<string, any>();
       localDeclaracao.forEach((d: any) => {
         if (d?.id && !isBannedSchoolOrEntity(d) && !isEntityTombstoned('declaracao_servico', d.id)) decMap.set(d.id, d);
       });
-      incomingDecl.forEach((d: any) => {
-        if (d?.id && !isBannedSchoolOrEntity(d) && !isEntityTombstoned('declaracao_servico', d.id)) decMap.set(d.id, { ...(decMap.get(d.id) || {}), ...d });
+      data.declaracaoServico.forEach((d: any) => {
+        if (d?.id && !isBannedSchoolOrEntity(d) && !isEntityTombstoned('declaracao_servico', d.id)) {
+          decMap.set(d.id, { ...(decMap.get(d.id) || {}), ...d });
+        }
       });
       const mergedDecl = Array.from(decMap.values());
       if (JSON.stringify(mergedDecl) !== JSON.stringify(localDeclaracao)) {
         localStorage.setItem('sigre_declaracao_servico_v1', JSON.stringify(mergedDecl));
+        window.dispatchEvent(new CustomEvent('sigre-declaracao-servico-updated', { detail: { records: mergedDecl } }));
         changed = true;
       }
     }
 
-    const incomingGf = [...(Array.isArray(data.guiasFerias) ? data.guiasFerias : []), ...firestoreGuiasFerias];
-    if (incomingGf.length > 0) {
+    if (Array.isArray(data.guiasFerias)) {
       const gfMap = new Map<string, any>();
       localGuiasFerias.forEach((g: any) => {
         if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_ferias', g.id)) gfMap.set(g.id, g);
       });
-      incomingGf.forEach((g: any) => {
-        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_ferias', g.id)) gfMap.set(g.id, { ...(gfMap.get(g.id) || {}), ...g });
+      data.guiasFerias.forEach((g: any) => {
+        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_ferias', g.id)) {
+          gfMap.set(g.id, { ...(gfMap.get(g.id) || {}), ...g });
+        }
       });
       const mergedGf = Array.from(gfMap.values());
       if (JSON.stringify(mergedGf) !== JSON.stringify(localGuiasFerias)) {
         localStorage.setItem('sigre_guias_ferias_records_v1', JSON.stringify(mergedGf));
+        window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
         changed = true;
       }
     }
 
-    const incomingGc = [...(Array.isArray(data.guiasColocacao) ? data.guiasColocacao : []), ...firestoreGuiasColocacao];
-    if (incomingGc.length > 0) {
+    if (Array.isArray(data.guiasColocacao)) {
       const gcMap = new Map<string, any>();
       localGuiasColocacao.forEach((g: any) => {
-        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_colocacao', g.id)) gcMap.set(g.id, g);
+        if (
+          g?.id &&
+          g.id !== 'guia-colocacao-default-1' &&
+          !isBannedSchoolOrEntity(g) &&
+          !isEntityTombstoned('guias_colocacao', g.id)
+        ) {
+          gcMap.set(g.id, g);
+        }
       });
-      incomingGc.forEach((g: any) => {
-        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_colocacao', g.id)) gcMap.set(g.id, { ...(gcMap.get(g.id) || {}), ...g });
+      data.guiasColocacao.forEach((g: any) => {
+        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_colocacao', g.id)) {
+          gcMap.set(g.id, { ...(gcMap.get(g.id) || {}), ...g });
+        }
       });
       const mergedGc = Array.from(gcMap.values());
       if (JSON.stringify(mergedGc) !== JSON.stringify(localGuiasColocacao)) {
         localStorage.setItem('sigre_guias_colocacao_records_v1', JSON.stringify(mergedGc));
+        window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
         changed = true;
       }
     }
 
-    const incomingFa = [...(Array.isArray(data.fichasAvaliacao) ? data.fichasAvaliacao : []), ...firestoreFichasAvaliacao];
-    if (incomingFa.length > 0) {
+    if (Array.isArray(data.fichasAvaliacao)) {
       const faMap = new Map<string, any>();
       localFichasAvaliacao.forEach((f: any) => {
-        if (f?.id && !isBannedSchoolOrEntity(f) && !isEntityTombstoned('fichas_avaliacao', f.id)) faMap.set(f.id, f);
+        if (
+          f?.id &&
+          f.id !== 'ficha-avaliacao-default-1' &&
+          !isBannedSchoolOrEntity(f) &&
+          !isEntityTombstoned('fichas_avaliacao', f.id)
+        ) {
+          faMap.set(f.id, f);
+        }
       });
-      incomingFa.forEach((f: any) => {
-        if (f?.id && !isBannedSchoolOrEntity(f) && !isEntityTombstoned('fichas_avaliacao', f.id)) faMap.set(f.id, { ...(faMap.get(f.id) || {}), ...f });
+      data.fichasAvaliacao.forEach((f: any) => {
+        if (f?.id && !isBannedSchoolOrEntity(f) && !isEntityTombstoned('fichas_avaliacao', f.id)) {
+          faMap.set(f.id, { ...(faMap.get(f.id) || {}), ...f });
+        }
       });
       const mergedFa = Array.from(faMap.values());
       if (JSON.stringify(mergedFa) !== JSON.stringify(localFichasAvaliacao)) {
         localStorage.setItem('sigre_fichas_avaliacao_records_v1', JSON.stringify(mergedFa));
+        window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
         changed = true;
       }
     }
 
-    const incomingCd = [...(Array.isArray(data.cadastroDocente) ? data.cadastroDocente : []), ...firestoreCadastroDocente];
-    if (incomingCd.length > 0) {
+    if (Array.isArray(data.cadastroDocente)) {
       const cdMap = new Map<string, any>();
       localCadastroDocente.forEach((c: any) => {
-        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('cadastro_docente', String(c.id))) cdMap.set(String(c.id), c);
+        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('cadastro_docente', String(c.id))) {
+          cdMap.set(String(c.id), c);
+        }
       });
-      incomingCd.forEach((c: any) => {
-        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('cadastro_docente', String(c.id))) cdMap.set(String(c.id), { ...(cdMap.get(String(c.id)) || {}), ...c });
+      data.cadastroDocente.forEach((c: any) => {
+        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('cadastro_docente', String(c.id))) {
+          cdMap.set(String(c.id), { ...(cdMap.get(String(c.id)) || {}), ...c });
+        }
       });
       const mergedCd = Array.from(cdMap.values());
       if (JSON.stringify(mergedCd) !== JSON.stringify(localCadastroDocente)) {
         localStorage.setItem('cadastro-docente-registos', JSON.stringify(mergedCd));
+        window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
+        window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
         changed = true;
       }
     }
 
-    if (Array.isArray(data.applications) && data.applications.length > 0) {
+    if (Array.isArray(data.applications)) {
       const appMap = new Map<string, any>();
       localApps.forEach((a: any) => {
         const k = norm(a?.id || a?.userId || a?.email);
-        if (k && !isBannedSchoolOrEntity(a) && !isEntityTombstoned('applications', k)) appMap.set(k, a);
+        if (k && !isBannedSchoolOrEntity(a) && !isEntityTombstoned('applications', a.id || k)) appMap.set(k, a);
       });
       data.applications.forEach((a: any) => {
         const k = norm(a?.id || a?.userId || a?.email);
-        if (k && !isBannedSchoolOrEntity(a) && !isEntityTombstoned('applications', k)) {
+        if (k && !isBannedSchoolOrEntity(a) && !isEntityTombstoned('applications', a.id || k)) {
           appMap.set(k, { ...(appMap.get(k) || {}), ...a });
         }
       });
@@ -1445,49 +1459,95 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       }
     }
 
-    if (Array.isArray(data.dmeStaff) && data.dmeStaff.length > 0) {
-      const dsMap = new Map<string, any>();
-      localDmeStaff.forEach((s: any) => {
-        const k = norm(s?.id || s?.email || s?.role);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('dme_staff', k)) dsMap.set(k, s);
+    if (Array.isArray(data.users) && data.users.length > 0) {
+      const userMap = new Map<string, any>();
+      localUsers.forEach((u: any) => {
+        const k = norm(u?.id || u?.email);
+        if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) userMap.set(k, u);
       });
-      data.dmeStaff.forEach((s: any) => {
-        const k = norm(s?.id || s?.email || s?.role);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('dme_staff', k)) dsMap.set(k, { ...(dsMap.get(k) || {}), ...s });
+      data.users.forEach((u: any) => {
+        const k = norm(u?.id || u?.email);
+        if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) {
+          userMap.set(k, { ...(userMap.get(k) || {}), ...u });
+        }
       });
-      const mergedDs = Array.from(dsMap.values());
-      if (JSON.stringify(mergedDs) !== JSON.stringify(localDmeStaff)) {
-        localStorage.setItem('ucore_dme_staff_list', JSON.stringify(mergedDs));
+      const mergedUsers = Array.from(userMap.values());
+      if (JSON.stringify(mergedUsers) !== JSON.stringify(localUsers)) {
+        localStorage.setItem('ucore_registered_users', JSON.stringify(mergedUsers));
         changed = true;
       }
     }
 
-    if (Array.isArray(data.rooms) && data.rooms.length > 0) {
+    if (Array.isArray(data.quickRequests)) {
+      const qrMap = new Map<string, any>();
+      localQuickRequests.forEach((q: any) => {
+        if (q?.id && !isBannedSchoolOrEntity(q) && !isEntityTombstoned('quickRequests', q.id)) qrMap.set(q.id, q);
+      });
+      data.quickRequests.forEach((q: any) => {
+        if (q?.id && !isBannedSchoolOrEntity(q) && !isEntityTombstoned('quickRequests', q.id)) {
+          qrMap.set(q.id, { ...(qrMap.get(q.id) || {}), ...q });
+        }
+      });
+      const mergedQr = Array.from(qrMap.values());
+      if (JSON.stringify(mergedQr) !== JSON.stringify(localQuickRequests)) {
+        localStorage.setItem('sigre_quick_services_local_cache', JSON.stringify(mergedQr));
+        window.dispatchEvent(new CustomEvent('sigre_quick_request_updated'));
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(data.dmeStaff)) {
+      const dsMap = new Map<string, any>();
+      localDmeStaff.forEach((s: any) => {
+        const k = norm(s?.id || s?.email || s?.role);
+        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('dme_staff', s.id || k)) dsMap.set(k, s);
+      });
+      data.dmeStaff.forEach((s: any) => {
+        const k = norm(s?.id || s?.email || s?.role);
+        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('dme_staff', s.id || k)) {
+          dsMap.set(k, { ...(dsMap.get(k) || {}), ...s });
+        }
+      });
+      const mergedDs = Array.from(dsMap.values());
+      if (JSON.stringify(mergedDs) !== JSON.stringify(localDmeStaff)) {
+        localStorage.setItem('ucore_dme_staff_list', JSON.stringify(mergedDs));
+        localStorage.setItem('ucore_dme_staff_members_v1', JSON.stringify(mergedDs));
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(data.rooms)) {
       const rmMap = new Map<string, any>();
       localRooms.forEach((r: any) => {
         if (r?.id && !isBannedSchoolOrEntity(r) && !isEntityTombstoned('rooms', r.id)) rmMap.set(r.id, r);
       });
       data.rooms.forEach((r: any) => {
-        if (r?.id && !isBannedSchoolOrEntity(r) && !isEntityTombstoned('rooms', r.id)) rmMap.set(r.id, { ...(rmMap.get(r.id) || {}), ...r });
+        if (r?.id && !isBannedSchoolOrEntity(r) && !isEntityTombstoned('rooms', r.id)) {
+          rmMap.set(r.id, { ...(rmMap.get(r.id) || {}), ...r });
+        }
       });
       const mergedRm = Array.from(rmMap.values());
       if (JSON.stringify(mergedRm) !== JSON.stringify(localRooms)) {
         localStorage.setItem('ucore_director_rooms', JSON.stringify(mergedRm));
+        localStorage.setItem('ucore_director_rooms_v1', JSON.stringify(mergedRm));
         changed = true;
       }
     }
 
-    if (Array.isArray(data.classes) && data.classes.length > 0) {
+    if (Array.isArray(data.classes)) {
       const clMap = new Map<string, any>();
       localClasses.forEach((c: any) => {
         if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('classes', c.id)) clMap.set(c.id, c);
       });
       data.classes.forEach((c: any) => {
-        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('classes', c.id)) clMap.set(c.id, { ...(clMap.get(c.id) || {}), ...c });
+        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('classes', c.id)) {
+          clMap.set(c.id, { ...(clMap.get(c.id) || {}), ...c });
+        }
       });
       const mergedCl = Array.from(clMap.values());
       if (JSON.stringify(mergedCl) !== JSON.stringify(localClasses)) {
         localStorage.setItem('ucore_director_classes', JSON.stringify(mergedCl));
+        localStorage.setItem('ucore_director_classes_v1', JSON.stringify(mergedCl));
         changed = true;
       }
     }

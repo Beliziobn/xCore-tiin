@@ -2,7 +2,12 @@
  * Storage and helper utilities for Guia de Férias (Serviços SIGRE)
  * República de Angola · Governo Provincial de Malanje · Administração Municipal do Quêssua
  */
-import { saveGuiaFeriasToFirestore, deleteGuiaFeriasFromFirestore } from './firestoreSync';
+import {
+  saveGuiaFeriasToFirestore,
+  deleteGuiaFeriasFromFirestore,
+  isEntityTombstoned,
+  isBannedSchoolOrEntity,
+} from './firestoreSync';
 
 export interface GuiaFeriasRecord {
   id: string;
@@ -79,10 +84,51 @@ export function getStoredGuiaFeriasRecords(): GuiaFeriasRecord[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r: any) =>
+        r &&
+        r.id &&
+        !isEntityTombstoned('guias_ferias', r.id) &&
+        !isBannedSchoolOrEntity(r)
+    );
   } catch {
     return [];
   }
+}
+
+export async function syncGuiaFeriasFromServer(): Promise<GuiaFeriasRecord[]> {
+  if (typeof window === 'undefined') return [];
+  const local = getStoredGuiaFeriasRecords();
+  try {
+    const res = await fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guiasFerias: local }),
+    });
+    if (!res.ok) return local;
+    const data = await res.json();
+    if (Array.isArray(data.guiasFerias)) {
+      const mergedMap = new Map<string, GuiaFeriasRecord>();
+      local.forEach((r) => {
+        if (r && r.id && !isEntityTombstoned('guias_ferias', r.id) && !isBannedSchoolOrEntity(r)) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      data.guiasFerias.forEach((r: GuiaFeriasRecord) => {
+        if (r && r.id && !isEntityTombstoned('guias_ferias', r.id) && !isBannedSchoolOrEntity(r)) {
+          mergedMap.set(r.id, r);
+        }
+      });
+      const merged = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
+      return merged;
+    }
+  } catch {
+    // ignore offline
+  }
+  return local;
 }
 
 export function saveGuiaFeriasRecord(record: Omit<GuiaFeriasRecord, 'id' | 'criadoEm'> & { id?: string }): {
@@ -126,6 +172,11 @@ export function deleteGuiaFeriasRecord(id: string): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     deleteGuiaFeriasFromFirestore(id).catch(() => {});
+    fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guiasFerias: filtered }),
+    }).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
     return true;
   } catch {
