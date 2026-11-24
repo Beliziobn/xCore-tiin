@@ -514,6 +514,12 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
 
     // Regra de privacidade: Usuários sem privilégio de administração apenas fazem o seu pedido e enviam para a Admin
     if (!isAdminOrDirector) {
+      const fullEfectividadeData = {
+        ...formData,
+        nome: formData.nome.trim(),
+        bi: formData.bi.trim().toUpperCase(),
+        agente: formData.agente.trim(),
+      };
       submitQuickServiceRequest({
         serviceType: 'DECLARACAO_EFECTIVIDADE',
         title: `Declaração de Efectividade - ${formData.nome.trim()}`,
@@ -522,6 +528,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         requesterRoleTitle: formData.funcao || 'Docente',
         targetRole: 'ADMIN',
         targetAdminEmail: 'dmedoquessua@gmail.com',
+        targetSchoolName: formData.escola,
         details: {
           employeeName: formData.nome.trim(),
           employeeBi: formData.bi.trim().toUpperCase(),
@@ -530,9 +537,27 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
           employeeCategory: formData.categoria,
           referenceMonthYear: formData.dataEmissao,
           purpose: formData.finalidade,
+          tratamento: formData.tratamento,
+          pai: formData.pai.trim(),
+          mae: formData.mae.trim(),
+          naturalidade: formData.naturalidade.trim(),
+          provNat: formData.provNat,
+          nascimento: formData.nascimento,
+          biEmissao: formData.biEmissao,
+          sector: formData.sector,
+          funcao: formData.funcao,
+          grau: formData.grau,
+          municipio: formData.municipio,
+          dataEmissao: formData.dataEmissao,
+          director: formData.director,
+          governoProv: formData.governoProv,
+          administracao: formData.administracao,
+          direccao: formData.direccao,
+          local: formData.local,
+          sigreEfectividade: fullEfectividadeData,
         },
       }).then((req) => {
-        showToast(`Pedido enviado com sucesso para a Admin Municipal! Protocolo: ${req.protocol}`);
+        showToast(`Pedido enviado com sucesso para a Admin Municipal! Protocolo: ${req.protocol || req.request?.protocol || ''}`);
         handleClearForm();
       }).catch(() => {
         showToast('Erro ao submeter o pedido. Tente novamente.');

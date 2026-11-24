@@ -2,7 +2,12 @@
  * Storage and helper utilities for Guia de Colocação (Serviços SIGRE)
  * República de Angola · Governo Provincial de Malanje · Direcção Municipal de Educação
  */
-import { saveGuiaColocacaoToFirestore, deleteGuiaColocacaoFromFirestore } from './firestoreSync';
+import {
+  saveGuiaColocacaoToFirestore,
+  deleteGuiaColocacaoFromFirestore,
+  isEntityTombstoned,
+  isBannedSchoolOrEntity,
+} from './firestoreSync';
 
 export interface GuiaColocacaoRecord {
   id: string;
@@ -124,6 +129,10 @@ export function getStoredGuiaColocacaoRecords(): GuiaColocacaoRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
+      if (isEntityTombstoned('guias_colocacao', 'guia-colocacao-default-1')) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+        return [];
+      }
       const defaultRecord: GuiaColocacaoRecord = {
         id: 'guia-colocacao-default-1',
         num: '045',
@@ -145,7 +154,14 @@ export function getStoredGuiaColocacaoRecords(): GuiaColocacaoRecord[] {
       return [defaultRecord];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r: any) =>
+        r &&
+        r.id &&
+        !isEntityTombstoned('guias_colocacao', r.id) &&
+        !isBannedSchoolOrEntity(r)
+    );
   } catch {
     return [];
   }
@@ -190,8 +206,13 @@ export function deleteGuiaColocacaoRecord(id: string): boolean {
   const existing = getStoredGuiaColocacaoRecords();
   const filtered = existing.filter((r) => r.id !== id);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     deleteGuiaColocacaoFromFirestore(id).catch(() => {});
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guiasColocacao: filtered }),
+    }).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
     return true;
   } catch {

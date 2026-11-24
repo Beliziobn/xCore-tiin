@@ -1149,7 +1149,7 @@ export interface QuickServiceRequest {
     reservedSala?: string;
     reservedTurno?: string;
 
-    // Declaração de efectividade
+    // Declaração de efectividade & Serviços SIGRE completos
     employeeName?: string;
     employeeBi?: string;
     employeeAgente?: string;
@@ -1157,6 +1157,27 @@ export interface QuickServiceRequest {
     employeeCategory?: string;
     referenceMonthYear?: string;
     purpose?: string;
+    tratamento?: string;
+    pai?: string;
+    mae?: string;
+    naturalidade?: string;
+    provNat?: string;
+    nascimento?: string;
+    biEmissao?: string;
+    sector?: string;
+    funcao?: string;
+    grau?: string;
+    municipio?: string;
+    dataEmissao?: string;
+    director?: string;
+    governoProv?: string;
+    administracao?: string;
+    direccao?: string;
+    local?: string;
+    sigreEfectividade?: Record<string, any>;
+    sigreServico?: Record<string, any>;
+    sigreGuiaFerias?: Record<string, any>;
+    sigreGuiaColocacao?: Record<string, any>;
 
     // General & notes
     notes?: string;

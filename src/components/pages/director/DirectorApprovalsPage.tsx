@@ -51,6 +51,7 @@ import {
   schoolsMatch,
   syncApplicationsFromServer
 } from '../../../utils/authApprovalStorage';
+import { isSubdirectorOrNonTeachingRole } from '../../../utils/teacherStorage';
 import { Hero } from '../../Hero';
 
 interface DirectorApprovalsPageProps {
@@ -190,8 +191,13 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   // Handle open approval modal
   const handleOpenApprove = (app: PendingApplication) => {
     setAppToApprove(app);
-    setAssignedRoom(app.assignedRoom || 'Sala 03');
-    setAssignedTurma(app.gradeClass || app.assignedTurma || 'Turma A');
+    const isNonTeachingOrSubdirector = isSubdirectorOrNonTeachingRole(app);
+    setAssignedRoom(app.assignedRoom || (isNonTeachingOrSubdirector ? 'Gabinete da Subdirecção' : 'Sala 03'));
+    setAssignedTurma(
+      isNonTeachingOrSubdirector
+        ? 'Sem Turma (Cargo Diretivo)'
+        : app.gradeClass || app.assignedTurma || 'Turma A'
+    );
     setAssignedShift((app.assignedShift as any) || 'Manhã');
     setApprovalNotes(app.notes || `Homologado e integrado no corpo escolar da ${schoolName}.`);
 
@@ -1111,57 +1117,102 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 </div>
               </div>
 
-              {/* SEÇÃO 1: Atribuição Pedagógica Imediata */}
-              <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <BookOpen className="w-4 h-4 text-[#f75142]" />
-                    Atribuição Pedagógica & Turma
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">Turma, Sala e Turno</span>
+              {/* SEÇÃO 1: Atribuição Pedagógica Imediata (Apenas Docentes e Alunos — Subdirectores não recebem turma) */}
+              {isSubdirectorOrNonTeachingRole(appToApprove) ? (
+                <div className="border border-indigo-200 rounded-xl p-4 bg-indigo-50/60 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                      <Briefcase className="w-4 h-4 text-indigo-700" />
+                      Enquadramento Diretivo / Administrativo (Sem Atribuição de Turma)
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      {appToApprove.roleRequested || 'Subdirecção / Secretaria'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-indigo-900/80 leading-relaxed">
+                    Os Subdirectores de Escola (Subdirector Pedagógico e Subdirector Administrativo) e o Pessoal de Secretaria exercem funções diretivas e técnico-administrativas, pelo que <strong>não lhes é atribuída regência de turma</strong>.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-indigo-900 mb-1">
+                        Gabinete / Sector de Afetação
+                      </label>
+                      <input
+                        type="text"
+                        value={assignedRoom}
+                        onChange={(e) => setAssignedRoom(e.target.value)}
+                        placeholder="Ex: Gabinete da Subdirecção"
+                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-indigo-900 mb-1">
+                        Turno de Coordenação
+                      </label>
+                      <select
+                        value={assignedShift}
+                        onChange={(e) => setAssignedShift(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="Manhã">Turno da Manhã</option>
+                        <option value="Tarde">Turno da Tarde</option>
+                        <option value="Noite">Turno da Noite</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <BookOpen className="w-4 h-4 text-[#f75142]" />
+                      Atribuição Pedagógica & Turma
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">Turma, Sala e Turno</span>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Atribuir Turma
-                    </label>
-                    <input
-                      type="text"
-                      value={assignedTurma}
-                      onChange={(e) => setAssignedTurma(e.target.value)}
-                      placeholder="Ex: Turma A, 6ª Classe"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Atribuir Sala
-                    </label>
-                    <input
-                      type="text"
-                      value={assignedRoom}
-                      onChange={(e) => setAssignedRoom(e.target.value)}
-                      placeholder="Ex: Sala 03, Sala 12"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Turno de Atuação
-                    </label>
-                    <select
-                      value={assignedShift}
-                      onChange={(e) => setAssignedShift(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
-                    >
-                      <option value="Manhã">Turno da Manhã</option>
-                      <option value="Tarde">Turno da Tarde</option>
-                      <option value="Noite">Turno da Noite</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Atribuir Turma
+                      </label>
+                      <input
+                        type="text"
+                        value={assignedTurma}
+                        onChange={(e) => setAssignedTurma(e.target.value)}
+                        placeholder="Ex: Turma A, 6ª Classe"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Atribuir Sala
+                      </label>
+                      <input
+                        type="text"
+                        value={assignedRoom}
+                        onChange={(e) => setAssignedRoom(e.target.value)}
+                        placeholder="Ex: Sala 03, Sala 12"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Turno de Atuação
+                      </label>
+                      <select
+                        value={assignedShift}
+                        onChange={(e) => setAssignedShift(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f75142]"
+                      >
+                        <option value="Manhã">Turno da Manhã</option>
+                        <option value="Tarde">Turno da Tarde</option>
+                        <option value="Noite">Turno da Noite</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* SEÇÃO 2: DADOS COMPLEMENTARES (DOCUMENTOS EM MÃOS) */}
               <div className="border border-amber-200/90 rounded-xl p-4 bg-gradient-to-b from-amber-50/40 via-white to-white shadow-xs space-y-4">

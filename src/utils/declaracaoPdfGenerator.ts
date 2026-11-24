@@ -1178,10 +1178,87 @@ export async function downloadQuickServiceDocumentPdf(
 
   const capturedModal = await captureSinglePageA4DomToPdf(
     'official-modal-print-sheet',
-    `Documento_Oficial_${safeNameEarly}.pdf`,
+    request.serviceType === 'DECLARACAO_EFECTIVIDADE'
+      ? `Declaracao_Efectividade_${safeNameEarly}.pdf`
+      : `Documento_Oficial_${safeNameEarly}.pdf`,
     targetPersonName
   );
   if (capturedModal) return;
+
+  if (request.serviceType === 'DECLARACAO_EFECTIVIDADE') {
+    const { getStoredEfectividadeRecords } = await import('./efectividadeStorage');
+    const sigre = (details.sigreEfectividade || {}) as Partial<CadastramentoEfectividadeRecord>;
+    const rawName = (sigre.nome || details.employeeName || request.requesterName || '').trim();
+    const rawBi = (sigre.bi || details.employeeBi || '').trim().toUpperCase();
+    const rawAgente = (sigre.agente || details.employeeAgente || '').trim();
+    const storedList = getStoredEfectividadeRecords();
+    const matched = storedList.find((r) => {
+      if (rawBi && (r.bi || '').trim().toUpperCase() === rawBi) return true;
+      if (rawAgente && rawAgente !== 'S/N' && (r.agente || '').trim().toLowerCase() === rawAgente.toLowerCase()) return true;
+      if (rawName && (r.nome || '').trim().toLowerCase() === rawName.toLowerCase()) return true;
+      return false;
+    });
+    const isFem =
+      genderOverride === 'F'
+        ? true
+        : genderOverride === 'M'
+        ? false
+        : sigre.tratamento
+        ? sigre.tratamento === 'Senhora'
+        : details.tratamento
+        ? details.tratamento === 'Senhora'
+        : matched?.tratamento
+        ? matched.tratamento === 'Senhora'
+        : isFemaleFirstName(rawName);
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const fullRecord: CadastramentoEfectividadeRecord = {
+      id: sigre.id || matched?.id || request.id,
+      nome: rawName || matched?.nome || 'Nome do Funcionário',
+      tratamento: isFem ? 'Senhora' : 'Senhor',
+      nascimento: sigre.nascimento || details.nascimento || matched?.nascimento || '1990-05-15',
+      pai: sigre.pai || details.pai || matched?.pai || 'Conforme Bilhete de Identidade',
+      mae: sigre.mae || details.mae || matched?.mae || 'Conforme Bilhete de Identidade',
+      naturalidade: sigre.naturalidade || details.naturalidade || matched?.naturalidade || 'Malanje',
+      provNat: sigre.provNat || details.provNat || matched?.provNat || 'Malanje',
+      bi: rawBi || matched?.bi || '000000000ME000',
+      biEmissao: sigre.biEmissao || details.biEmissao || matched?.biEmissao || '2022-06-10',
+      sector: sigre.sector || details.sector || matched?.sector || 'Educação',
+      funcao: sigre.funcao || details.funcao || matched?.funcao || 'Docente',
+      municipio: sigre.municipio || details.municipio || matched?.municipio || 'Quêssua',
+      agente: rawAgente || matched?.agente || 'REG-DME-2026',
+      escola:
+        sigre.escola ||
+        details.employeeSchoolOrDepartment ||
+        request.targetSchoolName ||
+        matched?.escola ||
+        'Complexo Escolar do Quêssua',
+      categoria: sigre.categoria || details.employeeCategory || matched?.categoria || 'P.E.P.E.S.',
+      grau: sigre.grau || details.grau || matched?.grau || '6º Grau',
+      finalidade:
+        sigre.finalidade ||
+        details.purpose ||
+        matched?.finalidade ||
+        'efeitos de candidatura ao Concurso Público de Ingresso no Sector da Educação',
+      governoProv: sigre.governoProv || details.governoProv || matched?.governoProv || 'Malanje',
+      administracao: sigre.administracao || details.administracao || matched?.administracao || 'Quêssua',
+      direccao: sigre.direccao || details.direccao || matched?.direccao || 'Educação',
+      director: sigre.director || details.director || matched?.director || 'Belízio Miguel dos Santos António',
+      local: sigre.local || details.local || matched?.local || 'Quêssua',
+      dataEmissao:
+        sigre.dataEmissao ||
+        details.dataEmissao ||
+        (details.referenceMonthYear && /^\d{4}-\d{2}-\d{2}$/.test(details.referenceMonthYear)
+          ? details.referenceMonthYear
+          : '') ||
+        matched?.dataEmissao ||
+        todayISO,
+      cadastradoEm: request.createdAt,
+      actualizadoEm: request.updatedAt,
+      status: 'homologado',
+    };
+    await downloadDeclaracaoEfectividadePdf(fullRecord, isFem ? 'Senhora' : 'Senhor');
+    return;
+  }
 
   const { extractStudentGradesFromPautas, verifyStudentEnrollmentInSchool } = await import(
     './quickServicesStorage'
@@ -1276,9 +1353,7 @@ export async function downloadQuickServiceDocumentPdf(
   doc.setFont('times', 'bold');
   doc.setFontSize(14);
   const docTitleText =
-    request.serviceType === 'DECLARACAO_EFECTIVIDADE'
-      ? 'DECLARAÇÃO DE EFECTIVIDADE'
-      : request.serviceType === 'BOLETIM_NOTAS'
+    request.serviceType === 'BOLETIM_NOTAS'
       ? 'BOLETIM OFICIAL DE APROVEITAMENTO ESCOLAR'
       : request.serviceType === 'DECLARACAO_MATRICULA'
       ? 'DECLARAÇÃO DE MATRÍCULA & FREQUÊNCIA'
@@ -1321,60 +1396,7 @@ export async function downloadQuickServiceDocumentPdf(
     details.studentBiOrProcesso ||
     'Confirmado';
 
-  if (request.serviceType === 'DECLARACAO_EFECTIVIDADE') {
-    const p1: TextSegment[] = [
-      {
-        text: `Para os devidos efeitos legais e administrativos, e por ter sido solicitada ${interessadoInteressada}, o Director Municipal da Educação do Município do Quêssua, Província de Malanje, `,
-      },
-      { text: 'DECLARA', bold: true },
-      { text: ` que ${artigoTratamento} ` },
-      { text: details.employeeName || request.requesterName, bold: true, color: [192, 0, 0] },
-      { text: `, ${portadorPortadora} do Bilhete de Identidade n.º ` },
-      { text: details.employeeBi || 'Conforme Registo', bold: true },
-      { text: ` e ${inscritoInscrita} sob o número de agente público ` },
-      { text: details.employeeAgente || 'REG-DME-2026', bold: true },
-      { text: `, é ${funcionarioFuncionaria} do Sector da Educação, onde se encontra ${colocadoColocada} ${prepEscola} ` },
-      { text: schoolOrDept, bold: true },
-      { text: `, ${enquadradoEnquadrada} na categoria e função de ` },
-      { text: `${adaptedCategory}.`, bold: true },
-    ];
-
-    const p2: TextSegment[] = [
-      {
-        text: 'Mais se declara que se encontra no pleno exercício da sua função nesta circunscrição municipal, mantendo ',
-      },
-      { text: 'EFECTIVIDADE PLENA', bold: true },
-      { text: ' e assiduidade ininterrupta no período de referência de ' },
-      { text: details.referenceMonthYear || 'Fevereiro / 2026', bold: true },
-      {
-        text: `, sem registo de faltas injustificadas nem quaisquer sanções disciplinares averbadas no processo individual ${doDaFuncionario}.`,
-      },
-    ];
-
-    const p3: TextSegment[] = [
-      {
-        text: `A presente declaração é emitida em conformidade com o Estatuto da Carreira Docente da República de Angola, destinando-se especificamente ${finalidadeFormatted.preposition} `,
-      },
-      { text: finalidadeFormatted.text, bold: true },
-      {
-        text: `, devendo ser utilizada exclusivamente ${peloMesmoPelaMesma} para os fins legalmente previstos.`,
-      },
-    ];
-
-    const p4: TextSegment[] = [
-      {
-        text: `Por corresponder à verdade e por ter sido solicitada ${interessadoInteressada}, mandei passar a presente declaração que vai por mim assinada e autenticada com o carimbo a óleo em uso nesta Direcção Municipal.`,
-      },
-    ];
-
-    y = renderJustifiedParagraph(doc, p1, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-    y += paragraphGapMm;
-    y = renderJustifiedParagraph(doc, p2, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-    y += paragraphGapMm;
-    y = renderJustifiedParagraph(doc, p3, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-    y += paragraphGapMm;
-    y = renderJustifiedParagraph(doc, p4, marginX, y, usableWidth, firstLineIndent, lineHeightMm, 12);
-  } else if (request.serviceType === 'BOLETIM_NOTAS') {
+  if (request.serviceType === 'BOLETIM_NOTAS') {
     const liveGrades = extractStudentGradesFromPautas({
       schoolName: request.targetSchoolName,
       studentName: details.studentName || request.requesterName,
@@ -1585,7 +1607,7 @@ export async function downloadQuickServiceDocumentPdf(
   doc.setFont('times', 'bold');
   doc.setFontSize(12);
   doc.text(
-    request.serviceType === 'DECLARACAO_EFECTIVIDADE' ? 'O Director Municipal' : 'A Direcção Escolar / O Director',
+    'A Direcção Escolar / O Director',
     centerX,
     y,
     { align: 'center' }
@@ -1599,9 +1621,7 @@ export async function downloadQuickServiceDocumentPdf(
   doc.setFont('times', 'bold');
   doc.setFontSize(12);
   doc.text(
-    request.serviceType === 'DECLARACAO_EFECTIVIDADE'
-      ? 'Belízio Miguel dos Santos António'
-      : details.resolvedBy || request.targetSchoolName || 'Direcção Escolar Oficial',
+    details.resolvedBy || request.targetSchoolName || 'Direcção Escolar Oficial',
     centerX,
     y,
     { align: 'center' }

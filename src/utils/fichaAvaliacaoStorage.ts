@@ -3,7 +3,12 @@
  * Modelo Oficial: Diário da República, I Série — N.º 18, de 27 de Janeiro de 2022, Anexo III
  * República de Angola · Governo Provincial de Malanje · Direcção Municipal de Educação do Quêssua
  */
-import { saveFichaAvaliacaoToFirestore, deleteFichaAvaliacaoFromFirestore } from './firestoreSync';
+import {
+  saveFichaAvaliacaoToFirestore,
+  deleteFichaAvaliacaoFromFirestore,
+  isEntityTombstoned,
+  isBannedSchoolOrEntity,
+} from './firestoreSync';
 
 export const INDICADORES_AVALIACAO = [
   'Qualidade do processo de ensino e aprendizagem',
@@ -234,6 +239,10 @@ export function getStoredFichaAvaliacaoRecords(): FichaAvaliacaoRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
+      if (isEntityTombstoned('fichas_avaliacao', 'ficha-avaliacao-default-1')) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+        return [];
+      }
       const today = getTodayIsoAvaliacao();
       const defaultRecord: FichaAvaliacaoRecord = {
         id: 'ficha-avaliacao-default-1',
@@ -270,7 +279,14 @@ export function getStoredFichaAvaliacaoRecords(): FichaAvaliacaoRecord[] {
       return [defaultRecord];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r: any) =>
+        r &&
+        r.id &&
+        !isEntityTombstoned('fichas_avaliacao', r.id) &&
+        !isBannedSchoolOrEntity(r)
+    );
   } catch {
     return [];
   }
@@ -315,8 +331,13 @@ export function deleteFichaAvaliacaoRecord(id: string): boolean {
   const existing = getStoredFichaAvaliacaoRecords();
   const filtered = existing.filter((r) => r.id !== id);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     deleteFichaAvaliacaoFromFirestore(id).catch(() => {});
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fichasAvaliacao: filtered }),
+    }).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
     return true;
   } catch {

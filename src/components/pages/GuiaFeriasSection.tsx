@@ -326,6 +326,30 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
 
     // Non-admin/non-director users submit a request to the Municipal Administration
     if (!isAdminOrDirector) {
+      const fullFeriasRecord = {
+        id: formData.id,
+        ng: formData.ng.trim(),
+        ang: formData.ang.trim(),
+        trat: formData.trat,
+        agente: formData.agente.trim(),
+        nome: formData.nome.trim(),
+        cat: formData.cat.trim(),
+        grau: formData.grau.trim(),
+        funcao: formData.funcao.trim(),
+        tipoesc: formData.tipoesc.trim(),
+        nesc: formData.nesc.trim(),
+        local: formData.local.trim(),
+        tipolic: formData.tipolic.trim(),
+        ano: formData.ano.trim(),
+        dias: parseInt(formData.dias, 10) || 30,
+        ini: formData.ini.trim(),
+        fim: formData.fim.trim(),
+        lemi: formData.lemi.trim(),
+        demi: formData.demi.trim(),
+        dir: formData.dir.trim(),
+        prov: formData.prov.trim() || 'Malanje',
+        mun: formData.mun.trim() || 'Quêssua',
+      };
       await submitQuickServiceRequest({
         serviceType: 'GUIA_FERIAS',
         title: `Guia de Férias - ${formData.nome.trim()}`,
@@ -340,7 +364,13 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
           employeeCategory: `${formData.cat.trim()} ${formData.grau.trim()}`,
           referenceMonthYear: `${formData.dias} dias (${formData.ini} a ${formData.fim})`,
           purpose: formData.tipolic.trim(),
+          tratamento: formData.trat,
+          funcao: formData.funcao.trim(),
+          grau: formData.grau.trim(),
+          dataEmissao: formData.demi.trim(),
+          director: formData.dir.trim(),
           notes: `Pedido de Guia de Férias nº ${formData.ng}/${formData.ang} submetido para homologação da Direcção Municipal da Educação.`,
+          sigreGuiaFerias: fullFeriasRecord,
         },
       });
       handleResetForm();

@@ -442,8 +442,46 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
 
     setFormErrorBanner(null);
 
+    const salKz = parseKz(formData.salario);
+    const ext = extensoKz(salKz);
+    const bancoFinal = formData.banco === 'Outro' ? formData.bancoOutro.trim() : formData.banco.trim();
+
     // Regra de privacidade: Cidadão sem sessão iniciada apenas preenche o seu e envia para a Admin
     if (!isAdminOrDirector) {
+      const fullServicoRecord = {
+        id: formData.id,
+        ref: formData.ref,
+        criadoEm: formData.criadoEm,
+        tratamento: formData.tratamento as 'Senhor' | 'Senhora',
+        nome: formData.nome.trim(),
+        nascimento: formData.nascimento.trim(),
+        naturalidade: formData.naturalidade.trim(),
+        provNat: formData.provNat.trim(),
+        pai: formData.pai.trim(),
+        mae: formData.mae.trim(),
+        bi: formData.bi.trim().toUpperCase(),
+        biData: formData.biData.trim(),
+        profissao: formData.profissao.trim(),
+        grau: formData.grau.trim(),
+        categoria: formData.categoria.trim(),
+        agente: formData.agente.trim(),
+        municipio: formData.municipio.trim(),
+        escola: formData.escola.trim(),
+        banco: formData.banco.trim(),
+        bancoOutro: formData.bancoOutro.trim(),
+        bancoNome: bancoFinal,
+        conta: formData.conta.trim(),
+        salario: fmtKz(salKz),
+        salarioKz: salKz,
+        extenso: ext,
+        finalidade: formData.finalidade.trim(),
+        provEmissao: formData.provEmissao.trim() || 'Malanje',
+        municipioAdm: formData.municipioAdm.trim() || 'Quêssua',
+        direccao: formData.direccao.trim() || 'Direcção Municipal de Educação',
+        localEmissao: formData.localEmissao.trim() || 'Quêssua',
+        dataEmissao: formData.dataEmissao.trim() || todayISO,
+        director: formData.director.trim() || 'Belízio Miguel dos Santos António',
+      };
       submitQuickServiceRequest({
         serviceType: 'DECLARACAO_SERVICO',
         title: `Declaração de Serviço - ${formData.nome.trim()}`,
@@ -452,6 +490,7 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
         requesterRoleTitle: formData.profissao || 'Docente',
         targetRole: 'ADMIN',
         targetAdminEmail: 'dmedoquessua@gmail.com',
+        targetSchoolName: formData.escola.trim(),
         details: {
           employeeName: formData.nome.trim(),
           employeeBi: formData.bi.trim().toUpperCase(),
@@ -460,19 +499,28 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
           employeeCategory: formData.categoria,
           referenceMonthYear: formData.dataEmissao,
           purpose: formData.finalidade,
+          tratamento: formData.tratamento,
+          pai: formData.pai.trim(),
+          mae: formData.mae.trim(),
+          naturalidade: formData.naturalidade.trim(),
+          provNat: formData.provNat.trim(),
+          nascimento: formData.nascimento.trim(),
+          biEmissao: formData.biData.trim(),
+          funcao: formData.profissao.trim(),
+          grau: formData.grau.trim(),
+          municipio: formData.municipio.trim(),
+          dataEmissao: formData.dataEmissao.trim() || todayISO,
+          director: formData.director.trim() || 'Belízio Miguel dos Santos António',
+          sigreServico: fullServicoRecord,
         },
       }).then((req) => {
-        showToast(`Pedido de Declaração de Serviço enviado com sucesso para a Admin Municipal! Protocolo: ${req.protocol}`);
+        showToast(`Pedido de Declaração de Serviço enviado com sucesso para a Admin Municipal! Protocolo: ${req.protocol || req.request?.protocol || ''}`);
         handleResetForm();
       }).catch(() => {
         showToast('Erro ao enviar para a Administração.');
       });
       return;
     }
-
-    const salKz = parseKz(formData.salario);
-    const ext = extensoKz(salKz);
-    const bancoFinal = formData.banco === 'Outro' ? formData.bancoOutro.trim() : formData.banco.trim();
 
     const saveRes = saveDeclaracaoServicoRecord({
       id: formData.id,

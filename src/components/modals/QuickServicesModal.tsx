@@ -30,6 +30,21 @@ import type { QuickServiceRequest, QuickServiceType, AdminSchool } from '../../t
 import { submitQuickServiceRequest, fetchQuickRequests } from '../../utils/quickServicesStorage';
 import { syncSchoolsFromServer } from '../../utils/schoolStorage';
 import { QuessuaMunicipalLogo } from '../common/QuessuaMunicipalLogo';
+import {
+  getStoredEfectividadeRecords,
+  formatAngolanDateExtenso,
+  ANGOLA_PROVINCIAS as PROVINCIAS_ANGOLA,
+} from '../../utils/efectividadeStorage';
+import {
+  isFemaleFirstName,
+  resolveIsFeminino,
+  adaptOccupationalTextToGender,
+  getPreposicaoEscola,
+  getPreposicaoProvincia,
+  formatFinalidadeWithPreposition,
+} from '../../utils/genderGrammar';
+import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
+import directorSignatureImg from '../../assets/images/assinatura_director_black.png';
 
 interface QuickServicesModalProps {
   isOpen: boolean;
@@ -70,14 +85,29 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
   const [studentPeriodo, setStudentPeriodo] = useState('Manhã');
   const [trimestre, setTrimestre] = useState('1º Trimestre');
 
-  // Declaração Efectividade Specific
+  // Declaração Efectividade Specific (aligned 1:1 with SIGRE Declaração de Efectividade)
+  const todayISO = new Date().toISOString().slice(0, 10);
   const [employeeName, setEmployeeName] = useState('');
+  const [tratamento, setTratamento] = useState<'Senhor' | 'Senhora'>('Senhor');
+  const [manualTratamento, setManualTratamento] = useState(false);
+  const [pai, setPai] = useState('');
+  const [mae, setMae] = useState('');
+  const [naturalidade, setNaturalidade] = useState('Malanje');
+  const [provNat, setProvNat] = useState('Malanje');
+  const [nascimento, setNascimento] = useState('1990-05-15');
   const [employeeBi, setEmployeeBi] = useState('');
+  const [biEmissao, setBiEmissao] = useState('2022-06-10');
   const [employeeAgente, setEmployeeAgente] = useState('');
+  const [funcao, setFuncao] = useState('Docente');
   const [employeeSchoolOrDepartment, setEmployeeSchoolOrDepartment] = useState('');
-  const [employeeCategory, setEmployeeCategory] = useState('Professor do Ensino Primário');
-  const [referenceMonthYear, setReferenceMonthYear] = useState('Fevereiro / 2026');
-  const [purpose, setPurpose] = useState('Fins Bancários / Crédito');
+  const [employeeCategory, setEmployeeCategory] = useState('P.E.P.E.S.');
+  const [grau, setGrau] = useState('6º Grau');
+  const [referenceMonthYear, setReferenceMonthYear] = useState(todayISO);
+  const [purpose, setPurpose] = useState(
+    'efeitos de candidatura ao Concurso Público de Ingresso no Sector da Educação'
+  );
+  const [showLiveEfectividadePreview, setShowLiveEfectividadePreview] = useState(true);
+  const [autoFilledFromRegistry, setAutoFilledFromRegistry] = useState(false);
 
   // Transferência Specific
   const [destinationSchool, setDestinationSchool] = useState('');
@@ -113,6 +143,49 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
     }
   }, [isOpen, initialServiceType]);
 
+  // Auto-detect gender from employeeName when not manually overridden
+  useEffect(() => {
+    if (!manualTratamento && employeeName.trim()) {
+      setTratamento(isFemaleFirstName(employeeName) ? 'Senhora' : 'Senhor');
+    }
+  }, [employeeName, manualTratamento]);
+
+  // Auto-fill from SIGRE Efectividade Registry when BI, Agente, or exact Name matches
+  useEffect(() => {
+    if (selectedService !== 'DECLARACAO_EFECTIVIDADE') return;
+    const cleanBi = employeeBi.trim().toUpperCase();
+    const cleanAg = employeeAgente.trim().toLowerCase();
+    const cleanName = employeeName.trim().toLowerCase();
+    if (cleanBi.length < 6 && cleanAg.length < 4 && cleanName.length < 8) return;
+
+    const existingRecords = getStoredEfectividadeRecords();
+    const matched = existingRecords.find((r) => {
+      if (cleanBi.length >= 6 && (r.bi || '').trim().toUpperCase() === cleanBi) return true;
+      if (cleanAg.length >= 4 && (r.agente || '').trim().toLowerCase() === cleanAg) return true;
+      if (cleanName.length >= 8 && (r.nome || '').trim().toLowerCase() === cleanName) return true;
+      return false;
+    });
+
+    if (matched) {
+      if (!employeeName.trim()) setEmployeeName(matched.nome);
+      if (!requesterName.trim()) setRequesterName(matched.nome);
+      if (!employeeBi.trim() && matched.bi) setEmployeeBi(matched.bi);
+      if (!employeeAgente.trim() && matched.agente) setEmployeeAgente(matched.agente);
+      if (!pai.trim() && matched.pai) setPai(matched.pai);
+      if (!mae.trim() && matched.mae) setMae(matched.mae);
+      if (matched.naturalidade) setNaturalidade(matched.naturalidade);
+      if (matched.provNat) setProvNat(matched.provNat);
+      if (matched.nascimento) setNascimento(matched.nascimento);
+      if (matched.biEmissao) setBiEmissao(matched.biEmissao);
+      if (matched.funcao) setFuncao(matched.funcao);
+      if (matched.categoria) setEmployeeCategory(matched.categoria);
+      if (matched.grau) setGrau(matched.grau);
+      if (matched.escola) setEmployeeSchoolOrDepartment(matched.escola);
+      if (matched.tratamento) setTratamento(matched.tratamento);
+      setAutoFilledFromRegistry(true);
+    }
+  }, [employeeBi, employeeAgente, employeeName, selectedService]);
+
   const handleSelectSchool = (schoolId: string) => {
     setSelectedSchoolId(schoolId);
     const found = schools.find((s) => s.id === schoolId);
@@ -140,7 +213,11 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
 
     if (!selectedService) return;
 
-    if (!requesterName.trim()) {
+    const effectiveRequesterName =
+      requesterName.trim() ||
+      (selectedService === 'DECLARACAO_EFECTIVIDADE' ? employeeName.trim() : '');
+
+    if (!effectiveRequesterName) {
       setFormError('Por favor preencha o seu nome completo.');
       return;
     }
@@ -190,16 +267,64 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
         notes: notes.trim(),
       };
     } else if (selectedService === 'DECLARACAO_EFECTIVIDADE') {
-      title = `Declaração de Efectividade - ${employeeName || requesterName}`;
+      const resolvedEmpName = (employeeName || effectiveRequesterName).trim();
+      const resolvedSchool =
+        employeeSchoolOrDepartment.trim() || selectedSchoolName || 'Complexo Escolar do Quêssua';
+      const resolvedPai = pai.trim() || 'Conforme Bilhete de Identidade';
+      const resolvedMae = mae.trim() || 'Conforme Bilhete de Identidade';
+      const sigreEfectividadePayload = {
+        nome: resolvedEmpName,
+        tratamento,
+        nascimento: nascimento || '1990-05-15',
+        pai: resolvedPai,
+        mae: resolvedMae,
+        naturalidade: naturalidade.trim() || 'Malanje',
+        provNat: provNat.trim() || 'Malanje',
+        bi: employeeBi.trim().toUpperCase(),
+        biEmissao: biEmissao || '2022-06-10',
+        sector: 'Educação',
+        funcao: funcao.trim() || 'Docente',
+        municipio: 'Quêssua',
+        agente: employeeAgente.trim() || 'S/N',
+        escola: resolvedSchool,
+        categoria: employeeCategory.trim() || 'P.E.P.E.S.',
+        grau: grau.trim() || '6º Grau',
+        finalidade: purpose,
+        governoProv: 'Malanje',
+        administracao: 'Quêssua',
+        direccao: 'Educação',
+        director: 'Belízio Miguel dos Santos António',
+        local: 'Quêssua',
+        dataEmissao: referenceMonthYear || todayISO,
+      };
+      title = `Declaração de Efectividade - ${resolvedEmpName}`;
       targetRole = 'ADMIN';
       details = {
-        employeeName: (employeeName || requesterName).trim(),
+        employeeName: resolvedEmpName,
         employeeBi: employeeBi.trim().toUpperCase(),
-        employeeAgente: employeeAgente.trim(),
-        employeeSchoolOrDepartment: employeeSchoolOrDepartment.trim() || selectedSchoolName,
-        employeeCategory,
-        referenceMonthYear,
+        employeeAgente: employeeAgente.trim() || 'S/N',
+        employeeSchoolOrDepartment: resolvedSchool,
+        employeeCategory: employeeCategory.trim() || 'P.E.P.E.S.',
+        referenceMonthYear: referenceMonthYear || todayISO,
         purpose,
+        tratamento,
+        pai: resolvedPai,
+        mae: resolvedMae,
+        naturalidade: naturalidade.trim() || 'Malanje',
+        provNat: provNat.trim() || 'Malanje',
+        nascimento: nascimento || '1990-05-15',
+        biEmissao: biEmissao || '2022-06-10',
+        sector: 'Educação',
+        funcao: funcao.trim() || 'Docente',
+        grau: grau.trim() || '6º Grau',
+        municipio: 'Quêssua',
+        dataEmissao: referenceMonthYear || todayISO,
+        director: 'Belízio Miguel dos Santos António',
+        governoProv: 'Malanje',
+        administracao: 'Quêssua',
+        direccao: 'Educação',
+        local: 'Quêssua',
+        sigreEfectividade: sigreEfectividadePayload,
         notes: notes.trim(),
       };
     } else if (selectedService === 'DECLARACAO_MATRICULA') {
@@ -244,12 +369,15 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
     const payload = {
       serviceType: selectedService,
       title,
-      requesterName: requesterName.trim(),
+      requesterName: effectiveRequesterName,
       requesterPhone: requesterPhone.trim(),
       requesterEmail: requesterEmail.trim() || undefined,
-      requesterRoleTitle: selectedService === 'BOLETIM_NOTAS' ? 'Encarregado de Educação' : 'Docente / Funcionário',
+      requesterRoleTitle: selectedService === 'BOLETIM_NOTAS' ? 'Encarregado de Educação' : funcao || 'Docente / Funcionário',
       targetSchoolId: selectedSchoolId,
-      targetSchoolName: selectedSchoolName,
+      targetSchoolName:
+        selectedService === 'DECLARACAO_EFECTIVIDADE'
+          ? employeeSchoolOrDepartment.trim() || selectedSchoolName
+          : selectedSchoolName,
       destinationSchoolId: matchedDest?.id,
       destinationSchoolName:
         selectedService === 'GUIA_TRANSFERENCIA' ? destinationSchool.trim() : undefined,
@@ -711,106 +839,402 @@ export const QuickServicesModal: React.FC<QuickServicesModalProps> = ({
                     </div>
                   )}
 
-                  {/* Declaração de Efectividade Fields */}
+                  {/* Declaração de Efectividade Fields (1:1 com o Serviço SIGRE) */}
                   {selectedService === 'DECLARACAO_EFECTIVIDADE' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Nome Completo do Funcionário *
-                        </label>
-                        <input
-                          type="text"
-                          value={employeeName}
-                          onChange={(e) => setEmployeeName(e.target.value)}
-                          placeholder="Ex: João Baptista Domingos"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
-                          required
-                        />
+                    <div className="space-y-5 pt-2">
+                      {autoFilledFromRegistry && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5 text-xs text-emerald-900 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>
+                            Dados do funcionário preenchidos automaticamente a partir da Base de Dados Oficial da Direcção Municipal.
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="sm:col-span-2">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                              Nome Completo do Funcionário *
+                            </label>
+                            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTratamento('Senhor');
+                                  setManualTratamento(true);
+                                }}
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer ${
+                                  tratamento === 'Senhor'
+                                    ? 'bg-slate-900 text-white'
+                                    : 'text-slate-600'
+                                }`}
+                              >
+                                Senhor
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTratamento('Senhora');
+                                  setManualTratamento(true);
+                                }}
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer ${
+                                  tratamento === 'Senhora'
+                                    ? 'bg-slate-900 text-white'
+                                    : 'text-slate-600'
+                                }`}
+                              >
+                                Senhora
+                              </button>
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            value={employeeName}
+                            onChange={(e) => {
+                              setEmployeeName(e.target.value);
+                              if (!requesterName.trim()) {
+                                setRequesterName(e.target.value);
+                              }
+                            }}
+                            placeholder="Ex: João Baptista Domingos"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Nº do Bilhete de Identidade (BI) *
+                          </label>
+                          <input
+                            type="text"
+                            value={employeeBi}
+                            onChange={(e) => setEmployeeBi(e.target.value)}
+                            placeholder="Ex: 002941829ME042"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Data de Emissão do BI *
+                          </label>
+                          <input
+                            type="date"
+                            value={biEmissao}
+                            onChange={(e) => setBiEmissao(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Nome do Pai *
+                          </label>
+                          <input
+                            type="text"
+                            value={pai}
+                            onChange={(e) => setPai(e.target.value)}
+                            placeholder="Ex: Manuel Domingos"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Nome da Mãe *
+                          </label>
+                          <input
+                            type="text"
+                            value={mae}
+                            onChange={(e) => setMae(e.target.value)}
+                            placeholder="Ex: Maria da Conceição"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Naturalidade (Município / Comuna) *
+                          </label>
+                          <input
+                            type="text"
+                            value={naturalidade}
+                            onChange={(e) => setNaturalidade(e.target.value)}
+                            placeholder="Ex: Malanje"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Província de Naturalidade *
+                          </label>
+                          <select
+                            value={provNat}
+                            onChange={(e) => setProvNat(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all cursor-pointer"
+                          >
+                            {PROVINCIAS_ANGOLA.map((prov) => (
+                              <option key={prov} value={prov}>
+                                {prov}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Data de Nascimento *
+                          </label>
+                          <input
+                            type="date"
+                            value={nascimento}
+                            onChange={(e) => setNascimento(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Nº de Agente do Estado *
+                          </label>
+                          <input
+                            type="text"
+                            value={employeeAgente}
+                            onChange={(e) => setEmployeeAgente(e.target.value)}
+                            placeholder="Ex: 4928172"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Escola / Local de Colocação *
+                          </label>
+                          <input
+                            type="text"
+                            value={employeeSchoolOrDepartment}
+                            onChange={(e) => setEmployeeSchoolOrDepartment(e.target.value)}
+                            placeholder="Ex: Escola Primária n.º 12 do Quêssua"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Função *
+                          </label>
+                          <input
+                            type="text"
+                            value={funcao}
+                            onChange={(e) => setFuncao(e.target.value)}
+                            placeholder="Ex: Docente"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Categoria Profissional *
+                          </label>
+                          <input
+                            type="text"
+                            value={employeeCategory}
+                            onChange={(e) => setEmployeeCategory(e.target.value)}
+                            placeholder="Ex: P.E.P.E.S. ou Professor do Ensino Primário e Secundário"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Grau / Escalão *
+                          </label>
+                          <input
+                            type="text"
+                            value={grau}
+                            onChange={(e) => setGrau(e.target.value)}
+                            placeholder="Ex: 6º Grau ou 13º Grau"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Data de Emissão *
+                          </label>
+                          <input
+                            type="date"
+                            value={referenceMonthYear}
+                            onChange={(e) => setReferenceMonthYear(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Finalidade da Declaração *
+                          </label>
+                          <input
+                            type="text"
+                            value={purpose}
+                            onChange={(e) => setPurpose(e.target.value)}
+                            placeholder="Ex: efeitos de candidatura ao Concurso Público de Ingresso no Sector da Educação"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                            required
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Nº do Bilhete de Identidade (BI) *
-                        </label>
-                        <input
-                          type="text"
-                          value={employeeBi}
-                          onChange={(e) => setEmployeeBi(e.target.value)}
-                          placeholder="Ex: 002941829ME042"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
-                          required
-                        />
-                      </div>
+                      {/* Pré-visualização Oficial SIGRE A4 em Tempo Real */}
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50">
+                        <div className="px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs font-bold">
+                            <FileText className="w-4 h-4 text-amber-400" />
+                            <span>Pré-visualização Oficial A4 (Modelo SIGRE da Direcção Municipal)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowLiveEfectividadePreview((prev) => !prev)}
+                            className="text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg border border-slate-700 cursor-pointer"
+                          >
+                            {showLiveEfectividadePreview ? 'Ocultar Preview' : 'Mostrar Preview'}
+                          </button>
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Nº de Agente do Estado (se possuir)
-                        </label>
-                        <input
-                          type="text"
-                          value={employeeAgente}
-                          onChange={(e) => setEmployeeAgente(e.target.value)}
-                          placeholder="Ex: AG-94812"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
-                        />
-                      </div>
+                        {showLiveEfectividadePreview && (() => {
+                          const pNome = employeeName.trim() || requesterName.trim() || '[Nome Completo do Funcionário]';
+                          const isFem = resolveIsFeminino(pNome, tratamento, true);
+                          const artTrat = isFem ? 'a Senhora' : 'o Senhor';
+                          const fFilha = isFem ? 'filha' : 'filho';
+                          const nNasc = isFem ? 'nascida' : 'nascido';
+                          const pPort = isFem ? 'portadora' : 'portador';
+                          const fFunc = isFem ? 'funcionária' : 'funcionário';
+                          const cCol = isFem ? 'colocada' : 'colocado';
+                          const eEnq = isFem ? 'enquadrada' : 'enquadrado';
+                          const iInsc = isFem ? 'inscrita' : 'inscrito';
+                          const refFunc = isFem ? 'a referida funcionária' : 'o referido funcionário';
+                          const doDaFunc = isFem ? 'da funcionária' : 'do funcionário';
+                          const peloPela = isFem ? 'pela mesma' : 'pelo mesmo';
+                          const intInt = isFem ? 'pela interessada' : 'pelo interessado';
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Escola / Local de Trabalho *
-                        </label>
-                        <input
-                          type="text"
-                          value={employeeSchoolOrDepartment}
-                          onChange={(e) => setEmployeeSchoolOrDepartment(e.target.value)}
-                          placeholder="Ex: Escola Primária nº 12 do Quêssua"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
-                          required
-                        />
-                      </div>
+                          const pEscola = employeeSchoolOrDepartment.trim() || selectedSchoolName || '[Escola de Colocação]';
+                          const prepProv = getPreposicaoProvincia(provNat || 'Malanje');
+                          const prepEsc = getPreposicaoEscola(pEscola);
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Categoria / Função
-                        </label>
-                        <input
-                          type="text"
-                          value={employeeCategory}
-                          onChange={(e) => setEmployeeCategory(e.target.value)}
-                          placeholder="Ex: Professor do Ensino Secundário"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
-                        />
-                      </div>
+                          const rawFunc = (funcao || 'Docente').trim();
+                          const adFunc = adaptOccupationalTextToGender(rawFunc, isFem);
+                          const funcTxt = rawFunc.toLowerCase().includes('docente')
+                            ? 'função docente'
+                            : rawFunc.toLowerCase().startsWith('funções')
+                            ? `função ${adFunc.replace(/^funções\s+/i, '').replace(/s\b/g, '')}`
+                            : rawFunc.toLowerCase().startsWith('função')
+                            ? adFunc
+                            : `a função de ${adFunc}`;
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Mês / Ano de Referência
-                        </label>
-                        <input
-                          type="text"
-                          value={referenceMonthYear}
-                          onChange={(e) => setReferenceMonthYear(e.target.value)}
-                          placeholder="Ex: Fevereiro / 2026"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all"
-                        />
-                      </div>
+                          const adCat = adaptOccupationalTextToGender(employeeCategory || 'P.E.P.E.S.', isFem);
+                          const finFmt = formatFinalidadeWithPreposition(purpose, isFem);
+                          const dtEmiExt = formatAngolanDateExtenso(referenceMonthYear || todayISO);
+                          const dtNascExt = formatAngolanDateExtenso(nascimento);
+                          const dtBiExt = formatAngolanDateExtenso(biEmissao);
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Finalidade da Declaração
-                        </label>
-                        <select
-                          value={purpose}
-                          onChange={(e) => setPurpose(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-indigo-600 outline-none transition-all cursor-pointer"
-                        >
-                          <option value="Fins Bancários / Abertura de Conta">Fins Bancários / Abertura de Conta</option>
-                          <option value="Crédito ao Consumo / Habitação">Crédito ao Consumo / Habitação</option>
-                          <option value="Segurança Social / INSS">Segurança Social / INSS</option>
-                          <option value="Concurso Público / Progressão de Carreira">Concurso Público / Progressão de Carreira</option>
-                          <option value="Processo Individual / Prova de Vida">Processo Individual / Prova de Vida</option>
-                          <option value="Outros Fins Legais">Outros Fins Legais</option>
-                        </select>
+                          return (
+                            <div className="p-4 sm:p-6 overflow-x-auto">
+                              <div
+                                className="bg-white w-full max-w-[210mm] p-6 sm:p-8 border border-slate-200 shadow-xs text-black mx-auto"
+                                style={{ fontFamily: "'Times New Roman', Times, Georgia, serif", fontSize: '11.5pt', lineHeight: 1.42 }}
+                              >
+                                <div className="text-center mb-3">
+                                  <img
+                                    src={emblemAngolaImg}
+                                    alt="Insígnia da República de Angola"
+                                    className="w-14 h-14 object-contain mx-auto mb-1.5"
+                                  />
+                                  <p className="font-bold uppercase text-black" style={{ fontSize: '13.5pt', lineHeight: 1.25 }}>
+                                    REPÚBLICA DE ANGOLA
+                                  </p>
+                                  <p className="font-bold uppercase text-black" style={{ fontSize: '11.5pt', lineHeight: 1.28 }}>
+                                    GOVERNO PROVINCIAL DE MALANJE
+                                  </p>
+                                  <p className="font-bold uppercase text-black" style={{ fontSize: '11.5pt', lineHeight: 1.28 }}>
+                                    ADMINISTRAÇÃO MUNICIPAL DO QUÊSSUA
+                                  </p>
+                                  <p className="font-bold uppercase text-black" style={{ fontSize: '11.5pt', lineHeight: 1.28 }}>
+                                    DIRECÇÃO MUNICIPAL DE EDUCAÇÃO
+                                  </p>
+                                  <div className="mt-3 mb-2">
+                                    <h1 className="font-bold uppercase text-black underline" style={{ fontSize: '13.5pt' }}>
+                                      DECLARAÇÃO DE EFECTIVIDADE
+                                    </h1>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2.5 text-justify text-black">
+                                  <p style={{ textIndent: '1.25cm' }}>
+                                    Para os devidos efeitos legais e administrativos, a Direcção Municipal da Educação do Quêssua declara, para os fins a que se destina, que {artTrat}{' '}
+                                    <strong style={{ color: '#c00000' }}>{pNome}</strong>, {fFilha} de <strong>{pai.trim() || '[Nome do Pai]'}</strong> e de{' '}
+                                    <strong>{mae.trim() || '[Nome da Mãe]'}</strong>, natural de <strong>{naturalidade.trim() || 'Malanje'}</strong>, Província {prepProv}{' '}
+                                    <strong>{provNat || 'Malanje'}</strong>, {nNasc} aos <strong>{dtNascExt}</strong>, {pPort} do Bilhete de Identidade n.º{' '}
+                                    <strong>{employeeBi.trim().toUpperCase() || '[Nº do BI]'}</strong>, emitido aos <strong>{dtBiExt}</strong>, é {fFunc} do Sector da Educação, exercendo{' '}
+                                    {funcTxt} no Município do Quêssua, onde se encontra {cCol} {prepEsc} <strong>{pEscola}</strong>, {eEnq} na categoria de{' '}
+                                    <strong>{adCat}</strong> do <strong>{grau.trim() || '6º Grau'}</strong>, {iInsc} sob o número de agente{' '}
+                                    <strong>{employeeAgente.trim() || '[Nº de Agente]'}</strong>.
+                                  </p>
+
+                                  <p style={{ textIndent: '1.25cm' }}>
+                                    Mais se declara que {refFunc} se encontra no efectivo exercício da sua função e que a presente declaração é emitida para efeitos de comprovação da sua efectividade no Sector da Educação, destinando-se, especificamente,{' '}
+                                    {finFmt.preposition} {finFmt.text}, para os fins administrativos e profissionais legalmente previstos.
+                                  </p>
+
+                                  <p style={{ textIndent: '1.25cm' }}>
+                                    A presente declaração comprova os elementos de identificação e de enquadramento profissional {doDaFunc} acima indicados, devendo ser utilizada exclusivamente{' '}
+                                    {peloPela} para a finalidade que motivou a sua emissão, sem prejuízo da apresentação de outros documentos exigidos pelas entidades competentes no âmbito do referido processo concursal.
+                                  </p>
+
+                                  <p style={{ textIndent: '1.25cm' }}>
+                                    Por corresponder à verdade e por ter sido solicitada {intInt}, mandei passar a presente declaração, que vai por mim assinada e autenticada com o carimbo a óleo em uso nesta Direcção, para que produza os efeitos administrativos a que se destina.
+                                  </p>
+                                </div>
+
+                                <div className="mt-4">
+                                  <div className="text-right mb-4">
+                                    <span>Direcção Municipal de Educação do Quêssua, Quêssua aos {dtEmiExt}.</span>
+                                  </div>
+                                  <div className="flex flex-col items-center justify-center text-center">
+                                    <p className="font-bold">O Director Municipal</p>
+                                    <div className="my-0.5 flex justify-center">
+                                      <img
+                                        src={directorSignatureImg}
+                                        alt="Assinatura do Director Municipal"
+                                        style={{
+                                          height: '58px',
+                                          width: 'auto',
+                                          objectFit: 'contain',
+                                          filter: 'brightness(0)',
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="border-b border-black w-56 mx-auto"></div>
+                                    <p className="font-bold mt-1">Belízio Miguel dos Santos António</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}

@@ -9,7 +9,7 @@ import { StatCardItem } from '../../StatCardItem';
 import { MAX_TURMA_CAPACITY } from '../../../data/classesConfig';
 import { getDisciplinasForClass, getGradingScaleForClass } from '../../../utils/miniPautaStorage';
 import { saveClassToFirestore } from '../../../utils/firestoreSync';
-import { assignResponsibleTeacherToClassTurma } from '../../../utils/teacherStorage';
+import { assignResponsibleTeacherToClassTurma, isSubdirectorOrNonTeachingRole } from '../../../utils/teacherStorage';
 
 interface DirectorClassesPageProps {
   onOpenGetStarted: () => void;
@@ -88,6 +88,14 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
     if (!params.newTeacherId) return;
     const chosenTeacher = schoolTeachers.find((t) => t.id === params.newTeacherId);
     if (!chosenTeacher) return;
+
+    if (isSubdirectorOrNonTeachingRole(chosenTeacher)) {
+      setRedefineToast(
+        `Ação não permitida: "${chosenTeacher.name}" exerce cargo de Subdirector(a) de Escola e não pode receber atribuição de turma.`
+      );
+      setTimeout(() => setRedefineToast(null), 4000);
+      return;
+    }
 
     const updatedTeachers = assignResponsibleTeacherToClassTurma({
       gradeClass: params.gradeClass,
@@ -608,11 +616,13 @@ export const DirectorClassesPage: React.FC<DirectorClassesPageProps> = ({
                                 className="w-full p-2 rounded-lg bg-white border border-slate-200 text-[11px] font-bold text-slate-800 focus:border-[#f75142] outline-none"
                               >
                                 <option value="">-- Distribuir / Redefinir Professor da Turma --</option>
-                                {schoolTeachers.map((t) => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.name} ({t.subject} • {t.gradeClass} {t.turma})
-                                  </option>
-                                ))}
+                                {schoolTeachers
+                                  .filter((t) => !isSubdirectorOrNonTeachingRole(t))
+                                  .map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} ({t.subject} • {t.gradeClass} {t.turma})
+                                    </option>
+                                  ))}
                               </select>
                             </div>
                           );

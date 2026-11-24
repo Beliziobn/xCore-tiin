@@ -97,15 +97,20 @@ async function startServer() {
     teachers: any[];
     students: any[];
     staff?: any[];
+    dmeStaff?: any[];
     applications: any[];
     efectividade: any[];
     declaracaoServico?: any[];
     guiasFerias?: any[];
     guiasColocacao?: any[];
+    fichasAvaliacao?: any[];
+    cadastroDocente?: any[];
     miniPautas?: any[];
     rooms?: any[];
     classes?: any[];
+    users?: any[];
     quickRequests: any[];
+    tombstones?: string[];
     updatedAt: string;
   }
 
@@ -115,22 +120,177 @@ async function startServer() {
   const networkStoreTmpFile = path.join(networkDataDir, "sigre-network-store.json.tmp");
   const backupsDir = path.join(networkDataDir, "backups");
 
+  const ELIMINATED_EXACT_IDS = new Set([
+    "sch-1790810466749",
+    "sch-1792936202845",
+    "sige-113013",
+    "usr_1790893847062",
+    "dir-dossier-usr_1790893847062",
+    "dir-dossier-usr_1793568518418",
+    "usr_1793568518418",
+    "std-1793571845753",
+    "std-1793575332234",
+    "std-1793568820276",
+    "efec-1792754014681-206",
+    "efec-1792944193609-356",
+    "efec-1792963605316-86",
+  ]);
+
+  function normalizeAscii(str: any): string {
+    return String(str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function isEliminatedSchoolOrRecord(item: any): boolean {
+    if (!item || typeof item !== "object") return false;
+    const rawId = String(item.id || item.userId || "").trim().toLowerCase();
+    if (rawId && ELIMINATED_EXACT_IDS.has(rawId)) return true;
+
+    const candidateFields = [
+      item.id,
+      item.userId,
+      item.schoolId,
+      item.escolaId,
+      item.targetSchoolId,
+      item.codigoSige,
+      item.name,
+      item.nome,
+      item.nomeCompleto,
+      item.fullName,
+      item.requesterName,
+      item.schoolName,
+      item.escola,
+      item.nomeEscola,
+      item.nomeOficial,
+      item.escolaColocacao,
+      item.escolaDestino,
+      item.escolaOrigem,
+      item.targetSchoolName,
+      item.email,
+      item.emailOficial,
+      item.directorEmail,
+      item.targetDirectorEmail,
+      item.directorName,
+      item.guardianName,
+      item.parentName,
+      item.registrationData?.identificacao?.nomeOficial,
+      item.registrationData?.identificacao?.codigoSige,
+      item.registrationData?.identificacao?.emailOficial,
+      item.registrationData?.director?.nome,
+      item.registrationData?.director?.email,
+    ];
+
+    for (const val of candidateFields) {
+      if (!val) continue;
+      const norm = normalizeAscii(val);
+      if (
+        norm.includes("so ciencia da educacao") ||
+        norm === "so da educacao" ||
+        norm.includes("socienciadaeduca") ||
+        norm.includes("scinciadaeducao") ||
+        norm.includes("sige-113013") ||
+        norm.includes("modelo central") ||
+        ELIMINATED_EXACT_IDS.has(norm)
+      ) {
+        return true;
+      }
+    }
+
+    // Sanitize searchTokens in place if present
+    if (Array.isArray(item.searchTokens)) {
+      item.searchTokens = item.searchTokens.filter((tok: any) => {
+        const nt = normalizeAscii(tok);
+        return (
+          !nt.includes("so ciencia da educacao") &&
+          nt !== "so da educacao" &&
+          !nt.includes("socienciadaeduca") &&
+          !nt.includes("scinciadaeducao")
+        );
+      });
+    }
+
+    return false;
+  }
+
+  function isItemTombstoned(col: string, item: any, tombstonesSet: Set<string>): boolean {
+    if (!item || typeof item !== "object" || tombstonesSet.size === 0) return false;
+    const candidates = [
+      item.id,
+      item.userId,
+      item.bi,
+      item.biNif,
+      item.numeroDocumento,
+      item.agente,
+      item.numeroAgente,
+      item.ref,
+      item.protocol,
+      item.email,
+      item.name,
+      item.nome,
+      item.nomeCompleto,
+      item.fullName,
+      item.nomeOficial,
+    ]
+      .filter(Boolean)
+      .map((v) => String(v).trim().toLowerCase());
+
+    for (const c of candidates) {
+      if (
+        tombstonesSet.has(`${col}:${c}`) ||
+        tombstonesSet.has(`*:${c}`) ||
+        tombstonesSet.has(c)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function sanitizeCollectionList(col: string, arr: any[], tombstonesSet: Set<string>): any[] {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((item) => {
+      if (!item || typeof item !== "object") return false;
+      if (isEliminatedSchoolOrRecord(item)) return false;
+      if (isItemTombstoned(col, item, tombstonesSet)) return false;
+      return true;
+    });
+  }
+
   function normalizeStoreObject(parsed: any): NetworkRegistryStore {
+    const rawTombstones: string[] = Array.isArray(parsed?.tombstones)
+      ? parsed.tombstones.map((t: any) => String(t || "").trim().toLowerCase()).filter(Boolean)
+      : [];
+    for (const eid of ELIMINATED_EXACT_IDS) {
+      rawTombstones.push(eid);
+    }
+    rawTombstones.push("schools:só ciência da educação");
+    rawTombstones.push("schools:so ciencia da educacao");
+    const tombstones = Array.from(new Set(rawTombstones));
+    const tombstonesSet = new Set(tombstones);
+
     return {
-      schools: Array.isArray(parsed?.schools) ? parsed.schools : [],
-      directors: Array.isArray(parsed?.directors) ? parsed.directors : [],
-      teachers: Array.isArray(parsed?.teachers) ? parsed.teachers : [],
-      students: Array.isArray(parsed?.students) ? parsed.students : [],
-      staff: Array.isArray(parsed?.staff) ? parsed.staff : [],
-      applications: Array.isArray(parsed?.applications) ? parsed.applications : [],
-      efectividade: Array.isArray(parsed?.efectividade) ? parsed.efectividade : [],
-      declaracaoServico: Array.isArray(parsed?.declaracaoServico) ? parsed.declaracaoServico : [],
-      guiasFerias: Array.isArray(parsed?.guiasFerias) ? parsed.guiasFerias : [],
-      guiasColocacao: Array.isArray(parsed?.guiasColocacao) ? parsed.guiasColocacao : [],
-      miniPautas: Array.isArray(parsed?.miniPautas) ? parsed.miniPautas : [],
-      rooms: Array.isArray(parsed?.rooms) ? parsed.rooms : [],
-      classes: Array.isArray(parsed?.classes) ? parsed.classes : [],
-      quickRequests: Array.isArray(parsed?.quickRequests) ? parsed.quickRequests : [],
+      schools: sanitizeCollectionList("schools", parsed?.schools, tombstonesSet),
+      directors: sanitizeCollectionList("directors", parsed?.directors, tombstonesSet),
+      teachers: sanitizeCollectionList("teachers", parsed?.teachers, tombstonesSet),
+      students: sanitizeCollectionList("students", parsed?.students, tombstonesSet),
+      staff: sanitizeCollectionList("staff", parsed?.staff, tombstonesSet),
+      dmeStaff: sanitizeCollectionList("dme_staff", parsed?.dmeStaff, tombstonesSet),
+      applications: sanitizeCollectionList("applications", parsed?.applications, tombstonesSet),
+      efectividade: sanitizeCollectionList("efectividade", parsed?.efectividade, tombstonesSet),
+      declaracaoServico: sanitizeCollectionList("declaracao_servico", parsed?.declaracaoServico, tombstonesSet),
+      guiasFerias: sanitizeCollectionList("guias_ferias", parsed?.guiasFerias, tombstonesSet),
+      guiasColocacao: sanitizeCollectionList("guias_colocacao", parsed?.guiasColocacao, tombstonesSet),
+      fichasAvaliacao: sanitizeCollectionList("fichas_avaliacao", parsed?.fichasAvaliacao, tombstonesSet),
+      cadastroDocente: sanitizeCollectionList("cadastro_docente", parsed?.cadastroDocente, tombstonesSet),
+      miniPautas: sanitizeCollectionList("grades", parsed?.miniPautas, tombstonesSet),
+      rooms: sanitizeCollectionList("rooms", parsed?.rooms, tombstonesSet),
+      classes: sanitizeCollectionList("classes", parsed?.classes, tombstonesSet),
+      users: sanitizeCollectionList("users", parsed?.users, tombstonesSet),
+      quickRequests: sanitizeCollectionList("quickRequests", parsed?.quickRequests, tombstonesSet),
+      tombstones,
       updatedAt: parsed?.updatedAt || new Date().toISOString(),
     };
   }
@@ -179,8 +339,45 @@ async function startServer() {
 
   const networkStore: NetworkRegistryStore = loadNetworkStore();
 
+  function applyStoreSanitization() {
+    const cleaned = normalizeStoreObject(networkStore);
+    networkStore.schools = cleaned.schools;
+    networkStore.directors = cleaned.directors;
+    networkStore.teachers = cleaned.teachers;
+    networkStore.students = cleaned.students;
+    networkStore.staff = cleaned.staff;
+    networkStore.dmeStaff = cleaned.dmeStaff;
+    networkStore.applications = cleaned.applications;
+    networkStore.efectividade = cleaned.efectividade;
+    networkStore.declaracaoServico = cleaned.declaracaoServico;
+    networkStore.guiasFerias = cleaned.guiasFerias;
+    networkStore.guiasColocacao = cleaned.guiasColocacao;
+    networkStore.fichasAvaliacao = cleaned.fichasAvaliacao;
+    networkStore.cadastroDocente = cleaned.cadastroDocente;
+    networkStore.miniPautas = cleaned.miniPautas;
+    networkStore.rooms = cleaned.rooms;
+    networkStore.classes = cleaned.classes;
+    networkStore.users = cleaned.users;
+    networkStore.quickRequests = cleaned.quickRequests;
+    networkStore.tombstones = cleaned.tombstones;
+  }
+
+  function addServerTombstone(...keys: (string | undefined | null)[]) {
+    if (!Array.isArray(networkStore.tombstones)) {
+      networkStore.tombstones = [];
+    }
+    const set = new Set(networkStore.tombstones);
+    for (const k of keys) {
+      if (!k) continue;
+      const clean = String(k).trim().toLowerCase();
+      if (clean) set.add(clean);
+    }
+    networkStore.tombstones = Array.from(set);
+  }
+
   function persistNetworkStore() {
     try {
+      applyStoreSanitization();
       if (!fs.existsSync(networkDataDir)) {
         fs.mkdirSync(networkDataDir, { recursive: true });
       }
@@ -198,10 +395,24 @@ async function startServer() {
     }
   }
 
-  // Ensure data directory and initial persistence file exist immediately
-  if (!fs.existsSync(networkStoreFile)) {
-    persistNetworkStore();
-  }
+  // Persist sanitized store immediately on startup & clean any backup snapshots of eliminated records
+  persistNetworkStore();
+  try {
+    if (fs.existsSync(backupsDir)) {
+      const bkpFiles = fs.readdirSync(backupsDir).filter((f) => f.endsWith(".json"));
+      for (const bf of bkpFiles) {
+        try {
+          const bfPath = path.join(backupsDir, bf);
+          const raw = fs.readFileSync(bfPath, "utf-8");
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.store && typeof parsed.store === "object") {
+            parsed.store = normalizeStoreObject(parsed.store);
+            fs.writeFileSync(bfPath, JSON.stringify(parsed, null, 2), "utf-8");
+          }
+        } catch {}
+      }
+    }
+  } catch {}
 
   // ============================================================================
   // BACKUP ENGINE & DATA PRESERVATION VAULT (DAILY SNAPSHOTS & 1-CLICK RESTORE)
@@ -519,6 +730,13 @@ async function startServer() {
     const targetId = String(req.params.id || "").trim().toLowerCase();
     const targetName = String(req.query.name || "").trim().toLowerCase();
 
+    addServerTombstone(
+      targetId ? `schools:${targetId}` : null,
+      targetId || null,
+      targetName ? `schools:${targetName}` : null,
+      targetName || null
+    );
+
     networkStore.schools = networkStore.schools.filter((sc) => {
       const sId = String(sc?.id || "").trim().toLowerCase();
       const sName = String(sc?.name || sc?.nomeOficial || "").trim().toLowerCase();
@@ -531,6 +749,7 @@ async function startServer() {
     res.json({
       success: true,
       schools: networkStore.schools,
+      tombstones: networkStore.tombstones,
       updatedAt: networkStore.updatedAt,
     });
   });
@@ -547,6 +766,7 @@ async function startServer() {
     } catch (e) {
       console.warn("[NetworkStore] Error reading applications:", e);
     }
+    applyStoreSanitization();
     res.json({
       success: true,
       applications: networkStore.applications || [],
@@ -561,7 +781,9 @@ async function startServer() {
     if (application && typeof application === "object") incoming.push(application);
     if (Array.isArray(applications)) incoming.push(...applications);
 
-    if (incoming.length > 0) {
+    const validIncoming = incoming.filter((item) => item && !isEliminatedSchoolOrRecord(item));
+
+    if (validIncoming.length > 0) {
       try {
         if (fs.existsSync(networkStoreFile)) {
           const raw = fs.readFileSync(networkStoreFile, "utf-8");
@@ -574,12 +796,12 @@ async function startServer() {
 
       networkStore.applications = upsertByKey(
         networkStore.applications,
-        incoming,
+        validIncoming,
         (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
       );
 
       // Handle approved roles synchronization
-      incoming.forEach((appItem) => {
+      validIncoming.forEach((appItem) => {
         if (!appItem) return;
 
         // If approved director, update schools and directors
@@ -659,10 +881,16 @@ async function startServer() {
   app.delete("/api/network/applications/:id", (req, res) => {
     const targetId = String(req.params.id || "").trim().toLowerCase();
     const beforeCount = (networkStore.applications || []).length;
-    
-    // Find target application to see if it was approved
+
     const targetApp = (networkStore.applications || []).find(
       (a) => String(a.id || a.userId || "").trim().toLowerCase() === targetId
+    );
+
+    addServerTombstone(
+      targetId ? `applications:${targetId}` : null,
+      targetId || null,
+      targetApp?.userId ? `applications:${String(targetApp.userId).toLowerCase()}` : null,
+      targetApp?.email ? `applications:${String(targetApp.email).toLowerCase()}` : null
     );
 
     networkStore.applications = (networkStore.applications || []).filter((a) => {
@@ -671,15 +899,26 @@ async function startServer() {
       return aId !== targetId && uId !== targetId;
     });
 
-    // Also remove from directors/teachers if it was linked
     if (targetApp) {
       if (targetApp.type === "diretor") {
+        addServerTombstone(
+          targetApp.userId ? `directors:${String(targetApp.userId).toLowerCase()}` : null,
+          targetApp.id ? `directors:${String(targetApp.id).toLowerCase()}` : null
+        );
         networkStore.directors = (networkStore.directors || []).filter(
-          (d) => String(d.id || d.email || "").trim().toLowerCase() !== String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
+          (d) =>
+            String(d.id || d.email || "").trim().toLowerCase() !==
+            String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
         );
       } else if (targetApp.type === "professor") {
+        addServerTombstone(
+          targetApp.userId ? `teachers:${String(targetApp.userId).toLowerCase()}` : null,
+          targetApp.id ? `teachers:${String(targetApp.id).toLowerCase()}` : null
+        );
         networkStore.teachers = (networkStore.teachers || []).filter(
-          (t) => String(t.id || t.email || "").trim().toLowerCase() !== String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
+          (t) =>
+            String(t.id || t.email || "").trim().toLowerCase() !==
+            String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
         );
       }
     }
@@ -692,6 +931,95 @@ async function startServer() {
       applications: networkStore.applications,
       directors: networkStore.directors,
       teachers: networkStore.teachers,
+      tombstones: networkStore.tombstones,
+      updatedAt: networkStore.updatedAt,
+    });
+  });
+
+  // Generic entity deletion endpoint across all collections with permanent tombstone registration
+  app.delete("/api/network/entity/:collection/:id", (req, res) => {
+    const rawCol = String(req.params.collection || "").trim();
+    const targetId = String(req.params.id || "").trim().toLowerCase();
+    const extraKey = String(req.query.key || req.query.name || req.query.bi || "").trim().toLowerCase();
+
+    if (!targetId) {
+      return res.status(400).json({ success: false, error: "ID obrigatório para eliminação." });
+    }
+
+    const colAliasMap: Record<string, { storeKey: keyof NetworkRegistryStore; tombstonePrefix: string }> = {
+      schools: { storeKey: "schools", tombstonePrefix: "schools" },
+      directors: { storeKey: "directors", tombstonePrefix: "directors" },
+      teachers: { storeKey: "teachers", tombstonePrefix: "teachers" },
+      students: { storeKey: "students", tombstonePrefix: "students" },
+      staff: { storeKey: "staff", tombstonePrefix: "staff" },
+      dme_staff: { storeKey: "dmeStaff", tombstonePrefix: "dme_staff" },
+      dmeStaff: { storeKey: "dmeStaff", tombstonePrefix: "dme_staff" },
+      applications: { storeKey: "applications", tombstonePrefix: "applications" },
+      efectividade: { storeKey: "efectividade", tombstonePrefix: "efectividade" },
+      declaracao_servico: { storeKey: "declaracaoServico", tombstonePrefix: "declaracao_servico" },
+      declaracaoServico: { storeKey: "declaracaoServico", tombstonePrefix: "declaracao_servico" },
+      guias_ferias: { storeKey: "guiasFerias", tombstonePrefix: "guias_ferias" },
+      guiasFerias: { storeKey: "guiasFerias", tombstonePrefix: "guias_ferias" },
+      guias_colocacao: { storeKey: "guiasColocacao", tombstonePrefix: "guias_colocacao" },
+      guiasColocacao: { storeKey: "guiasColocacao", tombstonePrefix: "guias_colocacao" },
+      fichas_avaliacao: { storeKey: "fichasAvaliacao", tombstonePrefix: "fichas_avaliacao" },
+      fichasAvaliacao: { storeKey: "fichasAvaliacao", tombstonePrefix: "fichas_avaliacao" },
+      cadastro_docente: { storeKey: "cadastroDocente", tombstonePrefix: "cadastro_docente" },
+      cadastroDocente: { storeKey: "cadastroDocente", tombstonePrefix: "cadastro_docente" },
+      grades: { storeKey: "miniPautas", tombstonePrefix: "grades" },
+      miniPautas: { storeKey: "miniPautas", tombstonePrefix: "grades" },
+      rooms: { storeKey: "rooms", tombstonePrefix: "rooms" },
+      classes: { storeKey: "classes", tombstonePrefix: "classes" },
+      users: { storeKey: "users", tombstonePrefix: "users" },
+      quickRequests: { storeKey: "quickRequests", tombstonePrefix: "quickRequests" },
+    };
+
+    const resolved = colAliasMap[rawCol];
+    const prefix = resolved ? resolved.tombstonePrefix : rawCol.toLowerCase();
+
+    addServerTombstone(
+      `${prefix}:${targetId}`,
+      targetId,
+      extraKey ? `${prefix}:${extraKey}` : null,
+      extraKey || null
+    );
+
+    if (resolved) {
+      const currentArr = (networkStore[resolved.storeKey] as any[]) || [];
+      (networkStore as any)[resolved.storeKey] = currentArr.filter((item) => {
+        if (!item || typeof item !== "object") return false;
+        const candidates = [
+          item.id,
+          item.userId,
+          item.bi,
+          item.biNif,
+          item.numeroDocumento,
+          item.agente,
+          item.numeroAgente,
+          item.ref,
+          item.protocol,
+          item.email,
+          item.name,
+          item.nome,
+          item.nomeCompleto,
+          item.fullName,
+          item.nomeOficial,
+        ]
+          .filter(Boolean)
+          .map((v) => String(v).trim().toLowerCase());
+        if (candidates.includes(targetId)) return false;
+        if (extraKey && candidates.includes(extraKey)) return false;
+        return true;
+      });
+    }
+
+    persistNetworkStore();
+
+    res.json({
+      success: true,
+      collection: prefix,
+      deletedId: targetId,
+      tombstones: networkStore.tombstones,
       updatedAt: networkStore.updatedAt,
     });
   });
@@ -707,9 +1035,21 @@ async function startServer() {
     const approvedAppEmails = new Set<string>();
     (networkStore.applications || []).forEach((a) => {
       if (a.status === "aprovado" || a.approvedAt) {
-        if (a.userId) approvedAppUserIds.add(String(a.userId).trim().toLowerCase());
-        if (a.id) approvedAppUserIds.add(String(a.id).trim().toLowerCase());
-        if (a.email) approvedAppEmails.add(String(a.email).trim().toLowerCase());
+        if (a.userId) {
+          const u = String(a.userId).trim().toLowerCase();
+          approvedAppUserIds.add(u);
+          addServerTombstone(`applications:${u}`, `directors:${u}`, `teachers:${u}`, u);
+        }
+        if (a.id) {
+          const aid = String(a.id).trim().toLowerCase();
+          approvedAppUserIds.add(aid);
+          addServerTombstone(`applications:${aid}`, `directors:${aid}`, `teachers:${aid}`, aid);
+        }
+        if (a.email) {
+          const em = String(a.email).trim().toLowerCase();
+          approvedAppEmails.add(em);
+          addServerTombstone(`applications:${em}`, em);
+        }
       }
     });
 
@@ -770,6 +1110,7 @@ async function startServer() {
       teachers: networkStore.teachers,
       efectividade: networkStore.efectividade,
       quickRequests: networkStore.quickRequests,
+      tombstones: networkStore.tombstones,
       updatedAt: networkStore.updatedAt,
     });
   };
@@ -778,6 +1119,7 @@ async function startServer() {
   app.post("/api/network/clear-homologated", clearHomologadosHandler);
 
   app.get("/api/network/sync", (_req, res) => {
+    applyStoreSanitization();
     res.json({
       success: true,
       ...networkStore,
@@ -791,27 +1133,36 @@ async function startServer() {
       teachers,
       students,
       staff,
+      dmeStaff,
       applications,
       efectividade,
       declaracaoServico,
       guiasFerias,
       guiasColocacao,
+      fichasAvaliacao,
+      cadastroDocente,
       miniPautas,
       rooms,
       classes,
+      users,
       quickRequests,
+      tombstones,
     } = req.body || {};
     let changed = false;
 
+    if (Array.isArray(tombstones) && tombstones.length > 0) {
+      const beforeT = (networkStore.tombstones || []).length;
+      addServerTombstone(...tombstones);
+      if ((networkStore.tombstones || []).length !== beforeT) {
+        changed = true;
+      }
+    }
+
+    const tombstonesSet = new Set(networkStore.tombstones || []);
+
     if (Array.isArray(schools) && schools.length > 0) {
-      const validSchools = schools.filter(
-        (sc) =>
-          sc &&
-          (sc.name || sc.nomeOficial) &&
-          !String(sc.name || sc.nomeOficial)
-            .trim()
-            .toLowerCase()
-            .includes("modelo central")
+      const validSchools = sanitizeCollectionList("schools", schools, tombstonesSet).filter(
+        (sc) => sc && (sc.name || sc.nomeOficial)
       );
       if (validSchools.length > 0) {
         networkStore.schools = upsertByKey(
@@ -824,151 +1175,252 @@ async function startServer() {
     }
 
     if (Array.isArray(directors) && directors.length > 0) {
-      networkStore.directors = upsertByKey(
-        networkStore.directors,
-        directors,
-        (d) => String(d.id || d.biNif || d.name || d.nomeCompleto || "").trim().toLowerCase()
-      );
-      changed = true;
+      const valid = sanitizeCollectionList("directors", directors, tombstonesSet);
+      if (valid.length > 0) {
+        networkStore.directors = upsertByKey(
+          networkStore.directors,
+          valid,
+          (d) => String(d.id || d.biNif || d.name || d.nomeCompleto || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
     }
 
     if (Array.isArray(teachers) && teachers.length > 0) {
-      networkStore.teachers = upsertByKey(
-        networkStore.teachers,
-        teachers,
-        (t) => String(t.id || t.biNif || t.name || t.nomeCompleto || "").trim().toLowerCase()
-      );
-      changed = true;
+      const valid = sanitizeCollectionList("teachers", teachers, tombstonesSet);
+      if (valid.length > 0) {
+        networkStore.teachers = upsertByKey(
+          networkStore.teachers,
+          valid,
+          (t) => String(t.id || t.biNif || t.name || t.nomeCompleto || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
     }
 
     if (Array.isArray(students) && students.length > 0) {
-      networkStore.students = upsertByKey(
-        networkStore.students,
-        students,
-        (s) => String(s.id || s.numeroDocumento || s.name || s.nomeCompleto || "").trim().toLowerCase()
-      );
-      changed = true;
+      const valid = sanitizeCollectionList("students", students, tombstonesSet);
+      if (valid.length > 0) {
+        networkStore.students = upsertByKey(
+          networkStore.students,
+          valid,
+          (s) => String(s.id || s.numeroDocumento || s.name || s.nomeCompleto || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
     }
 
     if (Array.isArray(staff) && staff.length > 0) {
-      if (!Array.isArray(networkStore.staff)) {
-        networkStore.staff = [];
+      const valid = sanitizeCollectionList("staff", staff, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.staff)) {
+          networkStore.staff = [];
+        }
+        networkStore.staff = upsertByKey(
+          networkStore.staff,
+          valid,
+          (st) => String(st.id || st.bi || st.agente || st.nomeCompleto || st.name || "").trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.staff = upsertByKey(
-        networkStore.staff,
-        staff,
-        (st) => String(st.id || st.bi || st.agente || st.nomeCompleto || st.name || "").trim().toLowerCase()
-      );
-      changed = true;
+    }
+
+    if (Array.isArray(dmeStaff) && dmeStaff.length > 0) {
+      const valid = sanitizeCollectionList("dme_staff", dmeStaff, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.dmeStaff)) {
+          networkStore.dmeStaff = [];
+        }
+        networkStore.dmeStaff = upsertByKey(
+          networkStore.dmeStaff,
+          valid,
+          (st) => String(st.id || st.bi || st.email || st.name || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
     }
 
     if (Array.isArray(applications) && applications.length > 0) {
-      networkStore.applications = upsertByKey(
-        networkStore.applications,
-        applications,
-        (a) => String(a.id || a.userId || a.email || "").trim().toLowerCase()
-      );
-      changed = true;
+      const valid = sanitizeCollectionList("applications", applications, tombstonesSet);
+      if (valid.length > 0) {
+        networkStore.applications = upsertByKey(
+          networkStore.applications,
+          valid,
+          (a) => String(a.id || a.userId || a.email || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
     }
 
     if (Array.isArray(efectividade) && efectividade.length > 0) {
-      if (!Array.isArray(networkStore.efectividade)) {
-        networkStore.efectividade = [];
+      const valid = sanitizeCollectionList("efectividade", efectividade, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.efectividade)) {
+          networkStore.efectividade = [];
+        }
+        networkStore.efectividade = upsertByKey(
+          networkStore.efectividade,
+          valid,
+          (e) => String(e.id || `${e.bi || ""}::${e.agente || ""}`).trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.efectividade = upsertByKey(
-        networkStore.efectividade,
-        efectividade,
-        (e) => String(e.id || `${e.bi || ''}::${e.agente || ''}`).trim().toLowerCase()
-      );
-      changed = true;
     }
 
     if (Array.isArray(declaracaoServico) && declaracaoServico.length > 0) {
-      if (!Array.isArray(networkStore.declaracaoServico)) {
-        networkStore.declaracaoServico = [];
+      const valid = sanitizeCollectionList("declaracao_servico", declaracaoServico, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.declaracaoServico)) {
+          networkStore.declaracaoServico = [];
+        }
+        networkStore.declaracaoServico = upsertByKey(
+          networkStore.declaracaoServico,
+          valid,
+          (rec) => String(rec.id || rec.ref || `${rec.bi || ""}::${rec.agente || ""}`).trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.declaracaoServico = upsertByKey(
-        networkStore.declaracaoServico,
-        declaracaoServico,
-        (rec) => String(rec.id || rec.ref || `${rec.bi || ""}::${rec.agente || ""}`).trim().toLowerCase()
-      );
-      changed = true;
     }
 
     if (Array.isArray(guiasFerias) && guiasFerias.length > 0) {
-      if (!Array.isArray(networkStore.guiasFerias)) {
-        networkStore.guiasFerias = [];
+      const valid = sanitizeCollectionList("guias_ferias", guiasFerias, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.guiasFerias)) {
+          networkStore.guiasFerias = [];
+        }
+        networkStore.guiasFerias = upsertByKey(
+          networkStore.guiasFerias,
+          valid,
+          (g) => String(g.id || `${g.numeroAgente || ""}::${g.dataSaida || ""}`).trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.guiasFerias = upsertByKey(
-        networkStore.guiasFerias,
-        guiasFerias,
-        (g) => String(g.id || `${g.numeroAgente || ""}::${g.dataSaida || ""}`).trim().toLowerCase()
-      );
-      changed = true;
     }
 
     if (Array.isArray(guiasColocacao) && guiasColocacao.length > 0) {
-      if (!Array.isArray(networkStore.guiasColocacao)) {
-        networkStore.guiasColocacao = [];
+      const valid = sanitizeCollectionList("guias_colocacao", guiasColocacao, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.guiasColocacao)) {
+          networkStore.guiasColocacao = [];
+        }
+        networkStore.guiasColocacao = upsertByKey(
+          networkStore.guiasColocacao,
+          valid,
+          (g) => String(g.id || `${g.numeroGuia || ""}::${g.bi || ""}`).trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.guiasColocacao = upsertByKey(
-        networkStore.guiasColocacao,
-        guiasColocacao,
-        (g) => String(g.id || `${g.numeroGuia || ""}::${g.bi || ""}`).trim().toLowerCase()
-      );
-      changed = true;
+    }
+
+    if (Array.isArray(fichasAvaliacao) && fichasAvaliacao.length > 0) {
+      const valid = sanitizeCollectionList("fichas_avaliacao", fichasAvaliacao, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.fichasAvaliacao)) {
+          networkStore.fichasAvaliacao = [];
+        }
+        networkStore.fichasAvaliacao = upsertByKey(
+          networkStore.fichasAvaliacao,
+          valid,
+          (f) => String(f.id || `${f.numeroAgente || ""}::${f.anoLectivo || ""}`).trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(cadastroDocente) && cadastroDocente.length > 0) {
+      const valid = sanitizeCollectionList("cadastro_docente", cadastroDocente, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.cadastroDocente)) {
+          networkStore.cadastroDocente = [];
+        }
+        networkStore.cadastroDocente = upsertByKey(
+          networkStore.cadastroDocente,
+          valid,
+          (c) => String(c.id || `${c.bi || ""}::${c.nome || ""}`).trim().toLowerCase()
+        );
+        changed = true;
+      }
     }
 
     if (Array.isArray(miniPautas) && miniPautas.length > 0) {
-      if (!Array.isArray(networkStore.miniPautas)) {
-        networkStore.miniPautas = [];
+      const valid = sanitizeCollectionList("grades", miniPautas, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.miniPautas)) {
+          networkStore.miniPautas = [];
+        }
+        networkStore.miniPautas = upsertByKey(
+          networkStore.miniPautas,
+          valid,
+          (p) => String(p.id || `${p.schoolName || ""}::${p.className || ""}::${p.subject || ""}`).trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.miniPautas = upsertByKey(
-        networkStore.miniPautas,
-        miniPautas,
-        (p) => String(p.id || `${p.schoolName || ""}::${p.className || ""}::${p.subject || ""}`).trim().toLowerCase()
-      );
-      changed = true;
     }
 
     if (Array.isArray(rooms) && rooms.length > 0) {
-      if (!Array.isArray(networkStore.rooms)) {
-        networkStore.rooms = [];
+      const valid = sanitizeCollectionList("rooms", rooms, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.rooms)) {
+          networkStore.rooms = [];
+        }
+        networkStore.rooms = upsertByKey(
+          networkStore.rooms,
+          valid,
+          (r) => String(r.id || `${r.schoolName || ""}::${r.number || ""}`).trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.rooms = upsertByKey(
-        networkStore.rooms,
-        rooms,
-        (r) => String(r.id || `${r.schoolName || ""}::${r.number || ""}`).trim().toLowerCase()
-      );
-      changed = true;
     }
 
     if (Array.isArray(classes) && classes.length > 0) {
-      if (!Array.isArray(networkStore.classes)) {
-        networkStore.classes = [];
+      const valid = sanitizeCollectionList("classes", classes, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.classes)) {
+          networkStore.classes = [];
+        }
+        networkStore.classes = upsertByKey(
+          networkStore.classes,
+          valid,
+          (c) => String(c.id || `${c.schoolName || ""}::${c.name || ""}`).trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.classes = upsertByKey(
-        networkStore.classes,
-        classes,
-        (c) => String(c.id || `${c.schoolName || ""}::${c.name || ""}`).trim().toLowerCase()
-      );
-      changed = true;
+    }
+
+    if (Array.isArray(users) && users.length > 0) {
+      const valid = sanitizeCollectionList("users", users, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.users)) {
+          networkStore.users = [];
+        }
+        networkStore.users = upsertByKey(
+          networkStore.users,
+          valid,
+          (u) => String(u.id || u.email || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
     }
 
     if (Array.isArray(quickRequests) && quickRequests.length > 0) {
-      if (!Array.isArray(networkStore.quickRequests)) {
-        networkStore.quickRequests = [];
+      const valid = sanitizeCollectionList("quickRequests", quickRequests, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.quickRequests)) {
+          networkStore.quickRequests = [];
+        }
+        networkStore.quickRequests = upsertByKey(
+          networkStore.quickRequests,
+          valid,
+          (q) => String(q.id || "").trim().toLowerCase()
+        );
+        changed = true;
       }
-      networkStore.quickRequests = upsertByKey(
-        networkStore.quickRequests,
-        quickRequests,
-        (q) => String(q.id || "").trim().toLowerCase()
-      );
-      changed = true;
     }
 
     if (changed) {
       persistNetworkStore();
+    } else {
+      applyStoreSanitization();
     }
 
     res.json({
@@ -985,6 +1437,7 @@ async function startServer() {
     const schoolQuery = String(req.query.school || req.query.schoolId || "").trim().toLowerCase();
     const userEmail = String(req.headers["x-user-email"] || req.query.email || "").trim().toLowerCase();
 
+    applyStoreSanitization();
     let records = networkStore.efectividade || [];
 
     // Isolation: If a school filter is provided and the caller is not the Super Admin Belízio, scope results
@@ -1016,7 +1469,7 @@ async function startServer() {
       networkStore.efectividade = upsertByKey(
         networkStore.efectividade,
         incoming,
-        (rec) => String(rec.id || `${rec.bi || ''}::${rec.agente || ''}::${rec.nome || ''}`).trim().toLowerCase()
+        (rec) => String(rec.id || `${rec.bi || ""}::${rec.agente || ""}::${rec.nome || ""}`).trim().toLowerCase()
       );
       persistNetworkStore();
     }
@@ -1032,27 +1485,31 @@ async function startServer() {
   // Individual record deletion: matches ID, BI, or Agente so the specific record is permanently deleted
   app.delete("/api/efectividade/:id", (req, res) => {
     const targetId = String(req.params.id || "").trim();
+    if (targetId) {
+      addServerTombstone(`efectividade:${targetId.toLowerCase()}`, targetId.toLowerCase());
+    }
     if (Array.isArray(networkStore.efectividade) && targetId) {
-      const initialCount = networkStore.efectividade.length;
       networkStore.efectividade = networkStore.efectividade.filter((r) => {
         const rId = String(r.id || "").trim();
         const rBi = String(r.bi || "").trim().toUpperCase();
         const rAgente = String(r.agente || "").trim();
         if (rId === targetId || rBi === targetId.toUpperCase() || rAgente === targetId) {
+          addServerTombstone(
+            rId ? `efectividade:${rId.toLowerCase()}` : null,
+            rBi ? `efectividade:${rBi.toLowerCase()}` : null
+          );
           return false;
         }
         return true;
       });
-
-      if (networkStore.efectividade.length !== initialCount) {
-        persistNetworkStore();
-      }
+      persistNetworkStore();
     }
 
     res.json({
       success: true,
       records: networkStore.efectividade || [],
       count: (networkStore.efectividade || []).length,
+      tombstones: networkStore.tombstones,
       updatedAt: networkStore.updatedAt,
     });
   });
@@ -1077,6 +1534,9 @@ async function startServer() {
     // Capture safety snapshot before wipe so data can NEVER be permanently lost!
     createBackupSnapshot("pre-esvaziamento-efectividade", adminEmail);
 
+    (networkStore.efectividade || []).forEach((r) => {
+      if (r?.id) addServerTombstone(`efectividade:${String(r.id).toLowerCase()}`);
+    });
     networkStore.efectividade = [];
     persistNetworkStore();
 
@@ -1102,6 +1562,7 @@ async function startServer() {
         }
       }
     } catch {}
+    applyStoreSanitization();
     const records = Array.isArray(networkStore.declaracaoServico) ? networkStore.declaracaoServico : [];
     res.json({
       success: true,
@@ -1139,8 +1600,10 @@ async function startServer() {
 
   app.delete("/api/declaracao-servico/:id", (req, res) => {
     const targetId = String(req.params.id || "").trim();
+    if (targetId) {
+      addServerTombstone(`declaracao_servico:${targetId.toLowerCase()}`, targetId.toLowerCase());
+    }
     if (Array.isArray(networkStore.declaracaoServico) && targetId) {
-      const initialCount = networkStore.declaracaoServico.length;
       networkStore.declaracaoServico = networkStore.declaracaoServico.filter((r) => {
         const rId = String(r.id || "").trim();
         const rRef = String(r.ref || "").trim();
@@ -1152,19 +1615,22 @@ async function startServer() {
           rBi === targetId.toUpperCase() ||
           rAgente === targetId
         ) {
+          addServerTombstone(
+            rId ? `declaracao_servico:${rId.toLowerCase()}` : null,
+            rRef ? `declaracao_servico:${rRef.toLowerCase()}` : null
+          );
           return false;
         }
         return true;
       });
-      if (networkStore.declaracaoServico.length !== initialCount) {
-        persistNetworkStore();
-      }
+      persistNetworkStore();
     }
 
     res.json({
       success: true,
       records: networkStore.declaracaoServico || [],
       count: (networkStore.declaracaoServico || []).length,
+      tombstones: networkStore.tombstones,
       updatedAt: networkStore.updatedAt,
     });
   });
@@ -1173,6 +1639,7 @@ async function startServer() {
   // OUTROS FUNCIONÁRIOS (ADMINISTRATIVOS, SECRETARIADO, AUXILIARES, SEGURANÇA E APOIO)
   // ============================================================================
   app.get("/api/staff", (req, res) => {
+    applyStoreSanitization();
     const records = Array.isArray(networkStore.staff) ? networkStore.staff : [];
     res.json({
       success: true,
@@ -1210,22 +1677,23 @@ async function startServer() {
 
   app.delete("/api/staff/:id", (req, res) => {
     const targetId = String(req.params.id || "").trim().toLowerCase();
+    if (targetId) {
+      addServerTombstone(`staff:${targetId}`, targetId);
+    }
     if (Array.isArray(networkStore.staff) && targetId) {
-      const initialCount = networkStore.staff.length;
       networkStore.staff = networkStore.staff.filter((r) => {
         const rId = String(r.id || "").trim().toLowerCase();
         const rBi = String(r.bi || "").trim().toLowerCase();
         const rAgente = String(r.agente || "").trim().toLowerCase();
         return rId !== targetId && rBi !== targetId && rAgente !== targetId;
       });
-      if (networkStore.staff.length !== initialCount) {
-        persistNetworkStore();
-      }
+      persistNetworkStore();
     }
     res.json({
       success: true,
       records: networkStore.staff || [],
       count: (networkStore.staff || []).length,
+      tombstones: networkStore.tombstones,
       updatedAt: networkStore.updatedAt,
     });
   });

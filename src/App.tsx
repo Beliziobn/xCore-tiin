@@ -326,21 +326,15 @@ export default function App() {
     });
   }, []);
 
-  // Persist admin entities on change and sync to backend network store (never overwrite non-empty storage with empty initial state)
+  // Persist admin entities on change and sync to backend network store
   useEffect(() => {
     try {
-      if (adminSchools.length === 0) {
-        const existing = localStorage.getItem('ucore_admin_schools');
-        if (existing && JSON.parse(existing)?.length > 0) return;
-      }
       localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
-      if (adminSchools.length > 0) {
-        fetch('/api/network/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ schools: adminSchools }),
-        }).catch(() => {});
-      }
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schools: adminSchools }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
@@ -348,18 +342,12 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (adminTeachers.length === 0) {
-        const existing = localStorage.getItem('ucore_admin_teachers');
-        if (existing && JSON.parse(existing)?.length > 0) return;
-      }
       localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
-      if (adminTeachers.length > 0) {
-        fetch('/api/network/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ teachers: adminTeachers }),
-        }).catch(() => {});
-      }
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teachers: adminTeachers }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
@@ -367,18 +355,12 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (adminDirectors.length === 0) {
-        const existing = localStorage.getItem('ucore_admin_directors');
-        if (existing && JSON.parse(existing)?.length > 0) return;
-      }
       localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
-      if (adminDirectors.length > 0) {
-        fetch('/api/network/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ directors: adminDirectors }),
-        }).catch(() => {});
-      }
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directors: adminDirectors }),
+      }).catch(() => {});
     } catch {
       // ignore
     }
@@ -386,18 +368,12 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (adminStudents.length === 0) {
-        const existing = localStorage.getItem('ucore_admin_students');
-        if (existing && JSON.parse(existing)?.length > 0) return;
-      }
       localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
-      if (adminStudents.length > 0) {
-        fetch('/api/network/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ students: adminStudents }),
-        }).catch(() => {});
-      }
+      fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: adminStudents }),
+      }).catch(() => {});
     } catch {
       // ignore
     }

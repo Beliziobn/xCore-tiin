@@ -50,8 +50,86 @@ const CHAT_MESSAGES_COL = 'chatMessages';
 const GUIAS_FERIAS_COL = 'guias_ferias';
 const GUIAS_COLOCACAO_COL = 'guias_colocacao';
 const FICHAS_AVALIACAO_COL = 'fichas_avaliacao';
+const CADASTRO_DOCENTE_COL = 'cadastro_docente';
+const TOMBSTONES_COL = 'tombstones';
 
 const DELETED_ENTITIES_KEY = 'sigre_deleted_entities_tombstones_v1';
+
+const BANNED_ENTITY_IDS = new Set([
+  'sch-1790810466749',
+  'sch-1792936202845',
+  'sige-113013',
+  'usr_1790893847062',
+  'dir-dossier-usr_1790893847062',
+  'dir-dossier-usr_1793568518418',
+  'usr_1793568518418',
+  'std-1793571845753',
+  'std-1793575332234',
+  'std-1793568820276',
+  'efec-1792754014681-206',
+  'efec-1792944193609-356',
+  'efec-1792963605316-86',
+]);
+
+export function isBannedSchoolOrEntity(item: any): boolean {
+  if (!item) return false;
+  if (typeof item === 'string') {
+    const s = item.trim().toLowerCase();
+    if (!s) return false;
+    if (BANNED_ENTITY_IDS.has(s)) return true;
+    return (
+      s.includes('modelo central') ||
+      s.includes('só ciência da educação') ||
+      s.includes('so ciencia da educacao') ||
+      s.includes('só da educação') ||
+      s.includes('socienciadaeduca') ||
+      s.includes('scinciadaeducao') ||
+      s.includes('sige-113013')
+    );
+  }
+  const id = String(item.id || item.userId || '').trim().toLowerCase();
+  if (id && BANNED_ENTITY_IDS.has(id)) return true;
+
+  const fieldsToCheck = [
+    item.id,
+    item.userId,
+    item.schoolId,
+    item.escolaId,
+    item.codigoSIGE,
+    item.codigoEscola,
+    item.name,
+    item.nomeOficial,
+    item.nomeCompleto,
+    item.nome,
+    item.schoolName,
+    item.nomeEscola,
+    item.escola,
+    item.sector,
+    item.unidadeOrganica,
+    item.escolaDestino,
+    item.email,
+    item.emailDireccao,
+    item.emailInstitucional,
+    item.emailPessoal,
+    item.director?.email,
+    item.registrationData?.id,
+    item.registrationData?.schoolId,
+    item.registrationData?.escolaId,
+    item.registrationData?.nomeOficial,
+    item.registrationData?.nomeEscola,
+    item.registrationData?.escola,
+    item.registrationData?.codigoSIGE,
+    item.registrationData?.emailDireccao,
+    item.registrationData?.email,
+  ];
+
+  for (const val of fieldsToCheck) {
+    if (typeof val === 'string' && val.trim() && isBannedSchoolOrEntity(val)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export function sanitizeDocId(rawId: string | undefined | null): string {
   if (!rawId) return '';
@@ -96,12 +174,32 @@ export function getEntityTombstones(): Set<string> {
   }
 }
 
-export function addEntityTombstone(col: string, id: string): void {
+export function addEntityTombstone(col: string, id: string, skipRemotePropagation: boolean = false): void {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined' || !id) return;
   try {
+    const cleanId = sanitizeDocId(id).toLowerCase();
+    if (!cleanId) return;
+    const tombKey = `${col}::${cleanId}`;
     const set = getEntityTombstones();
-    set.add(`${col}::${sanitizeDocId(id).toLowerCase()}`);
+    const isNew = !set.has(tombKey);
+    set.add(tombKey);
     localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
+
+    if (!skipRemotePropagation) {
+      const tombDocId = sanitizeDocId(tombKey);
+      if (tombDocId) {
+        setDoc(
+          doc(db, TOMBSTONES_COL, tombDocId),
+          { key: tombKey, col, id: cleanId, deletedAt: new Date().toISOString() },
+          { merge: true }
+        ).catch(() => {});
+      }
+      if (isNew) {
+        fetch(`/api/network/entity/${encodeURIComponent(col)}/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+    }
   } catch {}
 }
 
@@ -109,18 +207,25 @@ export function removeEntityTombstone(col: string, id: string): void {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined' || !id) return;
   try {
     const set = getEntityTombstones();
-    const key = `${col}::${sanitizeDocId(id).toLowerCase()}`;
+    const cleanId = sanitizeDocId(id).toLowerCase();
+    const key = `${col}::${cleanId}`;
     if (set.has(key)) {
       set.delete(key);
       localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
+      const tombDocId = sanitizeDocId(key);
+      if (tombDocId) {
+        deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch(() => {});
+      }
     }
   } catch {}
 }
 
 export function isEntityTombstoned(col: string, id: string): boolean {
   if (!id) return false;
+  if (isBannedSchoolOrEntity(id)) return true;
   const set = getEntityTombstones();
-  return set.has(`${col}::${sanitizeDocId(id).toLowerCase()}`);
+  const cleanId = sanitizeDocId(id).toLowerCase();
+  return set.has(`${col}::${cleanId}`) || set.has(`*::${cleanId}`);
 }
 
 // ============================================================================
@@ -1231,10 +1336,22 @@ export async function saveRoomToFirestore(room: DirectorRoom): Promise<void> {
   try {
     const docId = sanitizeDocId(room.id || room.roomNumber);
     if (!docId) return;
+    removeEntityTombstone(ROOMS_COL, docId);
     const ref = doc(db, ROOMS_COL, docId);
     await setDoc(ref, cleanObject(room), { merge: true });
   } catch (error) {
     console.warn('[Firestore] Erro ao gravar sala no Firestore:', error);
+  }
+}
+
+export async function deleteRoomFromFirestore(id: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(id);
+    if (!docId) return;
+    addEntityTombstone(ROOMS_COL, docId);
+    await deleteDoc(doc(db, ROOMS_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar sala no Firestore:', error);
   }
 }
 
@@ -1258,10 +1375,22 @@ export async function saveClassToFirestore(cls: DirectorClass): Promise<void> {
   try {
     const docId = sanitizeDocId(cls.id || cls.name);
     if (!docId) return;
+    removeEntityTombstone(CLASSES_COL, docId);
     const ref = doc(db, CLASSES_COL, docId);
     await setDoc(ref, cleanObject(cls), { merge: true });
   } catch (error) {
     console.warn('[Firestore] Erro ao gravar classe no Firestore:', error);
+  }
+}
+
+export async function deleteClassFromFirestore(id: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(id);
+    if (!docId) return;
+    addEntityTombstone(CLASSES_COL, docId);
+    await deleteDoc(doc(db, CLASSES_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar classe no Firestore:', error);
   }
 }
 
@@ -1435,6 +1564,17 @@ export async function deleteFichaAvaliacaoFromFirestore(id: string): Promise<voi
   }
 }
 
+export async function fetchFichasAvaliacaoFromFirestore(): Promise<any[]> {
+  try {
+    const snapshot = await getDocs(collection(db, FICHAS_AVALIACAO_COL));
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch {
+    return [];
+  }
+}
+
 export function subscribeToFichasAvaliacao(onUpdate: (records: any[]) => void): Unsubscribe {
   try {
     return onSnapshot(
@@ -1445,6 +1585,79 @@ export function subscribeToFichasAvaliacao(onUpdate: (records: any[]) => void): 
         onUpdate(list);
       },
       (err) => console.warn('[Firestore] Fichas de Avaliação subscription error:', err)
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+export async function saveCadastroDocenteToFirestore(record: Record<string, any>): Promise<void> {
+  try {
+    const docId = sanitizeDocId(record.id || `${record.numNota || ''}_${record.bi || ''}_${record.nome || ''}`);
+    if (!docId) return;
+    removeEntityTombstone(CADASTRO_DOCENTE_COL, docId);
+    const ref = doc(db, CADASTRO_DOCENTE_COL, docId);
+    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+  } catch (error) {
+    console.warn('[Firestore] Erro ao gravar Cadastro Docente no Firestore:', error);
+  }
+}
+
+export async function deleteCadastroDocenteFromFirestore(id: string): Promise<void> {
+  try {
+    const docId = sanitizeDocId(id);
+    if (!docId) return;
+    addEntityTombstone(CADASTRO_DOCENTE_COL, docId);
+    await deleteDoc(doc(db, CADASTRO_DOCENTE_COL, docId));
+  } catch (error) {
+    console.warn('[Firestore] Erro ao eliminar Cadastro Docente no Firestore:', error);
+  }
+}
+
+export async function fetchCadastroDocenteFromFirestore(): Promise<any[]> {
+  try {
+    const snapshot = await getDocs(collection(db, CADASTRO_DOCENTE_COL));
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeToCadastroDocente(onUpdate: (records: any[]) => void): Unsubscribe {
+  try {
+    return onSnapshot(
+      collection(db, CADASTRO_DOCENTE_COL),
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => list.push(d.data()));
+        onUpdate(list);
+      },
+      (err) => console.warn('[Firestore] Cadastro Docente subscription error:', err)
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsubscribe {
+  try {
+    return onSnapshot(
+      collection(db, TOMBSTONES_COL),
+      (snapshot) => {
+        const keys: string[] = [];
+        snapshot.forEach((d) => {
+          const data = d.data();
+          if (data && typeof data.key === 'string') {
+            keys.push(data.key);
+          } else if (data && data.col && data.id) {
+            keys.push(`${data.col}::${sanitizeDocId(data.id).toLowerCase()}`);
+          }
+        });
+        onUpdate(keys);
+      },
+      (err) => console.warn('[Firestore] Tombstones subscription error:', err)
     );
   } catch {
     return () => {};
@@ -1501,16 +1714,38 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
     return true;
   };
 
+  // 0. REAL-TIME TOMBSTONES & BANNED ENTITY PURGE ORCHESTRATION
+  unsubs.push(
+    subscribeToTombstones((cloudTombstoneKeys) => {
+      try {
+        if (!Array.isArray(cloudTombstoneKeys) || cloudTombstoneKeys.length === 0) return;
+        const currentSet = getEntityTombstones();
+        let added = false;
+        cloudTombstoneKeys.forEach((k) => {
+          if (k && !currentSet.has(k)) {
+            currentSet.add(k);
+            added = true;
+          }
+        });
+        if (added) {
+          localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(currentSet)));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
+      } catch {}
+    })
+  );
+
   // 1. REAL-TIME SCHOOLS UNIFICATION (ucore_admin_schools & sigre_school_registrations)
   unsubs.push(
     subscribeToSchools((cloudSchools) => {
       try {
         const localAdminSchools = safeReadJsonArray<AdminSchool>('ucore_admin_schools');
+        const localRegSchools = safeReadJsonArray<any>('sigre_school_registrations');
         const map = new Map<string, AdminSchool>();
 
         // Push any unsynced local schools to Firestore
         localAdminSchools.forEach((ls) => {
-          if (!ls || !ls.name || norm(ls.name).includes('modelo central')) return;
+          if (!ls || !ls.name || isBannedSchoolOrEntity(ls)) return;
           const k = norm(ls.id || ls.name);
           if (isEntityTombstoned(SCHOOLS_COL, ls.id) || isEntityTombstoned(SCHOOLS_COL, ls.name)) return;
           map.set(k, ls);
@@ -1522,9 +1757,30 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           }
         });
 
-        // Merge authoritative cloud schools
+        // Also ensure schools registered in sigre_school_registrations are represented
+        localRegSchools.forEach((reg) => {
+          if (!reg || !reg.nomeOficial || isBannedSchoolOrEntity(reg)) return;
+          if (isEntityTombstoned(SCHOOLS_COL, reg.id) || isEntityTombstoned(SCHOOLS_COL, reg.nomeOficial)) return;
+          const matchKey =
+            Array.from(map.keys()).find((k) => {
+              const item = map.get(k);
+              return item && (norm(item.id) === norm(reg.id) || norm(item.name) === norm(reg.nomeOficial));
+            }) || norm(reg.id || reg.nomeOficial);
+          const existing = map.get(matchKey);
+          if (existing) {
+            if (!existing.registrationData) {
+              map.set(matchKey, { ...existing, registrationData: reg });
+            }
+          }
+        });
+
+        // Merge authoritative cloud schools (and delete banned ones from Firestore)
         cloudSchools.forEach((cs) => {
-          if (!cs || !cs.name || norm(cs.name).includes('modelo central')) return;
+          if (!cs || !cs.name) return;
+          if (isBannedSchoolOrEntity(cs)) {
+            if (cs.id) deleteDoc(doc(db, SCHOOLS_COL, sanitizeDocId(cs.id))).catch(() => {});
+            return;
+          }
           if (isEntityTombstoned(SCHOOLS_COL, cs.id) || isEntityTombstoned(SCHOOLS_COL, cs.name)) return;
           const matchKey =
             Array.from(map.keys()).find((k) => {
@@ -1541,9 +1797,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const unifiedRegs = unifiedSchools
           .map((s) => s.registrationData)
           .filter(Boolean);
-        if (unifiedRegs.length > 0) {
-          safeWriteJsonIfChanged('sigre_school_registrations', unifiedRegs);
-        }
+        safeWriteJsonIfChanged('sigre_school_registrations', unifiedRegs);
 
         if (changedSchools) {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
@@ -1568,6 +1822,12 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
 
         const ingestTeacherItem = (item: any, fromCloud: boolean) => {
           if (!item) return;
+          if (isBannedSchoolOrEntity(item)) {
+            if (fromCloud && item.id) {
+              deleteDoc(doc(db, TEACHERS_COL, sanitizeDocId(item.id))).catch(() => {});
+            }
+            return;
+          }
           const id = String(item.id || item.nomeCompleto || item.name || '').trim();
           const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
           if (!id && !name) return;
@@ -1576,7 +1836,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const schoolName = String(
             item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua'
           ).trim();
-          if (norm(schoolName).includes('modelo central')) return;
+          if (isBannedSchoolOrEntity(schoolName)) return;
 
           const key = norm(id || name);
           const regData: TeacherRegistrationData | undefined =
@@ -1729,7 +1989,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const localReg = safeReadJsonArray<StudentRegistrationData>('ucore_registered_students_v2');
         const localAdmin = safeReadJsonArray<AdminStudent>('ucore_admin_students');
         const localDir = safeReadJsonArray<DirectorStudent>('ucore_director_students');
-        const localTeacher = safeReadJsonArray< any >('ucore_teacher_students');
+        const localTeacher = safeReadJsonArray<any>('ucore_teacher_students');
 
         const regMap = new Map<string, StudentRegistrationData>();
         const adminMap = new Map<string, AdminStudent>();
@@ -1738,6 +1998,12 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
 
         const ingestStudentItem = (item: any, fromCloud: boolean) => {
           if (!item) return;
+          if (isBannedSchoolOrEntity(item)) {
+            if (fromCloud && item.id) {
+              deleteDoc(doc(db, STUDENTS_COL, sanitizeDocId(item.id))).catch(() => {});
+            }
+            return;
+          }
           const id = String(item.id || '').trim();
           const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
           if (!id && !name) return;
@@ -1746,7 +2012,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const schoolName = String(
             item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial'
           ).trim();
-          if (norm(schoolName).includes('modelo central')) return;
+          if (isBannedSchoolOrEntity(schoolName)) return;
 
           const key = norm(id || `${name}::${schoolName}`);
           const studentId = id || `std-${Math.abs(key.split('').reduce((a, c) => a + c.charCodeAt(0), 1000))}`;
@@ -1960,6 +2226,12 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
 
         const ingestDirector = (item: any, fromCloud: boolean) => {
           if (!item) return;
+          if (isBannedSchoolOrEntity(item)) {
+            if (fromCloud && item.id) {
+              deleteDoc(doc(db, DIRECTORS_COL, sanitizeDocId(item.id))).catch(() => {});
+            }
+            return;
+          }
           const id = String(item.id || '').trim();
           const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
           if (!id && !name) return;
@@ -1968,7 +2240,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           const schoolName = String(
             item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || ''
           ).trim();
-          if (norm(schoolName).includes('modelo central')) return;
+          if (isBannedSchoolOrEntity(schoolName)) return;
 
           const key = norm(id || name);
           const regData: DirectorRegistrationData | undefined =
@@ -2026,7 +2298,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, any>();
 
         localStaff.forEach((s) => {
-          if (!s) return;
+          if (!s || isBannedSchoolOrEntity(s)) return;
           const k = norm(s.id || s.email || s.role);
           if (!k || isEntityTombstoned(DME_STAFF_COL, k)) return;
           map.set(k, s);
@@ -2037,7 +2309,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudStaff.forEach((cs) => {
-          if (!cs) return;
+          if (!cs || isBannedSchoolOrEntity(cs)) return;
           const k = norm(cs.id || cs.email || cs.role);
           if (!k || isEntityTombstoned(DME_STAFF_COL, k)) return;
           map.set(k, { ...(map.get(k) || {}), ...cs });
@@ -2062,7 +2334,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, any>();
 
         localRecs.forEach((lr) => {
-          if (!lr || !lr.id) return;
+          if (!lr || !lr.id || isBannedSchoolOrEntity(lr)) return;
           if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(EFECTIVIDADE_COL, lr.id)) return;
           map.set(lr.id, lr);
           const inCloud = cloudRecords.some((cr) => cr && cr.id === lr.id);
@@ -2073,6 +2345,10 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
 
         cloudRecords.forEach((cr) => {
           if (!cr || !cr.id) return;
+          if (isBannedSchoolOrEntity(cr)) {
+            deleteDoc(doc(db, EFECTIVIDADE_COL, sanitizeDocId(cr.id))).catch(() => {});
+            return;
+          }
           if (deletedSet.has(norm(cr.id)) || isEntityTombstoned(EFECTIVIDADE_COL, cr.id)) return;
           map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
         });
@@ -2098,7 +2374,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, any>();
 
         localRecs.forEach((lr) => {
-          if (!lr || !lr.id) return;
+          if (!lr || !lr.id || isBannedSchoolOrEntity(lr)) return;
           if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, lr.id)) return;
           map.set(lr.id, lr);
           const inCloud = cloudRecords.some((cr) => cr && cr.id === lr.id);
@@ -2108,7 +2384,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudRecords.forEach((cr) => {
-          if (!cr || !cr.id) return;
+          if (!cr || !cr.id || isBannedSchoolOrEntity(cr)) return;
           if (deletedSet.has(norm(cr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, cr.id)) return;
           map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
         });
@@ -2132,9 +2408,9 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, any>();
 
         localStaff.forEach((ls) => {
-          if (!ls) return;
+          if (!ls || isBannedSchoolOrEntity(ls)) return;
           const k = norm(ls.id || ls.bi || ls.agente || ls.nomeCompleto || ls.name);
-          if (!k || isEntityTombstoned(STAFF_COL, k)) return;
+          if (!k || isEntityTombstoned(STAFF_COL, k) || (ls.id && isEntityTombstoned(STAFF_COL, ls.id))) return;
           map.set(k, ls);
           const inCloud = cloudStaff.some(
             (cs) => norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name) === k
@@ -2145,9 +2421,9 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudStaff.forEach((cs) => {
-          if (!cs) return;
+          if (!cs || isBannedSchoolOrEntity(cs)) return;
           const k = norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name);
-          if (!k || isEntityTombstoned(STAFF_COL, k)) return;
+          if (!k || isEntityTombstoned(STAFF_COL, k) || (cs.id && isEntityTombstoned(STAFF_COL, cs.id))) return;
           map.set(k, { ...(map.get(k) || {}), ...cs });
         });
 
@@ -2172,7 +2448,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           `${norm(r.classe)}::${norm(r.turma)}::${norm(r.disciplina)}::${norm(r.schoolName)}`;
 
         localPautas.forEach((lp) => {
-          if (!lp) return;
+          if (!lp || isBannedSchoolOrEntity(lp)) return;
           const k = getKey(lp);
           map.set(k, lp);
           const inCloud = cloudPautas.some((cp) => getKey(cp) === k);
@@ -2182,7 +2458,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudPautas.forEach((cp) => {
-          if (!cp) return;
+          if (!cp || isBannedSchoolOrEntity(cp)) return;
           const k = getKey(cp);
           map.set(k, { ...(map.get(k) || {}), ...cp });
         });
@@ -2209,7 +2485,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const teaMap = new Map<string, any>();
 
         localStudentsAtt.forEach((r) => {
-          if (!r || !r.studentId || !r.date) return;
+          if (!r || !r.studentId || !r.date || isBannedSchoolOrEntity(r)) return;
           const k = `${r.studentId}_${r.date}`;
           stuMap.set(k, r);
           const inCloud = cloudAttendance.some(
@@ -2221,7 +2497,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         localTeachersAtt.forEach((r) => {
-          if (!r || !r.teacherId || !r.date) return;
+          if (!r || !r.teacherId || !r.date || isBannedSchoolOrEntity(r)) return;
           const k = `${r.teacherId}_${r.date}`;
           teaMap.set(k, r);
           const inCloud = cloudAttendance.some(
@@ -2233,7 +2509,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudAttendance.forEach((ca) => {
-          if (!ca) return;
+          if (!ca || isBannedSchoolOrEntity(ca)) return;
           if (ca.attendanceKind === 'student' || ca.studentId) {
             const k = `${ca.studentId}_${ca.date}`;
             stuMap.set(k, { ...(stuMap.get(k) || {}), ...ca });
@@ -2262,7 +2538,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, SchoolAnnouncement>();
 
         localAnn.forEach((la) => {
-          if (!la || !la.id || isEntityTombstoned(ANNOUNCEMENTS_COL, la.id)) return;
+          if (!la || !la.id || isEntityTombstoned(ANNOUNCEMENTS_COL, la.id) || isBannedSchoolOrEntity(la)) return;
           map.set(la.id, la);
           if (!cloudAnn.some((ca) => ca.id === la.id) && shouldPushMissing(ANNOUNCEMENTS_COL, la.id)) {
             saveAnnouncementToFirestore(la).catch(() => {});
@@ -2270,7 +2546,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudAnn.forEach((ca) => {
-          if (!ca || !ca.id || isEntityTombstoned(ANNOUNCEMENTS_COL, ca.id)) return;
+          if (!ca || !ca.id || isEntityTombstoned(ANNOUNCEMENTS_COL, ca.id) || isBannedSchoolOrEntity(ca)) return;
           map.set(ca.id, { ...(map.get(ca.id) || {}), ...ca });
         });
 
@@ -2287,18 +2563,18 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const localRooms = safeReadJsonArray<DirectorRoom>('ucore_director_rooms');
         const map = new Map<string, DirectorRoom>();
         localRooms.forEach((lr) => {
-          if (!lr || !lr.id) return;
+          if (!lr || !lr.id || isEntityTombstoned(ROOMS_COL, lr.id) || isBannedSchoolOrEntity(lr)) return;
           map.set(lr.id, lr);
           if (!cloudRooms.some((cr) => cr.id === lr.id) && shouldPushMissing(ROOMS_COL, lr.id)) {
             saveRoomToFirestore(lr).catch(() => {});
           }
         });
         cloudRooms.forEach((cr) => {
-          if (!cr || !cr.id) return;
+          if (!cr || !cr.id || isEntityTombstoned(ROOMS_COL, cr.id) || isBannedSchoolOrEntity(cr)) return;
           map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
         });
         const merged = Array.from(map.values());
-        if (merged.length > 0 && safeWriteJsonIfChanged('ucore_director_rooms', merged)) {
+        if (safeWriteJsonIfChanged('ucore_director_rooms', merged)) {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
       } catch {}
@@ -2311,25 +2587,25 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const localClasses = safeReadJsonArray<DirectorClass>('ucore_director_classes');
         const map = new Map<string, DirectorClass>();
         localClasses.forEach((lc) => {
-          if (!lc || !lc.id) return;
+          if (!lc || !lc.id || isEntityTombstoned(CLASSES_COL, lc.id) || isBannedSchoolOrEntity(lc)) return;
           map.set(lc.id, lc);
           if (!cloudClasses.some((cc) => cc.id === lc.id) && shouldPushMissing(CLASSES_COL, lc.id)) {
             saveClassToFirestore(lc).catch(() => {});
           }
         });
         cloudClasses.forEach((cc) => {
-          if (!cc || !cc.id) return;
+          if (!cc || !cc.id || isEntityTombstoned(CLASSES_COL, cc.id) || isBannedSchoolOrEntity(cc)) return;
           map.set(cc.id, { ...(map.get(cc.id) || {}), ...cc });
         });
         const merged = Array.from(map.values());
-        if (merged.length > 0 && safeWriteJsonIfChanged('ucore_director_classes', merged)) {
+        if (safeWriteJsonIfChanged('ucore_director_classes', merged)) {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
       } catch {}
     })
   );
 
-  // 9. REAL-TIME GUIAS DE FÉRIAS & GUIAS DE COLOCAÇÃO UNIFICATION
+  // 9. REAL-TIME GUIAS DE FÉRIAS, GUIAS DE COLOCAÇÃO, FICHAS DE AVALIAÇÃO & CADASTRO DOCENTE UNIFICATION
   unsubs.push(
     subscribeToGuiasFerias((cloudGuias) => {
       try {
@@ -2337,7 +2613,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, any>();
 
         localGuias.forEach((lg) => {
-          if (!lg || !lg.id || isEntityTombstoned(GUIAS_FERIAS_COL, lg.id)) return;
+          if (!lg || !lg.id || isEntityTombstoned(GUIAS_FERIAS_COL, lg.id) || isBannedSchoolOrEntity(lg)) return;
           map.set(lg.id, lg);
           if (!cloudGuias.some((cg) => cg && cg.id === lg.id) && shouldPushMissing(GUIAS_FERIAS_COL, lg.id)) {
             saveGuiaFeriasToFirestore(lg).catch(() => {});
@@ -2345,12 +2621,12 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudGuias.forEach((cg) => {
-          if (!cg || !cg.id || isEntityTombstoned(GUIAS_FERIAS_COL, cg.id)) return;
+          if (!cg || !cg.id || isEntityTombstoned(GUIAS_FERIAS_COL, cg.id) || isBannedSchoolOrEntity(cg)) return;
           map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
         });
 
         const merged = Array.from(map.values());
-        if (merged.length > 0 && safeWriteJsonIfChanged('sigre_guias_ferias_records_v1', merged)) {
+        if (safeWriteJsonIfChanged('sigre_guias_ferias_records_v1', merged)) {
           window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
@@ -2365,7 +2641,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, any>();
 
         localGuias.forEach((lg) => {
-          if (!lg || !lg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, lg.id)) return;
+          if (!lg || !lg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, lg.id) || isBannedSchoolOrEntity(lg)) return;
           map.set(lg.id, lg);
           if (!cloudGuias.some((cg) => cg && cg.id === lg.id) && shouldPushMissing(GUIAS_COLOCACAO_COL, lg.id)) {
             saveGuiaColocacaoToFirestore(lg).catch(() => {});
@@ -2373,12 +2649,12 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudGuias.forEach((cg) => {
-          if (!cg || !cg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, cg.id)) return;
+          if (!cg || !cg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, cg.id) || isBannedSchoolOrEntity(cg)) return;
           map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
         });
 
         const merged = Array.from(map.values());
-        if (merged.length > 0 && safeWriteJsonIfChanged('sigre_guias_colocacao_records_v1', merged)) {
+        if (safeWriteJsonIfChanged('sigre_guias_colocacao_records_v1', merged)) {
           window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
@@ -2393,7 +2669,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const map = new Map<string, any>();
 
         localFichas.forEach((lf) => {
-          if (!lf || !lf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, lf.id)) return;
+          if (!lf || !lf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, lf.id) || isBannedSchoolOrEntity(lf)) return;
           map.set(lf.id, lf);
           if (!cloudFichas.some((cf) => cf && cf.id === lf.id) && shouldPushMissing(FICHAS_AVALIACAO_COL, lf.id)) {
             saveFichaAvaliacaoToFirestore(lf).catch(() => {});
@@ -2401,13 +2677,41 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
 
         cloudFichas.forEach((cf) => {
-          if (!cf || !cf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, cf.id)) return;
+          if (!cf || !cf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, cf.id) || isBannedSchoolOrEntity(cf)) return;
           map.set(cf.id, { ...(map.get(cf.id) || {}), ...cf });
         });
 
         const merged = Array.from(map.values());
-        if (merged.length > 0 && safeWriteJsonIfChanged('sigre_fichas_avaliacao_records_v1', merged)) {
+        if (safeWriteJsonIfChanged('sigre_fichas_avaliacao_records_v1', merged)) {
           window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
+      } catch {}
+    })
+  );
+
+  unsubs.push(
+    subscribeToCadastroDocente((cloudCadastros) => {
+      try {
+        const localCadastros = safeReadJsonArray<any>('cadastro-docente-registos');
+        const map = new Map<string, any>();
+
+        localCadastros.forEach((lc) => {
+          if (!lc || !lc.id || isEntityTombstoned(CADASTRO_DOCENTE_COL, lc.id) || isBannedSchoolOrEntity(lc)) return;
+          map.set(String(lc.id), lc);
+          if (!cloudCadastros.some((cc) => cc && String(cc.id) === String(lc.id)) && shouldPushMissing(CADASTRO_DOCENTE_COL, String(lc.id))) {
+            saveCadastroDocenteToFirestore(lc).catch(() => {});
+          }
+        });
+
+        cloudCadastros.forEach((cc) => {
+          if (!cc || !cc.id || isEntityTombstoned(CADASTRO_DOCENTE_COL, cc.id) || isBannedSchoolOrEntity(cc)) return;
+          map.set(String(cc.id), { ...(map.get(String(cc.id)) || {}), ...cc });
+        });
+
+        const merged = Array.from(map.values());
+        if (safeWriteJsonIfChanged('cadastro-docente-registos', merged)) {
+          window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated', { detail: { records: merged } }));
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
       } catch {}
@@ -2420,7 +2724,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const localUsers = safeReadJsonArray<UserAccount>('ucore_registered_users');
         const map = new Map<string, UserAccount>();
         localUsers.forEach((lu) => {
-          if (!lu || !lu.email) return;
+          if (!lu || !lu.email || isBannedSchoolOrEntity(lu)) return;
           if (
             isEntityTombstoned(USERS_COL, lu.email) ||
             (lu.id && isEntityTombstoned(USERS_COL, lu.id)) ||
@@ -2437,6 +2741,10 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         });
         cloudUsers.forEach((cu) => {
           if (!cu || !cu.email) return;
+          if (isBannedSchoolOrEntity(cu)) {
+            deleteDoc(doc(db, USERS_COL, sanitizeDocId(cu.email))).catch(() => {});
+            return;
+          }
           if (
             isEntityTombstoned(USERS_COL, cu.email) ||
             (cu.id && isEntityTombstoned(USERS_COL, cu.id)) ||
@@ -2495,48 +2803,59 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
 }
 
 /**
- * Flushes all local collections (schools, directors, teachers, students, staff, applications,
- * efectividade, declaracaoServico, guiasFerias, guiasColocacao, miniPautas, rooms, classes)
+ * Flushes all local collections (schools, directors, dmeStaff, teachers, students, staff, applications,
+ * efectividade, declaracaoServico, guiasFerias, guiasColocacao, fichasAvaliacao, cadastroDocente,
+ * miniPautas, rooms, classes, users, quickRequests, tombstones)
  * to both the shared backend disk store (/api/network/sync) and Firestore cloud database.
  */
 export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: boolean = false): Promise<void> {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   try {
-    const schools = safeReadJsonArray<AdminSchool>('ucore_admin_schools');
-    const directors = safeReadJsonArray<any>('ucore_admin_directors');
-    const regDirectors = safeReadJsonArray<any>('ucore_registered_directors_v2');
-    const teachers = safeReadJsonArray<any>('ucore_admin_teachers');
-    const regTeachers = safeReadJsonArray<any>('ucore_registered_teachers_v2');
-    const dirTeachers = safeReadJsonArray<any>('ucore_director_teachers_v1');
-    const students = safeReadJsonArray<any>('ucore_admin_students');
-    const regStudents = safeReadJsonArray<any>('ucore_registered_students_v2');
-    const dirStudents = safeReadJsonArray<any>('ucore_director_students');
-    const staff = safeReadJsonArray<any>('ucore_registered_staff_v1');
-    const applications = safeReadJsonArray<any>('ucore_pending_applications');
-    const efectividade = safeReadJsonArray<any>('sigre_cadastramento_efectividade_v2');
-    const declaracaoServico = safeReadJsonArray<any>('sigre_declaracao_servico_v1');
-    const guiasFerias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1');
-    const guiasColocacao = safeReadJsonArray<any>('sigre_guias_colocacao_records_v1');
-    const fichasAvaliacao = safeReadJsonArray<any>('sigre_fichas_avaliacao_records_v1');
-    const miniPautas = safeReadJsonArray<any>('sigre_teacher_mini_pautas_v5_blank');
-    const rooms = safeReadJsonArray<any>('ucore_director_rooms');
-    const classes = safeReadJsonArray<any>('ucore_director_classes');
+    const schools = safeReadJsonArray<AdminSchool>('ucore_admin_schools').filter((s) => !isBannedSchoolOrEntity(s));
+    const directors = safeReadJsonArray<any>('ucore_admin_directors').filter((d) => !isBannedSchoolOrEntity(d));
+    const regDirectors = safeReadJsonArray<any>('ucore_registered_directors_v2').filter((d) => !isBannedSchoolOrEntity(d));
+    const dmeStaff = safeReadJsonArray<any>('ucore_dme_staff_list').filter((s) => !isBannedSchoolOrEntity(s));
+    const teachers = safeReadJsonArray<any>('ucore_admin_teachers').filter((t) => !isBannedSchoolOrEntity(t));
+    const regTeachers = safeReadJsonArray<any>('ucore_registered_teachers_v2').filter((t) => !isBannedSchoolOrEntity(t));
+    const dirTeachers = safeReadJsonArray<any>('ucore_director_teachers_v1').filter((t) => !isBannedSchoolOrEntity(t));
+    const students = safeReadJsonArray<any>('ucore_admin_students').filter((s) => !isBannedSchoolOrEntity(s));
+    const regStudents = safeReadJsonArray<any>('ucore_registered_students_v2').filter((s) => !isBannedSchoolOrEntity(s));
+    const dirStudents = safeReadJsonArray<any>('ucore_director_students').filter((s) => !isBannedSchoolOrEntity(s));
+    const staff = safeReadJsonArray<any>('ucore_registered_staff_v1').filter((s) => !isBannedSchoolOrEntity(s));
+    const applications = safeReadJsonArray<any>('ucore_pending_applications').filter((a) => !isBannedSchoolOrEntity(a));
+    const quickRequests = safeReadJsonArray<any>('ucore_quick_service_requests_v1').filter((q) => !isBannedSchoolOrEntity(q));
+    const efectividade = safeReadJsonArray<any>('sigre_cadastramento_efectividade_v2').filter((e) => !isBannedSchoolOrEntity(e));
+    const declaracaoServico = safeReadJsonArray<any>('sigre_declaracao_servico_v1').filter((d) => !isBannedSchoolOrEntity(d));
+    const guiasFerias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1').filter((g) => !isBannedSchoolOrEntity(g));
+    const guiasColocacao = safeReadJsonArray<any>('sigre_guias_colocacao_records_v1').filter((g) => !isBannedSchoolOrEntity(g));
+    const fichasAvaliacao = safeReadJsonArray<any>('sigre_fichas_avaliacao_records_v1').filter((f) => !isBannedSchoolOrEntity(f));
+    const cadastroDocente = safeReadJsonArray<any>('cadastro-docente-registos').filter((c) => !isBannedSchoolOrEntity(c));
+    const miniPautas = safeReadJsonArray<any>('sigre_teacher_mini_pautas_v5_blank').filter((m) => !isBannedSchoolOrEntity(m));
+    const rooms = safeReadJsonArray<any>('ucore_director_rooms').filter((r) => !isBannedSchoolOrEntity(r));
+    const classes = safeReadJsonArray<any>('ucore_director_classes').filter((c) => !isBannedSchoolOrEntity(c));
+    const users = safeReadJsonArray<any>('ucore_registered_users').filter((u) => !isBannedSchoolOrEntity(u));
+    const tombstones = Array.from(getEntityTombstones());
 
     const payload = {
       schools,
       directors: directors.length > 0 ? directors : regDirectors,
+      dmeStaff,
       teachers: teachers.length > 0 ? teachers : regTeachers.length > 0 ? regTeachers : dirTeachers,
       students: students.length > 0 ? students : regStudents.length > 0 ? regStudents : dirStudents,
       staff,
       applications,
+      quickRequests,
       efectividade,
       declaracaoServico,
       guiasFerias,
       guiasColocacao,
       fichasAvaliacao,
+      cadastroDocente,
       miniPautas,
       rooms,
       classes,
+      users,
+      tombstones,
     };
 
     const jsonBody = JSON.stringify(payload);
@@ -2549,11 +2868,28 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
       } catch {}
     }
 
-    await fetch('/api/network/sync', {
+    const res = await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: jsonBody,
       keepalive: useBeaconOrKeepalive,
-    }).catch(() => {});
+    }).catch(() => null);
+
+    if (res && res.ok) {
+      const serverData = await res.json().catch(() => null);
+      if (serverData && Array.isArray(serverData.tombstones)) {
+        const currentTombstones = getEntityTombstones();
+        let addedTombstone = false;
+        serverData.tombstones.forEach((tk: string) => {
+          if (tk && !currentTombstones.has(tk)) {
+            currentTombstones.add(tk);
+            addedTombstone = true;
+          }
+        });
+        if (addedTombstone) {
+          localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(currentTombstones)));
+        }
+      }
+    }
   } catch {}
 }

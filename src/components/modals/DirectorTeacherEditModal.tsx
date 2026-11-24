@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { DirectorTeacher, TeacherRegistrationData, TeacherTurmaAssignment } from '../../types';
 import { getDisciplinasForClass } from '../../utils/miniPautaStorage';
+import { isSubdirectorOrNonTeachingRole } from '../../utils/teacherStorage';
 
 interface DirectorTeacherEditModalProps {
   isOpen: boolean;
@@ -141,8 +142,10 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
       setNewSubject(teacher.subject || 'Língua Portuguesa');
       setNewRoom(teacher.room || 'Sala 03');
 
-      const initialAssignments: TeacherTurmaAssignment[] =
-        Array.isArray(teacher.assignedTurmas) && teacher.assignedTurmas.length > 0
+      const isSubdirector = isSubdirectorOrNonTeachingRole(teacher);
+      const initialAssignments: TeacherTurmaAssignment[] = isSubdirector
+        ? []
+        : Array.isArray(teacher.assignedTurmas) && teacher.assignedTurmas.length > 0
           ? teacher.assignedTurmas.map((a) => ({ ...a }))
           : [
               {
@@ -198,6 +201,10 @@ export const DirectorTeacherEditModal: React.FC<DirectorTeacherEditModalProps> =
   };
 
   const handleAddAssignedTurma = () => {
+    if (isSubdirectorOrNonTeachingRole(teacher)) {
+      setErrorMsg('Subdirectores de Escola exercem cargos diretivos e não podem ter turmas atribuídas.');
+      return;
+    }
     if (!newTurmaGrade.trim() || !newTurmaName.trim()) {
       setErrorMsg('Informe a Classe e a Turma para atribuir ao professor.');
       return;

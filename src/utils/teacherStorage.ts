@@ -21,10 +21,69 @@ import {
   clearAllTeachersFromFirestore,
   saveClassToFirestore,
   deleteApplicationFromFirestore,
+  isBannedSchoolOrEntity,
+  isEntityTombstoned,
 } from './firestoreSync';
 import { purgeDeletedAccountCredentials } from './authApprovalStorage';
 
 export const STORAGE_KEY_TEACHERS = 'ucore_registered_teachers_v2';
+
+/**
+ * Identifica se um registo ou utilizador corresponde a Subdirector de Escola
+ * (Subdirector Pedagógico, Subdirector Administrativo / Director Administrativo)
+ * ou membro não-docente da secretaria a quem NÃO deve ser atribuída regência de turma.
+ */
+export function isSubdirectorOrNonTeachingRole(entity: any): boolean {
+  if (!entity || typeof entity !== 'object') return false;
+  if (entity.type === 'funcionario') return true;
+  const schoolRole = String(entity.schoolRole || entity.registrationData?.schoolRole || '')
+    .trim()
+    .toLowerCase();
+  if (
+    schoolRole === 'subdiretor_pedagogico' ||
+    schoolRole === 'subdiretor_administrativo' ||
+    schoolRole === 'secretario_escolar'
+  ) {
+    return true;
+  }
+
+  const combinedText = [
+    entity.role,
+    entity.roleRequested,
+    entity.category,
+    entity.funcaoCategoria,
+    entity.cargo,
+    entity.subject,
+    entity.gradeClass,
+    entity.registrationData?.funcaoCategoria,
+    entity.registrationData?.cargo,
+    entity.registrationData?.disciplinas,
+  ]
+    .filter(Boolean)
+    .map((v) =>
+      String(v)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+    )
+    .join(' | ');
+
+  if (
+    combinedText.includes('subdirector') ||
+    combinedText.includes('subdiretor') ||
+    combinedText.includes('sub-director') ||
+    combinedText.includes('sub-diretor') ||
+    combinedText.includes('director administrativo') ||
+    combinedText.includes('diretor administrativo') ||
+    combinedText.includes('secretario escolar') ||
+    combinedText.includes('secretaria escolar') ||
+    combinedText.includes('chefe de secretaria')
+  ) {
+    return true;
+  }
+
+  return false;
+}
 
 // 1. Calculate Age and Age Bracket (Faixa Etária)
 export function calculateAge(birthDateString: string): number {
@@ -161,7 +220,10 @@ export function getStoredTeachers(): TeacherRegistrationData[] {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
       const filtered = parsed.filter(
-        (t: TeacherRegistrationData) => !String(t?.nomeEscola || '').trim().toLowerCase().includes('modelo central')
+        (t: TeacherRegistrationData) =>
+          t &&
+          !isBannedSchoolOrEntity(t) &&
+          !isEntityTombstoned('teachers', t.id)
       );
       if (filtered.length !== parsed.length) {
         localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(filtered));
@@ -1077,10 +1139,12 @@ export function distributeTeacherTurmas(
   }
 
   const norm = (s?: string) => (s || '').trim().toLowerCase();
+  const isSubdirector = isSubdirectorOrNonTeachingRole(updatedTeacher);
 
-  // Garantir que assignedTurmas contenha pelo menos a turma principal caso esteja vazio
-  const normalizedAssignments: TeacherTurmaAssignment[] =
-    Array.isArray(updatedTeacher.assignedTurmas) && updatedTeacher.assignedTurmas.length > 0
+  // Subdirectores de escola não podem ter turmas atribuídas
+  const normalizedAssignments: TeacherTurmaAssignment[] = isSubdirector
+    ? []
+    : Array.isArray(updatedTeacher.assignedTurmas) && updatedTeacher.assignedTurmas.length > 0
       ? updatedTeacher.assignedTurmas
       : [
           {
@@ -1095,15 +1159,25 @@ export function distributeTeacherTurmas(
         ];
 
   const primaryAssignment = normalizedAssignments[0];
-  const finalTeacher: DirectorTeacher = {
-    ...updatedTeacher,
-    gradeClass: primaryAssignment.gradeClass || updatedTeacher.gradeClass,
-    turma: primaryAssignment.turma || updatedTeacher.turma,
-    room: primaryAssignment.room || updatedTeacher.room,
-    shift: primaryAssignment.shift || updatedTeacher.shift,
-    subject: updatedTeacher.subject || primaryAssignment.subject,
-    assignedTurmas: normalizedAssignments,
-  };
+  const finalTeacher: DirectorTeacher = isSubdirector
+    ? {
+        ...updatedTeacher,
+        gradeClass: 'Coordenação / Subdirecção',
+        turma: 'Sem Turma (Cargo Diretivo)',
+        room: updatedTeacher.room || 'Gabinete da Subdirecção',
+        shift: updatedTeacher.shift || 'Manhã',
+        subject: updatedTeacher.subject || 'Subdirecção Escolar',
+        assignedTurmas: [],
+      }
+    : {
+        ...updatedTeacher,
+        gradeClass: primaryAssignment.gradeClass || updatedTeacher.gradeClass,
+        turma: primaryAssignment.turma || updatedTeacher.turma,
+        room: primaryAssignment.room || updatedTeacher.room,
+        shift: primaryAssignment.shift || updatedTeacher.shift,
+        subject: updatedTeacher.subject || primaryAssignment.subject,
+        assignedTurmas: normalizedAssignments,
+      };
 
   try {
     // 1. Atualizar ucore_director_teachers_v1
@@ -1267,6 +1341,12 @@ export function assignResponsibleTeacherToClassTurma(params: {
   const updatedList: DirectorTeacher[] = [];
 
   for (const teacher of allSchoolTeachers) {
+    if (teacher.id === newTeacherId && isSubdirectorOrNonTeachingRole(teacher)) {
+      // Bloquear atribuição de turma a Subdirectores de Escola
+      updatedList.push(teacher);
+      continue;
+    }
+
     const currentAssignments: TeacherTurmaAssignment[] =
       Array.isArray(teacher.assignedTurmas) && teacher.assignedTurmas.length > 0
         ? [...teacher.assignedTurmas]

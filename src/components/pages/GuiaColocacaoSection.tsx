@@ -322,6 +322,22 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
 
     // Non-admin/non-director users submit a request to the Municipal Administration
     if (!isAdminOrDirector) {
+      const fullColocacaoRecord = {
+        id: formData.id,
+        num: formData.num.trim(),
+        ano: formData.ano.trim(),
+        trat: formData.trat,
+        nome: formData.nome.trim(),
+        cat: formData.cat.trim(),
+        grau: formData.grau.trim(),
+        agente: formData.agente.trim(),
+        escola: formData.escola.trim(),
+        local: formData.local.trim() || 'Quêssua',
+        data: formData.data.trim(),
+        dir: formData.dir.trim(),
+        prov: formData.prov.trim() || 'Malanje',
+        mun: formData.mun.trim() || 'Quêssua',
+      };
       await submitQuickServiceRequest({
         serviceType: 'GUIA_COLOCACAO',
         title: `Guia de Colocação - ${formData.nome.trim()}`,
@@ -336,7 +352,12 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
           employeeCategory: catGrau,
           referenceMonthYear: formData.data.trim(),
           purpose: 'Reiniciar as suas funções de professor',
+          tratamento: formData.trat,
+          grau: formData.grau.trim(),
+          dataEmissao: formData.data.trim(),
+          director: formData.dir.trim(),
           notes: `Pedido de Guia de Colocação Nº ${formData.num.trim() || 'S/N'}/${formData.ano.trim()} para colocação na escola ${formData.escola.trim()}.`,
+          sigreGuiaColocacao: fullColocacaoRecord,
         },
       });
       handleResetForm();

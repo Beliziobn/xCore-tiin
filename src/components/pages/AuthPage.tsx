@@ -1372,10 +1372,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           ? (registeredSchools.find((s) => s.id === selectedSchoolId) || registeredSchools[0])
           : null;
         const resolvedSchoolName = institutionalScope === 'escola'
-          ? (matchedSchool?.name || schoolOrUnitName || 'Só Ciência da Educação')
+          ? (matchedSchool?.name || schoolOrUnitName || 'Escola Primária n.º 12 do Quêssua')
           : 'Direcção Municipal da Educação de Quêssua';
         const resolvedSchoolId = institutionalScope === 'escola'
-          ? (matchedSchool?.id || selectedSchoolId || 'sige-113013')
+          ? (matchedSchool?.id || selectedSchoolId || 'SIGE-102012')
           : undefined;
 
         const isPending = true;
@@ -2727,7 +2727,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                                     {registeredSchools.length > 0 ? (
                                       registeredSchools.map((s) => {
                                         const reg = getSchoolRegistrationData(s);
-                                        const code = reg.codigoSIGE || s.codigoSIGE || 'SIGE-113013';
+                                        const code = reg.codigoSIGE || s.codigoSIGE || 'SIGE-102012';
                                         return (
                                           <option key={s.id} value={s.id}>
                                             {s.name} ({code})
@@ -2735,8 +2735,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                                         );
                                       })
                                     ) : (
-                                      <option value="sige-113013">
-                                        Só Ciência da Educação (SIGE-113013)
+                                      <option value="" disabled>
+                                        Nenhuma unidade escolar registada neste município
                                       </option>
                                     )}
                                   </>
@@ -2769,9 +2769,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       {institutionalScope === 'escola' && regMunicipalityValue && selectedSchoolId && (() => {
                         const currentSc = registeredSchools.find((s) => s.id === selectedSchoolId);
                         const regData = currentSc ? getSchoolRegistrationData(currentSc) : null;
-                        const code = regData?.codigoSIGE || currentSc?.codigoSIGE || 'SIGE-113013';
+                        const code = regData?.codigoSIGE || currentSc?.codigoSIGE || 'SIGE-102012';
                         const typeLabel = (regData?.natureza || currentSc?.natureza || 'PÚBLICA').toUpperCase();
-                        const nameLabel = currentSc?.name || 'Só Ciência da Educação';
+                        const nameLabel = currentSc?.name || 'Escola Primária n.º 12 do Quêssua';
                         const locationLabel = `${regData?.endereco?.municipio || 'Quêssua'} · ${regData?.endereco?.provincia || 'Malanje'}`;
                         const stageLabel = currentSc?.category || 'Ensino primário';
                         const totalRooms = currentSc?.roomsCount || regData?.infraestrutura?.totalSalas || 10;

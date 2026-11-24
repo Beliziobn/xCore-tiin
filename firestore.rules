@@ -20,8 +20,7 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (request.auth.token.email != null && (
           request.auth.token.email == 'dmedoquessua@gmail.com' ||
-          request.auth.token.email == 'beliziodos20@gmail.com' ||
-          request.auth.token.email == 'socienciadaeduca2018@gmail.com'
+          request.auth.token.email == 'beliziodos20@gmail.com'
         ))
       );
     }
@@ -188,6 +187,33 @@ service cloud.firestore {
     // Official Guia de Colocação records
     // ==========================================
     match /guias_colocacao/{guiaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /fichas_avaliacao/{fichaId}
+    // Official Ficha de Avaliação de Desempenho Docente records
+    // ==========================================
+    match /fichas_avaliacao/{fichaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /cadastro_docente/{recordId}
+    // Official Cadastro Docente — Pedido de Vaga records
+    // ==========================================
+    match /cadastro_docente/{recordId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ==========================================
+    // Collection: /tombstones/{tombstoneId}
+    // Cross-device permanent deletion tombstones
+    // ==========================================
+    match /tombstones/{tombstoneId} {
       allow read: if true;
       allow write: if true;
     }

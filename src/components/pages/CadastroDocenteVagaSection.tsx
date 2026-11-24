@@ -29,6 +29,12 @@ import {
 } from '../../utils/guiaColocacaoStorage';
 import type { UserAccount } from '../../types';
 import { submitQuickServiceRequest } from '../../utils/quickServicesStorage';
+import {
+  saveCadastroDocenteToFirestore,
+  deleteCadastroDocenteFromFirestore,
+  isEntityTombstoned,
+  isBannedSchoolOrEntity,
+} from '../../utils/firestoreSync';
 
 export type VagaDocenteStatusFluxo =
   | 'Aguardando Direção da Escola'
@@ -397,7 +403,14 @@ export function loadVagaDocenteRecords(): CadastroDocenteVagaRecord[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r: any) =>
+        r &&
+        r.id &&
+        !isEntityTombstoned('cadastro_docente', String(r.id)) &&
+        !isBannedSchoolOrEntity(r)
+    );
   } catch {
     return [];
   }
@@ -447,6 +460,11 @@ export async function syncVagasDocentesFromFirestore(): Promise<CadastroDocenteV
 function saveRecordsToStorage(list: CadastroDocenteVagaRecord[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    fetch('/api/network/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cadastroDocente: list }),
+    }).catch(() => {});
     window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
     window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
   } catch {
@@ -501,9 +519,11 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
     reloadRecords();
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-cadastro-docente-updated', handleUpdated);
+    window.addEventListener('sigre-data-synced', handleUpdated);
     window.addEventListener('storage', handleUpdated);
     return () => {
       window.removeEventListener('sigre-cadastro-docente-updated', handleUpdated);
+      window.removeEventListener('sigre-data-synced', handleUpdated);
       window.removeEventListener('storage', handleUpdated);
     };
   }, []);
@@ -807,6 +827,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
 
     setRecords(updatedList);
     saveRecordsToStorage(updatedList);
+    saveCadastroDocenteToFirestore(newRecord).catch(() => {});
 
     // If not admin/director, also notify DME via QuickServices
     if (!isAdminOrDirector) {
@@ -914,6 +935,10 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
     );
     setRecords(next);
     saveRecordsToStorage(next);
+    const updatedTarget = next.find((r) => r.id === id);
+    if (updatedTarget) {
+      saveCadastroDocenteToFirestore(updatedTarget).catch(() => {});
+    }
     if (submittedRecord?.id === id) {
       setSubmittedRecord((prev) => (prev ? { ...prev, parecer: newParecer } : null));
     }
@@ -2844,6 +2869,7 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
                 onClick={() => {
                   const target = recordToDelete;
                   setRecordToDelete(null);
+                  deleteCadastroDocenteFromFirestore(target.id).catch(() => {});
                   const next = records.filter((r) => r.id !== target.id);
                   setRecords(next);
                   saveRecordsToStorage(next);

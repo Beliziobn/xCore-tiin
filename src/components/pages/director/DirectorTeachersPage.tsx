@@ -42,6 +42,7 @@ import {
   deleteTeacher,
   distributeTeacherTurmas,
   assignResponsibleTeacherToClassTurma,
+  isSubdirectorOrNonTeachingRole,
 } from '../../../utils/teacherStorage';
 import { directorClassesData as defaultDirectorClasses } from '../../../data/directorData';
 import { TeacherApplicationModal } from '../../modals/TeacherApplicationModal';
@@ -354,6 +355,14 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
     const chosenTeacher = teachers.find((t) => t.id === params.newTeacherId);
     if (!chosenTeacher) return;
 
+    if (isSubdirectorOrNonTeachingRole(chosenTeacher)) {
+      setEditToast(
+        `Ação não permitida: "${chosenTeacher.name}" exerce cargo de Subdirector(a) de Escola e não pode receber atribuição de turma.`
+      );
+      setTimeout(() => setEditToast(null), 4500);
+      return;
+    }
+
     const nextTeachers = assignResponsibleTeacherToClassTurma({
       gradeClass: params.gradeClass,
       turma: params.turma,
@@ -564,8 +573,10 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {teachers.map((t) => {
-                    const turmasList =
-                      Array.isArray(t.assignedTurmas) && t.assignedTurmas.length > 0
+                    const isSubdirector = isSubdirectorOrNonTeachingRole(t);
+                    const turmasList = isSubdirector
+                      ? []
+                      : Array.isArray(t.assignedTurmas) && t.assignedTurmas.length > 0
                         ? t.assignedTurmas
                         : [
                             {
@@ -598,39 +609,60 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                                 </p>
                               </div>
                             </div>
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-blue-100 text-blue-900">
-                              {turmasList.length} {turmasList.length === 1 ? 'Turma' : 'Turmas'}
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                                isSubdirector
+                                  ? 'bg-indigo-100 text-indigo-900'
+                                  : 'bg-blue-100 text-blue-900'
+                              }`}
+                            >
+                              {isSubdirector
+                                ? 'Subdirecção'
+                                : `${turmasList.length} ${turmasList.length === 1 ? 'Turma' : 'Turmas'}`}
                             </span>
                           </div>
 
-                          <div className="flex flex-wrap gap-1.5 mt-2">
-                            {turmasList.map((asg, i) => (
-                              <span
-                                key={asg.id || i}
-                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border ${
-                                  i === 0
-                                    ? 'bg-[#fef2f1] text-[#f75142] border-[#fee4e2]'
-                                    : 'bg-white text-slate-700 border-slate-200'
-                                }`}
-                              >
-                                <span>
-                                  {asg.gradeClass} • {asg.turma}
+                          {isSubdirector ? (
+                            <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-[10px] font-semibold text-indigo-900">
+                              Cargo Diretivo de Subdirector(a) de Escola — Sem atribuição de turma
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {turmasList.map((asg, i) => (
+                                <span
+                                  key={asg.id || i}
+                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border ${
+                                    i === 0
+                                      ? 'bg-[#fef2f1] text-[#f75142] border-[#fee4e2]'
+                                      : 'bg-white text-slate-700 border-slate-200'
+                                  }`}
+                                >
+                                  <span>
+                                    {asg.gradeClass} • {asg.turma}
+                                  </span>
+                                  <span className="text-slate-400">({asg.room})</span>
                                 </span>
-                                <span className="text-slate-400">({asg.room})</span>
-                              </span>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(t, 'alocacao')}
-                            className="flex-1 py-2 px-3 rounded-lg bg-[#002133] hover:bg-black text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-[#f75142]" />
-                            <span>Distribuir / Redefinir Turmas</span>
-                          </button>
+                          {isSubdirector ? (
+                            <span className="flex-1 py-2 px-3 rounded-lg bg-slate-200/80 text-slate-600 text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-not-allowed">
+                              <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Inelegível para Regência de Turma</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(t, 'alocacao')}
+                              className="flex-1 py-2 px-3 rounded-lg bg-[#002133] hover:bg-black text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-[#f75142]" />
+                              <span>Distribuir / Redefinir Turmas</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setTeacherToDelete(t)}
@@ -767,11 +799,13 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
                                   className="flex-1 p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:border-[#f75142] outline-none"
                                 >
                                   <option value="">-- Selecionar Professor da Escola --</option>
-                                  {teachers.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.name} ({t.subject} • Atual: {t.gradeClass} {t.turma})
-                                    </option>
-                                  ))}
+                                  {teachers
+                                    .filter((t) => !isSubdirectorOrNonTeachingRole(t))
+                                    .map((t) => (
+                                      <option key={t.id} value={t.id}>
+                                        {t.name} ({t.subject} • Atual: {t.gradeClass} {t.turma})
+                                      </option>
+                                    ))}
                                 </select>
                               </div>
                             </div>
