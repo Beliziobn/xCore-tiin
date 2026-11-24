@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -49,6 +49,8 @@ import {
   resolveSchoolDirectorName,
   isSchoolDirectorApproval,
   schoolsMatch,
+  deduplicateApplicationsList,
+  normalizeSchoolText,
   syncApplicationsFromServer
 } from '../../../utils/authApprovalStorage';
 import { isSubdirectorOrNonTeachingRole } from '../../../utils/teacherStorage';
@@ -81,6 +83,7 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   const [roleFilter, setRoleFilter] = useState<'todos' | 'professor' | 'aluno' | 'funcionario'>('todos');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
+  const hasInitializedStatusRef = useRef(false);
 
   // Approval Modal State
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
@@ -116,15 +119,27 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   const [simBi, setSimBi] = useState('');
 
   const loadApplications = async () => {
+    let directorApps: PendingApplication[] = [];
     try {
       const all = await syncApplicationsFromServer();
-      // Filter for applications directed to School Directors (Teachers and School Staff)
-      const directorApps = all.filter((a) => isSchoolDirectorApproval(a));
-      setApplications(directorApps);
+      directorApps = deduplicateApplicationsList(all).filter((a) => isSchoolDirectorApproval(a));
     } catch {
       const all = getPendingApplications();
-      const directorApps = all.filter((a) => isSchoolDirectorApproval(a));
-      setApplications(directorApps);
+      directorApps = deduplicateApplicationsList(all).filter((a) => isSchoolDirectorApproval(a));
+    }
+    setApplications(directorApps);
+    if (!hasInitializedStatusRef.current && directorApps.length > 0) {
+      const scoped = !schoolName && !schoolId
+        ? directorApps
+        : directorApps.filter((app) => schoolsMatch(app.schoolName, schoolName, app.schoolId, schoolId));
+      if (scoped.length > 0) {
+        hasInitializedStatusRef.current = true;
+        const pendCount = scoped.filter((a) => a.status === 'pendente').length;
+        const appCount = scoped.filter((a) => a.status === 'aprovado').length;
+        if (pendCount === 0 && appCount > 0) {
+          setStatusFilter('todos');
+        }
+      }
     }
   };
 
@@ -397,6 +412,24 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   // Create simulated candidate for demo testing
   const handleSimulateCandidate = async () => {
     if (!simName.trim()) return;
+    const cleanName = normalizeSchoolText(simName);
+    const cleanBi = simBi.trim().toUpperCase();
+    const existingDuplicate = schoolScopedApps.find(
+      (a) =>
+        (cleanBi && a.biNumber && a.biNumber.trim().toUpperCase() === cleanBi) ||
+        (normalizeSchoolText(a.fullName) === cleanName && a.type === simRole)
+    );
+    if (existingDuplicate) {
+      const notify = showToast || alert;
+      notify(
+        `O candidato "${existingDuplicate.fullName}" já possui registo (${
+          existingDuplicate.status === 'aprovado' ? 'Homologado' : 'Pendente'
+        }) nesta escola. Duplicação impedida.`
+      );
+      setShowSimulateModal(false);
+      return;
+    }
+
     const newId = 'app-sim-' + Date.now();
     const newApp: PendingApplication = {
       id: newId,

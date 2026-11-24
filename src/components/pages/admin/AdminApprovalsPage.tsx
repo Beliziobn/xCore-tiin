@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -50,6 +50,9 @@ import {
   deleteApplication,
   clearAllHomologatedData,
   isSchoolDirectorApproval,
+  schoolsMatch,
+  deduplicateApplicationsList,
+  normalizeSchoolText,
   OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
 import { buildInitialDirectorDossier, saveDirector } from '../../../utils/directorStorage';
@@ -79,11 +82,12 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [applications, setApplications] = useState<PendingApplication[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'aprovado' | 'rejeitado'>('pendente');
-  const [roleScopeFilter, setRoleScopeFilter] = useState<'todos' | 'diretor' | 'membro_dme'>('todos');
+  const [roleScopeFilter, setRoleScopeFilter] = useState<'todos' | 'diretor' | 'membro_dme' | 'funcionario' | 'professor'>('todos');
   const [selectedSchoolFilter, setSelectedSchoolFilter] = useState<string>('todas');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const hasInitializedStatusRef = useRef(false);
 
   // Approval Modal State
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
@@ -157,14 +161,22 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   };
 
   const loadApplications = async () => {
+    let unified: PendingApplication[] = [];
     try {
       const all = await syncApplicationsFromServer();
-      // DME Quêssua Admin portal only receives School General Directors & DME Staff;
-      // teachers and school staff route directly to their chosen school's Director.
-      setApplications(all.filter((a) => !isSchoolDirectorApproval(a)));
+      unified = deduplicateApplicationsList(all);
     } catch {
       const all = getPendingApplications();
-      setApplications(all.filter((a) => !isSchoolDirectorApproval(a)));
+      unified = deduplicateApplicationsList(all);
+    }
+    setApplications(unified);
+    if (!hasInitializedStatusRef.current && unified.length > 0) {
+      hasInitializedStatusRef.current = true;
+      const pendCount = unified.filter((a) => a.status === 'pendente').length;
+      const appCount = unified.filter((a) => a.status === 'aprovado').length;
+      if (pendCount === 0 && appCount > 0) {
+        setStatusFilter('todos');
+      }
     }
   };
 
@@ -179,6 +191,26 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     };
   }, []);
 
+  // Unified school options from registered schools and applications
+  const availableSchoolOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    schools.forEach((s) => {
+      if (s?.name) {
+        const clean = s.name.trim().replace(/\s+/g, ' ');
+        const key = normalizeSchoolText(clean);
+        if (key && !map.has(key)) map.set(key, clean);
+      }
+    });
+    applications.forEach((a) => {
+      if (a?.schoolName && a.type !== 'membro_dme' && a.scope !== 'administracao') {
+        const clean = a.schoolName.trim().replace(/\s+/g, ' ');
+        const key = normalizeSchoolText(clean);
+        if (key && !map.has(key)) map.set(key, clean);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt'));
+  }, [schools, applications]);
+
   // Filtered applications
   const filteredApps = useMemo(() => {
     return applications.filter((app) => {
@@ -187,12 +219,24 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
 
       // Role Scope filter
       if (roleScopeFilter !== 'todos') {
-        if (roleScopeFilter === 'diretor' && app.type !== 'diretor') return false;
+        if (roleScopeFilter === 'diretor' && app.type !== 'diretor' && app.schoolRole !== 'diretor_geral') return false;
         if (roleScopeFilter === 'membro_dme' && app.type !== 'membro_dme' && app.scope !== 'administracao') return false;
+        if (
+          roleScopeFilter === 'funcionario' &&
+          app.type !== 'funcionario' &&
+          app.schoolRole !== 'subdiretor_pedagogico' &&
+          app.schoolRole !== 'subdiretor_administrativo' &&
+          app.schoolRole !== 'secretario_escolar'
+        ) {
+          return false;
+        }
+        if (roleScopeFilter === 'professor' && app.type !== 'professor' && app.schoolRole !== 'professor') return false;
       }
 
-      // School filter
-      if (selectedSchoolFilter !== 'todas' && app.schoolName !== selectedSchoolFilter) return false;
+      // School filter (normalized so minor spacing differences never hide records)
+      if (selectedSchoolFilter !== 'todas' && !schoolsMatch(app.schoolName, selectedSchoolFilter, app.schoolId)) {
+        return false;
+      }
 
       // Search query
       if (searchQuery.trim()) {
@@ -216,9 +260,15 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     const pendentes = applications.filter((a) => a.status === 'pendente').length;
     const aprovados = applications.filter((a) => a.status === 'aprovado').length;
     const rejeitados = applications.filter((a) => a.status === 'rejeitado').length;
-    const directores = applications.filter((a) => a.type === 'diretor').length;
-    const professores = applications.filter((a) => a.type === 'professor').length;
-    const funcionarios = applications.filter((a) => a.type === 'funcionario').length;
+    const directores = applications.filter((a) => a.type === 'diretor' || a.schoolRole === 'diretor_geral').length;
+    const professores = applications.filter((a) => a.type === 'professor' || a.schoolRole === 'professor').length;
+    const funcionarios = applications.filter(
+      (a) =>
+        a.type === 'funcionario' ||
+        a.schoolRole === 'subdiretor_pedagogico' ||
+        a.schoolRole === 'subdiretor_administrativo' ||
+        a.schoolRole === 'secretario_escolar'
+    ).length;
     const membrosDme = applications.filter((a) => a.type === 'membro_dme' || a.scope === 'administracao').length;
     const taxaAprovacao = total > 0 ? Math.round((aprovados / total) * 100) : 100;
     return {
@@ -327,7 +377,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
 
           const fullRegistrationData: any = {
             ...baseDossier,
-            id: `dir-dossier-${dirId}`,
+            id: dirId,
             nomeCompleto: updated.fullName,
             biNif: updated.biNumber,
             telefone: updated.phone || '+244 923 000 000',
@@ -430,6 +480,24 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const handleSimulateDirector = async () => {
     if (!simName.trim()) return;
     const targetSchool = simSchool.trim() || (schools[0]?.name || 'Escola Primária nº 402');
+    const cleanName = normalizeSchoolText(simName);
+    const cleanBi = simBi.trim().toUpperCase();
+    const existingDuplicate = applications.find(
+      (a) =>
+        (cleanBi && a.biNumber && a.biNumber.trim().toUpperCase() === cleanBi) ||
+        (normalizeSchoolText(a.fullName) === cleanName && a.type === 'diretor')
+    );
+    if (existingDuplicate) {
+      const notify = showToast || alert;
+      notify(
+        `O candidato "${existingDuplicate.fullName}" já possui registo (${
+          existingDuplicate.status === 'aprovado' ? 'Homologado' : 'Pendente'
+        }) no sistema. Duplicação impedida.`
+      );
+      setShowSimModal(false);
+      return;
+    }
+
     const newId = 'app-sim-dir-' + Date.now();
     const newApp: PendingApplication = {
       id: newId,
@@ -605,7 +673,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           </div>
         </section>
 
-        {/* Role Category Tabs (Directores Escolares & Membros DME) */}
+        {/* Role Category Tabs (Todas as Categorias de Homologação) */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-thin">
           <button
             type="button"
@@ -616,7 +684,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
             }`}
           >
-            <span>Todas as Homologações DME</span>
+            <span>Todas as Homologações</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
               roleScopeFilter === 'todos' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
             }`}>
@@ -659,6 +727,42 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
               {counts.membrosDme}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setRoleScopeFilter('funcionario')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
+              roleScopeFilter === 'funcionario'
+                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <Briefcase className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Subdirectores & Quadro Escolar</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              roleScopeFilter === 'funcionario' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {counts.funcionarios}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setRoleScopeFilter('professor')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs ${
+              roleScopeFilter === 'professor'
+                ? 'bg-[#002133] text-white ring-2 ring-[#002133]/20'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Docentes / Professores</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              roleScopeFilter === 'professor' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {counts.professores}
+            </span>
+          </button>
         </div>
 
         {/* Filter & View Switcher Bar */}
@@ -694,10 +798,10 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   onChange={(e) => setSelectedSchoolFilter(e.target.value)}
                   className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002133]/20 cursor-pointer appearance-none"
                 >
-                  <option value="todas">Todas as Escolas ({schools.length})</option>
-                  {schools.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
+                  <option value="todas">Todas as Escolas ({availableSchoolOptions.length})</option>
+                  {availableSchoolOptions.map((sName) => (
+                    <option key={sName} value={sName}>
+                      {sName}
                     </option>
                   ))}
                 </select>

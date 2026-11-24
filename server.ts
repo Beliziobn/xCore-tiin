@@ -516,8 +516,277 @@ async function startServer() {
     };
   }
 
+  function stripEntityIdPrefix(val?: string): string {
+    return String(val || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^(dir-dossier-|app-diretor-|app-professor-|app-funcionario-|app-membro_dme-|app-aluno-|app-sim-dir-|app-sim-)/i, "");
+  }
+
+  function isGenericPlaceholderEmail(email?: string): boolean {
+    const clean = String(email || "").trim().toLowerCase();
+    if (!clean || !clean.includes("@")) return true;
+    return (
+      clean.endsWith("@ucore.edu.ao") ||
+      clean.includes("escola.quessua@") ||
+      clean.includes("director@ucore")
+    );
+  }
+
+  function cleanSchoolNameSpaces(name?: string): string {
+    return String(name || "").trim().replace(/\s+/g, " ");
+  }
+
   function reconcileNetworkStore() {
     const tombstonesSet = new Set(networkStore.tombstones || []);
+
+    if (!Array.isArray(networkStore.users)) networkStore.users = [];
+    if (!Array.isArray(networkStore.directors)) networkStore.directors = [];
+    if (!Array.isArray(networkStore.teachers)) networkStore.teachers = [];
+    if (!Array.isArray(networkStore.staff)) networkStore.staff = [];
+    if (!Array.isArray(networkStore.dmeStaff)) networkStore.dmeStaff = [];
+    if (!Array.isArray(networkStore.applications)) networkStore.applications = [];
+
+    // 0. Collect all known approved/active identities across rosters so an already-homologated person never reverts to 'pendente'
+    const approvedBIs = new Set<string>();
+    const approvedEmails = new Set<string>();
+    const approvedBaseIds = new Set<string>();
+    const approvedNameRoles = new Set<string>();
+
+    const registerApprovedIdentity = (bi?: string, email?: string, id?: string, name?: string, roleOrType?: string) => {
+      const cleanBi = String(bi || "").trim().replace(/\s+/g, "").toLowerCase();
+      if (cleanBi.length >= 5) approvedBIs.add(cleanBi);
+      const cleanEmail = String(email || "").trim().toLowerCase();
+      if (!isGenericPlaceholderEmail(cleanEmail)) approvedEmails.add(cleanEmail);
+      const baseId = stripEntityIdPrefix(id);
+      if (baseId && baseId.length >= 4) approvedBaseIds.add(baseId);
+      const normName = normalizeAscii(name || "");
+      if (normName.length >= 4) {
+        approvedNameRoles.add(`${normName}::${roleOrType || ""}`);
+        approvedNameRoles.add(normName);
+      }
+    };
+
+    networkStore.directors.forEach((d) => {
+      if (!d || isEliminatedSchoolOrRecord(d) || isItemTombstoned("directors", d, tombstonesSet)) return;
+      if (d.id === "dir-municipal-quessua") return;
+      registerApprovedIdentity(
+        d.biNif || d.bi || d.registrationData?.biNif,
+        d.email || d.registrationData?.emailPessoal,
+        d.id,
+        d.name || d.nomeCompleto || d.registrationData?.nomeCompleto,
+        "diretor"
+      );
+    });
+
+    networkStore.dmeStaff.forEach((m) => {
+      if (!m || isEliminatedSchoolOrRecord(m) || isItemTombstoned("dme_staff", m, tombstonesSet)) return;
+      registerApprovedIdentity(m.biNumber || m.bi, m.email, m.id, m.name, "membro_dme");
+    });
+
+    networkStore.teachers.forEach((t) => {
+      if (!t || isEliminatedSchoolOrRecord(t) || isItemTombstoned("teachers", t, tombstonesSet)) return;
+      registerApprovedIdentity(
+        t.biNif || t.bi || t.registrationData?.biNif,
+        t.email || t.registrationData?.email,
+        t.id,
+        t.name || t.nomeCompleto || t.registrationData?.nomeCompleto,
+        "escolar"
+      );
+    });
+
+    networkStore.staff.forEach((st) => {
+      if (!st || isEliminatedSchoolOrRecord(st) || isItemTombstoned("staff", st, tombstonesSet)) return;
+      registerApprovedIdentity(st.biNif || st.bi, st.email, st.id, st.name || st.nomeCompleto, "funcionario");
+    });
+
+    networkStore.users.forEach((u) => {
+      if (!u || isEliminatedSchoolOrRecord(u) || isItemTombstoned("users", u, tombstonesSet)) return;
+      if (u.status === "ativo" && u.id !== "usr_dme_quessua") {
+        const fullName = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+        registerApprovedIdentity(u.biNumber, u.email, u.id, fullName, u.role);
+      }
+    });
+
+    // Also synthesize applications for any registered user or director who was missing from networkStore.applications
+    const rawApplications: any[] = [...networkStore.applications];
+    networkStore.users.forEach((u) => {
+      if (!u || u.id === "usr_dme_quessua") return;
+      const uEmail = String(u.email || "").trim().toLowerCase();
+      if (uEmail === "dmedoquessua@gmail.com" || uEmail === "beliziodos20@gmail.com") return;
+      if (isEliminatedSchoolOrRecord(u) || isItemTombstoned("users", u, tombstonesSet)) return;
+      const fullName = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+      if (!fullName) return;
+
+      const appType =
+        u.scope === "administracao" || u.role === "admin"
+          ? "membro_dme"
+          : u.role === "diretor" || u.schoolRole === "diretor_geral"
+          ? "diretor"
+          : u.schoolRole && u.schoolRole !== "professor"
+          ? "funcionario"
+          : "professor";
+
+      rawApplications.push({
+        id: `app-${appType}-${stripEntityIdPrefix(u.id).replace(/^usr_/, "") || Date.now()}`,
+        userId: u.id,
+        type: appType,
+        scope: u.scope || (appType === "membro_dme" ? "administracao" : "escolar"),
+        schoolRole: u.schoolRole || (appType === "diretor" ? "diretor_geral" : undefined),
+        adminRole: u.adminRole,
+        roleRequested:
+          u.roleTitle ||
+          u.cargoTitle ||
+          (appType === "diretor"
+            ? "Director(a) de Escola"
+            : appType === "membro_dme"
+            ? "Quadro Técnico da DME"
+            : appType === "funcionario"
+            ? "Subdirector / Quadro Escolar"
+            : "Professor(a)"),
+        fullName,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        phone: u.phone || "+244 923 000 000",
+        biNumber: u.biNumber || "",
+        schoolName: cleanSchoolNameSpaces(u.schoolName || "Direcção Municipal da Educação de Quêssua"),
+        schoolId: u.schoolId,
+        municipality: u.municipality || "Quêssua (Malanje)",
+        status: u.status === "ativo" ? "aprovado" : u.status === "rejeitado" ? "rejeitado" : "pendente",
+        createdAt: u.createdAt,
+        approvedAt: u.approvedAt || (u.status === "ativo" ? "23/11/2026, 13:30:00" : undefined),
+        approvedBy: u.approvedBy || (u.status === "ativo" ? "Direcção Municipal da Educação (DME)" : undefined),
+        passwordVerifier: u.passwordVerifier,
+      });
+    });
+
+    // Deduplicate & unify applications by BI, personal email, base userId/id, or (fullName + type + schoolName)
+    const canonicalApps: any[] = [];
+    const findMatchingAppIdx = (candidate: any): number => {
+      const cBi = String(candidate.biNumber || "").trim().replace(/\s+/g, "").toLowerCase();
+      const cEmail = String(candidate.email || "").trim().toLowerCase();
+      const cHasPersonalEmail = !isGenericPlaceholderEmail(cEmail);
+      const cBaseUser = stripEntityIdPrefix(candidate.userId);
+      const cBaseId = stripEntityIdPrefix(candidate.id);
+      const cNormName = normalizeAscii(candidate.fullName || `${candidate.firstName || ""} ${candidate.lastName || ""}`);
+      const cNormSchool = normalizeAscii(candidate.schoolName || "");
+      const cType = String(candidate.type || "").trim().toLowerCase();
+
+      return canonicalApps.findIndex((existing) => {
+        const eBi = String(existing.biNumber || "").trim().replace(/\s+/g, "").toLowerCase();
+        if (cBi.length >= 5 && eBi.length >= 5 && cBi === eBi) return true;
+
+        const eEmail = String(existing.email || "").trim().toLowerCase();
+        if (cHasPersonalEmail && !isGenericPlaceholderEmail(eEmail) && cEmail === eEmail) return true;
+
+        const eBaseUser = stripEntityIdPrefix(existing.userId);
+        const eBaseId = stripEntityIdPrefix(existing.id);
+        if (cBaseUser && eBaseUser && cBaseUser === eBaseUser) return true;
+        if (cBaseId && eBaseId && cBaseId === eBaseId) return true;
+        if (cBaseUser && eBaseId && cBaseUser === eBaseId) return true;
+        if (cBaseId && eBaseUser && cBaseId === eBaseUser) return true;
+
+        const eNormName = normalizeAscii(existing.fullName || `${existing.firstName || ""} ${existing.lastName || ""}`);
+        const eNormSchool = normalizeAscii(existing.schoolName || "");
+        const eType = String(existing.type || "").trim().toLowerCase();
+        if (
+          cNormName.length >= 4 &&
+          cNormName === eNormName &&
+          (!cType || !eType || cType === eType) &&
+          (!cNormSchool || !eNormSchool || cNormSchool === eNormSchool)
+        ) {
+          return true;
+        }
+        return false;
+      });
+    };
+
+    rawApplications.forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      if (isEliminatedSchoolOrRecord(item) || isItemTombstoned("applications", item, tombstonesSet)) return;
+      const fullName = String(item.fullName || `${item.firstName || ""} ${item.lastName || ""}`).trim();
+      if (!fullName) return;
+
+      const cBi = String(item.biNumber || "").trim().replace(/\s+/g, "").toLowerCase();
+      const cEmail = String(item.email || "").trim().toLowerCase();
+      const cBaseUser = stripEntityIdPrefix(item.userId || item.id);
+      const cNormName = normalizeAscii(fullName);
+
+      const isRosterApproved =
+        (cBi.length >= 5 && approvedBIs.has(cBi)) ||
+        (!isGenericPlaceholderEmail(cEmail) && approvedEmails.has(cEmail)) ||
+        (cBaseUser.length >= 4 && approvedBaseIds.has(cBaseUser)) ||
+        (cNormName.length >= 4 && approvedNameRoles.has(`${cNormName}::${item.type || ""}`));
+
+      const idx = findMatchingAppIdx(item);
+      if (idx === -1) {
+        const isApproved = item.status === "aprovado" || Boolean(item.approvedAt) || isRosterApproved;
+        const finalStatus = isApproved ? "aprovado" : item.status === "rejeitado" ? "rejeitado" : "pendente";
+        canonicalApps.push({
+          ...item,
+          fullName,
+          schoolName: cleanSchoolNameSpaces(item.schoolName),
+          status: finalStatus,
+          approvedAt: item.approvedAt || (isApproved ? "23/11/2026, 14:00:00" : undefined),
+          approvedBy:
+            item.approvedBy ||
+            (isApproved
+              ? item.targetApproverRole === "diretor"
+                ? item.approverDirectorName || "Direcção da Escola"
+                : "Direcção Municipal da Educação (DME)"
+              : undefined),
+        });
+      } else {
+        const prev = canonicalApps[idx];
+        const isApproved =
+          prev.status === "aprovado" ||
+          item.status === "aprovado" ||
+          Boolean(prev.approvedAt) ||
+          Boolean(item.approvedAt) ||
+          isRosterApproved;
+        const isRejected = !isApproved && (prev.status === "rejeitado" || item.status === "rejeitado");
+        const finalStatus = isApproved ? "aprovado" : isRejected ? "rejeitado" : "pendente";
+
+        // Prefer real personal email & non-empty fields
+        const bestEmail = !isGenericPlaceholderEmail(prev.email)
+          ? prev.email
+          : !isGenericPlaceholderEmail(item.email)
+          ? item.email
+          : prev.email || item.email;
+
+        canonicalApps[idx] = {
+          ...prev,
+          ...item,
+          id: prev.id || item.id,
+          userId: prev.userId || item.userId,
+          fullName: prev.fullName || fullName,
+          email: bestEmail,
+          biNumber: prev.biNumber || item.biNumber,
+          phone: prev.phone || item.phone,
+          schoolName: cleanSchoolNameSpaces(prev.schoolName || item.schoolName),
+          schoolId: prev.schoolId || item.schoolId,
+          roleRequested: prev.roleRequested || item.roleRequested,
+          schoolRole: prev.schoolRole || item.schoolRole,
+          adminRole: prev.adminRole || item.adminRole,
+          scope: prev.scope || item.scope,
+          status: finalStatus,
+          approvedAt: prev.approvedAt || item.approvedAt || (isApproved ? "23/11/2026, 14:00:00" : undefined),
+          approvedBy:
+            prev.approvedBy ||
+            item.approvedBy ||
+            (isApproved
+              ? (prev.targetApproverRole || item.targetApproverRole) === "diretor"
+                ? prev.approverDirectorName || item.approverDirectorName || "Direcção da Escola"
+                : "Direcção Municipal da Educação (DME)"
+              : undefined),
+          complementaryData: item.complementaryData || prev.complementaryData,
+          passwordVerifier: prev.passwordVerifier || item.passwordVerifier,
+        };
+      }
+    });
+
+    networkStore.applications = canonicalApps;
 
     // 1. Build unified school map keyed by normalized school name
     const schoolByNormName = new Map<string, any>();
@@ -525,7 +794,7 @@ async function startServer() {
 
     const registerSchoolCandidate = (sc: any) => {
       if (!sc || typeof sc !== "object") return;
-      const rawName = String(sc.name || sc.nomeOficial || sc.registrationData?.nomeOficial || "").trim().replace(/\s+/g, " ");
+      const rawName = cleanSchoolNameSpaces(sc.name || sc.nomeOficial || sc.registrationData?.nomeOficial || "");
       if (!rawName) return;
       if (isEliminatedSchoolOrRecord(sc) || isItemTombstoned("schools", sc, tombstonesSet)) return;
       const normName = normalizeAscii(rawName);
@@ -559,7 +828,7 @@ async function startServer() {
     // Register schools referenced in applications (preserving their exact schoolId!)
     (networkStore.applications || []).forEach((appItem) => {
       if (!appItem || !appItem.schoolName) return;
-      const sName = String(appItem.schoolName).trim().replace(/\s+/g, " ");
+      const sName = cleanSchoolNameSpaces(appItem.schoolName);
       const normS = normalizeAscii(sName);
       if (!normS || normS.includes("direccao municipal") || normS.includes("direcao municipal")) return;
       const isApprovedDir = (appItem.type === "diretor" || appItem.schoolRole === "diretor_geral") && appItem.status === "aprovado";
@@ -600,7 +869,9 @@ async function startServer() {
     // Also register any additional Quêssua schools referenced in directors or teachers
     (networkStore.directors || []).forEach((dir) => {
       if (dir?.schoolName) {
-        const normS = normalizeAscii(dir.schoolName);
+        const cleanS = cleanSchoolNameSpaces(dir.schoolName);
+        const normS = normalizeAscii(cleanS);
+        if (!normS || normS.includes("direccao municipal") || normS.includes("direcao municipal")) return;
         const existing = schoolByNormName.get(normS);
         if (existing && (dir.name || dir.nomeCompleto)) {
           existing.directorName = dir.name || dir.nomeCompleto;
@@ -608,18 +879,12 @@ async function startServer() {
             existing.registrationData.director.nome = dir.name || dir.nomeCompleto;
           }
         } else if (!existing) {
-          registerSchoolCandidate(buildDefaultSchoolRecord(dir.schoolName, dir.schoolId, dir.name || dir.nomeCompleto, dir.email, dir.phone));
+          registerSchoolCandidate(buildDefaultSchoolRecord(cleanS, dir.schoolId, dir.name || dir.nomeCompleto, dir.email, dir.phone));
         }
       }
     });
 
     // 2. Reconcile all applications into users, directors, teachers, staff, and dmeStaff
-    if (!Array.isArray(networkStore.users)) networkStore.users = [];
-    if (!Array.isArray(networkStore.directors)) networkStore.directors = [];
-    if (!Array.isArray(networkStore.teachers)) networkStore.teachers = [];
-    if (!Array.isArray(networkStore.staff)) networkStore.staff = [];
-    if (!Array.isArray(networkStore.dmeStaff)) networkStore.dmeStaff = [];
-
     (networkStore.applications || []).forEach((appItem) => {
       if (!appItem || isEliminatedSchoolOrRecord(appItem) || isItemTombstoned("applications", appItem, tombstonesSet)) return;
       const userId = String(appItem.userId || appItem.id || "").trim();
@@ -627,7 +892,6 @@ async function startServer() {
       const fullName = String(appItem.fullName || `${appItem.firstName || ""} ${appItem.lastName || ""}`).trim();
       if (!userId && !email) return;
 
-      // Ensure UserAccount exists and has up-to-date status & credentials
       const userStatus =
         appItem.status === "aprovado" ? "ativo" : appItem.status === "rejeitado" ? "rejeitado" : "pendente";
       const mappedRole =
@@ -639,47 +903,46 @@ async function startServer() {
 
       const existingUser = networkStore.users!.find(
         (u) =>
-          (userId && String(u.id || "").trim().toLowerCase() === userId.toLowerCase()) ||
-          (email && String(u.email || "").trim().toLowerCase() === email)
+          (userId && stripEntityIdPrefix(u.id) === stripEntityIdPrefix(userId)) ||
+          (!isGenericPlaceholderEmail(email) && String(u.email || "").trim().toLowerCase() === email) ||
+          (appItem.biNumber && String(u.biNumber || "").trim().toLowerCase() === String(appItem.biNumber).trim().toLowerCase())
       );
 
       const userAccountObj = {
         ...(existingUser || {}),
-        id: userId || existingUser?.id || `usr_${Date.now()}`,
+        id: existingUser?.id || userId || `usr_${Date.now()}`,
         firstName: appItem.firstName || existingUser?.firstName || fullName.split(" ")[0] || "Utilizador",
         lastName: appItem.lastName || existingUser?.lastName || fullName.split(" ").slice(1).join(" ") || "",
-        email: email || existingUser?.email || "",
+        email: (!isGenericPlaceholderEmail(email) ? email : existingUser?.email) || email || "",
         phone: appItem.phone || existingUser?.phone || "+244 923 000 000",
         role: mappedRole,
-        status: userStatus,
+        status: existingUser?.status === "ativo" || userStatus === "ativo" ? "ativo" : userStatus,
         scope: appItem.scope || existingUser?.scope || (mappedRole === "admin" ? "administracao" : "escolar"),
         adminRole: appItem.adminRole || existingUser?.adminRole,
         schoolRole: appItem.schoolRole || existingUser?.schoolRole,
         roleTitle: appItem.roleRequested || existingUser?.roleTitle,
         schoolId: appItem.schoolId || existingUser?.schoolId,
-        schoolName: appItem.schoolName || existingUser?.schoolName,
+        schoolName: cleanSchoolNameSpaces(appItem.schoolName || existingUser?.schoolName),
         municipality: appItem.municipality || existingUser?.municipality || "Quêssua (Malanje)",
         biNumber: appItem.biNumber || existingUser?.biNumber,
         passwordVerifier: appItem.passwordVerifier || existingUser?.passwordVerifier,
-        createdAt: appItem.submittedAt || existingUser?.createdAt || new Date().toISOString(),
+        createdAt: appItem.createdAt || appItem.submittedAt || existingUser?.createdAt || new Date().toISOString(),
         approvedAt: appItem.approvedAt || existingUser?.approvedAt,
         approvedBy: appItem.approvedBy || existingUser?.approvedBy,
       };
 
       if (!isItemTombstoned("users", userAccountObj, tombstonesSet)) {
-        networkStore.users = upsertByKey(networkStore.users!, [userAccountObj], (u) =>
-          String(u.id || u.email || "").trim().toLowerCase()
-        );
+        networkStore.users!.push(userAccountObj);
       }
 
       if (appItem.status === "aprovado" && fullName) {
         if (appItem.type === "diretor" || appItem.schoolRole === "diretor_geral") {
           const dirEntry = {
-            id: userId || appItem.id,
+            id: stripEntityIdPrefix(userId || appItem.id),
             name: fullName,
             nomeCompleto: fullName,
-            schoolName: appItem.schoolName || "Unidade Escolar Municipal",
-            nomeEscola: appItem.schoolName || "Unidade Escolar Municipal",
+            schoolName: cleanSchoolNameSpaces(appItem.schoolName || "Unidade Escolar Municipal"),
+            nomeEscola: cleanSchoolNameSpaces(appItem.schoolName || "Unidade Escolar Municipal"),
             schoolId: appItem.schoolId,
             email: appItem.email,
             phone: appItem.phone || "+244 923 000 000",
@@ -691,13 +954,11 @@ async function startServer() {
             approvedAt: appItem.approvedAt || new Date().toISOString(),
           };
           if (!isItemTombstoned("directors", dirEntry, tombstonesSet)) {
-            networkStore.directors = upsertByKey(networkStore.directors, [dirEntry], (d) =>
-              String(d.id || d.email || d.name || "").trim().toLowerCase()
-            );
+            networkStore.directors.push(dirEntry);
           }
         } else if (appItem.type === "membro_dme" || appItem.scope === "administracao") {
           const dmeEntry = {
-            id: userId || appItem.id,
+            id: stripEntityIdPrefix(userId || appItem.id),
             name: fullName,
             role: appItem.adminRole || "chefe_reparticao",
             cargoTitle: appItem.roleRequested || "Quadro Técnico da Direcção Municipal",
@@ -709,12 +970,9 @@ async function startServer() {
             approvedAt: appItem.approvedAt || new Date().toISOString(),
           };
           if (!isItemTombstoned("dme_staff", dmeEntry, tombstonesSet)) {
-            networkStore.dmeStaff = upsertByKey(networkStore.dmeStaff!, [dmeEntry], (m) =>
-              String(m.id || m.email || m.name || "").trim().toLowerCase()
-            );
+            networkStore.dmeStaff!.push(dmeEntry);
           }
         } else {
-          // Professor, Subdiretor Pedagógico, Subdiretor Administrativo, Secretário Escolar, Outro Funcionário
           const roleCategory =
             appItem.schoolRole === "subdiretor_pedagogico"
               ? "Subdirector Pedagógico"
@@ -725,11 +983,11 @@ async function startServer() {
               : appItem.roleRequested || "Docente / Professor";
 
           const teacherOrStaffEntry = {
-            id: userId || appItem.id,
+            id: stripEntityIdPrefix(userId || appItem.id),
             name: fullName,
             nomeCompleto: fullName,
-            schoolName: appItem.schoolName || "Complexo Escolar do Quêssua",
-            nomeEscola: appItem.schoolName || "Complexo Escolar do Quêssua",
+            schoolName: cleanSchoolNameSpaces(appItem.schoolName || "Complexo Escolar do Quêssua"),
+            nomeEscola: cleanSchoolNameSpaces(appItem.schoolName || "Complexo Escolar do Quêssua"),
             schoolId: appItem.schoolId,
             subject: appItem.subject || (appItem.type === "professor" ? "Língua Portuguesa" : roleCategory),
             gradeClass: appItem.gradeClass || (appItem.type === "professor" ? "Ensino Primário" : "Direcção / Administração"),
@@ -747,20 +1005,188 @@ async function startServer() {
           };
 
           if (!isItemTombstoned("teachers", teacherOrStaffEntry, tombstonesSet)) {
-            networkStore.teachers = upsertByKey(networkStore.teachers, [teacherOrStaffEntry], (t) =>
-              String(t.id || t.email || t.name || "").trim().toLowerCase()
-            );
+            networkStore.teachers.push(teacherOrStaffEntry);
           }
           if (appItem.type === "funcionario" || (appItem.schoolRole && appItem.schoolRole !== "professor")) {
             if (!isItemTombstoned("staff", teacherOrStaffEntry, tombstonesSet)) {
-              networkStore.staff = upsertByKey(networkStore.staff!, [teacherOrStaffEntry], (st) =>
-                String(st.id || st.email || st.name || "").trim().toLowerCase()
-              );
+              networkStore.staff!.push(teacherOrStaffEntry);
             }
           }
         }
       }
     });
+
+    // 2b. Canonically deduplicate users, directors, dmeStaff, teachers, and staff so no person ever appears twice
+    const dedupUsers: any[] = [];
+    (networkStore.users || []).forEach((u) => {
+      if (!u || isEliminatedSchoolOrRecord(u) || isItemTombstoned("users", u, tombstonesSet)) return;
+      const uBi = String(u.biNumber || "").trim().replace(/\s+/g, "").toLowerCase();
+      const uEmail = String(u.email || "").trim().toLowerCase();
+      const uBaseId = stripEntityIdPrefix(u.id);
+      const idx = dedupUsers.findIndex((eu) => {
+        const eBi = String(eu.biNumber || "").trim().replace(/\s+/g, "").toLowerCase();
+        if (uBi.length >= 5 && eBi.length >= 5 && uBi === eBi) return true;
+        const eEmail = String(eu.email || "").trim().toLowerCase();
+        if (!isGenericPlaceholderEmail(uEmail) && !isGenericPlaceholderEmail(eEmail) && uEmail === eEmail) return true;
+        const eBaseId = stripEntityIdPrefix(eu.id);
+        return Boolean(uBaseId && eBaseId && uBaseId === eBaseId);
+      });
+      if (idx === -1) {
+        dedupUsers.push({
+          ...u,
+          schoolName: cleanSchoolNameSpaces(u.schoolName),
+        });
+      } else {
+        const prev = dedupUsers[idx];
+        dedupUsers[idx] = {
+          ...prev,
+          ...u,
+          id: prev.id || u.id,
+          email: !isGenericPlaceholderEmail(prev.email) ? prev.email : u.email || prev.email,
+          biNumber: prev.biNumber || u.biNumber,
+          status: prev.status === "ativo" || u.status === "ativo" ? "ativo" : u.status || prev.status,
+          passwordVerifier: prev.passwordVerifier || u.passwordVerifier,
+          schoolName: cleanSchoolNameSpaces(prev.schoolName || u.schoolName),
+        };
+      }
+    });
+    networkStore.users = dedupUsers;
+
+    const dedupDirectors: any[] = [];
+    (networkStore.directors || []).forEach((d) => {
+      if (!d || isEliminatedSchoolOrRecord(d) || isItemTombstoned("directors", d, tombstonesSet)) return;
+      const dBi = String(d.biNif || d.bi || d.registrationData?.biNif || "").trim().replace(/\s+/g, "").toLowerCase();
+      const dEmail = String(d.email || d.registrationData?.emailPessoal || "").trim().toLowerCase();
+      const dBaseId = stripEntityIdPrefix(d.id);
+      const dName = normalizeAscii(d.name || d.nomeCompleto || d.registrationData?.nomeCompleto || "");
+
+      const idx = dedupDirectors.findIndex((ed) => {
+        const eBi = String(ed.biNif || ed.bi || ed.registrationData?.biNif || "").trim().replace(/\s+/g, "").toLowerCase();
+        if (dBi.length >= 5 && eBi.length >= 5 && dBi === eBi) return true;
+        const eEmail = String(ed.email || ed.registrationData?.emailPessoal || "").trim().toLowerCase();
+        if (!isGenericPlaceholderEmail(dEmail) && !isGenericPlaceholderEmail(eEmail) && dEmail === eEmail) return true;
+        const eBaseId = stripEntityIdPrefix(ed.id);
+        if (dBaseId && eBaseId && dBaseId === eBaseId) return true;
+        const eName = normalizeAscii(ed.name || ed.nomeCompleto || ed.registrationData?.nomeCompleto || "");
+        return Boolean(dName.length >= 4 && dName === eName);
+      });
+
+      const canonicalId = d.id === "dir-municipal-quessua" ? d.id : stripEntityIdPrefix(d.id) || d.id;
+      if (idx === -1) {
+        dedupDirectors.push({
+          ...d,
+          id: canonicalId,
+          schoolName: cleanSchoolNameSpaces(d.schoolName || d.nomeEscola),
+          nomeEscola: cleanSchoolNameSpaces(d.nomeEscola || d.schoolName),
+        });
+      } else {
+        const prev = dedupDirectors[idx];
+        const bestEmail = !isGenericPlaceholderEmail(prev.email)
+          ? prev.email
+          : !isGenericPlaceholderEmail(d.email)
+          ? d.email
+          : prev.registrationData?.emailPessoal || d.registrationData?.emailPessoal || prev.email || d.email;
+        dedupDirectors[idx] = {
+          ...prev,
+          ...d,
+          id: prev.id === "dir-municipal-quessua" ? prev.id : stripEntityIdPrefix(prev.id || d.id),
+          name: prev.name || d.name || prev.nomeCompleto || d.nomeCompleto,
+          nomeCompleto: prev.nomeCompleto || d.nomeCompleto || prev.name || d.name,
+          email: bestEmail,
+          biNif: prev.biNif || d.biNif || prev.registrationData?.biNif || d.registrationData?.biNif,
+          schoolName: cleanSchoolNameSpaces(prev.schoolName || d.schoolName || prev.nomeEscola || d.nomeEscola),
+          nomeEscola: cleanSchoolNameSpaces(prev.nomeEscola || d.nomeEscola || prev.schoolName || d.schoolName),
+          registrationData: prev.registrationData && d.registrationData
+            ? { ...prev.registrationData, ...d.registrationData, id: stripEntityIdPrefix(prev.id || d.id) }
+            : prev.registrationData || d.registrationData,
+        };
+      }
+    });
+    networkStore.directors = dedupDirectors;
+
+    const dedupDmeStaff: any[] = [];
+    (networkStore.dmeStaff || []).forEach((m) => {
+      if (!m || isEliminatedSchoolOrRecord(m) || isItemTombstoned("dme_staff", m, tombstonesSet)) return;
+      const mBi = String(m.biNumber || m.bi || "").trim().replace(/\s+/g, "").toLowerCase();
+      const mEmail = String(m.email || "").trim().toLowerCase();
+      const mBaseId = stripEntityIdPrefix(m.id);
+      const mName = normalizeAscii(m.name || "");
+
+      const idx = dedupDmeStaff.findIndex((em) => {
+        const eBi = String(em.biNumber || em.bi || "").trim().replace(/\s+/g, "").toLowerCase();
+        if (mBi.length >= 5 && eBi.length >= 5 && mBi === eBi) return true;
+        const eEmail = String(em.email || "").trim().toLowerCase();
+        if (!isGenericPlaceholderEmail(mEmail) && !isGenericPlaceholderEmail(eEmail) && mEmail === eEmail) return true;
+        const eBaseId = stripEntityIdPrefix(em.id);
+        if (mBaseId && eBaseId && mBaseId === eBaseId) return true;
+        const eName = normalizeAscii(em.name || "");
+        return Boolean(mName.length >= 4 && mName === eName);
+      });
+      if (idx === -1) {
+        dedupDmeStaff.push(m);
+      } else {
+        const prev = dedupDmeStaff[idx];
+        dedupDmeStaff[idx] = {
+          ...prev,
+          ...m,
+          id: prev.id || m.id,
+          biNumber: prev.biNumber || m.biNumber,
+          email: !isGenericPlaceholderEmail(prev.email) ? prev.email : m.email || prev.email,
+        };
+      }
+    });
+    networkStore.dmeStaff = dedupDmeStaff;
+
+    const deduplicateRosterList = (list: any[], colName: string) => {
+      const result: any[] = [];
+      (list || []).forEach((t) => {
+        if (!t || isEliminatedSchoolOrRecord(t) || isItemTombstoned(colName, t, tombstonesSet)) return;
+        const tBi = String(t.biNif || t.bi || t.registrationData?.biNif || "").trim().replace(/\s+/g, "").toLowerCase();
+        const tEmail = String(t.email || t.registrationData?.email || "").trim().toLowerCase();
+        const tBaseId = stripEntityIdPrefix(t.id);
+        const tName = normalizeAscii(t.name || t.nomeCompleto || t.registrationData?.nomeCompleto || "");
+        const tSchool = normalizeAscii(t.schoolName || t.nomeEscola || t.registrationData?.nomeEscola || "");
+
+        const idx = result.findIndex((et) => {
+          const eBi = String(et.biNif || et.bi || et.registrationData?.biNif || "").trim().replace(/\s+/g, "").toLowerCase();
+          if (tBi.length >= 5 && eBi.length >= 5 && tBi === eBi) return true;
+          const eEmail = String(et.email || et.registrationData?.email || "").trim().toLowerCase();
+          if (!isGenericPlaceholderEmail(tEmail) && !isGenericPlaceholderEmail(eEmail) && tEmail === eEmail) return true;
+          const eBaseId = stripEntityIdPrefix(et.id);
+          if (tBaseId && eBaseId && tBaseId === eBaseId) return true;
+          const eName = normalizeAscii(et.name || et.nomeCompleto || et.registrationData?.nomeCompleto || "");
+          const eSchool = normalizeAscii(et.schoolName || et.nomeEscola || et.registrationData?.nomeEscola || "");
+          return Boolean(tName.length >= 4 && tName === eName && (!tSchool || !eSchool || tSchool === eSchool));
+        });
+
+        if (idx === -1) {
+          result.push({
+            ...t,
+            schoolName: cleanSchoolNameSpaces(t.schoolName || t.nomeEscola),
+            nomeEscola: cleanSchoolNameSpaces(t.nomeEscola || t.schoolName),
+          });
+        } else {
+          const prev = result[idx];
+          result[idx] = {
+            ...prev,
+            ...t,
+            id: prev.id || t.id,
+            biNif: prev.biNif || t.biNif || prev.bi || t.bi,
+            bi: prev.bi || t.bi || prev.biNif || t.biNif,
+            email: !isGenericPlaceholderEmail(prev.email) ? prev.email : t.email || prev.email,
+            schoolName: cleanSchoolNameSpaces(prev.schoolName || t.schoolName || prev.nomeEscola || t.nomeEscola),
+            nomeEscola: cleanSchoolNameSpaces(prev.nomeEscola || t.nomeEscola || prev.schoolName || t.schoolName),
+            registrationData: prev.registrationData && t.registrationData
+              ? { ...prev.registrationData, ...t.registrationData }
+              : prev.registrationData || t.registrationData,
+          };
+        }
+      });
+      return result;
+    };
+
+    networkStore.teachers = deduplicateRosterList(networkStore.teachers, "teachers");
+    networkStore.staff = deduplicateRosterList(networkStore.staff, "staff");
 
     // 3. Recompute teachersCount per school from networkStore.teachers + networkStore.efectividade
     const finalSchools = Array.from(schoolByNormName.values()).map((sc) => {
@@ -1078,7 +1504,23 @@ async function startServer() {
       const k = getKey(item);
       if (k) {
         const existing = map.get(k);
-        map.set(k, existing ? { ...existing, ...item } : item);
+        if (existing) {
+          const merged = { ...existing, ...item };
+          // Never allow a stale 'pendente' payload from another device to downgrade an already approved/active record
+          if (
+            (existing.status === "aprovado" || Boolean(existing.approvedAt)) &&
+            item.status === "pendente"
+          ) {
+            merged.status = "aprovado";
+            merged.approvedAt = existing.approvedAt || item.approvedAt;
+            merged.approvedBy = existing.approvedBy || item.approvedBy;
+          } else if (existing.status === "ativo" && item.status === "pendente") {
+            merged.status = "ativo";
+          }
+          map.set(k, merged);
+        } else {
+          map.set(k, item);
+        }
       }
     });
     return Array.from(map.values());
@@ -1316,46 +1758,111 @@ async function startServer() {
     const beforeCount = (networkStore.applications || []).length;
 
     const targetApp = (networkStore.applications || []).find(
-      (a) => String(a.id || a.userId || "").trim().toLowerCase() === targetId
+      (a) =>
+        String(a.id || "").trim().toLowerCase() === targetId ||
+        String(a.userId || "").trim().toLowerCase() === targetId ||
+        stripEntityIdPrefix(a.id) === stripEntityIdPrefix(targetId)
     );
+
+    const tUserId = targetApp?.userId ? String(targetApp.userId).trim().toLowerCase() : "";
+    const tEmail = targetApp?.email ? String(targetApp.email).trim().toLowerCase() : "";
+    const tBi = targetApp?.biNumber ? String(targetApp.biNumber).trim().toLowerCase() : "";
 
     addServerTombstone(
       targetId ? `applications:${targetId}` : null,
       targetId ? `applications::${targetId}` : null,
       targetId || null,
-      targetApp?.userId ? `applications:${String(targetApp.userId).toLowerCase()}` : null,
-      targetApp?.userId ? `applications::${String(targetApp.userId).toLowerCase()}` : null,
-      targetApp?.email ? `applications:${String(targetApp.email).toLowerCase()}` : null,
-      targetApp?.email ? `applications::${String(targetApp.email).toLowerCase()}` : null
+      tUserId ? `applications:${tUserId}` : null,
+      tUserId ? `applications::${tUserId}` : null,
+      tUserId ? `users:${tUserId}` : null,
+      tUserId ? `users::${tUserId}` : null,
+      tEmail ? `applications:${tEmail}` : null,
+      tEmail ? `applications::${tEmail}` : null,
+      tEmail ? `users:${tEmail}` : null,
+      tEmail ? `users::${tEmail}` : null,
+      tBi ? `applications:${tBi}` : null,
+      tBi ? `applications::${tBi}` : null,
+      tBi ? `users:${tBi}` : null,
+      tBi ? `users::${tBi}` : null
     );
 
     networkStore.applications = (networkStore.applications || []).filter((a) => {
       const aId = String(a.id || "").trim().toLowerCase();
       const uId = String(a.userId || "").trim().toLowerCase();
-      return aId !== targetId && uId !== targetId;
+      const aEmail = String(a.email || "").trim().toLowerCase();
+      const aBi = String(a.biNumber || "").trim().toLowerCase();
+      if (aId === targetId || uId === targetId) return false;
+      if (tUserId && (aId === tUserId || uId === tUserId)) return false;
+      if (tEmail && aEmail === tEmail) return false;
+      if (tBi && aBi === tBi) return false;
+      return true;
     });
 
     if (targetApp) {
-      if (targetApp.type === "diretor") {
+      networkStore.users = (networkStore.users || []).filter((u) => {
+        const uId = String(u.id || "").trim().toLowerCase();
+        const uEm = String(u.email || "").trim().toLowerCase();
+        const uBi = String(u.biNumber || "").trim().toLowerCase();
+        if (tUserId && uId === tUserId) return false;
+        if (tEmail && uEm === tEmail) return false;
+        if (tBi && uBi === tBi) return false;
+        return true;
+      });
+
+      if (targetApp.type === "diretor" || targetApp.schoolRole === "diretor_geral") {
         addServerTombstone(
-          targetApp.userId ? `directors:${String(targetApp.userId).toLowerCase()}` : null,
-          targetApp.id ? `directors:${String(targetApp.id).toLowerCase()}` : null
+          tUserId ? `directors:${tUserId}` : null,
+          targetApp.id ? `directors:${String(targetApp.id).toLowerCase()}` : null,
+          tBi ? `directors:${tBi}` : null
         );
-        networkStore.directors = (networkStore.directors || []).filter(
-          (d) =>
-            String(d.id || d.email || "").trim().toLowerCase() !==
-            String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
-        );
-      } else if (targetApp.type === "professor") {
+        networkStore.directors = (networkStore.directors || []).filter((d) => {
+          const dId = stripEntityIdPrefix(d.id);
+          const dEm = String(d.email || "").trim().toLowerCase();
+          const dBi = String(d.biNif || d.bi || "").trim().toLowerCase();
+          if (tUserId && dId === stripEntityIdPrefix(tUserId)) return false;
+          if (tEmail && dEm === tEmail) return false;
+          if (tBi && dBi === tBi) return false;
+          return true;
+        });
+      } else if (targetApp.type === "membro_dme" || targetApp.scope === "administracao") {
         addServerTombstone(
-          targetApp.userId ? `teachers:${String(targetApp.userId).toLowerCase()}` : null,
-          targetApp.id ? `teachers:${String(targetApp.id).toLowerCase()}` : null
+          tUserId ? `dme_staff:${tUserId}` : null,
+          tBi ? `dme_staff:${tBi}` : null
         );
-        networkStore.teachers = (networkStore.teachers || []).filter(
-          (t) =>
-            String(t.id || t.email || "").trim().toLowerCase() !==
-            String(targetApp.userId || targetApp.id || targetApp.email).trim().toLowerCase()
+        networkStore.dmeStaff = (networkStore.dmeStaff || []).filter((m) => {
+          const mId = stripEntityIdPrefix(m.id);
+          const mEm = String(m.email || "").trim().toLowerCase();
+          const mBi = String(m.biNumber || "").trim().toLowerCase();
+          if (tUserId && mId === stripEntityIdPrefix(tUserId)) return false;
+          if (tEmail && mEm === tEmail) return false;
+          if (tBi && mBi === tBi) return false;
+          return true;
+        });
+      } else {
+        addServerTombstone(
+          tUserId ? `teachers:${tUserId}` : null,
+          tUserId ? `staff:${tUserId}` : null,
+          tBi ? `teachers:${tBi}` : null,
+          tBi ? `staff:${tBi}` : null
         );
+        networkStore.teachers = (networkStore.teachers || []).filter((t) => {
+          const tId = stripEntityIdPrefix(t.id);
+          const tEm = String(t.email || "").trim().toLowerCase();
+          const tB = String(t.biNif || t.bi || "").trim().toLowerCase();
+          if (tUserId && tId === stripEntityIdPrefix(tUserId)) return false;
+          if (tEmail && tEm === tEmail) return false;
+          if (tBi && tB === tBi) return false;
+          return true;
+        });
+        networkStore.staff = (networkStore.staff || []).filter((st) => {
+          const sId = stripEntityIdPrefix(st.id);
+          const sEm = String(st.email || "").trim().toLowerCase();
+          const sB = String(st.biNif || st.bi || "").trim().toLowerCase();
+          if (tUserId && sId === stripEntityIdPrefix(tUserId)) return false;
+          if (tEmail && sEm === tEmail) return false;
+          if (tBi && sB === tBi) return false;
+          return true;
+        });
       }
     }
 
@@ -1367,6 +1874,9 @@ async function startServer() {
       applications: networkStore.applications,
       directors: networkStore.directors,
       teachers: networkStore.teachers,
+      dmeStaff: networkStore.dmeStaff,
+      staff: networkStore.staff,
+      users: networkStore.users,
       tombstones: networkStore.tombstones,
       updatedAt: networkStore.updatedAt,
     });

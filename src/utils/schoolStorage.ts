@@ -22,7 +22,7 @@ import {
   addEntityTombstone,
   deleteApplicationFromFirestore,
 } from './firestoreSync';
-import { purgeDeletedAccountCredentials } from './authApprovalStorage';
+import { purgeDeletedAccountCredentials, deduplicateApplicationsList, stripAppIdPrefix } from './authApprovalStorage';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
 
@@ -981,25 +981,21 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       }
     }
 
-    // 2. Merge Directors
+    // 2. Merge Directors (using base ID without dir-dossier- prefix so duplicates are collapsed)
     if (Array.isArray(data.directors)) {
       const dirMap = new Map<string, any>();
-      localDirs.forEach((d: any) => {
-        const k = norm(d?.id || d?.email || d?.name || d?.nomeCompleto);
-        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.email || d.id)) {
-          dirMap.set(k, d);
-        }
-      });
       data.directors.forEach((d: any) => {
         if (!d) return;
-        const k = norm(d.id || d.email || d.name || d.nomeCompleto);
+        const baseId = stripAppIdPrefix(d.id);
+        const k = norm(baseId || d.email || d.name || d.nomeCompleto);
         if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.email || d.id)) {
-          dirMap.set(k, { ...(dirMap.get(k) || {}), ...d });
+          dirMap.set(k, { ...(dirMap.get(k) || {}), ...d, id: baseId || d.id });
         }
       });
       const mergedDirs = Array.from(dirMap.values());
       if (JSON.stringify(mergedDirs) !== JSON.stringify(localDirs)) {
         localStorage.setItem('ucore_admin_directors', JSON.stringify(mergedDirs));
+        localStorage.setItem('ucore_registered_directors_v2', JSON.stringify(mergedDirs));
         changed = true;
       }
     }
@@ -1441,18 +1437,7 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     }
 
     if (Array.isArray(data.applications)) {
-      const appMap = new Map<string, any>();
-      localApps.forEach((a: any) => {
-        const k = norm(a?.id || a?.userId || a?.email);
-        if (k && !isBannedSchoolOrEntity(a) && !isEntityTombstoned('applications', a.id || k)) appMap.set(k, a);
-      });
-      data.applications.forEach((a: any) => {
-        const k = norm(a?.id || a?.userId || a?.email);
-        if (k && !isBannedSchoolOrEntity(a) && !isEntityTombstoned('applications', a.id || k)) {
-          appMap.set(k, { ...(appMap.get(k) || {}), ...a });
-        }
-      });
-      const mergedApps = Array.from(appMap.values());
+      const mergedApps = deduplicateApplicationsList([...data.applications, ...localApps]);
       if (JSON.stringify(mergedApps) !== JSON.stringify(localApps)) {
         localStorage.setItem('ucore_pending_applications', JSON.stringify(mergedApps));
         changed = true;
@@ -1461,14 +1446,12 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
     if (Array.isArray(data.users) && data.users.length > 0) {
       const userMap = new Map<string, any>();
-      localUsers.forEach((u: any) => {
-        const k = norm(u?.id || u?.email);
-        if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) userMap.set(k, u);
-      });
       data.users.forEach((u: any) => {
-        const k = norm(u?.id || u?.email);
+        const k = norm(u?.biNumber || u?.email || u?.id);
         if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) {
-          userMap.set(k, { ...(userMap.get(k) || {}), ...u });
+          const prev = userMap.get(k);
+          const isApproved = prev?.status === 'ativo' || u?.status === 'ativo' || Boolean(prev?.approvedAt) || Boolean(u?.approvedAt);
+          userMap.set(k, { ...(prev || {}), ...u, status: isApproved ? 'ativo' : u.status });
         }
       });
       const mergedUsers = Array.from(userMap.values());
@@ -1498,12 +1481,8 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
     if (Array.isArray(data.dmeStaff)) {
       const dsMap = new Map<string, any>();
-      localDmeStaff.forEach((s: any) => {
-        const k = norm(s?.id || s?.email || s?.role);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('dme_staff', s.id || k)) dsMap.set(k, s);
-      });
       data.dmeStaff.forEach((s: any) => {
-        const k = norm(s?.id || s?.email || s?.role);
+        const k = norm(s?.biNumber || s?.email || s?.name || s?.id);
         if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('dme_staff', s.id || k)) {
           dsMap.set(k, { ...(dsMap.get(k) || {}), ...s });
         }
