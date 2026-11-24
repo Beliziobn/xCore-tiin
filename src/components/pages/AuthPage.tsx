@@ -1232,7 +1232,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           if (app.nivelAcademico) loggedUser.nivelAcademico = app.nivelAcademico;
           if (typeof app.anosServico === 'number') loggedUser.anosServico = app.anosServico;
           if (app.regimeTrabalho) loggedUser.regimeTrabalho = app.regimeTrabalho;
-          loggedUser.approverTargetRole = isSchoolDirectorApproval(app) ? 'diretor' : 'admin';
+          loggedUser.approverTargetRole = 'admin';
+          loggedUser.approverTargetEmail = OFFICIAL_DME_ADMIN_EMAIL;
           loggedUser.approverTargetSchoolName = app.schoolName;
         }
 
@@ -1271,13 +1272,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         if (approvalCheck.status === 'pendente' && !isMasterAdmin) {
           loggedUser.status = 'pendente';
-          const isSchoolDirTarget =
-            loggedUser.approverTargetRole === 'diretor' ||
-            (loggedUser.scope === 'escola' && loggedUser.schoolRole !== 'diretor_geral');
+          loggedUser.approverTargetRole = 'admin';
+          loggedUser.approverTargetEmail = OFFICIAL_DME_ADMIN_EMAIL;
           setSuccessMsg(
-            isSchoolDirTarget
-              ? `A sua candidatura como ${loggedUser.cargoTitle} continua em análise pelo(a) Director(a) da escola ${loggedUser.schoolName || ''}. Redirecionando para o acompanhamento...`
-              : `A sua candidatura como ${loggedUser.cargoTitle} continua em análise na Direção Municipal da Educação. Redirecionando para o acompanhamento...`
+            `A sua candidatura como ${loggedUser.cargoTitle} encontra-se em análise na conta central da Direção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}). Redirecionando para o acompanhamento...`
           );
         } else if (approvalCheck.status === 'rejeitado' && !isMasterAdmin) {
           setErrorMsg(
@@ -1394,19 +1392,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const pwdRes = updatePassword(email.trim(), password);
         const passwordVerifier = pwdRes.verifier || encodePasswordVerifier(email.trim(), password);
 
-        // Route teacher & school-scope staff registrations to the chosen school's Director;
-        // School General Director and Municipal (DME) registrations go to Municipal Admin.
-        const isSchoolDirectorTarget =
-          institutionalScope === 'escola' && schoolRole !== 'diretor_geral';
-        const targetApproverRole: 'admin' | 'diretor' = isSchoolDirectorTarget ? 'diretor' : 'admin';
-        const targetDirectorName = isSchoolDirectorTarget
-          ? resolveSchoolDirectorName(matchedSchool, resolvedSchoolName)
-          : `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`;
-        const targetDirectorEmail = isSchoolDirectorTarget
-          ? resolveSchoolDirectorEmail(matchedSchool, resolvedSchoolName, resolvedSchoolId)
-          : OFFICIAL_DME_ADMIN_EMAIL;
+        // All homologations (every role & school) now route centrally to the Municipal Admin account (dmedoquessua@gmail.com)
+        const targetApproverRole: 'admin' | 'diretor' = 'admin';
+        const targetDirectorName = `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`;
+        const targetDirectorEmail = OFFICIAL_DME_ADMIN_EMAIL;
 
-        // Create pending application record targeted to the appropriate approver
+        // Create pending application record targeted directly to dmedoquessua@gmail.com
         if (isPending) {
           const appId = `app-${appType}-${Date.now()}`;
           await savePendingApplicationAsync({
@@ -1436,14 +1427,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             passwordVerifier,
             notes:
               institutionalScope === 'administracao'
-                ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Director Municipal (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
-                : isSchoolDirectorTarget
-                ? preRegResult?.found
-                  ? `Registro docente pré-existente localizado na escola "${resolvedSchoolName}". Enviado ao(à) Director(a) da Escola (${targetDirectorName}) para homologação.`
-                  : `Inscrição de ${cargoTitle} para a unidade escolar "${resolvedSchoolName}" enviada diretamente ao(à) Director(a) desta escola (${targetDirectorName}) para homologação.`
+                ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
                 : preRegResult?.found
-                ? `Registro de Direcção pré-existente localizado no sistema. Ficha associada automaticamente.`
-                : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada ao Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`,
+                ? `Registro pré-existente localizado para "${resolvedSchoolName}". Enviado diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
+                : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`,
           });
         }
 
@@ -3191,9 +3178,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <h2>Pedido enviado</h2>
 
                   <p>
-                    {submittedUserAccount?.approverTargetRole === 'diretor'
-                      ? `Os seus dados foram registados e enviados ao(à) Director(a) da escola ${submittedUserAccount.schoolName || 'selecionada'} para homologação.`
-                      : 'Os seus dados foram registados. Aguarde a validação da Direcção Municipal da Educação.'}
+                    {`Os seus dados foram registados e enviados diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`}
                   </p>
 
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>

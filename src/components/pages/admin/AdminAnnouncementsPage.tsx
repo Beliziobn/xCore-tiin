@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
   Plus, 
@@ -50,6 +50,18 @@ export const AdminAnnouncementsPage: React.FC<AdminAnnouncementsPageProps> = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<SchoolAnnouncement | null>(null);
   const [readingAnnouncement, setReadingAnnouncement] = useState<SchoolAnnouncement | null>(null);
+
+  useEffect(() => {
+    const handleSync = () => {
+      setAnnouncements(getStoredAnnouncements());
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   // Statistics calculation
   const totalCount = announcements.length;

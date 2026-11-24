@@ -209,33 +209,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       updateVagasWorkflow();
       syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
       syncApplicationsFromServer().then((all) => {
-        const dirPending = all.filter((a) => {
-          if (a.status !== 'pendente') return false;
-          if (!isSchoolDirectorApproval(a)) return false;
-          if (currentUser?.role === 'diretor' && (currentUser?.schoolName || currentUser?.schoolId)) {
-            return schoolsMatch(a.schoolName, currentUser.schoolName, a.schoolId, currentUser.schoolId);
-          }
-          return true;
-        }).length;
-
-        // Municipal Admin DME only receives School General Directors & DME Staff
-        const admPending = all.filter((a) => a.status === 'pendente' && !isSchoolDirectorApproval(a)).length;
-
-        setPendingAppsCount({ director: dirPending, admin: admPending });
+        // All homologations now route exclusively to the central Admin account (dmedoquessua@gmail.com)
+        const admPending = all.filter((a) => a.status === 'pendente').length;
+        setPendingAppsCount({ director: 0, admin: admPending });
       }).catch(() => {
         try {
           const all = getPendingApplications();
-          const dirPending = all.filter((a) => {
-            if (a.status !== 'pendente') return false;
-            if (!isSchoolDirectorApproval(a)) return false;
-            if (currentUser?.role === 'diretor' && (currentUser?.schoolName || currentUser?.schoolId)) {
-              return schoolsMatch(a.schoolName, currentUser.schoolName, a.schoolId, currentUser.schoolId);
-            }
-            return true;
-          }).length;
-
-          const admPending = all.filter((a) => a.status === 'pendente' && !isSchoolDirectorApproval(a)).length;
-          setPendingAppsCount({ director: dirPending, admin: admPending });
+          const admPending = all.filter((a) => a.status === 'pendente').length;
+          setPendingAppsCount({ director: 0, admin: admPending });
         } catch {}
       });
     };
@@ -816,7 +797,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         ? 'bg-white text-[#002133] ring-2 ring-white/40 shadow-sm'
                         : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
                     }`}
-                    title="Central de Homologação de Diretores e Inscrições"
+                    title={`Central de Homologações — Todas as aprovações (${OFFICIAL_DME_ADMIN_EMAIL})`}
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
                     <span>Homologações</span>

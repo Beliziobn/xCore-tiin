@@ -13,6 +13,7 @@ import {
   saveTeacherToFirestore,
   saveDirectorToFirestore,
   saveDmeStaffToFirestore,
+  saveStaffToFirestore,
   saveUserToFirestore,
   deleteUserFromFirestore,
   deleteTeacherFromFirestore,
@@ -272,6 +273,9 @@ export function deduplicateApplicationsList(apps: PendingApplication[]): Pending
     const app: PendingApplication = {
       ...rawApp,
       ...(cleanSchoolName ? { schoolName: cleanSchoolName } : {}),
+      targetApproverRole: 'admin',
+      targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
+      approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
       status: isActuallyApproved ? 'aprovado' : rawApp.status || 'pendente',
     };
 
@@ -325,6 +329,9 @@ export function deduplicateApplicationsList(apps: PendingApplication[]): Pending
         id: prev.id || app.id,
         userId: prev.userId || app.userId,
         schoolName: (primary.schoolName || secondary.schoolName || '').trim().replace(/\s+/g, ' '),
+        targetApproverRole: 'admin',
+        targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
+        approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
         status: mergedApproved ? 'aprovado' : mergedRejected ? 'rejeitado' : 'pendente',
         approvedAt: primary.approvedAt || secondary.approvedAt,
         approvedBy: primary.approvedBy || secondary.approvedBy,
@@ -482,48 +489,28 @@ export function schoolsMatch(
 }
 
 /**
- * Determines whether an application must be homologated by the School Director
- * of the chosen school (professors, school staff, students) rather than the
- * Municipal Directorate (school general directors and DME staff).
+ * All homologations are now centralized exclusively in the Municipal Admin account
+ * (dmedoquessua@gmail.com). School Directors no longer receive separate approval queues.
  */
 export function isSchoolDirectorApproval(
-  app?: Partial<Pick<PendingApplication, 'type' | 'scope' | 'schoolRole' | 'targetApproverRole'>> | null
+  _app?: Partial<Pick<PendingApplication, 'type' | 'scope' | 'schoolRole' | 'targetApproverRole'>> | null
 ): boolean {
-  if (!app) return false;
-  if (app.scope === 'administracao' || app.type === 'membro_dme') return false;
-  if (app.type === 'diretor' || app.schoolRole === 'diretor_geral') return false;
-  if (
-    app.type === 'professor' ||
-    app.type === 'funcionario' ||
-    app.type === 'aluno' ||
-    app.schoolRole === 'professor' ||
-    app.schoolRole === 'subdiretor_pedagogico' ||
-    app.schoolRole === 'subdiretor_administrativo' ||
-    app.schoolRole === 'secretario_escolar'
-  ) {
-    return true;
-  }
-  return app.targetApproverRole === 'diretor';
+  return false;
 }
 
 /**
- * Returns applications targeted for the school director, filtered by the director's school.
- * Teachers and school staff route here.
+ * Returns applications targeted for the school director.
+ * Returns an empty list because all homologations now route centrally to dmedoquessua@gmail.com.
  */
 export function getApplicationsForDirector(
-  schoolName?: string,
-  schoolId?: string
+  _schoolName?: string,
+  _schoolId?: string
 ): PendingApplication[] {
-  const all = getPendingApplications();
-  return all.filter((a) => {
-    if (!isSchoolDirectorApproval(a)) return false;
-    if (!schoolName && !schoolId) return true;
-    return schoolsMatch(a.schoolName, schoolName, a.schoolId, schoolId);
-  });
+  return [];
 }
 
 /**
- * Returns applications visible to the central administrator (DME Quêssua).
+ * Returns all applications visible to the central administrator (dmedoquessua@gmail.com).
  */
 export function getApplicationsForAdmin(filterType?: string): PendingApplication[] {
   const all = getPendingApplications();
@@ -536,26 +523,6 @@ export function getApplicationsForAdmin(filterType?: string): PendingApplication
 function buildNormalizedPendingApplication(app: PendingApplication): PendingApplication {
   const cleanSchool = app.schoolName ? app.schoolName.trim().replace(/\s+/g, ' ') : app.schoolName;
   const appWithCleanSchool = cleanSchool ? { ...app, schoolName: cleanSchool } : app;
-  const routeToDirector = isSchoolDirectorApproval(appWithCleanSchool);
-  if (routeToDirector) {
-    const resolvedDirName =
-      appWithCleanSchool.approverDirectorName &&
-      !appWithCleanSchool.approverDirectorName.includes(OFFICIAL_DME_ADMIN_EMAIL) &&
-      !appWithCleanSchool.approverDirectorName.toLowerCase().includes('director municipal')
-        ? appWithCleanSchool.approverDirectorName
-        : resolveSchoolDirectorName(null, appWithCleanSchool.schoolName);
-    const resolvedDirEmail =
-      appWithCleanSchool.targetApproverEmail && appWithCleanSchool.targetApproverEmail !== OFFICIAL_DME_ADMIN_EMAIL
-        ? appWithCleanSchool.targetApproverEmail
-        : resolveSchoolDirectorEmail(null, appWithCleanSchool.schoolName, appWithCleanSchool.schoolId);
-
-    return {
-      ...appWithCleanSchool,
-      targetApproverRole: 'diretor',
-      targetApproverEmail: resolvedDirEmail,
-      approverDirectorName: resolvedDirName,
-    };
-  }
 
   return {
     ...appWithCleanSchool,
@@ -947,6 +914,63 @@ export function approveApplication(
         saveTeacherToFirestore(teacherEntry).catch(() => {});
       } catch (err) {
         console.warn('Erro ao integrar professor no quadro após aprovação:', err);
+      }
+    }
+
+    // If a School Administrative Staff / Subdirector / Secretary is approved, persist into ucore_registered_staff_v1 (without assigning any teaching turma)
+    if (
+      target.type === 'funcionario' ||
+      target.schoolRole === 'subdiretor_pedagogico' ||
+      target.schoolRole === 'subdiretor_administrativo' ||
+      target.schoolRole === 'secretario_escolar'
+    ) {
+      try {
+        const rawStaff = localStorage.getItem('ucore_registered_staff_v1');
+        const staffList = rawStaff ? JSON.parse(rawStaff) : [];
+        const roleLabel =
+          target.roleRequested ||
+          (target.schoolRole === 'subdiretor_pedagogico'
+            ? 'Subdirector Pedagógico'
+            : target.schoolRole === 'subdiretor_administrativo'
+            ? 'Subdirector Administrativo'
+            : target.schoolRole === 'secretario_escolar'
+            ? 'Secretário(a) Escolar'
+            : 'Funcionário Administrativo');
+
+        const staffEntry = {
+          id: target.userId || target.id,
+          name: target.fullName,
+          fullName: target.fullName,
+          role: roleLabel,
+          schoolRole: target.schoolRole || 'funcionario',
+          schoolName: target.schoolName || 'Unidade Escolar do Quêssua',
+          schoolId: target.schoolId,
+          email: target.email,
+          phone: target.phone || '+244 923 000 000',
+          biNumber: target.biNumber,
+          qualification: complementaryData?.nivelAcademico || target.nivelAcademico || 'Licenciado',
+          status: 'Ativo' as const,
+          approvedAt: updatedApp.approvedAt,
+          approvedBy: approverName,
+        };
+
+        const nextStaff = Array.isArray(staffList) ? [...staffList] : [];
+        const existingIdx = nextStaff.findIndex(
+          (s: any) =>
+            s &&
+            (s.id === staffEntry.id ||
+              (s.email && target.email && !isGenericSchoolEmail(s.email) && s.email.toLowerCase() === target.email.toLowerCase()) ||
+              (s.biNumber && target.biNumber && s.biNumber.trim().toUpperCase() === target.biNumber.trim().toUpperCase()))
+        );
+        if (existingIdx >= 0) {
+          nextStaff[existingIdx] = { ...nextStaff[existingIdx], ...staffEntry };
+        } else {
+          nextStaff.unshift(staffEntry);
+        }
+        localStorage.setItem('ucore_registered_staff_v1', JSON.stringify(nextStaff));
+        saveStaffToFirestore(staffEntry).catch(() => {});
+      } catch (err) {
+        console.warn('Erro ao integrar subdirector/funcionário escolar após aprovação:', err);
       }
     }
 

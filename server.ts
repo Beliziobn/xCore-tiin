@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
-import { setupSignalingServer, getRoomsList, createOrGetRoom, getRoomPresence, dispatchHttpSignal } from "./server/signaling";
+import { setupSignalingServer, getRoomsList, createOrGetRoom, getRoomPresence, dispatchHttpSignal, getSocketIOServer } from "./server/signaling";
 import {
   executeRagQuery,
   retrieveRelevantChunks,
@@ -124,6 +124,13 @@ async function startServer() {
     classes?: any[];
     users?: any[];
     quickRequests: any[];
+    announcements?: any[];
+    studentAttendance?: any[];
+    teacherAttendance?: any[];
+    attendanceNotes?: any[];
+    chatChannels?: any[];
+    chatMessages?: any[];
+    kvStore?: Record<string, any>;
     tombstones?: string[];
     updatedAt: string;
   }
@@ -307,6 +314,13 @@ async function startServer() {
       classes: sanitizeCollectionList("classes", parsed?.classes, tombstonesSet),
       users: sanitizeCollectionList("users", parsed?.users, tombstonesSet),
       quickRequests: sanitizeCollectionList("quickRequests", parsed?.quickRequests, tombstonesSet),
+      announcements: sanitizeCollectionList("announcements", parsed?.announcements, tombstonesSet),
+      studentAttendance: sanitizeCollectionList("student_attendance", parsed?.studentAttendance, tombstonesSet),
+      teacherAttendance: sanitizeCollectionList("teacher_attendance", parsed?.teacherAttendance, tombstonesSet),
+      attendanceNotes: sanitizeCollectionList("attendance_notes", parsed?.attendanceNotes, tombstonesSet),
+      chatChannels: sanitizeCollectionList("chat_channels", parsed?.chatChannels, tombstonesSet),
+      chatMessages: sanitizeCollectionList("chat_messages", parsed?.chatMessages, tombstonesSet),
+      kvStore: parsed?.kvStore && typeof parsed.kvStore === "object" ? parsed.kvStore : {},
       tombstones,
       updatedAt: parsed?.updatedAt || new Date().toISOString(),
     };
@@ -555,40 +569,40 @@ async function startServer() {
     const tombstonesSet = new Set(networkStore.tombstones || []);
 
     if (!Array.isArray(networkStore.users) || networkStore.users.length === 0) {
-      networkStore.users = [...CANONICAL_USERS];
+      networkStore.users = sanitizeCollectionList("users", [...CANONICAL_USERS], tombstonesSet);
     }
     if (!Array.isArray(networkStore.directors) || networkStore.directors.length === 0) {
-      networkStore.directors = [...CANONICAL_DIRECTORS];
+      networkStore.directors = sanitizeCollectionList("directors", [...CANONICAL_DIRECTORS], tombstonesSet);
     }
     if (!Array.isArray(networkStore.teachers) || networkStore.teachers.length === 0) {
-      networkStore.teachers = [...CANONICAL_TEACHERS];
+      networkStore.teachers = sanitizeCollectionList("teachers", [...CANONICAL_TEACHERS], tombstonesSet);
     }
     if (!Array.isArray(networkStore.students) || networkStore.students.length === 0) {
-      networkStore.students = [...CANONICAL_STUDENTS];
+      networkStore.students = sanitizeCollectionList("students", [...CANONICAL_STUDENTS], tombstonesSet);
     }
     if (!Array.isArray(networkStore.staff) || networkStore.staff.length === 0) {
-      networkStore.staff = [...CANONICAL_STAFF];
+      networkStore.staff = sanitizeCollectionList("staff", [...CANONICAL_STAFF], tombstonesSet);
     }
     if (!Array.isArray(networkStore.dmeStaff) || networkStore.dmeStaff.length === 0) {
-      networkStore.dmeStaff = [...CANONICAL_DME_STAFF];
+      networkStore.dmeStaff = sanitizeCollectionList("dme_staff", [...CANONICAL_DME_STAFF], tombstonesSet);
     }
     if (!Array.isArray(networkStore.applications) || networkStore.applications.length === 0) {
-      networkStore.applications = [...CANONICAL_APPLICATIONS];
+      networkStore.applications = sanitizeCollectionList("applications", [...CANONICAL_APPLICATIONS], tombstonesSet);
     }
     if (!Array.isArray(networkStore.schools) || networkStore.schools.length === 0) {
-      networkStore.schools = [...CANONICAL_SCHOOLS];
+      networkStore.schools = sanitizeCollectionList("schools", [...CANONICAL_SCHOOLS], tombstonesSet);
     }
     if (!Array.isArray(networkStore.declaracaoServico) || networkStore.declaracaoServico.length === 0) {
-      networkStore.declaracaoServico = [...CANONICAL_DECLARACAO_SERVICO];
+      networkStore.declaracaoServico = sanitizeCollectionList("declaracao_servico", [...CANONICAL_DECLARACAO_SERVICO], tombstonesSet);
     }
     if (!Array.isArray(networkStore.guiasFerias) || networkStore.guiasFerias.length === 0) {
-      networkStore.guiasFerias = [...CANONICAL_GUIAS_FERIAS];
+      networkStore.guiasFerias = sanitizeCollectionList("guias_ferias", [...CANONICAL_GUIAS_FERIAS], tombstonesSet);
     }
     if (!Array.isArray(networkStore.guiasColocacao) || networkStore.guiasColocacao.length === 0) {
-      networkStore.guiasColocacao = [...CANONICAL_GUIAS_COLOCACAO];
+      networkStore.guiasColocacao = sanitizeCollectionList("guias_colocacao", [...CANONICAL_GUIAS_COLOCACAO], tombstonesSet);
     }
     if (!Array.isArray(networkStore.fichasAvaliacao) || networkStore.fichasAvaliacao.length === 0) {
-      networkStore.fichasAvaliacao = [...CANONICAL_FICHAS_AVALIACAO];
+      networkStore.fichasAvaliacao = sanitizeCollectionList("fichas_avaliacao", [...CANONICAL_FICHAS_AVALIACAO], tombstonesSet);
     }
 
     // 0. Collect all known approved/active identities across rosters so an already-homologated person never reverts to 'pendente'
@@ -697,10 +711,13 @@ async function startServer() {
         schoolName: cleanSchoolNameSpaces(u.schoolName || "Direcção Municipal da Educação de Quêssua"),
         schoolId: u.schoolId,
         municipality: u.municipality || "Quêssua (Malanje)",
+        targetApproverRole: "admin",
+        targetApproverEmail: "dmedoquessua@gmail.com",
+        approverDirectorName: "Director Municipal da Educação (dmedoquessua@gmail.com)",
         status: u.status === "ativo" ? "aprovado" : u.status === "rejeitado" ? "rejeitado" : "pendente",
         createdAt: u.createdAt,
         approvedAt: u.approvedAt || (u.status === "ativo" ? "23/11/2026, 13:30:00" : undefined),
-        approvedBy: u.approvedBy || (u.status === "ativo" ? "Direcção Municipal da Educação (DME)" : undefined),
+        approvedBy: u.approvedBy || (u.status === "ativo" ? "Direcção Municipal da Educação (dmedoquessua@gmail.com)" : undefined),
         passwordVerifier: u.passwordVerifier,
       });
     });
@@ -771,15 +788,14 @@ async function startServer() {
           ...item,
           fullName,
           schoolName: cleanSchoolNameSpaces(item.schoolName),
+          targetApproverRole: "admin",
+          targetApproverEmail: "dmedoquessua@gmail.com",
+          approverDirectorName: "Director Municipal da Educação (dmedoquessua@gmail.com)",
           status: finalStatus,
           approvedAt: item.approvedAt || (isApproved ? "23/11/2026, 14:00:00" : undefined),
           approvedBy:
             item.approvedBy ||
-            (isApproved
-              ? item.targetApproverRole === "diretor"
-                ? item.approverDirectorName || "Direcção da Escola"
-                : "Direcção Municipal da Educação (DME)"
-              : undefined),
+            (isApproved ? "Direcção Municipal da Educação (dmedoquessua@gmail.com)" : undefined),
         });
       } else {
         const prev = canonicalApps[idx];
@@ -814,16 +830,15 @@ async function startServer() {
           schoolRole: prev.schoolRole || item.schoolRole,
           adminRole: prev.adminRole || item.adminRole,
           scope: prev.scope || item.scope,
+          targetApproverRole: "admin",
+          targetApproverEmail: "dmedoquessua@gmail.com",
+          approverDirectorName: "Director Municipal da Educação (dmedoquessua@gmail.com)",
           status: finalStatus,
           approvedAt: prev.approvedAt || item.approvedAt || (isApproved ? "23/11/2026, 14:00:00" : undefined),
           approvedBy:
             prev.approvedBy ||
             item.approvedBy ||
-            (isApproved
-              ? (prev.targetApproverRole || item.targetApproverRole) === "diretor"
-                ? prev.approverDirectorName || item.approverDirectorName || "Direcção da Escola"
-                : "Direcção Municipal da Educação (DME)"
-              : undefined),
+            (isApproved ? "Direcção Municipal da Educação (dmedoquessua@gmail.com)" : undefined),
           complementaryData: item.complementaryData || prev.complementaryData,
           passwordVerifier: prev.passwordVerifier || item.passwordVerifier,
         };
@@ -844,20 +859,27 @@ async function startServer() {
       const normName = normalizeAscii(rawName);
       if (!normName || normName.includes("direccao municipal") || normName.includes("direcao municipal")) return;
 
-      const existing = schoolByNormName.get(normName) || (sc.id ? schoolById.get(String(sc.id).toLowerCase()) : undefined);
+      const existingById = sc.id ? schoolById.get(String(sc.id).toLowerCase()) : undefined;
+      const existing = existingById || schoolByNormName.get(normName);
       if (existing) {
+        const oldNorm = normalizeAscii(existing.name || existing.nomeOficial || "");
+        const incomingNewer = Number(sc._updatedAt || 0) >= Number(existing._updatedAt || 0);
+        const resolvedName = incomingNewer ? (rawName || existing.name) : (existing.name || rawName);
+        if (oldNorm && oldNorm !== normalizeAscii(resolvedName)) {
+          schoolByNormName.delete(oldNorm);
+        }
         const merged = {
           ...existing,
           ...sc,
           id: existing.id?.startsWith("sch-179") ? existing.id : (sc.id || existing.id),
-          name: existing.name || rawName,
+          name: resolvedName,
           directorName:
             sc.directorName && sc.directorName !== "Diretor a Designar" && sc.directorName !== "Fert Horlan"
               ? sc.directorName
               : existing.directorName,
           registrationData: sc.registrationData || existing.registrationData,
         };
-        schoolByNormName.set(normName, merged);
+        schoolByNormName.set(normalizeAscii(resolvedName), merged);
         if (merged.id) schoolById.set(String(merged.id).toLowerCase(), merged);
       } else {
         const full = sc.registrationData ? { ...sc, name: rawName } : { ...buildDefaultSchoolRecord(rawName, sc.id, sc.directorName, sc.email, sc.phone), ...sc, name: rawName };
@@ -876,11 +898,12 @@ async function startServer() {
       const normS = normalizeAscii(sName);
       if (!normS || normS.includes("direccao municipal") || normS.includes("direcao municipal")) return;
       const isApprovedDir = (appItem.type === "diretor" || appItem.schoolRole === "diretor_geral") && appItem.status === "aprovado";
-      const existing = schoolByNormName.get(normS);
+      const existing = (appItem.schoolId ? schoolById.get(String(appItem.schoolId).toLowerCase()) : undefined) || schoolByNormName.get(normS);
       if (existing) {
         if (appItem.schoolId && String(existing.id || "").startsWith("sch-quessua-")) {
           existing.id = appItem.schoolId;
           if (existing.registrationData) existing.registrationData.id = appItem.schoolId;
+          schoolById.set(String(appItem.schoolId).toLowerCase(), existing);
         }
         if (isApprovedDir && appItem.fullName) {
           existing.directorName = appItem.fullName;
@@ -905,8 +928,9 @@ async function startServer() {
     // Register all 30 official Quêssua schools so every device has the complete municipal network
     OFFICIAL_QUESSUA_SCHOOL_NAMES.forEach((officialName) => {
       const normS = normalizeAscii(officialName);
-      if (!schoolByNormName.has(normS)) {
-        registerSchoolCandidate(buildDefaultSchoolRecord(officialName));
+      const defaultRec = buildDefaultSchoolRecord(officialName);
+      if (!schoolByNormName.has(normS) && !schoolById.has(String(defaultRec.id).toLowerCase())) {
+        registerSchoolCandidate(defaultRec);
       }
     });
 
@@ -1286,6 +1310,13 @@ async function startServer() {
     networkStore.classes = cleaned.classes;
     networkStore.users = cleaned.users;
     networkStore.quickRequests = cleaned.quickRequests;
+    networkStore.announcements = cleaned.announcements;
+    networkStore.studentAttendance = cleaned.studentAttendance;
+    networkStore.teacherAttendance = cleaned.teacherAttendance;
+    networkStore.attendanceNotes = cleaned.attendanceNotes;
+    networkStore.chatChannels = cleaned.chatChannels;
+    networkStore.chatMessages = cleaned.chatMessages;
+    networkStore.kvStore = cleaned.kvStore;
     networkStore.tombstones = cleaned.tombstones;
     reconcileNetworkStore();
   }
@@ -1341,6 +1372,16 @@ async function startServer() {
         fs.writeFileSync(networkStoreFile, JSON.stringify(networkStore, null, 2), "utf-8");
       } catch {}
     }
+
+    try {
+      const io = getSocketIOServer();
+      if (io) {
+        io.emit("network:state-updated", {
+          updatedAt: networkStore.updatedAt,
+          tombstonesCount: (networkStore.tombstones || []).length,
+        });
+      }
+    } catch {}
   }
 
   // Persist sanitized store immediately on startup & clean any backup snapshots of eliminated records
@@ -1549,16 +1590,23 @@ async function startServer() {
       if (k) {
         const existing = map.get(k);
         if (existing) {
-          const merged = { ...existing, ...item };
+          const existingTs = Number(existing._updatedAt || 0);
+          const incomingTs = Number(item._updatedAt || 0);
+          const isIncomingOlder = existingTs > 0 && incomingTs > 0 && incomingTs < existingTs;
+          const merged = isIncomingOlder ? { ...item, ...existing } : { ...existing, ...item };
+          if (Math.max(existingTs, incomingTs) > 0) {
+            merged._updatedAt = Math.max(existingTs, incomingTs);
+          }
           // Never allow a stale 'pendente' payload from another device to downgrade an already approved/active record
           if (
             (existing.status === "aprovado" || Boolean(existing.approvedAt)) &&
-            item.status === "pendente"
+            item.status === "pendente" &&
+            incomingTs <= existingTs
           ) {
             merged.status = "aprovado";
             merged.approvedAt = existing.approvedAt || item.approvedAt;
             merged.approvedBy = existing.approvedBy || item.approvedBy;
-          } else if (existing.status === "ativo" && item.status === "pendente") {
+          } else if (existing.status === "ativo" && item.status === "pendente" && incomingTs <= existingTs) {
             merged.status = "ativo";
           }
           map.set(k, merged);
@@ -1607,18 +1655,18 @@ async function startServer() {
     };
   }
 
-  // Rate Limiter 1: Standard API (120 req / minute)
+  // Rate Limiter 1: Standard API (5000 req / minute for real-time multi-device sync)
   const standardApiLimiter = createRateLimiter({
     windowMs: 60 * 1000,
-    maxRequests: 120,
+    maxRequests: 5000,
     message: "Limite de requisições excedido. Por favor aguarde 60 segundos.",
     map: apiRateMap,
   });
 
-  // Rate Limiter 2: Sensitive Operations (30 req / minute) - Meetings, Logins, Audit writes
+  // Rate Limiter 2: Sensitive Operations (500 req / minute) - Meetings, Logins, Audit writes
   const sensitiveApiLimiter = createRateLimiter({
     windowMs: 60 * 1000,
-    maxRequests: 30,
+    maxRequests: 500,
     message: "Limite de operações sensíveis atingido para o seu endereço de rede.",
     map: sensitiveRateMap,
   });
@@ -1678,7 +1726,7 @@ async function startServer() {
       networkStore.schools = upsertByKey(
         networkStore.schools,
         validIncoming,
-        (sc) => normalizeAscii(sc.name || sc.nomeOficial || sc.id || "")
+        (sc) => String(sc.id || normalizeAscii(sc.name || sc.nomeOficial || "")).trim().toLowerCase()
       );
       persistNetworkStore();
     }
@@ -1774,9 +1822,16 @@ async function startServer() {
         }
       });
 
+      const normalizedIncoming = validIncoming.map((appItem) => ({
+        ...appItem,
+        targetApproverRole: "admin",
+        targetApproverEmail: "dmedoquessua@gmail.com",
+        approverDirectorName: "Director Municipal da Educação (dmedoquessua@gmail.com)",
+      }));
+
       networkStore.applications = upsertByKey(
         networkStore.applications,
-        validIncoming,
+        normalizedIncoming,
         (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
       );
 
@@ -1962,6 +2017,17 @@ async function startServer() {
       classes: { storeKey: "classes", tombstonePrefix: "classes" },
       users: { storeKey: "users", tombstonePrefix: "users" },
       quickRequests: { storeKey: "quickRequests", tombstonePrefix: "quickRequests" },
+      announcements: { storeKey: "announcements", tombstonePrefix: "announcements" },
+      student_attendance: { storeKey: "studentAttendance", tombstonePrefix: "student_attendance" },
+      studentAttendance: { storeKey: "studentAttendance", tombstonePrefix: "student_attendance" },
+      teacher_attendance: { storeKey: "teacherAttendance", tombstonePrefix: "teacher_attendance" },
+      teacherAttendance: { storeKey: "teacherAttendance", tombstonePrefix: "teacher_attendance" },
+      attendance_notes: { storeKey: "attendanceNotes", tombstonePrefix: "attendance_notes" },
+      attendanceNotes: { storeKey: "attendanceNotes", tombstonePrefix: "attendance_notes" },
+      chat_channels: { storeKey: "chatChannels", tombstonePrefix: "chat_channels" },
+      chatChannels: { storeKey: "chatChannels", tombstonePrefix: "chat_channels" },
+      chat_messages: { storeKey: "chatMessages", tombstonePrefix: "chat_messages" },
+      chatMessages: { storeKey: "chatMessages", tombstonePrefix: "chat_messages" },
     };
 
     const resolved = colAliasMap[rawCol];
@@ -2138,6 +2204,13 @@ async function startServer() {
       classes,
       users,
       quickRequests,
+      announcements,
+      studentAttendance,
+      teacherAttendance,
+      attendanceNotes,
+      chatChannels,
+      chatMessages,
+      kvStore,
       tombstones,
     } = req.body || {};
     let changed = false;
@@ -2160,7 +2233,7 @@ async function startServer() {
         networkStore.schools = upsertByKey(
           networkStore.schools,
           validSchools,
-          (sc) => normalizeAscii(sc.name || sc.nomeOficial || sc.id || "")
+          (sc) => String(sc.id || normalizeAscii(sc.name || sc.nomeOficial || "")).trim().toLowerCase()
         );
         changed = true;
       }
@@ -2406,6 +2479,115 @@ async function startServer() {
           (q) => String(q.id || "").trim().toLowerCase()
         );
         changed = true;
+      }
+    }
+
+    if (Array.isArray(announcements) && announcements.length > 0) {
+      const valid = sanitizeCollectionList("announcements", announcements, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.announcements)) {
+          networkStore.announcements = [];
+        }
+        networkStore.announcements = upsertByKey(
+          networkStore.announcements,
+          valid,
+          (a) => String(a.id || a.title || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(studentAttendance) && studentAttendance.length > 0) {
+      const valid = sanitizeCollectionList("student_attendance", studentAttendance, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.studentAttendance)) {
+          networkStore.studentAttendance = [];
+        }
+        networkStore.studentAttendance = upsertByKey(
+          networkStore.studentAttendance,
+          valid,
+          (r) => String(r.id || `${r.studentId || ""}::${r.date || ""}`).trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(teacherAttendance) && teacherAttendance.length > 0) {
+      const valid = sanitizeCollectionList("teacher_attendance", teacherAttendance, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.teacherAttendance)) {
+          networkStore.teacherAttendance = [];
+        }
+        networkStore.teacherAttendance = upsertByKey(
+          networkStore.teacherAttendance,
+          valid,
+          (r) => String(r.id || `${r.teacherId || ""}::${r.date || ""}`).trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(attendanceNotes) && attendanceNotes.length > 0) {
+      const valid = sanitizeCollectionList("attendance_notes", attendanceNotes, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.attendanceNotes)) {
+          networkStore.attendanceNotes = [];
+        }
+        networkStore.attendanceNotes = upsertByKey(
+          networkStore.attendanceNotes,
+          valid,
+          (n) => String(n.id || `${n.date || ""}::${n.author || ""}`).trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(chatChannels) && chatChannels.length > 0) {
+      const valid = sanitizeCollectionList("chat_channels", chatChannels, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.chatChannels)) {
+          networkStore.chatChannels = [];
+        }
+        networkStore.chatChannels = upsertByKey(
+          networkStore.chatChannels,
+          valid,
+          (c) => String(c.id || c.name || "").trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (Array.isArray(chatMessages) && chatMessages.length > 0) {
+      const valid = sanitizeCollectionList("chat_messages", chatMessages, tombstonesSet);
+      if (valid.length > 0) {
+        if (!Array.isArray(networkStore.chatMessages)) {
+          networkStore.chatMessages = [];
+        }
+        networkStore.chatMessages = upsertByKey(
+          networkStore.chatMessages,
+          valid,
+          (m) => String(m.id || `${m.channelId || ""}::${m.timestamp || ""}`).trim().toLowerCase()
+        );
+        changed = true;
+      }
+    }
+
+    if (kvStore && typeof kvStore === "object") {
+      if (!networkStore.kvStore || typeof networkStore.kvStore !== "object") {
+        networkStore.kvStore = {};
+      }
+      for (const [k, entry] of Object.entries(kvStore)) {
+        if (!k || k === "ucore_active_user" || k === "ucore_active_role") continue;
+        const existingEntry = networkStore.kvStore[k];
+        const existingTs = Number(existingEntry?.updatedAt || 0);
+        const incomingTs = Number((entry as any)?.updatedAt || Date.now());
+        if (!existingEntry || incomingTs >= existingTs) {
+          networkStore.kvStore[k] = {
+            value: (entry as any)?.value !== undefined ? (entry as any).value : entry,
+            updatedAt: incomingTs,
+          };
+          changed = true;
+        }
       }
     }
 

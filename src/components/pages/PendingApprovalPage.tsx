@@ -62,47 +62,20 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     currentUser.schoolRole === 'professor' ||
     matchedApp?.type === 'professor';
 
-  const isSchoolStaffForDirector =
-    isTeacher ||
-    matchedApp?.type === 'funcionario' ||
-    matchedApp?.type === 'aluno' ||
-    currentUser.schoolRole === 'subdiretor_pedagogico' ||
-    currentUser.schoolRole === 'subdiretor_administrativo' ||
-    currentUser.schoolRole === 'secretario_escolar';
-
-  const isTargetAdmin =
-    isAdminScopeMember ||
-    matchedApp?.type === 'diretor' ||
-    currentUser.schoolRole === 'diretor_geral'
-      ? true
-      : isSchoolStaffForDirector
-      ? false
-      : matchedApp
-      ? matchedApp.targetApproverRole === 'admin'
-      : currentUser.approverTargetRole === 'admin';
+  // All homologations are centralized in the Municipal Admin account (dmedoquessua@gmail.com)
+  const isTargetAdmin = true;
 
   const targetSchool =
     matchedApp?.schoolName ||
     currentUser.schoolName ||
     'Complexo Escolar do Quéssua';
 
-  const rawAppDirectorName = matchedApp?.approverDirectorName;
-  const schoolDirectorName = !isTargetAdmin
-    ? rawAppDirectorName &&
-      !rawAppDirectorName.includes(OFFICIAL_DME_ADMIN_EMAIL) &&
-      !rawAppDirectorName.toLowerCase().includes('director municipal')
-      ? rawAppDirectorName
-      : resolveSchoolDirectorName(null, targetSchool)
-    : `Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL})`;
-
-  const approverRole = isTargetAdmin
-    ? `Administrador Central (DME) — ${OFFICIAL_DME_ADMIN_EMAIL}`
-    : `Direção da Escola: ${targetSchool} (Diretor(a): ${schoolDirectorName})`;
+  const approverRole = `Administrador Central (DME) — ${OFFICIAL_DME_ADMIN_EMAIL}`;
 
   const cargoDisplay =
     currentUser.cargoTitle ||
     matchedApp?.roleRequested ||
-    (isTeacher ? 'Professor(a) / Docente' : isTargetAdmin ? 'Membro da Direção Municipal' : 'Pessoal do Âmbito Escolar');
+    (isTeacher ? 'Professor(a) / Docente' : isAdminScopeMember ? 'Membro da Direção Municipal' : 'Pessoal do Âmbito Escolar');
 
   // Background polling to auto-detect approval by supervisor in real-time
   React.useEffect(() => {
@@ -161,9 +134,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
         showToast?.('Aviso: A sua inscrição requer retificação documental junto do seu responsável.');
       } else {
         showToast?.(
-          isTargetAdmin
-            ? `A sua candidatura continua na fila de despacho do Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}).`
-            : `A sua candidatura continua na fila de homologação do(a) Diretor(a) da escola (${schoolDirectorName}).`
+          `A sua candidatura continua na fila de homologação do Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}).`
         );
       }
     }, 1200);
@@ -177,9 +148,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       const targetApp = apps.find(
         (a) => a.userId === currentUser.id || a.email.toLowerCase() === currentUser.email.toLowerCase()
       );
-      const approverLabel = isTargetAdmin
-        ? `Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL})`
-        : `${schoolDirectorName} (Direção da ${targetSchool})`;
+      const approverLabel = `Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL})`;
       if (targetApp) {
         approveApplication(targetApp.id, approverLabel);
       }
@@ -588,9 +557,9 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
             <h2 className="text-sm font-bold text-slate-900">
               {isAdminScopeMember
                 ? `Inscrição da Direção Municipal — ${cargoDisplay}`
-                : isTargetAdmin
+                : matchedApp?.type === 'diretor' || currentUser.schoolRole === 'diretor_geral'
                 ? 'Candidatura de Direção Geral Escolar'
-                : `Inscrição de Professor(a) / Docente — ${cargoDisplay}`}
+                : `Inscrição Escolar — ${cargoDisplay}`}
             </h2>
           </div>
           <div className="pl-6 space-y-1">
@@ -601,15 +570,9 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
               </span>
             </p>
             <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pt-1">
-              {isAdminScopeMember || isTargetAdmin ? (
-                <>
-                  A sua conta foi registada com sucesso na rede Sigre e encontra-se na fila de homologação do <strong>Administrador Central da Direção Municipal (dmedoquessua@gmail.com)</strong>. <em>Não parou em um vazio:</em> a sua ficha já está disponível no painel de despachos oficiais para validação e atribuição de permissões.
-                </>
-              ) : (
-                <>
-                  A sua conta de Professor(a) foi registada e encaminhada diretamente para a fila de homologação do(a) <strong>Diretor(a) da sua escola ({schoolDirectorName})</strong> na instituição <strong>{targetSchool}</strong>. <em>Não parou em um vazio:</em> o(a) seu(sua) Diretor(a) tem a sua inscrição ativa no painel de inscrições docentes para atribuir turma, sala e efectividade.
-                </>
-              )}
+              <>
+                A sua conta foi registada com sucesso na rede Sigre e encaminhada diretamente para a fila central de homologação do <strong>Administrador Central da Direção Municipal ({OFFICIAL_DME_ADMIN_EMAIL})</strong>. <em>Não parou em um vazio:</em> a sua ficha já está disponível no painel de homologações oficiais da DME para validação e liberação de acesso.
+              </>
             </p>
           </div>
         </div>
@@ -661,9 +624,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
                 Responsável pela Homologação
               </span>
               <span className="font-bold text-emerald-800 mt-1 text-sm block">
-                {isTargetAdmin
-                  ? 'Administrador Central (DME)'
-                  : `Diretor(a): ${schoolDirectorName} (${targetSchool})`}
+                {`Administrador Central (DME) — ${OFFICIAL_DME_ADMIN_EMAIL}`}
               </span>
             </div>
 

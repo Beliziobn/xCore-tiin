@@ -208,11 +208,9 @@ export function addEntityTombstone(col: string, id: string, skipRemotePropagatio
           ).catch((e) => markFirestoreQuotaIfExhausted(e));
         }
       }
-      if (isNew) {
-        fetch(`/api/network/entity/${encodeURIComponent(col)}/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-        }).catch(() => {});
-      }
+      fetch(`/api/network/entity/${encodeURIComponent(col)}/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }).catch(() => {});
     }
   } catch {}
 }

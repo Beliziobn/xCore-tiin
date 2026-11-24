@@ -366,6 +366,32 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
     setAdminData(loadSavedAdminProfile(currentUser));
   }, [currentUser?.id]);
 
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const savedDme = localStorage.getItem(STORAGE_KEY_DME_STAFF);
+        if (savedDme) {
+          const parsed = JSON.parse(savedDme);
+          if (Array.isArray(parsed)) {
+            setDmeStaff((prev) => (JSON.stringify(prev) === savedDme ? prev : parsed));
+          }
+        }
+        const nextProfile = loadSavedAdminProfile(currentUser);
+        setAdminData((prev) => (JSON.stringify(prev) === JSON.stringify(nextProfile) ? prev : nextProfile));
+        const nextAvatar = localStorage.getItem(userAdminAvatarKey) || currentUser?.avatarUrl || null;
+        setAdminPhoto((prev) => (prev === nextAvatar ? prev : nextAvatar));
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [currentUser?.id, userAdminAvatarKey]);
+
   const handleUpdateAdminData = (updated: Partial<UserProfileData>) => {
     const next: UserProfileData = {
       ...adminData,

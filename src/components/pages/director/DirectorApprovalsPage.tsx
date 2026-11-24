@@ -51,7 +51,8 @@ import {
   schoolsMatch,
   deduplicateApplicationsList,
   normalizeSchoolText,
-  syncApplicationsFromServer
+  syncApplicationsFromServer,
+  OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
 import { isSubdirectorOrNonTeachingRole } from '../../../utils/teacherStorage';
 import { Hero } from '../../Hero';
@@ -442,15 +443,16 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       biNumber: simBi.trim() || '00' + Math.floor(1000000 + Math.random() * 9000000) + 'LA042',
       schoolName: schoolName,
       municipality: 'Quêssua (Malanje)',
-      targetApproverRole: 'diretor',
-      approverDirectorName: directorName,
+      targetApproverRole: 'admin',
+      targetApproverEmail: OFFICIAL_DME_ADMIN_EMAIL,
+      approverDirectorName: `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`,
       subject: simRole === 'professor' ? simSubject : undefined,
       gradeClass: simRole === 'aluno' ? '7ª Classe' : undefined,
       status: 'pendente',
       isPreRegistered: true,
-      preRegisteredDetails: 'Simulação cadastrada para testes de homologação da Direção.',
+      preRegisteredDetails: `Simulação encaminhada à conta central da DME (${OFFICIAL_DME_ADMIN_EMAIL}).`,
       createdAt: new Date().toLocaleString('pt-AO'),
-      notes: 'Candidatura de teste inserida para demonstração da Direção Escolar.',
+      notes: `Candidatura de teste encaminhada para homologação central em ${OFFICIAL_DME_ADMIN_EMAIL}.`,
     };
 
     await savePendingApplicationAsync(newApp);
@@ -467,13 +469,13 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       {/* Hero Header */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
-        customTitle="Homologação de Pessoal do Âmbito Escolar"
-        customSubtitle={`Aprovação pela Direção da escola selecionada (${schoolName || 'Unidade Escolar'}) para Subdiretor Pedagógico, Subdiretor Administrativo, Professor e Secretário Escolar.`}
-        badge="Direção da Escola"
+        customTitle="Homologações Centralizadas na DME"
+        customSubtitle={`Todas as homologações de inscrições (${schoolName || 'Unidade Escolar'} e restante rede municipal) são agora encaminhadas exclusivamente à conta administrativa central (${OFFICIAL_DME_ADMIN_EMAIL}).`}
+        badge="Direcção Municipal (DME)"
         breadcrumbs={[
           { label: 'Início', onClick: () => window.location.reload() },
           { label: 'Direção Escolar' },
-          { label: 'Aprovação de Inscrições' },
+          { label: 'Homologações' },
         ]}
         isLoggedIn={isLoggedIn}
       />
@@ -484,15 +486,15 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
           <div className="p-5 sm:p-6 bg-transparent text-slate-900 border-b border-slate-100">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
               <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold tracking-wide border border-slate-200">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 text-[11px] font-semibold tracking-wide border border-amber-200">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{schoolName || 'Unidades Escolares da Rede'} • Diretor(a): {resolveSchoolDirectorName(null, schoolName) || directorName}</span>
+                  <span>Homologação Centralizada • {OFFICIAL_DME_ADMIN_EMAIL}</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Homologação pela Direção da Escola Selecionada
+                  Todas as Homologações Encaminhadas para a Conta Admin DME
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  As inscrições do pessoal do âmbito escolar (Subdiretor Pedagógico, Subdiretor Administrativo, Professor e Secretário Escolar) são enviadas diretamente ao Diretor da escola escolhida no registo para homologação.
+                  Por norma da Direcção Municipal da Educação, todas as solicitações de homologação (Diretores Gerais, Subdiretores Pedagógicos, Subdiretores Administrativos, Professores, Secretários Escolares e Funcionários) são agora enviadas diretamente para a conta administrativa <strong>{OFFICIAL_DME_ADMIN_EMAIL}</strong>.
                 </p>
               </div>
 

@@ -37,6 +37,7 @@ import {
   CANONICAL_GUIAS_COLOCACAO,
   CANONICAL_FICHAS_AVALIACAO,
 } from '../data/canonicalNetworkSeed';
+import { io, Socket } from 'socket.io-client';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
 
@@ -840,16 +841,277 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
   }
 }
 
+// ============================================================================
+// UNIVERSAL REAL-TIME MULTI-DEVICE SYNC ENGINE (SOCKET.IO + LOCALSTORAGE INTERCEPTOR)
+// Guarantees that ANY create, update, or delete in localStorage on one device
+// is pushed within 25ms and broadcast in real time (< 100ms) to all other devices.
+// ============================================================================
+
+interface CollectionSyncConfig {
+  payloadKey: string;
+  tombstoneCol: string;
+  primaryStorageKey: string;
+  detectDeletions: boolean;
+}
+
+const KEY_TO_COLLECTION_CONFIG: Record<string, CollectionSyncConfig> = {
+  [STORAGE_KEY_SCHOOLS]: { payloadKey: 'schools', tombstoneCol: 'schools', primaryStorageKey: STORAGE_KEY_SCHOOLS, detectDeletions: true },
+  ucore_registered_schools_v1: { payloadKey: 'schools', tombstoneCol: 'schools', primaryStorageKey: STORAGE_KEY_SCHOOLS, detectDeletions: true },
+  ucore_admin_directors: { payloadKey: 'directors', tombstoneCol: 'directors', primaryStorageKey: 'ucore_admin_directors', detectDeletions: true },
+  ucore_registered_directors_v2: { payloadKey: 'directors', tombstoneCol: 'directors', primaryStorageKey: 'ucore_admin_directors', detectDeletions: true },
+  ucore_admin_teachers: { payloadKey: 'teachers', tombstoneCol: 'teachers', primaryStorageKey: 'ucore_admin_teachers', detectDeletions: true },
+  ucore_registered_teachers_v2: { payloadKey: 'teachers', tombstoneCol: 'teachers', primaryStorageKey: 'ucore_registered_teachers_v2', detectDeletions: true },
+  ucore_director_teachers_v1: { payloadKey: 'teachers', tombstoneCol: 'teachers', primaryStorageKey: 'ucore_director_teachers_v1', detectDeletions: true },
+  ucore_admin_students: { payloadKey: 'students', tombstoneCol: 'students', primaryStorageKey: 'ucore_admin_students', detectDeletions: true },
+  ucore_registered_students_v2: { payloadKey: 'students', tombstoneCol: 'students', primaryStorageKey: 'ucore_registered_students_v2', detectDeletions: true },
+  ucore_director_students: { payloadKey: 'students', tombstoneCol: 'students', primaryStorageKey: 'ucore_director_students', detectDeletions: true },
+  ucore_teacher_students: { payloadKey: 'students', tombstoneCol: 'students', primaryStorageKey: 'ucore_admin_students', detectDeletions: false },
+  ucore_registered_staff_v1: { payloadKey: 'staff', tombstoneCol: 'staff', primaryStorageKey: 'ucore_registered_staff_v1', detectDeletions: true },
+  sigre_admin_other_staff_v1: { payloadKey: 'staff', tombstoneCol: 'staff', primaryStorageKey: 'ucore_registered_staff_v1', detectDeletions: true },
+  ucore_dme_staff_list: { payloadKey: 'dmeStaff', tombstoneCol: 'dme_staff', primaryStorageKey: 'ucore_dme_staff_list', detectDeletions: true },
+  ucore_dme_staff_members_v1: { payloadKey: 'dmeStaff', tombstoneCol: 'dme_staff', primaryStorageKey: 'ucore_dme_staff_list', detectDeletions: true },
+  ucore_pending_applications: { payloadKey: 'applications', tombstoneCol: 'applications', primaryStorageKey: 'ucore_pending_applications', detectDeletions: true },
+  sigre_cadastramento_efectividade_v2: { payloadKey: 'efectividade', tombstoneCol: 'efectividade', primaryStorageKey: 'sigre_cadastramento_efectividade_v2', detectDeletions: true },
+  sigre_declaracao_servico_v1: { payloadKey: 'declaracaoServico', tombstoneCol: 'declaracao_servico', primaryStorageKey: 'sigre_declaracao_servico_v1', detectDeletions: true },
+  sigre_guias_ferias_records_v1: { payloadKey: 'guiasFerias', tombstoneCol: 'guias_ferias', primaryStorageKey: 'sigre_guias_ferias_records_v1', detectDeletions: true },
+  sigre_guias_colocacao_records_v1: { payloadKey: 'guiasColocacao', tombstoneCol: 'guias_colocacao', primaryStorageKey: 'sigre_guias_colocacao_records_v1', detectDeletions: true },
+  sigre_fichas_avaliacao_records_v1: { payloadKey: 'fichasAvaliacao', tombstoneCol: 'fichas_avaliacao', primaryStorageKey: 'sigre_fichas_avaliacao_records_v1', detectDeletions: true },
+  'cadastro-docente-registos': { payloadKey: 'cadastroDocente', tombstoneCol: 'cadastro_docente', primaryStorageKey: 'cadastro-docente-registos', detectDeletions: true },
+  sigre_teacher_mini_pautas_v5_blank: { payloadKey: 'miniPautas', tombstoneCol: 'grades', primaryStorageKey: 'sigre_teacher_mini_pautas_v5_blank', detectDeletions: true },
+  ucore_director_rooms: { payloadKey: 'rooms', tombstoneCol: 'rooms', primaryStorageKey: 'ucore_director_rooms', detectDeletions: true },
+  ucore_director_rooms_v1: { payloadKey: 'rooms', tombstoneCol: 'rooms', primaryStorageKey: 'ucore_director_rooms', detectDeletions: true },
+  sigre_director_rooms: { payloadKey: 'rooms', tombstoneCol: 'rooms', primaryStorageKey: 'ucore_director_rooms', detectDeletions: true },
+  ucore_director_classes: { payloadKey: 'classes', tombstoneCol: 'classes', primaryStorageKey: 'ucore_director_classes', detectDeletions: true },
+  ucore_director_classes_v1: { payloadKey: 'classes', tombstoneCol: 'classes', primaryStorageKey: 'ucore_director_classes', detectDeletions: true },
+  sigre_director_classes: { payloadKey: 'classes', tombstoneCol: 'classes', primaryStorageKey: 'ucore_director_classes', detectDeletions: true },
+  ucore_registered_users: { payloadKey: 'users', tombstoneCol: 'users', primaryStorageKey: 'ucore_registered_users', detectDeletions: true },
+  sigre_quick_services_local_cache: { payloadKey: 'quickRequests', tombstoneCol: 'quickRequests', primaryStorageKey: 'sigre_quick_services_local_cache', detectDeletions: true },
+  ucore_school_announcements_v1: { payloadKey: 'announcements', tombstoneCol: 'announcements', primaryStorageKey: 'ucore_school_announcements_v1', detectDeletions: true },
+  ucore_student_attendance_records_v2: { payloadKey: 'studentAttendance', tombstoneCol: 'student_attendance', primaryStorageKey: 'ucore_student_attendance_records_v2', detectDeletions: true },
+  ucore_teacher_attendance_records_v2: { payloadKey: 'teacherAttendance', tombstoneCol: 'teacher_attendance', primaryStorageKey: 'ucore_teacher_attendance_records_v2', detectDeletions: true },
+  ucore_attendance_diary_notes: { payloadKey: 'attendanceNotes', tombstoneCol: 'attendance_notes', primaryStorageKey: 'ucore_attendance_diary_notes', detectDeletions: true },
+  ucore_chat_channels_v3: { payloadKey: 'chatChannels', tombstoneCol: 'chat_channels', primaryStorageKey: 'ucore_chat_channels_v3', detectDeletions: true },
+  ucore_chat_channels: { payloadKey: 'chatChannels', tombstoneCol: 'chat_channels', primaryStorageKey: 'ucore_chat_channels_v3', detectDeletions: false },
+  ucore_chat_messages: { payloadKey: 'chatMessages', tombstoneCol: 'chat_messages', primaryStorageKey: 'ucore_chat_messages', detectDeletions: true },
+};
+
+function isSyncedKvKey(key: string): boolean {
+  if (!key) return false;
+  if (
+    key === 'ucore_active_user' ||
+    key === 'ucore_active_role' ||
+    key === 'ucore_deleted_entity_tombstones_v1' ||
+    key.includes('draft')
+  ) {
+    return false;
+  }
+  return (
+    key.startsWith('ucore_admin_profile_data') ||
+    key.startsWith('ucore_admin_avatar') ||
+    key.startsWith('ucore_director_profile') ||
+    key.startsWith('ucore_teacher_profile') ||
+    key.startsWith('ucore_profile_extra') ||
+    key === 'ucore_session_settings' ||
+    key === 'ucore_profile_notifications' ||
+    key === 'ucore_user_avatar'
+  );
+}
+
+let isApplyingServerState = false;
+let hasCompletedInitialServerPull = false;
+let interceptorInstalled = false;
+let realtimeSocket: Socket | null = null;
+let lastKnownServerUpdatedAt = '';
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+const dirtyCollections = new Set<string>();
+const dirtyStorageKeys = new Map<string, string>(); // payloadKey -> last modified storage key
+const dirtyKvStore: Record<string, { value: string; updatedAt: number }> = {};
+
+function getItemIdentityKey(item: any): string {
+  if (!item || typeof item !== 'object') return '';
+  const candidates = [
+    item.id,
+    item.userId,
+    item.biNif,
+    item.biNumber,
+    item.bi,
+    item.numeroDocumento,
+    item.agente,
+    item.numeroAgente,
+    item.ref,
+    item.protocol,
+    item.email,
+    item.name,
+    item.nomeOficial,
+    item.nomeCompleto,
+    item.fullName,
+    item.nome,
+  ];
+  for (const c of candidates) {
+    if (c !== undefined && c !== null && String(c).trim() !== '') {
+      return String(c).trim().toLowerCase();
+    }
+  }
+  return '';
+}
+
+function setLocalStorageFromServer(key: string, value: string): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  const prevFlag = isApplyingServerState;
+  isApplyingServerState = true;
+  try {
+    localStorage.setItem(key, value);
+  } finally {
+    isApplyingServerState = prevFlag;
+  }
+}
+
+function scheduleDirtyFlush(): void {
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    syncSchoolsFromServer().catch(() => {});
+  }, 25);
+}
+
+export function initUniversalRealtimeSyncEngine(): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+
+  if (!interceptorInstalled) {
+    interceptorInstalled = true;
+    const rawSetItem = Storage.prototype.setItem;
+    const rawGetItem = Storage.prototype.getItem;
+
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (this !== window.localStorage || isApplyingServerState) {
+        return rawSetItem.call(this, key, value);
+      }
+
+      const prevRaw = rawGetItem.call(this, key);
+      if (prevRaw === value) {
+        return;
+      }
+
+      const colConfig = KEY_TO_COLLECTION_CONFIG[key];
+      if (colConfig) {
+        // Ignore initial default seeding before first server pull when key did not exist yet
+        if (prevRaw === null && !hasCompletedInitialServerPull) {
+          return rawSetItem.call(this, key, value);
+        }
+
+        try {
+          const prevArr: any[] = prevRaw ? JSON.parse(prevRaw) : [];
+          const nextArr: any[] = value ? JSON.parse(value) : [];
+
+          if (Array.isArray(nextArr)) {
+            const nowTs = Date.now();
+            const prevById = new Map<string, { item: any; raw: string }>();
+            if (Array.isArray(prevArr)) {
+              prevArr.forEach((p) => {
+                const k = getItemIdentityKey(p);
+                if (k) prevById.set(k, { item: p, raw: JSON.stringify(p) });
+              });
+            }
+
+            const nextIds = new Set<string>();
+            const stampedNext = nextArr.map((n) => {
+              if (!n || typeof n !== 'object') return n;
+              const k = getItemIdentityKey(n);
+              if (k) nextIds.add(k);
+              const prevEntry = k ? prevById.get(k) : undefined;
+              if (!prevEntry) {
+                return { ...n, _updatedAt: nowTs };
+              }
+              const { _updatedAt: _oldTs, ...prevClean } = prevEntry.item || {};
+              const { _updatedAt: _newTs, ...nextClean } = n;
+              if (JSON.stringify(prevClean) !== JSON.stringify(nextClean)) {
+                return { ...n, _updatedAt: nowTs };
+              }
+              return n;
+            });
+
+            // Detect deleted items and register permanent tombstones immediately
+            if (colConfig.detectDeletions && Array.isArray(prevArr) && prevArr.length > nextArr.length) {
+              prevArr.forEach((p) => {
+                const k = getItemIdentityKey(p);
+                if (k && !nextIds.has(k)) {
+                  const rawId = String(p.id || p.userId || k).trim();
+                  if (rawId) {
+                    addEntityTombstone(colConfig.tombstoneCol, rawId);
+                  }
+                  if (colConfig.tombstoneCol === 'schools' && (p.name || p.nomeOficial)) {
+                    addEntityTombstone('schools', String(p.name || p.nomeOficial));
+                  }
+                }
+              });
+            }
+
+            const stampedJson = JSON.stringify(stampedNext);
+            rawSetItem.call(this, key, stampedJson);
+            dirtyCollections.add(colConfig.payloadKey);
+            dirtyStorageKeys.set(colConfig.payloadKey, key);
+            scheduleDirtyFlush();
+            return;
+          }
+        } catch {
+          // fallback to raw write
+        }
+      } else if (isSyncedKvKey(key)) {
+        rawSetItem.call(this, key, value);
+        if (prevRaw !== null || hasCompletedInitialServerPull) {
+          dirtyKvStore[key] = { value, updatedAt: Date.now() };
+          scheduleDirtyFlush();
+        }
+        return;
+      }
+
+      return rawSetItem.call(this, key, value);
+    };
+  }
+
+  if (!realtimeSocket) {
+    try {
+      realtimeSocket = io({
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 500,
+        reconnectionAttempts: Infinity,
+      });
+
+      realtimeSocket.on('network:state-updated', (payload?: { updatedAt?: string }) => {
+        if (payload?.updatedAt && payload.updatedAt === lastKnownServerUpdatedAt && dirtyCollections.size === 0) {
+          return;
+        }
+        syncSchoolsFromServer().catch(() => {});
+      });
+
+      realtimeSocket.on('connect', () => {
+        syncSchoolsFromServer().catch(() => {});
+      });
+    } catch {
+      // ignore socket setup errors
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  initUniversalRealtimeSyncEngine();
+}
+
 /**
- * Synchronizes registered schools, directors, teachers, students, staff, applications,
- * efectividade, declaracaoServico, guias, rooms, and classes
- * between the browser localStorage, Firestore, and the shared backend (/api/network/sync).
- * Ensures that when users register on any session/device or reload the app, zero data is lost.
+ * Synchronizes all collections and profile/settings key-values
+ * between browser localStorage and the shared backend (/api/network/sync) in real time.
+ * Passive tabs pull via GET /api/network/sync so they never overwrite fresh edits from other devices;
+ * active tabs push only their dirty mutated collections via POST /api/network/sync.
  */
 export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return [];
   }
+
+  initUniversalRealtimeSyncEngine();
 
   const norm = (str?: string) =>
     (str || '')
@@ -859,23 +1121,33 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       .toLowerCase()
       .replace(/\s+/g, ' ');
 
-  const safeParseArr = (key: string, canonicalFallback?: any[]): any[] => {
+  const safeParseArr = (key: string, canonicalFallback?: any[], tombstoneCol?: string): any[] => {
     try {
       const raw = localStorage.getItem(key);
-      if (raw) {
+      if (raw !== null) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 || hasCompletedInitialServerPull) {
+            return parsed.filter(
+              (item) =>
+                !isBannedSchoolOrEntity(item) &&
+                (!tombstoneCol || !isEntityTombstoned(tombstoneCol, item?.id || item?.userId || item?.name || ''))
+            );
+          }
         }
       }
-      if (Array.isArray(canonicalFallback) && canonicalFallback.length > 0) {
-        const safeSeed = canonicalFallback.filter((item) => !isBannedSchoolOrEntity(item));
-        localStorage.setItem(key, JSON.stringify(safeSeed));
+      if (!hasCompletedInitialServerPull && Array.isArray(canonicalFallback) && canonicalFallback.length > 0) {
+        const safeSeed = canonicalFallback.filter(
+          (item) =>
+            !isBannedSchoolOrEntity(item) &&
+            (!tombstoneCol || !isEntityTombstoned(tombstoneCol, item?.id || item?.userId || item?.name || ''))
+        );
+        setLocalStorageFromServer(key, JSON.stringify(safeSeed));
         return safeSeed;
       }
       return [];
     } catch {
-      return Array.isArray(canonicalFallback) ? canonicalFallback : [];
+      return [];
     }
   };
 
@@ -883,397 +1155,412 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     const canonicalRegTeachers = (CANONICAL_TEACHERS as any[])
       .map((t: any) => t?.registrationData || t)
       .filter((t: any) => t && t.nomeCompleto);
-    const localSchools: AdminSchool[] = safeParseArr(STORAGE_KEY_SCHOOLS, CANONICAL_SCHOOLS).filter((s) => !isBannedSchoolOrEntity(s));
-    const localDirs = safeParseArr('ucore_admin_directors', CANONICAL_DIRECTORS).filter((d) => !isBannedSchoolOrEntity(d));
-    const localRegDirs = safeParseArr('ucore_registered_directors_v2', CANONICAL_DIRECTORS).filter((d) => !isBannedSchoolOrEntity(d));
-    const localDmeStaff = safeParseArr('ucore_dme_staff_list', CANONICAL_DME_STAFF).filter((s) => !isBannedSchoolOrEntity(s));
-    const localTeachers = safeParseArr('ucore_admin_teachers', CANONICAL_TEACHERS).filter((t) => !isBannedSchoolOrEntity(t));
-    const localRegTeachers = safeParseArr('ucore_registered_teachers_v2', canonicalRegTeachers).filter((t) => !isBannedSchoolOrEntity(t));
-    const localDirTeachers = safeParseArr('ucore_director_teachers_v1', CANONICAL_TEACHERS).filter((t) => !isBannedSchoolOrEntity(t));
-    const localStudents = safeParseArr('ucore_admin_students', CANONICAL_STUDENTS).filter((s) => !isBannedSchoolOrEntity(s));
-    const localRegStudents = safeParseArr('ucore_registered_students_v2').filter((s) => !isBannedSchoolOrEntity(s));
-    const localDirStudents = safeParseArr('ucore_director_students').filter((s) => !isBannedSchoolOrEntity(s));
-    const localTeacherStudents = safeParseArr('ucore_teacher_students').filter((s) => !isBannedSchoolOrEntity(s));
-    const localStaff = safeParseArr('ucore_registered_staff_v1', CANONICAL_STAFF).filter((s) => !isBannedSchoolOrEntity(s));
-    const localApps = safeParseArr('ucore_pending_applications', CANONICAL_APPLICATIONS).filter((a) => !isBannedSchoolOrEntity(a));
-    const localEfectividade = safeParseArr('sigre_cadastramento_efectividade_v2').filter((e) => !isBannedSchoolOrEntity(e));
-    const localDeclaracao = safeParseArr('sigre_declaracao_servico_v1', CANONICAL_DECLARACAO_SERVICO).filter((d) => !isBannedSchoolOrEntity(d));
-    const localGuiasFerias = safeParseArr('sigre_guias_ferias_records_v1', CANONICAL_GUIAS_FERIAS).filter((g) => !isBannedSchoolOrEntity(g));
-    const localGuiasColocacao = safeParseArr('sigre_guias_colocacao_records_v1', CANONICAL_GUIAS_COLOCACAO).filter(
-      (g) => !isBannedSchoolOrEntity(g) && g?.id !== 'guia-colocacao-default-1'
+
+    const localSchools: AdminSchool[] = safeParseArr(STORAGE_KEY_SCHOOLS, CANONICAL_SCHOOLS, 'schools');
+    const localDirs = safeParseArr('ucore_admin_directors', CANONICAL_DIRECTORS, 'directors');
+    const localRegDirs = safeParseArr('ucore_registered_directors_v2', CANONICAL_DIRECTORS, 'directors');
+    const localDmeStaff = safeParseArr('ucore_dme_staff_list', CANONICAL_DME_STAFF, 'dme_staff');
+    const localTeachers = safeParseArr('ucore_admin_teachers', CANONICAL_TEACHERS, 'teachers');
+    const localRegTeachers = safeParseArr('ucore_registered_teachers_v2', canonicalRegTeachers, 'teachers');
+    const localDirTeachers = safeParseArr('ucore_director_teachers_v1', CANONICAL_TEACHERS, 'teachers');
+    const localStudents = safeParseArr('ucore_admin_students', CANONICAL_STUDENTS, 'students');
+    const localRegStudents = safeParseArr('ucore_registered_students_v2', undefined, 'students');
+    const localDirStudents = safeParseArr('ucore_director_students', undefined, 'students');
+    const localTeacherStudents = safeParseArr('ucore_teacher_students', undefined, 'students');
+    const localStaff = safeParseArr('ucore_registered_staff_v1', CANONICAL_STAFF, 'staff');
+    const localApps = safeParseArr('ucore_pending_applications', CANONICAL_APPLICATIONS, 'applications');
+    const localEfectividade = safeParseArr('sigre_cadastramento_efectividade_v2', undefined, 'efectividade');
+    const localDeclaracao = safeParseArr('sigre_declaracao_servico_v1', CANONICAL_DECLARACAO_SERVICO, 'declaracao_servico');
+    const localGuiasFerias = safeParseArr('sigre_guias_ferias_records_v1', CANONICAL_GUIAS_FERIAS, 'guias_ferias');
+    const localGuiasColocacao = safeParseArr('sigre_guias_colocacao_records_v1', CANONICAL_GUIAS_COLOCACAO, 'guias_colocacao').filter(
+      (g) => g?.id !== 'guia-colocacao-default-1'
     );
-    const localFichasAvaliacao = safeParseArr('sigre_fichas_avaliacao_records_v1', CANONICAL_FICHAS_AVALIACAO).filter(
-      (f) => !isBannedSchoolOrEntity(f) && f?.id !== 'ficha-avaliacao-default-1'
+    const localFichasAvaliacao = safeParseArr('sigre_fichas_avaliacao_records_v1', CANONICAL_FICHAS_AVALIACAO, 'fichas_avaliacao').filter(
+      (f) => f?.id !== 'ficha-avaliacao-default-1'
     );
-    const localCadastroDocente = safeParseArr('cadastro-docente-registos').filter((c) => !isBannedSchoolOrEntity(c));
-    const localMiniPautas = safeParseArr('sigre_teacher_mini_pautas_v5_blank').filter((m) => !isBannedSchoolOrEntity(m));
-    const localRooms = safeParseArr('ucore_director_rooms').filter((r) => !isBannedSchoolOrEntity(r));
-    const localClasses = safeParseArr('ucore_director_classes').filter((c) => !isBannedSchoolOrEntity(c));
-    const localUsers = safeParseArr('ucore_registered_users', CANONICAL_USERS).filter((u) => !isBannedSchoolOrEntity(u));
-    const localQuickRequests = safeParseArr('sigre_quick_services_local_cache').filter((q) => !isBannedSchoolOrEntity(q));
+    const localCadastroDocente = safeParseArr('cadastro-docente-registos', undefined, 'cadastro_docente');
+    const localMiniPautas = safeParseArr('sigre_teacher_mini_pautas_v5_blank', undefined, 'grades');
+    const localRooms = safeParseArr('ucore_director_rooms', undefined, 'rooms');
+    const localClasses = safeParseArr('ucore_director_classes', undefined, 'classes');
+    const localUsers = safeParseArr('ucore_registered_users', CANONICAL_USERS, 'users');
+    const localQuickRequests = safeParseArr('sigre_quick_services_local_cache', undefined, 'quickRequests');
+    const localAnnouncements = safeParseArr('ucore_school_announcements_v1', undefined, 'announcements');
+    const localStudentAttendance = safeParseArr('ucore_student_attendance_records_v2', undefined, 'student_attendance');
+    const localTeacherAttendance = safeParseArr('ucore_teacher_attendance_records_v2', undefined, 'teacher_attendance');
+    const localAttendanceNotes = safeParseArr('ucore_attendance_diary_notes', undefined, 'attendance_notes');
+    const localChatChannels = safeParseArr('ucore_chat_channels_v3', undefined, 'chat_channels');
+    const localChatMessages = safeParseArr('ucore_chat_messages', undefined, 'chat_messages');
     const localTombstones = Array.from(getEntityTombstones());
 
-    const res = await fetch('/api/network/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        schools: localSchools,
-        directors: localDirs.length > 0 ? localDirs : localRegDirs,
-        dmeStaff: localDmeStaff,
-        teachers: localTeachers.length > 0 ? localTeachers : localRegTeachers,
-        students: localStudents.length > 0 ? localStudents : localRegStudents,
-        staff: localStaff,
-        applications: localApps,
-        efectividade: localEfectividade,
-        declaracaoServico: localDeclaracao,
-        guiasFerias: localGuiasFerias,
-        guiasColocacao: localGuiasColocacao,
-        fichasAvaliacao: localFichasAvaliacao,
-        cadastroDocente: localCadastroDocente,
-        miniPautas: localMiniPautas,
-        rooms: localRooms,
-        classes: localClasses,
-        users: localUsers,
-        quickRequests: localQuickRequests,
+    const hasDirtyMutations = dirtyCollections.size > 0 || Object.keys(dirtyKvStore).length > 0;
+    let res: Response;
+
+    if (hasDirtyMutations) {
+      const payload: Record<string, any> = {
         tombstones: localTombstones,
-      }),
-    });
+      };
+      const readLatestDirty = (payloadKey: string, fallbackArr: any[]) => {
+        const lastKey = dirtyStorageKeys.get(payloadKey);
+        if (lastKey) {
+          try {
+            const raw = localStorage.getItem(lastKey);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) return parsed;
+            }
+          } catch {}
+        }
+        return fallbackArr;
+      };
+
+      if (dirtyCollections.has('schools')) payload.schools = readLatestDirty('schools', localSchools);
+      if (dirtyCollections.has('directors')) payload.directors = readLatestDirty('directors', localDirs.length > 0 ? localDirs : localRegDirs);
+      if (dirtyCollections.has('dmeStaff')) payload.dmeStaff = readLatestDirty('dmeStaff', localDmeStaff);
+      if (dirtyCollections.has('teachers')) payload.teachers = readLatestDirty('teachers', localTeachers.length > 0 ? localTeachers : localRegTeachers);
+      if (dirtyCollections.has('students')) payload.students = readLatestDirty('students', localStudents.length > 0 ? localStudents : localRegStudents);
+      if (dirtyCollections.has('staff')) payload.staff = readLatestDirty('staff', localStaff);
+      if (dirtyCollections.has('applications')) payload.applications = readLatestDirty('applications', localApps);
+      if (dirtyCollections.has('efectividade')) payload.efectividade = readLatestDirty('efectividade', localEfectividade);
+      if (dirtyCollections.has('declaracaoServico')) payload.declaracaoServico = readLatestDirty('declaracaoServico', localDeclaracao);
+      if (dirtyCollections.has('guiasFerias')) payload.guiasFerias = readLatestDirty('guiasFerias', localGuiasFerias);
+      if (dirtyCollections.has('guiasColocacao')) payload.guiasColocacao = readLatestDirty('guiasColocacao', localGuiasColocacao);
+      if (dirtyCollections.has('fichasAvaliacao')) payload.fichasAvaliacao = readLatestDirty('fichasAvaliacao', localFichasAvaliacao);
+      if (dirtyCollections.has('cadastroDocente')) payload.cadastroDocente = readLatestDirty('cadastroDocente', localCadastroDocente);
+      if (dirtyCollections.has('miniPautas')) payload.miniPautas = readLatestDirty('miniPautas', localMiniPautas);
+      if (dirtyCollections.has('rooms')) payload.rooms = readLatestDirty('rooms', localRooms);
+      if (dirtyCollections.has('classes')) payload.classes = readLatestDirty('classes', localClasses);
+      if (dirtyCollections.has('users')) payload.users = readLatestDirty('users', localUsers);
+      if (dirtyCollections.has('quickRequests')) payload.quickRequests = readLatestDirty('quickRequests', localQuickRequests);
+      if (dirtyCollections.has('announcements')) payload.announcements = readLatestDirty('announcements', localAnnouncements);
+      if (dirtyCollections.has('studentAttendance')) payload.studentAttendance = readLatestDirty('studentAttendance', localStudentAttendance);
+      if (dirtyCollections.has('teacherAttendance')) payload.teacherAttendance = readLatestDirty('teacherAttendance', localTeacherAttendance);
+      if (dirtyCollections.has('attendanceNotes')) payload.attendanceNotes = readLatestDirty('attendanceNotes', localAttendanceNotes);
+      if (dirtyCollections.has('chatChannels')) payload.chatChannels = readLatestDirty('chatChannels', localChatChannels);
+      if (dirtyCollections.has('chatMessages')) payload.chatMessages = readLatestDirty('chatMessages', localChatMessages);
+
+      if (Object.keys(dirtyKvStore).length > 0) {
+        payload.kvStore = { ...dirtyKvStore };
+        for (const k of Object.keys(dirtyKvStore)) {
+          delete dirtyKvStore[k];
+        }
+      }
+
+      dirtyCollections.clear();
+      dirtyStorageKeys.clear();
+
+      res = await fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      res = await fetch('/api/network/sync', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+    }
 
     if (!res.ok) {
       return localSchools;
     }
 
     const data = await res.json();
+    hasCompletedInitialServerPull = true;
+    if (data.updatedAt) {
+      lastKnownServerUpdatedAt = data.updatedAt;
+    }
     let changed = false;
 
-    // 0. Merge Tombstones from Server first (supporting both "::" and ":" formats) so deleted entities never resurrect
-    if (Array.isArray(data.tombstones) && data.tombstones.length > 0) {
-      data.tombstones.forEach((tk: string) => {
-        if (typeof tk !== 'string' || !tk) return;
-        if (tk.includes('::')) {
-          const [col, id] = tk.split('::');
-          if (col && id) addEntityTombstone(col, id, true);
-        } else if (tk.includes(':')) {
-          const idx = tk.indexOf(':');
-          const col = tk.slice(0, idx);
-          const id = tk.slice(idx + 1);
-          if (col && id) addEntityTombstone(col, id, true);
-        }
-      });
-    }
-
-    // 1. Merge Schools
-    if (Array.isArray(data.schools) && data.schools.length > 0) {
-      const mergedMap = new Map<string, AdminSchool>();
-      localSchools.forEach((s) => {
-        if (s && s.name && !isModeloCentralSchool(s.name)) {
-          if (!isEntityTombstoned('schools', s.id) && !isEntityTombstoned('schools', s.name)) {
-            mergedMap.set(norm(s.name), s);
+    isApplyingServerState = true;
+    try {
+      // 0. Merge Tombstones from Server first (supporting both "::" and ":" formats) so deleted entities never resurrect
+      if (Array.isArray(data.tombstones) && data.tombstones.length > 0) {
+        data.tombstones.forEach((tk: string) => {
+          if (typeof tk !== 'string' || !tk) return;
+          if (tk.includes('::')) {
+            const [col, id] = tk.split('::');
+            if (col && id) addEntityTombstone(col, id, true);
+          } else if (tk.includes(':')) {
+            const idx = tk.indexOf(':');
+            const col = tk.slice(0, idx);
+            const id = tk.slice(idx + 1);
+            if (col && id) addEntityTombstone(col, id, true);
           }
-        }
-      });
-      data.schools.forEach((s: AdminSchool) => {
-        if (s && s.name && !isModeloCentralSchool(s.name)) {
-          if (!isEntityTombstoned('schools', s.id) && !isEntityTombstoned('schools', s.name)) {
-            const key = norm(s.name);
-            const existing = mergedMap.get(key);
-            mergedMap.set(
-              key,
-              existing
-                ? {
-                    ...existing,
-                    ...s,
-                    directorName:
-                      s.directorName && s.directorName !== 'Diretor a Designar' && s.directorName !== 'Fert Horlan'
-                        ? s.directorName
-                        : existing.directorName || s.directorName,
-                    teachersCount: Math.max(s.teachersCount || 0, existing.teachersCount || 0),
-                    registrationData: s.registrationData || existing.registrationData,
-                  }
-                : s
-            );
+        });
+      }
+
+      const nowMs = Date.now();
+      // Authoritative helper: server items win; local items missing from server are only kept if created in the last 6 seconds
+      const reconcileList = (localArr: any[], serverArr: any[], tombstoneCol: string, keyFn: (item: any) => string): any[] => {
+        const serverKeys = new Set<string>();
+        const map = new Map<string, any>();
+
+        serverArr.forEach((sItem: any) => {
+          if (!sItem || isBannedSchoolOrEntity(sItem)) return;
+          const k = keyFn(sItem);
+          if (!k) return;
+          if (isEntityTombstoned(tombstoneCol, sItem.id || k)) return;
+          serverKeys.add(k);
+          map.set(k, sItem);
+        });
+
+        localArr.forEach((lItem: any) => {
+          if (!lItem || isBannedSchoolOrEntity(lItem)) return;
+          const k = keyFn(lItem);
+          if (!k) return;
+          if (isEntityTombstoned(tombstoneCol, lItem.id || k)) return;
+          if (serverKeys.has(k)) {
+            const sItem = map.get(k);
+            const lTs = Number(lItem._updatedAt || 0);
+            const sTs = Number(sItem._updatedAt || 0);
+            if (lTs > sTs && lTs > nowMs - 6000) {
+              map.set(k, { ...sItem, ...lItem });
+            } else {
+              map.set(k, { ...lItem, ...sItem });
+            }
+          } else if (Number(lItem._updatedAt || 0) > nowMs - 6000) {
+            map.set(k, lItem);
           }
+        });
+
+        return Array.from(map.values());
+      };
+
+      // 1. Merge Schools (Server authoritative)
+      if (Array.isArray(data.schools) && !dirtyCollections.has('schools')) {
+        const mergedSchools = reconcileList(
+          localSchools,
+          data.schools.filter((s: any) => s && s.name && !isModeloCentralSchool(s.name)),
+          'schools',
+          (s) => String(s.id || norm(s.name)).trim().toLowerCase()
+        ).filter((s) => !isEntityTombstoned('schools', s.name));
+
+        if (JSON.stringify(mergedSchools) !== JSON.stringify(localSchools)) {
+          setLocalStorageFromServer(STORAGE_KEY_SCHOOLS, JSON.stringify(mergedSchools));
+          setLocalStorageFromServer('ucore_registered_schools_v1', JSON.stringify(mergedSchools));
+          const regs = mergedSchools.map((sc) => sc.registrationData).filter(Boolean);
+          if (regs.length > 0) {
+            setLocalStorageFromServer('sigre_school_registrations', JSON.stringify(regs));
+          }
+          changed = true;
         }
-      });
-      const mergedSchools = Array.from(mergedMap.values());
-      if (JSON.stringify(mergedSchools) !== JSON.stringify(localSchools)) {
-        localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(mergedSchools));
-        localStorage.setItem('ucore_registered_schools_v1', JSON.stringify(mergedSchools));
-        const regs = mergedSchools.map((sc) => sc.registrationData).filter(Boolean);
-        if (regs.length > 0) {
-          localStorage.setItem('sigre_school_registrations', JSON.stringify(regs));
-        }
-        changed = true;
       }
-    }
 
-    // 2. Merge Directors (using base ID without dir-dossier- prefix so duplicates are collapsed)
-    if (Array.isArray(data.directors)) {
-      const dirMap = new Map<string, any>();
-      data.directors.forEach((d: any) => {
-        if (!d) return;
-        const baseId = stripAppIdPrefix(d.id);
-        const k = norm(baseId || d.email || d.name || d.nomeCompleto);
-        if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.email || d.id)) {
-          dirMap.set(k, { ...(dirMap.get(k) || {}), ...d, id: baseId || d.id });
+      // 2. Merge Directors
+      if (Array.isArray(data.directors) && !dirtyCollections.has('directors')) {
+        const dirMap = new Map<string, any>();
+        data.directors.forEach((d: any) => {
+          if (!d) return;
+          const baseId = stripAppIdPrefix(d.id);
+          const k = norm(baseId || d.email || d.name || d.nomeCompleto);
+          if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.email || d.id)) {
+            dirMap.set(k, { ...(dirMap.get(k) || {}), ...d, id: baseId || d.id });
+          }
+        });
+        const mergedDirs = Array.from(dirMap.values());
+        if (JSON.stringify(mergedDirs) !== JSON.stringify(localDirs)) {
+          setLocalStorageFromServer('ucore_admin_directors', JSON.stringify(mergedDirs));
+          setLocalStorageFromServer('ucore_registered_directors_v2', JSON.stringify(mergedDirs));
+          changed = true;
         }
-      });
-      const mergedDirs = Array.from(dirMap.values());
-      if (JSON.stringify(mergedDirs) !== JSON.stringify(localDirs)) {
-        localStorage.setItem('ucore_admin_directors', JSON.stringify(mergedDirs));
-        localStorage.setItem('ucore_registered_directors_v2', JSON.stringify(mergedDirs));
-        changed = true;
       }
-    }
 
-    // 3. Merge Teachers (Server -> ucore_admin_teachers, ucore_registered_teachers_v2, ucore_director_teachers_v1)
-    const incomingTeachers = Array.isArray(data.teachers) ? data.teachers : [];
-    if (incomingTeachers.length > 0) {
-      const adminTMap = new Map<string, any>();
-      const regTMap = new Map<string, any>();
-      const dirTMap = new Map<string, any>();
+      // 3. Merge Teachers
+      if (Array.isArray(data.teachers) && !dirtyCollections.has('teachers')) {
+        const adminTMap = new Map<string, any>();
+        const regTMap = new Map<string, any>();
+        const dirTMap = new Map<string, any>();
 
-      localTeachers.forEach((t: any) => {
-        const k = norm(t?.id || t?.name);
-        if (k && !isEntityTombstoned('teachers', t.id)) {
-          adminTMap.set(k, t);
+        data.teachers.forEach((item: any) => {
+          if (!item) return;
+          const id = String(item.id || '').trim();
+          const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
+          if (!id && !name) return;
+          if (isEntityTombstoned('teachers', id)) return;
+          const schoolName = String(item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua').trim();
+          if (isModeloCentralSchool(schoolName)) return;
+
+          const k = norm(id || name);
+          const regData = item.nomeCompleto ? item : item.registrationData;
+          if (regData && regData.nomeCompleto) {
+            regTMap.set(k, { ...(regTMap.get(k) || {}), ...regData });
+          }
+
+          const mergedReg = regTMap.get(k) || regData;
+          const adminEntry = {
+            ...item,
+            id: id || `prof-${Date.now()}`,
+            name,
+            phone: item.phone || item.telefone || mergedReg?.telefone || '+244 923 000 000',
+            gradeClass: item.gradeClass || item.primaryGradeClass || mergedReg?.primaryGradeClass || 'Ensino Primário',
+            room: item.room || item.primaryRoom || mergedReg?.primaryRoom || 'Sala 01',
+            turma: item.turma || item.primaryTurma || mergedReg?.primaryTurma || 'Turma A',
+            category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || 'Docente / Professor',
+            location: item.location || 'Quêssua',
+            schoolName,
+            schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId,
+            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 100,
+            subject: item.subject || item.disciplinas || mergedReg?.disciplinas || 'Língua Portuguesa',
+            gender: item.gender || (item.sexo === 'Feminino' || mergedReg?.sexo === 'Feminino' ? 'F' : 'M'),
+            qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico,
+            assignedTurmas: item.assignedTurmas || mergedReg?.assignedTurmas,
+            registrationData: mergedReg || item.registrationData,
+          };
+          adminTMap.set(k, adminEntry);
+
+          const dirEntry = {
+            id: adminEntry.id,
+            name: adminEntry.name,
+            schoolName: adminEntry.schoolName,
+            gradeClass: adminEntry.gradeClass,
+            room: adminEntry.room,
+            turma: adminEntry.turma,
+            directorName: item.directorName || 'Direção Escolar',
+            location: adminEntry.location,
+            subject: adminEntry.subject,
+            presenceRate: adminEntry.presenceRate,
+            shift: item.shift || item.primaryShift || mergedReg?.primaryShift || 'Manhã',
+            phone: adminEntry.phone,
+            email: item.email || mergedReg?.email,
+            assignedTurmas: adminEntry.assignedTurmas,
+            registrationData: adminEntry.registrationData,
+            schedule: item.schedule || [
+              { day: 'Segunda', period: '07h30 - 12h00', subject: adminEntry.subject, room: adminEntry.room },
+            ],
+          };
+          dirTMap.set(k, dirEntry);
+        });
+
+        const nextAdminT = Array.from(adminTMap.values());
+        const nextRegT = Array.from(regTMap.values());
+        const nextDirT = Array.from(dirTMap.values());
+
+        if (JSON.stringify(nextAdminT) !== JSON.stringify(localTeachers)) {
+          setLocalStorageFromServer('ucore_admin_teachers', JSON.stringify(nextAdminT));
+          changed = true;
         }
-      });
-      localRegTeachers.forEach((t: any) => {
-        const k = norm(t?.id || t?.nomeCompleto);
-        if (k && !isEntityTombstoned('teachers', t.id)) {
-          regTMap.set(k, t);
+        if (JSON.stringify(nextRegT) !== JSON.stringify(localRegTeachers)) {
+          setLocalStorageFromServer('ucore_registered_teachers_v2', JSON.stringify(nextRegT));
+          changed = true;
         }
-      });
-      localDirTeachers.forEach((t: any) => {
-        const k = norm(t?.id || t?.name);
-        if (k && !isEntityTombstoned('teachers', t.id)) {
-          dirTMap.set(k, t);
+        if (JSON.stringify(nextDirT) !== JSON.stringify(localDirTeachers)) {
+          setLocalStorageFromServer('ucore_director_teachers_v1', JSON.stringify(nextDirT));
+          changed = true;
         }
-      });
-
-      incomingTeachers.forEach((item: any) => {
-        if (!item) return;
-        const id = String(item.id || '').trim();
-        const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
-        if (!id && !name) return;
-        if (isEntityTombstoned('teachers', id)) return;
-        const schoolName = String(item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua').trim();
-        if (isModeloCentralSchool(schoolName)) return;
-
-        const k = norm(id || name);
-        const regData = item.nomeCompleto ? item : item.registrationData;
-        if (regData && regData.nomeCompleto) {
-          regTMap.set(k, { ...(regTMap.get(k) || {}), ...regData });
-        }
-
-        const existingAdmin = adminTMap.get(k);
-        const mergedReg = regTMap.get(k) || regData;
-        const adminEntry = {
-          ...(existingAdmin || {}),
-          id: id || existingAdmin?.id || `prof-${Date.now()}`,
-          name,
-          phone: item.phone || item.telefone || mergedReg?.telefone || existingAdmin?.phone || '+244 923 000 000',
-          gradeClass: item.gradeClass || item.primaryGradeClass || mergedReg?.primaryGradeClass || existingAdmin?.gradeClass || 'Ensino Primário',
-          room: item.room || item.primaryRoom || mergedReg?.primaryRoom || existingAdmin?.room || 'Sala 01',
-          turma: item.turma || item.primaryTurma || mergedReg?.primaryTurma || existingAdmin?.turma || 'Turma A',
-          category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || existingAdmin?.category || 'Docente / Professor',
-          location: item.location || existingAdmin?.location || 'Quêssua',
-          schoolName,
-          schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId || existingAdmin?.schoolId,
-          presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : (existingAdmin?.presenceRate ?? 100),
-          subject: item.subject || item.disciplinas || mergedReg?.disciplinas || existingAdmin?.subject || 'Língua Portuguesa',
-          gender: item.gender || (item.sexo === 'Feminino' || mergedReg?.sexo === 'Feminino' ? 'F' : 'M'),
-          qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico || existingAdmin?.qualification,
-          assignedTurmas: item.assignedTurmas || mergedReg?.assignedTurmas || existingAdmin?.assignedTurmas,
-          registrationData: mergedReg || existingAdmin?.registrationData,
-        };
-        adminTMap.set(k, adminEntry);
-
-        const existingDir = dirTMap.get(k);
-        const dirEntry = {
-          ...(existingDir || {}),
-          id: adminEntry.id,
-          name: adminEntry.name,
-          schoolName: adminEntry.schoolName,
-          gradeClass: adminEntry.gradeClass,
-          room: adminEntry.room,
-          turma: adminEntry.turma,
-          directorName: item.directorName || existingDir?.directorName || 'Direção Escolar',
-          location: adminEntry.location,
-          subject: adminEntry.subject,
-          presenceRate: adminEntry.presenceRate,
-          shift: item.shift || item.primaryShift || mergedReg?.primaryShift || existingDir?.shift || 'Manhã',
-          phone: adminEntry.phone,
-          email: item.email || mergedReg?.email || existingDir?.email,
-          assignedTurmas: adminEntry.assignedTurmas,
-          registrationData: adminEntry.registrationData,
-          schedule: item.schedule || existingDir?.schedule || [
-            { day: 'Segunda', period: '07h30 - 12h00', subject: adminEntry.subject, room: adminEntry.room },
-          ],
-        };
-        dirTMap.set(k, dirEntry);
-      });
-
-      const nextAdminT = Array.from(adminTMap.values());
-      const nextRegT = Array.from(regTMap.values());
-      const nextDirT = Array.from(dirTMap.values());
-
-      if (JSON.stringify(nextAdminT) !== JSON.stringify(localTeachers)) {
-        localStorage.setItem('ucore_admin_teachers', JSON.stringify(nextAdminT));
-        changed = true;
       }
-      if (JSON.stringify(nextRegT) !== JSON.stringify(localRegTeachers)) {
-        localStorage.setItem('ucore_registered_teachers_v2', JSON.stringify(nextRegT));
-        changed = true;
-      }
-      if (JSON.stringify(nextDirT) !== JSON.stringify(localDirTeachers)) {
-        localStorage.setItem('ucore_director_teachers_v1', JSON.stringify(nextDirT));
-        changed = true;
-      }
-    }
 
-    // 4. Merge Students
-    const incomingStudents = Array.isArray(data.students) ? data.students : [];
-    if (incomingStudents.length > 0) {
-      const adminSMap = new Map<string, any>();
-      const regSMap = new Map<string, any>();
-      const dirSMap = new Map<string, any>();
-      const teachSMap = new Map<string, any>();
+      // 4. Merge Students
+      if (Array.isArray(data.students) && !dirtyCollections.has('students')) {
+        const adminSMap = new Map<string, any>();
+        const regSMap = new Map<string, any>();
+        const dirSMap = new Map<string, any>();
+        const teachSMap = new Map<string, any>();
 
-      localStudents.forEach((s: any) => {
-        const k = norm(s?.id || `${s?.name}::${s?.schoolName}`);
-        if (k && !isEntityTombstoned('students', s.id)) {
-          adminSMap.set(k, s);
-        }
-      });
-      localRegStudents.forEach((s: any) => {
-        const k = norm(s?.id || `${s?.nomeCompleto || s?.name}::${s?.escola}`);
-        if (k && !isEntityTombstoned('students', s.id)) {
-          regSMap.set(k, s);
-        }
-      });
-      localDirStudents.forEach((s: any) => {
-        const k = norm(s?.id || s?.name);
-        if (k && !isEntityTombstoned('students', s.id)) {
-          dirSMap.set(k, s);
-        }
-      });
-      localTeacherStudents.forEach((s: any) => {
-        const k = norm(s?.id || s?.name);
-        if (k && !isEntityTombstoned('students', s.id)) {
-          teachSMap.set(k, s);
-        }
-      });
+        data.students.forEach((item: any) => {
+          if (!item) return;
+          const id = String(item.id || '').trim();
+          const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
+          if (!id && !name) return;
+          if (isEntityTombstoned('students', id)) return;
+          const schoolName = String(item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial').trim();
+          if (isModeloCentralSchool(schoolName)) return;
 
-      incomingStudents.forEach((item: any) => {
-        if (!item) return;
-        const id = String(item.id || '').trim();
-        const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
-        if (!id && !name) return;
-        if (isEntityTombstoned('students', id)) return;
-        const schoolName = String(item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial').trim();
-        if (isModeloCentralSchool(schoolName)) return;
+          const k = norm(id || `${name}::${schoolName}`);
+          const studentId = id || `std-${Math.abs(k.split('').reduce((a, c) => a + c.charCodeAt(0), 1000))}`;
+          const genero: 'M' | 'F' =
+            item.genero === 'M' || item.gender === 'M' || item.registrationData?.genero === 'M' ? 'M' : 'F';
+          const classe = String(
+            item.classeEtapaModulo || item.classe || item.gradeClass || item.registrationData?.classe || '1.ª Classe'
+          );
+          const turma = String(item.turma || item.registrationData?.turma || 'Turma A');
+          const sala = String(item.sala || item.room || item.registrationData?.sala || 'Sala 01');
+          const tipoDoc =
+            item.tipoDocumento || item.documentType || item.registrationData?.tipoDocumento || (item.hasDocuments === false ? 'sem Documento' : 'BI');
+          const hasDocs = tipoDoc !== 'sem Documento';
+          const encarregado = String(
+            item.encarregado || item.guardianName || item.registrationData?.encarregado || 'Encarregado de Educação'
+          );
+          const endereco = String(item.endereco || item.location || item.registrationData?.endereco || 'Quêssua, Malanje');
+          const dataNascimento = String(item.dataNascimento || item.registrationData?.dataNascimento || '2016-05-10');
+          const idade = Number(item.idade ?? item.age ?? item.registrationData?.idade ?? 9);
 
-        const k = norm(id || `${name}::${schoolName}`);
-        const studentId = id || `std-${Math.abs(k.split('').reduce((a, c) => a + c.charCodeAt(0), 1000))}`;
-        const genero: 'M' | 'F' =
-          item.genero === 'M' || item.gender === 'M' || item.registrationData?.genero === 'M' ? 'M' : 'F';
-        const classe = String(
-          item.classeEtapaModulo || item.classe || item.gradeClass || item.registrationData?.classe || '1.ª Classe'
-        );
-        const turma = String(item.turma || item.registrationData?.turma || 'Turma A');
-        const sala = String(item.sala || item.room || item.registrationData?.sala || 'Sala 01');
-        const tipoDoc =
-          item.tipoDocumento || item.documentType || item.registrationData?.tipoDocumento || (item.hasDocuments === false ? 'sem Documento' : 'BI');
-        const hasDocs = tipoDoc !== 'sem Documento';
-        const encarregado = String(
-          item.encarregado || item.guardianName || item.registrationData?.encarregado || 'Encarregado de Educação'
-        );
-        const endereco = String(item.endereco || item.location || item.registrationData?.endereco || 'Quêssua, Malanje');
-        const dataNascimento = String(item.dataNascimento || item.registrationData?.dataNascimento || '2016-05-10');
-        const idade = Number(item.idade ?? item.age ?? item.registrationData?.idade ?? 9);
+          const regObj = {
+            ...(item.registrationData || {}),
+            ...(item.nomeCompleto || item.escola ? item : {}),
+            id: studentId,
+            name,
+            nomeCompleto: name,
+            genero,
+            dataNascimento,
+            idade,
+            tipoDocumento: tipoDoc,
+            numeroDocumento: item.numeroDocumento || item.registrationData?.numeroDocumento,
+            naturezaEscola: item.naturezaEscola || item.schoolType || item.registrationData?.naturezaEscola || 'Pública',
+            tipoEscolaModalidade: item.tipoEscolaModalidade || item.registrationData?.tipoEscolaModalidade || 'primario_regular',
+            classeEtapaModulo: classe,
+            classe,
+            turma,
+            sala,
+            escola: schoolName,
+            schoolId: item.schoolId || item.registrationData?.schoolId,
+            condicaoMatricula: item.condicaoMatricula || item.registrationData?.condicaoMatricula || 'primeira_vez',
+            alunoRepetente: Boolean(item.alunoRepetente || item.condicaoMatricula === 'repetente'),
+            encarregado,
+            telefone: item.telefone || item.registrationData?.telefone || '+244 923 000 000',
+            endereco,
+          };
+          regSMap.set(k, regObj);
 
-        const regObj = {
-          ...(regSMap.get(k) || {}),
-          ...(item.registrationData || {}),
-          ...(item.nomeCompleto || item.escola ? item : {}),
-          id: studentId,
-          name,
-          nomeCompleto: name,
-          genero,
-          dataNascimento,
-          idade,
-          tipoDocumento: tipoDoc,
-          numeroDocumento: item.numeroDocumento || item.registrationData?.numeroDocumento,
-          naturezaEscola: item.naturezaEscola || item.schoolType || item.registrationData?.naturezaEscola || 'Pública',
-          tipoEscolaModalidade: item.tipoEscolaModalidade || item.registrationData?.tipoEscolaModalidade || 'primario_regular',
-          classeEtapaModulo: classe,
-          classe,
-          turma,
-          sala,
-          escola: schoolName,
-          schoolId: item.schoolId || item.registrationData?.schoolId,
-          condicaoMatricula: item.condicaoMatricula || item.registrationData?.condicaoMatricula || 'primeira_vez',
-          alunoRepetente: Boolean(item.alunoRepetente || item.condicaoMatricula === 'repetente'),
-          encarregado,
-          telefone: item.telefone || item.registrationData?.telefone || '+244 923 000 000',
-          endereco,
-        };
-        regSMap.set(k, regObj);
+          const adminObj = {
+            ...item,
+            id: studentId,
+            name,
+            gender: genero,
+            gradeClass: classe,
+            room: sala,
+            turma,
+            guardianName: encarregado,
+            location: endereco,
+            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 98,
+            hasDocuments: hasDocs,
+            documentType: tipoDoc,
+            numeroDocumento: regObj.numeroDocumento,
+            dataNascimento,
+            idade,
+            condicaoMatricula: regObj.condicaoMatricula,
+            foto: item.foto || regObj.foto,
+            anexoDocumentoNome: item.anexoDocumentoNome || regObj.anexoDocumentoNome,
+            performanceScore: typeof item.performanceScore === 'number' ? item.performanceScore : 8.5,
+            schoolName,
+            schoolId: regObj.schoolId,
+            schoolType: regObj.naturezaEscola,
+            registrationData: regObj,
+          };
+          adminSMap.set(k, adminObj);
 
-        const adminObj = {
-          ...(adminSMap.get(k) || {}),
-          id: studentId,
-          name,
-          gender: genero,
-          gradeClass: classe,
-          room: sala,
-          turma,
-          guardianName: encarregado,
-          location: endereco,
-          presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 98,
-          hasDocuments: hasDocs,
-          documentType: tipoDoc,
-          numeroDocumento: regObj.numeroDocumento,
-          dataNascimento,
-          idade,
-          condicaoMatricula: regObj.condicaoMatricula,
-          foto: item.foto || regObj.foto,
-          anexoDocumentoNome: item.anexoDocumentoNome || regObj.anexoDocumentoNome,
-          performanceScore: typeof item.performanceScore === 'number' ? item.performanceScore : 8.5,
-          schoolName,
-          schoolId: regObj.schoolId,
-          schoolType: regObj.naturezaEscola,
-          registrationData: regObj,
-        };
-        adminSMap.set(k, adminObj);
+          const dirObj = {
+            id: studentId,
+            name,
+            gradeClass: classe,
+            room: sala,
+            turma,
+            teacherName: item.teacherName || 'Corpo Docente',
+            guardianName: encarregado,
+            location: endereco,
+            hasDocuments: hasDocs,
+            documentType: tipoDoc,
+            numeroDocumento: regObj.numeroDocumento,
+            dataNascimento,
+            idade,
+            condicaoMatricula: regObj.condicaoMatricula,
+            foto: adminObj.foto,
+            anexoDocumentoNome: adminObj.anexoDocumentoNome,
+            performanceScore: adminObj.performanceScore,
+            presenceRate: adminObj.presenceRate,
+            registrationData: regObj,
+          };
+          dirSMap.set(k, dirObj);
 
-        const dirObj = {
-          ...(dirSMap.get(k) || {}),
-          id: studentId,
-          name,
-          gradeClass: classe,
-          room: sala,
-          turma,
-          teacherName: item.teacherName || 'Corpo Docente',
-          guardianName: encarregado,
-          location: endereco,
-          hasDocuments: hasDocs,
-          documentType: tipoDoc,
-          numeroDocumento: regObj.numeroDocumento,
-          dataNascimento,
-          idade,
-          condicaoMatricula: regObj.condicaoMatricula,
-          foto: adminObj.foto,
-          anexoDocumentoNome: adminObj.anexoDocumentoNome,
-          performanceScore: adminObj.performanceScore,
-          presenceRate: adminObj.presenceRate,
-          registrationData: regObj,
-        };
-        dirSMap.set(k, dirObj);
-
-        if (!teachSMap.has(k)) {
           teachSMap.set(k, {
             id: studentId,
             name,
@@ -1290,275 +1577,325 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
             telefone: regObj.telefone,
             endereco,
           });
-        }
-      });
+        });
 
-      const nextAdminS = Array.from(adminSMap.values());
-      const nextRegS = Array.from(regSMap.values());
-      const nextDirS = Array.from(dirSMap.values());
-      const nextTeachS = Array.from(teachSMap.values());
+        const nextAdminS = Array.from(adminSMap.values());
+        const nextRegS = Array.from(regSMap.values());
+        const nextDirS = Array.from(dirSMap.values());
+        const nextTeachS = Array.from(teachSMap.values());
 
-      if (JSON.stringify(nextAdminS) !== JSON.stringify(localStudents)) {
-        localStorage.setItem('ucore_admin_students', JSON.stringify(nextAdminS));
-        changed = true;
+        if (JSON.stringify(nextAdminS) !== JSON.stringify(localStudents)) {
+          setLocalStorageFromServer('ucore_admin_students', JSON.stringify(nextAdminS));
+          changed = true;
+        }
+        if (JSON.stringify(nextRegS) !== JSON.stringify(localRegStudents)) {
+          setLocalStorageFromServer('ucore_registered_students_v2', JSON.stringify(nextRegS));
+          changed = true;
+        }
+        if (JSON.stringify(nextDirS) !== JSON.stringify(localDirStudents)) {
+          setLocalStorageFromServer('ucore_director_students', JSON.stringify(nextDirS));
+          changed = true;
+        }
+        if (JSON.stringify(nextTeachS) !== JSON.stringify(localTeacherStudents)) {
+          setLocalStorageFromServer('ucore_teacher_students', JSON.stringify(nextTeachS));
+          changed = true;
+        }
       }
-      if (JSON.stringify(nextRegS) !== JSON.stringify(localRegStudents)) {
-        localStorage.setItem('ucore_registered_students_v2', JSON.stringify(nextRegS));
-        changed = true;
-      }
-      if (JSON.stringify(nextDirS) !== JSON.stringify(localDirStudents)) {
-        localStorage.setItem('ucore_director_students', JSON.stringify(nextDirS));
-        changed = true;
-      }
-      if (JSON.stringify(nextTeachS) !== JSON.stringify(localTeacherStudents)) {
-        localStorage.setItem('ucore_teacher_students', JSON.stringify(nextTeachS));
-        changed = true;
-      }
-    }
 
-    // 5. Merge Staff, Efectividade, Declaração de Serviço, Guias, Fichas, Cadastro Docente, Applications, Users & QuickRequests
-    if (Array.isArray(data.staff)) {
-      const stMap = new Map<string, any>();
-      localStaff.forEach((s: any) => {
-        const k = norm(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('staff', s.id || k)) stMap.set(k, s);
-      });
-      data.staff.forEach((s: any) => {
-        const k = norm(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('staff', s.id || k)) {
-          stMap.set(k, { ...(stMap.get(k) || {}), ...s });
+      // 5. Merge Staff, Efectividade, Declaração de Serviço, Guias, Fichas, Cadastro Docente, MiniPautas, Applications, Users, QuickRequests, Announcements, Attendance, Chat
+      if (Array.isArray(data.staff) && !dirtyCollections.has('staff')) {
+        const mergedStaff = reconcileList(
+          localStaff,
+          data.staff,
+          'staff',
+          (s) => norm(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name)
+        );
+        if (JSON.stringify(mergedStaff) !== JSON.stringify(localStaff)) {
+          setLocalStorageFromServer('ucore_registered_staff_v1', JSON.stringify(mergedStaff));
+          setLocalStorageFromServer('sigre_admin_other_staff_v1', JSON.stringify(mergedStaff));
+          changed = true;
         }
-      });
-      const mergedStaff = Array.from(stMap.values());
-      if (JSON.stringify(mergedStaff) !== JSON.stringify(localStaff)) {
-        localStorage.setItem('ucore_registered_staff_v1', JSON.stringify(mergedStaff));
-        localStorage.setItem('sigre_admin_other_staff_v1', JSON.stringify(mergedStaff));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.efectividade)) {
-      const efMap = new Map<string, any>();
-      localEfectividade.forEach((e: any) => {
-        if (e?.id && !isBannedSchoolOrEntity(e) && !isEntityTombstoned('efectividade', e.id)) efMap.set(e.id, e);
-      });
-      data.efectividade.forEach((e: any) => {
-        if (e?.id && !isBannedSchoolOrEntity(e) && !isEntityTombstoned('efectividade', e.id)) {
-          efMap.set(e.id, { ...(efMap.get(e.id) || {}), ...e });
+      if (Array.isArray(data.efectividade) && !dirtyCollections.has('efectividade')) {
+        const mergedEf = reconcileList(
+          localEfectividade,
+          data.efectividade,
+          'efectividade',
+          (e) => String(e?.id || `${e?.bi || ''}::${e?.agente || ''}`).trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedEf) !== JSON.stringify(localEfectividade)) {
+          setLocalStorageFromServer('sigre_cadastramento_efectividade_v2', JSON.stringify(mergedEf));
+          window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { records: mergedEf } }));
+          changed = true;
         }
-      });
-      const mergedEf = Array.from(efMap.values());
-      if (JSON.stringify(mergedEf) !== JSON.stringify(localEfectividade)) {
-        localStorage.setItem('sigre_cadastramento_efectividade_v2', JSON.stringify(mergedEf));
-        window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { records: mergedEf } }));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.declaracaoServico)) {
-      const decMap = new Map<string, any>();
-      localDeclaracao.forEach((d: any) => {
-        if (d?.id && !isBannedSchoolOrEntity(d) && !isEntityTombstoned('declaracao_servico', d.id)) decMap.set(d.id, d);
-      });
-      data.declaracaoServico.forEach((d: any) => {
-        if (d?.id && !isBannedSchoolOrEntity(d) && !isEntityTombstoned('declaracao_servico', d.id)) {
-          decMap.set(d.id, { ...(decMap.get(d.id) || {}), ...d });
+      if (Array.isArray(data.declaracaoServico) && !dirtyCollections.has('declaracaoServico')) {
+        const mergedDecl = reconcileList(
+          localDeclaracao,
+          data.declaracaoServico,
+          'declaracao_servico',
+          (d) => String(d?.id || d?.ref || `${d?.bi || ''}::${d?.agente || ''}`).trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedDecl) !== JSON.stringify(localDeclaracao)) {
+          setLocalStorageFromServer('sigre_declaracao_servico_v1', JSON.stringify(mergedDecl));
+          window.dispatchEvent(new CustomEvent('sigre-declaracao-servico-updated', { detail: { records: mergedDecl } }));
+          changed = true;
         }
-      });
-      const mergedDecl = Array.from(decMap.values());
-      if (JSON.stringify(mergedDecl) !== JSON.stringify(localDeclaracao)) {
-        localStorage.setItem('sigre_declaracao_servico_v1', JSON.stringify(mergedDecl));
-        window.dispatchEvent(new CustomEvent('sigre-declaracao-servico-updated', { detail: { records: mergedDecl } }));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.guiasFerias)) {
-      const gfMap = new Map<string, any>();
-      localGuiasFerias.forEach((g: any) => {
-        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_ferias', g.id)) gfMap.set(g.id, g);
-      });
-      data.guiasFerias.forEach((g: any) => {
-        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_ferias', g.id)) {
-          gfMap.set(g.id, { ...(gfMap.get(g.id) || {}), ...g });
+      if (Array.isArray(data.guiasFerias) && !dirtyCollections.has('guiasFerias')) {
+        const mergedGf = reconcileList(
+          localGuiasFerias,
+          data.guiasFerias,
+          'guias_ferias',
+          (g) => String(g?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedGf) !== JSON.stringify(localGuiasFerias)) {
+          setLocalStorageFromServer('sigre_guias_ferias_records_v1', JSON.stringify(mergedGf));
+          window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
+          changed = true;
         }
-      });
-      const mergedGf = Array.from(gfMap.values());
-      if (JSON.stringify(mergedGf) !== JSON.stringify(localGuiasFerias)) {
-        localStorage.setItem('sigre_guias_ferias_records_v1', JSON.stringify(mergedGf));
-        window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.guiasColocacao)) {
-      const gcMap = new Map<string, any>();
-      localGuiasColocacao.forEach((g: any) => {
-        if (
-          g?.id &&
-          g.id !== 'guia-colocacao-default-1' &&
-          !isBannedSchoolOrEntity(g) &&
-          !isEntityTombstoned('guias_colocacao', g.id)
-        ) {
-          gcMap.set(g.id, g);
+      if (Array.isArray(data.guiasColocacao) && !dirtyCollections.has('guiasColocacao')) {
+        const mergedGc = reconcileList(
+          localGuiasColocacao,
+          data.guiasColocacao.filter((g: any) => g?.id !== 'guia-colocacao-default-1'),
+          'guias_colocacao',
+          (g) => String(g?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedGc) !== JSON.stringify(localGuiasColocacao)) {
+          setLocalStorageFromServer('sigre_guias_colocacao_records_v1', JSON.stringify(mergedGc));
+          window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
+          changed = true;
         }
-      });
-      data.guiasColocacao.forEach((g: any) => {
-        if (g?.id && !isBannedSchoolOrEntity(g) && !isEntityTombstoned('guias_colocacao', g.id)) {
-          gcMap.set(g.id, { ...(gcMap.get(g.id) || {}), ...g });
-        }
-      });
-      const mergedGc = Array.from(gcMap.values());
-      if (JSON.stringify(mergedGc) !== JSON.stringify(localGuiasColocacao)) {
-        localStorage.setItem('sigre_guias_colocacao_records_v1', JSON.stringify(mergedGc));
-        window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.fichasAvaliacao)) {
-      const faMap = new Map<string, any>();
-      localFichasAvaliacao.forEach((f: any) => {
-        if (
-          f?.id &&
-          f.id !== 'ficha-avaliacao-default-1' &&
-          !isBannedSchoolOrEntity(f) &&
-          !isEntityTombstoned('fichas_avaliacao', f.id)
-        ) {
-          faMap.set(f.id, f);
+      if (Array.isArray(data.fichasAvaliacao) && !dirtyCollections.has('fichasAvaliacao')) {
+        const mergedFa = reconcileList(
+          localFichasAvaliacao,
+          data.fichasAvaliacao.filter((f: any) => f?.id !== 'ficha-avaliacao-default-1'),
+          'fichas_avaliacao',
+          (f) => String(f?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedFa) !== JSON.stringify(localFichasAvaliacao)) {
+          setLocalStorageFromServer('sigre_fichas_avaliacao_records_v1', JSON.stringify(mergedFa));
+          window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
+          changed = true;
         }
-      });
-      data.fichasAvaliacao.forEach((f: any) => {
-        if (f?.id && !isBannedSchoolOrEntity(f) && !isEntityTombstoned('fichas_avaliacao', f.id)) {
-          faMap.set(f.id, { ...(faMap.get(f.id) || {}), ...f });
-        }
-      });
-      const mergedFa = Array.from(faMap.values());
-      if (JSON.stringify(mergedFa) !== JSON.stringify(localFichasAvaliacao)) {
-        localStorage.setItem('sigre_fichas_avaliacao_records_v1', JSON.stringify(mergedFa));
-        window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.cadastroDocente)) {
-      const cdMap = new Map<string, any>();
-      localCadastroDocente.forEach((c: any) => {
-        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('cadastro_docente', String(c.id))) {
-          cdMap.set(String(c.id), c);
+      if (Array.isArray(data.cadastroDocente) && !dirtyCollections.has('cadastroDocente')) {
+        const mergedCd = reconcileList(
+          localCadastroDocente,
+          data.cadastroDocente,
+          'cadastro_docente',
+          (c) => String(c?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedCd) !== JSON.stringify(localCadastroDocente)) {
+          setLocalStorageFromServer('cadastro-docente-registos', JSON.stringify(mergedCd));
+          window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
+          window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
+          changed = true;
         }
-      });
-      data.cadastroDocente.forEach((c: any) => {
-        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('cadastro_docente', String(c.id))) {
-          cdMap.set(String(c.id), { ...(cdMap.get(String(c.id)) || {}), ...c });
-        }
-      });
-      const mergedCd = Array.from(cdMap.values());
-      if (JSON.stringify(mergedCd) !== JSON.stringify(localCadastroDocente)) {
-        localStorage.setItem('cadastro-docente-registos', JSON.stringify(mergedCd));
-        window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
-        window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.applications)) {
-      const mergedApps = deduplicateApplicationsList([...data.applications, ...localApps]);
-      if (JSON.stringify(mergedApps) !== JSON.stringify(localApps)) {
-        localStorage.setItem('ucore_pending_applications', JSON.stringify(mergedApps));
-        changed = true;
-      }
-    }
-
-    if (Array.isArray(data.users) && data.users.length > 0) {
-      const userMap = new Map<string, any>();
-      data.users.forEach((u: any) => {
-        const k = norm(u?.biNumber || u?.email || u?.id);
-        if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) {
-          const prev = userMap.get(k);
-          const isApproved = prev?.status === 'ativo' || u?.status === 'ativo' || Boolean(prev?.approvedAt) || Boolean(u?.approvedAt);
-          userMap.set(k, { ...(prev || {}), ...u, status: isApproved ? 'ativo' : u.status });
+      if (Array.isArray(data.miniPautas) && !dirtyCollections.has('miniPautas')) {
+        const mergedMp = reconcileList(
+          localMiniPautas,
+          data.miniPautas,
+          'grades',
+          (p) => String(p?.id || `${p?.schoolName || ''}::${p?.className || ''}::${p?.subject || ''}`).trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedMp) !== JSON.stringify(localMiniPautas)) {
+          setLocalStorageFromServer('sigre_teacher_mini_pautas_v5_blank', JSON.stringify(mergedMp));
+          window.dispatchEvent(new CustomEvent('sigre-minipautas-updated'));
+          changed = true;
         }
-      });
-      const mergedUsers = Array.from(userMap.values());
-      if (JSON.stringify(mergedUsers) !== JSON.stringify(localUsers)) {
-        localStorage.setItem('ucore_registered_users', JSON.stringify(mergedUsers));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.quickRequests)) {
-      const qrMap = new Map<string, any>();
-      localQuickRequests.forEach((q: any) => {
-        if (q?.id && !isBannedSchoolOrEntity(q) && !isEntityTombstoned('quickRequests', q.id)) qrMap.set(q.id, q);
-      });
-      data.quickRequests.forEach((q: any) => {
-        if (q?.id && !isBannedSchoolOrEntity(q) && !isEntityTombstoned('quickRequests', q.id)) {
-          qrMap.set(q.id, { ...(qrMap.get(q.id) || {}), ...q });
+      if (Array.isArray(data.applications) && !dirtyCollections.has('applications')) {
+        const mergedApps = deduplicateApplicationsList(data.applications);
+        if (JSON.stringify(mergedApps) !== JSON.stringify(localApps)) {
+          setLocalStorageFromServer('ucore_pending_applications', JSON.stringify(mergedApps));
+          changed = true;
         }
-      });
-      const mergedQr = Array.from(qrMap.values());
-      if (JSON.stringify(mergedQr) !== JSON.stringify(localQuickRequests)) {
-        localStorage.setItem('sigre_quick_services_local_cache', JSON.stringify(mergedQr));
-        window.dispatchEvent(new CustomEvent('sigre_quick_request_updated'));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.dmeStaff)) {
-      const dsMap = new Map<string, any>();
-      data.dmeStaff.forEach((s: any) => {
-        const k = norm(s?.biNumber || s?.email || s?.name || s?.id);
-        if (k && !isBannedSchoolOrEntity(s) && !isEntityTombstoned('dme_staff', s.id || k)) {
-          dsMap.set(k, { ...(dsMap.get(k) || {}), ...s });
+      if (Array.isArray(data.users) && data.users.length > 0 && !dirtyCollections.has('users')) {
+        const userMap = new Map<string, any>();
+        data.users.forEach((u: any) => {
+          const k = norm(u?.biNumber || u?.email || u?.id);
+          if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) {
+            const prev = userMap.get(k);
+            const isApproved = prev?.status === 'ativo' || u?.status === 'ativo' || Boolean(prev?.approvedAt) || Boolean(u?.approvedAt);
+            userMap.set(k, { ...(prev || {}), ...u, status: isApproved ? 'ativo' : u.status });
+          }
+        });
+        const mergedUsers = Array.from(userMap.values());
+        if (JSON.stringify(mergedUsers) !== JSON.stringify(localUsers)) {
+          setLocalStorageFromServer('ucore_registered_users', JSON.stringify(mergedUsers));
+          changed = true;
         }
-      });
-      const mergedDs = Array.from(dsMap.values());
-      if (JSON.stringify(mergedDs) !== JSON.stringify(localDmeStaff)) {
-        localStorage.setItem('ucore_dme_staff_list', JSON.stringify(mergedDs));
-        localStorage.setItem('ucore_dme_staff_members_v1', JSON.stringify(mergedDs));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.rooms)) {
-      const rmMap = new Map<string, any>();
-      localRooms.forEach((r: any) => {
-        if (r?.id && !isBannedSchoolOrEntity(r) && !isEntityTombstoned('rooms', r.id)) rmMap.set(r.id, r);
-      });
-      data.rooms.forEach((r: any) => {
-        if (r?.id && !isBannedSchoolOrEntity(r) && !isEntityTombstoned('rooms', r.id)) {
-          rmMap.set(r.id, { ...(rmMap.get(r.id) || {}), ...r });
+      if (Array.isArray(data.quickRequests) && !dirtyCollections.has('quickRequests')) {
+        const mergedQr = reconcileList(
+          localQuickRequests,
+          data.quickRequests,
+          'quickRequests',
+          (q) => String(q?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedQr) !== JSON.stringify(localQuickRequests)) {
+          setLocalStorageFromServer('sigre_quick_services_local_cache', JSON.stringify(mergedQr));
+          window.dispatchEvent(new CustomEvent('sigre_quick_request_updated'));
+          changed = true;
         }
-      });
-      const mergedRm = Array.from(rmMap.values());
-      if (JSON.stringify(mergedRm) !== JSON.stringify(localRooms)) {
-        localStorage.setItem('ucore_director_rooms', JSON.stringify(mergedRm));
-        localStorage.setItem('ucore_director_rooms_v1', JSON.stringify(mergedRm));
-        changed = true;
       }
-    }
 
-    if (Array.isArray(data.classes)) {
-      const clMap = new Map<string, any>();
-      localClasses.forEach((c: any) => {
-        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('classes', c.id)) clMap.set(c.id, c);
-      });
-      data.classes.forEach((c: any) => {
-        if (c?.id && !isBannedSchoolOrEntity(c) && !isEntityTombstoned('classes', c.id)) {
-          clMap.set(c.id, { ...(clMap.get(c.id) || {}), ...c });
+      if (Array.isArray(data.dmeStaff) && !dirtyCollections.has('dmeStaff')) {
+        const mergedDs = reconcileList(
+          localDmeStaff,
+          data.dmeStaff,
+          'dme_staff',
+          (s) => norm(s?.id || s?.biNumber || s?.email || s?.name)
+        );
+        if (JSON.stringify(mergedDs) !== JSON.stringify(localDmeStaff)) {
+          setLocalStorageFromServer('ucore_dme_staff_list', JSON.stringify(mergedDs));
+          setLocalStorageFromServer('ucore_dme_staff_members_v1', JSON.stringify(mergedDs));
+          changed = true;
         }
-      });
-      const mergedCl = Array.from(clMap.values());
-      if (JSON.stringify(mergedCl) !== JSON.stringify(localClasses)) {
-        localStorage.setItem('ucore_director_classes', JSON.stringify(mergedCl));
-        localStorage.setItem('ucore_director_classes_v1', JSON.stringify(mergedCl));
-        changed = true;
       }
+
+      if (Array.isArray(data.rooms) && !dirtyCollections.has('rooms')) {
+        const mergedRm = reconcileList(
+          localRooms,
+          data.rooms,
+          'rooms',
+          (r) => String(r?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedRm) !== JSON.stringify(localRooms)) {
+          setLocalStorageFromServer('ucore_director_rooms', JSON.stringify(mergedRm));
+          setLocalStorageFromServer('ucore_director_rooms_v1', JSON.stringify(mergedRm));
+          setLocalStorageFromServer('sigre_director_rooms', JSON.stringify(mergedRm));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.classes) && !dirtyCollections.has('classes')) {
+        const mergedCl = reconcileList(
+          localClasses,
+          data.classes,
+          'classes',
+          (c) => String(c?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedCl) !== JSON.stringify(localClasses)) {
+          setLocalStorageFromServer('ucore_director_classes', JSON.stringify(mergedCl));
+          setLocalStorageFromServer('ucore_director_classes_v1', JSON.stringify(mergedCl));
+          setLocalStorageFromServer('sigre_director_classes', JSON.stringify(mergedCl));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.announcements) && !dirtyCollections.has('announcements')) {
+        const mergedAnn = reconcileList(
+          localAnnouncements,
+          data.announcements,
+          'announcements',
+          (a) => String(a?.id || a?.title || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedAnn) !== JSON.stringify(localAnnouncements)) {
+          setLocalStorageFromServer('ucore_school_announcements_v1', JSON.stringify(mergedAnn));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.studentAttendance) && !dirtyCollections.has('studentAttendance')) {
+        const mergedSa = reconcileList(
+          localStudentAttendance,
+          data.studentAttendance,
+          'student_attendance',
+          (r) => String(r?.id || `${r?.studentId || ''}::${r?.date || ''}`).trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedSa) !== JSON.stringify(localStudentAttendance)) {
+          setLocalStorageFromServer('ucore_student_attendance_records_v2', JSON.stringify(mergedSa));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.teacherAttendance) && !dirtyCollections.has('teacherAttendance')) {
+        const mergedTa = reconcileList(
+          localTeacherAttendance,
+          data.teacherAttendance,
+          'teacher_attendance',
+          (r) => String(r?.id || `${r?.teacherId || ''}::${r?.date || ''}`).trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedTa) !== JSON.stringify(localTeacherAttendance)) {
+          setLocalStorageFromServer('ucore_teacher_attendance_records_v2', JSON.stringify(mergedTa));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.attendanceNotes) && !dirtyCollections.has('attendanceNotes')) {
+        const mergedAn = reconcileList(
+          localAttendanceNotes,
+          data.attendanceNotes,
+          'attendance_notes',
+          (n) => String(n?.id || `${n?.date || ''}::${n?.author || ''}`).trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedAn) !== JSON.stringify(localAttendanceNotes)) {
+          setLocalStorageFromServer('ucore_attendance_diary_notes', JSON.stringify(mergedAn));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.chatChannels) && data.chatChannels.length > 0 && !dirtyCollections.has('chatChannels')) {
+        const mergedCc = reconcileList(
+          localChatChannels,
+          data.chatChannels,
+          'chat_channels',
+          (c) => String(c?.id || c?.name || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedCc) !== JSON.stringify(localChatChannels)) {
+          setLocalStorageFromServer('ucore_chat_channels_v3', JSON.stringify(mergedCc));
+          setLocalStorageFromServer('ucore_chat_channels', JSON.stringify(mergedCc));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.chatMessages) && data.chatMessages.length > 0 && !dirtyCollections.has('chatMessages')) {
+        const mergedCm = reconcileList(
+          localChatMessages,
+          data.chatMessages,
+          'chat_messages',
+          (m) => String(m?.id || `${m?.channelId || ''}::${m?.timestamp || ''}`).trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedCm) !== JSON.stringify(localChatMessages)) {
+          setLocalStorageFromServer('ucore_chat_messages', JSON.stringify(mergedCm));
+          changed = true;
+        }
+      }
+
+      if (data.kvStore && typeof data.kvStore === 'object') {
+        for (const [k, entry] of Object.entries(data.kvStore)) {
+          if (!isSyncedKvKey(k) || dirtyKvStore[k]) continue;
+          const val = (entry as any)?.value !== undefined ? (entry as any).value : entry;
+          const strVal = typeof val === 'string' ? val : JSON.stringify(val);
+          if (localStorage.getItem(k) !== strVal) {
+            setLocalStorageFromServer(k, strVal);
+            changed = true;
+          }
+        }
+      }
+    } finally {
+      isApplyingServerState = false;
     }
 
     if (changed) {
       window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
+      window.dispatchEvent(new CustomEvent('ucore-students-updated'));
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
     }
 

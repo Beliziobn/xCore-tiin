@@ -339,18 +339,12 @@ export default function App() {
       });
   }, []);
 
-  // Persist admin entities on change and sync to backend network store (only after initial sync or if non-empty)
+  // Persist admin entities on change (localStorage interceptor handles real-time server push)
   useEffect(() => {
     try {
-      if (adminSchools.length > 0) {
-        localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
-        if (isInitialSyncCompleteRef.current) {
-          fetch('/api/network/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ schools: adminSchools }),
-          }).catch(() => {});
-        }
+      const nextJson = JSON.stringify(adminSchools);
+      if (localStorage.getItem('ucore_admin_schools') !== nextJson) {
+        localStorage.setItem('ucore_admin_schools', nextJson);
       }
     } catch {
       // ignore
@@ -359,15 +353,9 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (adminTeachers.length > 0) {
-        localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
-        if (isInitialSyncCompleteRef.current) {
-          fetch('/api/network/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ teachers: adminTeachers }),
-          }).catch(() => {});
-        }
+      const nextJson = JSON.stringify(adminTeachers);
+      if (localStorage.getItem('ucore_admin_teachers') !== nextJson) {
+        localStorage.setItem('ucore_admin_teachers', nextJson);
       }
     } catch {
       // ignore
@@ -376,15 +364,9 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (adminDirectors.length > 0) {
-        localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
-        if (isInitialSyncCompleteRef.current) {
-          fetch('/api/network/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ directors: adminDirectors }),
-          }).catch(() => {});
-        }
+      const nextJson = JSON.stringify(adminDirectors);
+      if (localStorage.getItem('ucore_admin_directors') !== nextJson) {
+        localStorage.setItem('ucore_admin_directors', nextJson);
       }
     } catch {
       // ignore
@@ -393,36 +375,30 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (adminStudents.length > 0) {
-        localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
-        if (isInitialSyncCompleteRef.current) {
-          fetch('/api/network/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ students: adminStudents }),
-          }).catch(() => {});
-        }
+      const nextJson = JSON.stringify(adminStudents);
+      if (localStorage.getItem('ucore_admin_students') !== nextJson) {
+        localStorage.setItem('ucore_admin_students', nextJson);
       }
     } catch {
       // ignore
     }
   }, [adminStudents]);
 
-  // Listen for sigre-data-synced and ucore-teachers-updated events so adminStudents, adminTeachers, adminSchools, and teacherStudents stay in real-time sync
+  // Listen for sigre-data-synced and ucore-teachers-updated events so adminStudents, adminTeachers, adminSchools, teacherStudents, and chat stay in real-time sync
   useEffect(() => {
     const handleSync = () => {
       try {
         const savedStudents = localStorage.getItem('ucore_admin_students');
         if (savedStudents) {
           const parsed = JSON.parse(savedStudents);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setAdminStudents((prev) => (JSON.stringify(prev) === savedStudents ? prev : parsed));
           }
         }
         const savedTeachers = localStorage.getItem('ucore_admin_teachers');
         if (savedTeachers) {
           const parsed = JSON.parse(savedTeachers);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setAdminTeachers((prev) => (JSON.stringify(prev) === savedTeachers ? prev : parsed));
           }
         }
@@ -436,17 +412,31 @@ export default function App() {
         const savedDirectors = localStorage.getItem('ucore_admin_directors');
         if (savedDirectors) {
           const parsed = JSON.parse(savedDirectors);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setAdminDirectors((prev) => (JSON.stringify(prev) === savedDirectors ? prev : parsed));
           }
         }
         const savedTeacherStudents = localStorage.getItem('ucore_teacher_students');
         if (savedTeacherStudents) {
           const parsed = JSON.parse(savedTeacherStudents);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setTeacherStudents((prev) =>
               JSON.stringify(prev) === savedTeacherStudents ? prev : parsed
             );
+          }
+        }
+        const savedChatMessages = localStorage.getItem('ucore_chat_messages');
+        if (savedChatMessages) {
+          const parsed = JSON.parse(savedChatMessages);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setChatMessages((prev) => (JSON.stringify(prev) === savedChatMessages ? prev : parsed));
+          }
+        }
+        const savedChatChannels = localStorage.getItem('ucore_chat_channels_v3');
+        if (savedChatChannels) {
+          const parsed = JSON.parse(savedChatChannels);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setChatChannels((prev) => (JSON.stringify(prev) === savedChatChannels ? prev : parsed));
           }
         }
       } catch {
@@ -470,11 +460,13 @@ export default function App() {
     const unsubUnifiedDb = initUnifiedRealtimeDatabaseSync();
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
+    window.addEventListener('ucore-students-updated', handleSync);
     window.addEventListener('focus', triggerFullNetworkSync);
-    const pollInterval = setInterval(triggerFullNetworkSync, 4000);
+    const pollInterval = setInterval(triggerFullNetworkSync, 3000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('ucore-teachers-updated', handleSync);
+      window.removeEventListener('ucore-students-updated', handleSync);
       window.removeEventListener('focus', triggerFullNetworkSync);
       clearInterval(pollInterval);
       if (typeof unsubApps === 'function') unsubApps();
