@@ -272,6 +272,7 @@ export function isEntityTombstoned(col: string, id: string): boolean {
 // ============================================================================
 
 export async function saveApplicationToFirestore(app: PendingApplication): Promise<void> {
+  if (firestoreQuotaExhausted) return;
   try {
     const docId = sanitizeDocId(app.id || app.userId);
     if (!docId) return;
@@ -279,11 +280,12 @@ export async function saveApplicationToFirestore(app: PendingApplication): Promi
     const ref = doc(db, APPLICATIONS_COL, docId);
     await setDoc(ref, cleanObject(app), { merge: true });
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar candidatura no Firestore:', error);
+    markFirestoreQuotaIfExhausted(error);
   }
 }
 
 export async function fetchApplicationsFromFirestore(): Promise<PendingApplication[]> {
+  if (firestoreQuotaExhausted) return [];
   try {
     const ref = collection(db, APPLICATIONS_COL);
     const snapshot = await getDocs(ref);
@@ -293,7 +295,7 @@ export async function fetchApplicationsFromFirestore(): Promise<PendingApplicati
     });
     return list;
   } catch (error) {
-    console.warn('[Firestore] Erro ao buscar candidaturas na nuvem:', error);
+    markFirestoreQuotaIfExhausted(error);
     return [];
   }
 }
@@ -302,13 +304,14 @@ export async function updateApplicationInFirestore(
   appId: string,
   updates: Partial<PendingApplication>
 ): Promise<void> {
+  if (firestoreQuotaExhausted) return;
   try {
     const docId = sanitizeDocId(appId);
     if (!docId) return;
     const ref = doc(db, APPLICATIONS_COL, docId);
     await setDoc(ref, cleanObject(updates), { merge: true });
   } catch (error) {
-    console.warn('[Firestore] Erro ao atualizar candidatura no Firestore:', error);
+    markFirestoreQuotaIfExhausted(error);
   }
 }
 
@@ -317,14 +320,16 @@ export async function deleteApplicationFromFirestore(appId: string): Promise<voi
     const docId = sanitizeDocId(appId);
     if (!docId) return;
     addEntityTombstone(APPLICATIONS_COL, docId);
+    if (firestoreQuotaExhausted) return;
     const ref = doc(db, APPLICATIONS_COL, docId);
     await deleteDoc(ref);
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar candidatura do Firestore:', error);
+    markFirestoreQuotaIfExhausted(error);
   }
 }
 
 export async function clearApprovedApplicationsFromFirestore(): Promise<number> {
+  if (firestoreQuotaExhausted) return 0;
   try {
     const ref = collection(db, APPLICATIONS_COL);
     const snapshot = await getDocs(ref);
@@ -345,7 +350,7 @@ export async function clearApprovedApplicationsFromFirestore(): Promise<number> 
     }
     return count;
   } catch (error) {
-    console.warn('[Firestore] Erro ao limpar candidaturas homologadas:', error);
+    markFirestoreQuotaIfExhausted(error);
     return 0;
   }
 }
@@ -353,6 +358,7 @@ export async function clearApprovedApplicationsFromFirestore(): Promise<number> 
 export function subscribeToApplications(
   onUpdate: (apps: PendingApplication[]) => void
 ): Unsubscribe {
+  if (firestoreQuotaExhausted) return () => {};
   try {
     const ref = collection(db, APPLICATIONS_COL);
     return onSnapshot(
@@ -365,11 +371,11 @@ export function subscribeToApplications(
         onUpdate(apps);
       },
       (error) => {
-        console.warn('[Firestore] Realtime applications subscription error:', error);
+        markFirestoreQuotaIfExhausted(error);
       }
     );
   } catch (err) {
-    console.warn('[Firestore] Falha ao iniciar listener de candidaturas:', err);
+    markFirestoreQuotaIfExhausted(err);
     return () => {};
   }
 }
@@ -379,6 +385,7 @@ export function subscribeToApplications(
 // ============================================================================
 
 export async function saveQuickRequestToFirestore(request: QuickServiceRequest): Promise<void> {
+  if (firestoreQuotaExhausted) return;
   try {
     const docId = sanitizeDocId(request.id);
     if (!docId) return;
@@ -386,11 +393,12 @@ export async function saveQuickRequestToFirestore(request: QuickServiceRequest):
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     await setDoc(ref, cleanObject(request), { merge: true });
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar pedido de serviço rápido no Firestore:', error);
+    markFirestoreQuotaIfExhausted(error);
   }
 }
 
 export async function fetchQuickRequestsFromFirestore(): Promise<QuickServiceRequest[]> {
+  if (firestoreQuotaExhausted) return [];
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     const snapshot = await getDocs(ref);
@@ -400,7 +408,7 @@ export async function fetchQuickRequestsFromFirestore(): Promise<QuickServiceReq
     });
     return list;
   } catch (error) {
-    console.warn('[Firestore] Erro ao buscar pedidos de serviços rápidos na nuvem:', error);
+    markFirestoreQuotaIfExhausted(error);
     return [];
   }
 }
@@ -409,13 +417,14 @@ export async function updateQuickRequestInFirestore(
   id: string,
   updates: Partial<QuickServiceRequest>
 ): Promise<void> {
+  if (firestoreQuotaExhausted) return;
   try {
     const docId = sanitizeDocId(id);
     if (!docId) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     await setDoc(ref, cleanObject(updates), { merge: true });
   } catch (error) {
-    console.warn('[Firestore] Erro ao atualizar pedido de serviço rápido no Firestore:', error);
+    markFirestoreQuotaIfExhausted(error);
   }
 }
 
@@ -424,14 +433,16 @@ export async function deleteQuickRequestFromFirestore(id: string): Promise<void>
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(QUICK_REQUESTS_COL, docId);
+    if (firestoreQuotaExhausted) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     await deleteDoc(ref);
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar pedido no Firestore:', error);
+    markFirestoreQuotaIfExhausted(error);
   }
 }
 
 export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
+  if (firestoreQuotaExhausted) return 0;
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     const snapshot = await getDocs(ref);
@@ -449,7 +460,7 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
     }
     return count;
   } catch (error) {
-    console.warn('[Firestore] Erro ao limpar pedidos de serviços rápidos:', error);
+    markFirestoreQuotaIfExhausted(error);
     return 0;
   }
 }
@@ -457,6 +468,7 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
 export function subscribeToQuickRequests(
   onUpdate: (requests: QuickServiceRequest[]) => void
 ): Unsubscribe {
+  if (firestoreQuotaExhausted) return () => {};
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     return onSnapshot(
@@ -469,11 +481,11 @@ export function subscribeToQuickRequests(
         onUpdate(list);
       },
       (error) => {
-        console.warn('[Firestore] QuickRequests real-time subscription error:', error);
+        markFirestoreQuotaIfExhausted(error);
       }
     );
   } catch (err) {
-    console.warn('[Firestore] Falha ao iniciar listener de pedidos rápidos:', err);
+    markFirestoreQuotaIfExhausted(err);
     return () => {};
   }
 }
@@ -483,6 +495,7 @@ export function subscribeToQuickRequests(
 // ============================================================================
 
 export async function saveUserToFirestore(user: UserAccount): Promise<void> {
+  if (firestoreQuotaExhausted) return;
   try {
     const docId = sanitizeDocId((user.email || user.id || '').trim().toLowerCase());
     if (!docId) return;
@@ -493,7 +506,7 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
     const ref = doc(db, USERS_COL, docId);
     await setDoc(ref, cleanObject({ ...user, userId: user.id || docId }), { merge: true });
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar usuário no Firestore:', error);
+    markFirestoreQuotaIfExhausted(error);
   }
 }
 

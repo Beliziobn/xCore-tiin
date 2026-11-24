@@ -4,15 +4,21 @@ import type {
   AdminStudent, 
   AdminDirector 
 } from '../types';
+import {
+  CANONICAL_SCHOOLS,
+  CANONICAL_TEACHERS,
+  CANONICAL_STUDENTS,
+  CANONICAL_DIRECTORS,
+} from './canonicalNetworkSeed';
 
-// Network Schools - Initialized empty for live municipal data entry
-export const initialAdminSchools: AdminSchool[] = [];
+// Network Schools - Seeded with the canonical Quêssua municipal network
+export const initialAdminSchools: AdminSchool[] = CANONICAL_SCHOOLS as AdminSchool[];
 
-// Network Teachers - Initialized empty for live municipal data entry
-export const initialAdminTeachers: AdminTeacher[] = [];
+// Network Teachers - Seeded with the canonical Quêssua municipal teaching & leadership roster
+export const initialAdminTeachers: AdminTeacher[] = CANONICAL_TEACHERS as AdminTeacher[];
 
-// Network Students - Initialized empty for live municipal data entry
-export const initialAdminStudents: AdminStudent[] = [];
+// Network Students - Seeded with the canonical Quêssua municipal student records
+export const initialAdminStudents: AdminStudent[] = CANONICAL_STUDENTS as AdminStudent[];
 
 // Historical Performance Trends (%Aprovação vs %Reprovação)
 export const historicalSchoolPerformance = [
@@ -118,6 +124,7 @@ export function computeAdminStats(
   };
 }
 
-// Initialized empty for clean slate
-export const initialAdminDirectors: AdminDirector[] = [];
+// Seeded with the canonical Quêssua municipal directors
+export const initialAdminDirectors: AdminDirector[] = CANONICAL_DIRECTORS as AdminDirector[];
+
 

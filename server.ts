@@ -22,6 +22,20 @@ import {
   validateBirthDate,
   validateTrimestre,
 } from "./src/utils/formConstraints";
+import {
+  CANONICAL_SCHOOLS,
+  CANONICAL_DIRECTORS,
+  CANONICAL_TEACHERS,
+  CANONICAL_STUDENTS,
+  CANONICAL_STAFF,
+  CANONICAL_DME_STAFF,
+  CANONICAL_APPLICATIONS,
+  CANONICAL_USERS,
+  CANONICAL_DECLARACAO_SERVICO,
+  CANONICAL_GUIAS_FERIAS,
+  CANONICAL_GUIAS_COLOCACAO,
+  CANONICAL_FICHAS_AVALIACAO,
+} from "./src/data/canonicalNetworkSeed";
 
 dotenv.config();
 
@@ -540,12 +554,42 @@ async function startServer() {
   function reconcileNetworkStore() {
     const tombstonesSet = new Set(networkStore.tombstones || []);
 
-    if (!Array.isArray(networkStore.users)) networkStore.users = [];
-    if (!Array.isArray(networkStore.directors)) networkStore.directors = [];
-    if (!Array.isArray(networkStore.teachers)) networkStore.teachers = [];
-    if (!Array.isArray(networkStore.staff)) networkStore.staff = [];
-    if (!Array.isArray(networkStore.dmeStaff)) networkStore.dmeStaff = [];
-    if (!Array.isArray(networkStore.applications)) networkStore.applications = [];
+    if (!Array.isArray(networkStore.users) || networkStore.users.length === 0) {
+      networkStore.users = [...CANONICAL_USERS];
+    }
+    if (!Array.isArray(networkStore.directors) || networkStore.directors.length === 0) {
+      networkStore.directors = [...CANONICAL_DIRECTORS];
+    }
+    if (!Array.isArray(networkStore.teachers) || networkStore.teachers.length === 0) {
+      networkStore.teachers = [...CANONICAL_TEACHERS];
+    }
+    if (!Array.isArray(networkStore.students) || networkStore.students.length === 0) {
+      networkStore.students = [...CANONICAL_STUDENTS];
+    }
+    if (!Array.isArray(networkStore.staff) || networkStore.staff.length === 0) {
+      networkStore.staff = [...CANONICAL_STAFF];
+    }
+    if (!Array.isArray(networkStore.dmeStaff) || networkStore.dmeStaff.length === 0) {
+      networkStore.dmeStaff = [...CANONICAL_DME_STAFF];
+    }
+    if (!Array.isArray(networkStore.applications) || networkStore.applications.length === 0) {
+      networkStore.applications = [...CANONICAL_APPLICATIONS];
+    }
+    if (!Array.isArray(networkStore.schools) || networkStore.schools.length === 0) {
+      networkStore.schools = [...CANONICAL_SCHOOLS];
+    }
+    if (!Array.isArray(networkStore.declaracaoServico) || networkStore.declaracaoServico.length === 0) {
+      networkStore.declaracaoServico = [...CANONICAL_DECLARACAO_SERVICO];
+    }
+    if (!Array.isArray(networkStore.guiasFerias) || networkStore.guiasFerias.length === 0) {
+      networkStore.guiasFerias = [...CANONICAL_GUIAS_FERIAS];
+    }
+    if (!Array.isArray(networkStore.guiasColocacao) || networkStore.guiasColocacao.length === 0) {
+      networkStore.guiasColocacao = [...CANONICAL_GUIAS_COLOCACAO];
+    }
+    if (!Array.isArray(networkStore.fichasAvaliacao) || networkStore.fichasAvaliacao.length === 0) {
+      networkStore.fichasAvaliacao = [...CANONICAL_FICHAS_AVALIACAO];
+    }
 
     // 0. Collect all known approved/active identities across rosters so an already-homologated person never reverts to 'pendente'
     const approvedBIs = new Set<string>();

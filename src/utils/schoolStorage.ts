@@ -23,6 +23,20 @@ import {
   deleteApplicationFromFirestore,
 } from './firestoreSync';
 import { purgeDeletedAccountCredentials, deduplicateApplicationsList, stripAppIdPrefix } from './authApprovalStorage';
+import {
+  CANONICAL_SCHOOLS,
+  CANONICAL_DIRECTORS,
+  CANONICAL_TEACHERS,
+  CANONICAL_STUDENTS,
+  CANONICAL_STAFF,
+  CANONICAL_DME_STAFF,
+  CANONICAL_APPLICATIONS,
+  CANONICAL_USERS,
+  CANONICAL_DECLARACAO_SERVICO,
+  CANONICAL_GUIAS_FERIAS,
+  CANONICAL_GUIAS_COLOCACAO,
+  CANONICAL_FICHAS_AVALIACAO,
+} from '../data/canonicalNetworkSeed';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
 
@@ -845,45 +859,57 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       .toLowerCase()
       .replace(/\s+/g, ' ');
 
-  const safeParseArr = (key: string): any[] => {
+  const safeParseArr = (key: string, canonicalFallback?: any[]): any[] => {
     try {
       const raw = localStorage.getItem(key);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      if (Array.isArray(canonicalFallback) && canonicalFallback.length > 0) {
+        const safeSeed = canonicalFallback.filter((item) => !isBannedSchoolOrEntity(item));
+        localStorage.setItem(key, JSON.stringify(safeSeed));
+        return safeSeed;
+      }
       return [];
+    } catch {
+      return Array.isArray(canonicalFallback) ? canonicalFallback : [];
     }
   };
 
   try {
-    const localSchools: AdminSchool[] = safeParseArr(STORAGE_KEY_SCHOOLS).filter((s) => !isBannedSchoolOrEntity(s));
-    const localDirs = safeParseArr('ucore_admin_directors').filter((d) => !isBannedSchoolOrEntity(d));
-    const localRegDirs = safeParseArr('ucore_registered_directors_v2').filter((d) => !isBannedSchoolOrEntity(d));
-    const localDmeStaff = safeParseArr('ucore_dme_staff_list').filter((s) => !isBannedSchoolOrEntity(s));
-    const localTeachers = safeParseArr('ucore_admin_teachers').filter((t) => !isBannedSchoolOrEntity(t));
-    const localRegTeachers = safeParseArr('ucore_registered_teachers_v2').filter((t) => !isBannedSchoolOrEntity(t));
-    const localDirTeachers = safeParseArr('ucore_director_teachers_v1').filter((t) => !isBannedSchoolOrEntity(t));
-    const localStudents = safeParseArr('ucore_admin_students').filter((s) => !isBannedSchoolOrEntity(s));
+    const canonicalRegTeachers = (CANONICAL_TEACHERS as any[])
+      .map((t: any) => t?.registrationData || t)
+      .filter((t: any) => t && t.nomeCompleto);
+    const localSchools: AdminSchool[] = safeParseArr(STORAGE_KEY_SCHOOLS, CANONICAL_SCHOOLS).filter((s) => !isBannedSchoolOrEntity(s));
+    const localDirs = safeParseArr('ucore_admin_directors', CANONICAL_DIRECTORS).filter((d) => !isBannedSchoolOrEntity(d));
+    const localRegDirs = safeParseArr('ucore_registered_directors_v2', CANONICAL_DIRECTORS).filter((d) => !isBannedSchoolOrEntity(d));
+    const localDmeStaff = safeParseArr('ucore_dme_staff_list', CANONICAL_DME_STAFF).filter((s) => !isBannedSchoolOrEntity(s));
+    const localTeachers = safeParseArr('ucore_admin_teachers', CANONICAL_TEACHERS).filter((t) => !isBannedSchoolOrEntity(t));
+    const localRegTeachers = safeParseArr('ucore_registered_teachers_v2', canonicalRegTeachers).filter((t) => !isBannedSchoolOrEntity(t));
+    const localDirTeachers = safeParseArr('ucore_director_teachers_v1', CANONICAL_TEACHERS).filter((t) => !isBannedSchoolOrEntity(t));
+    const localStudents = safeParseArr('ucore_admin_students', CANONICAL_STUDENTS).filter((s) => !isBannedSchoolOrEntity(s));
     const localRegStudents = safeParseArr('ucore_registered_students_v2').filter((s) => !isBannedSchoolOrEntity(s));
     const localDirStudents = safeParseArr('ucore_director_students').filter((s) => !isBannedSchoolOrEntity(s));
     const localTeacherStudents = safeParseArr('ucore_teacher_students').filter((s) => !isBannedSchoolOrEntity(s));
-    const localStaff = safeParseArr('ucore_registered_staff_v1').filter((s) => !isBannedSchoolOrEntity(s));
-    const localApps = safeParseArr('ucore_pending_applications').filter((a) => !isBannedSchoolOrEntity(a));
+    const localStaff = safeParseArr('ucore_registered_staff_v1', CANONICAL_STAFF).filter((s) => !isBannedSchoolOrEntity(s));
+    const localApps = safeParseArr('ucore_pending_applications', CANONICAL_APPLICATIONS).filter((a) => !isBannedSchoolOrEntity(a));
     const localEfectividade = safeParseArr('sigre_cadastramento_efectividade_v2').filter((e) => !isBannedSchoolOrEntity(e));
-    const localDeclaracao = safeParseArr('sigre_declaracao_servico_v1').filter((d) => !isBannedSchoolOrEntity(d));
-    const localGuiasFerias = safeParseArr('sigre_guias_ferias_records_v1').filter((g) => !isBannedSchoolOrEntity(g));
-    const localGuiasColocacao = safeParseArr('sigre_guias_colocacao_records_v1').filter(
+    const localDeclaracao = safeParseArr('sigre_declaracao_servico_v1', CANONICAL_DECLARACAO_SERVICO).filter((d) => !isBannedSchoolOrEntity(d));
+    const localGuiasFerias = safeParseArr('sigre_guias_ferias_records_v1', CANONICAL_GUIAS_FERIAS).filter((g) => !isBannedSchoolOrEntity(g));
+    const localGuiasColocacao = safeParseArr('sigre_guias_colocacao_records_v1', CANONICAL_GUIAS_COLOCACAO).filter(
       (g) => !isBannedSchoolOrEntity(g) && g?.id !== 'guia-colocacao-default-1'
     );
-    const localFichasAvaliacao = safeParseArr('sigre_fichas_avaliacao_records_v1').filter(
+    const localFichasAvaliacao = safeParseArr('sigre_fichas_avaliacao_records_v1', CANONICAL_FICHAS_AVALIACAO).filter(
       (f) => !isBannedSchoolOrEntity(f) && f?.id !== 'ficha-avaliacao-default-1'
     );
     const localCadastroDocente = safeParseArr('cadastro-docente-registos').filter((c) => !isBannedSchoolOrEntity(c));
     const localMiniPautas = safeParseArr('sigre_teacher_mini_pautas_v5_blank').filter((m) => !isBannedSchoolOrEntity(m));
     const localRooms = safeParseArr('ucore_director_rooms').filter((r) => !isBannedSchoolOrEntity(r));
     const localClasses = safeParseArr('ucore_director_classes').filter((c) => !isBannedSchoolOrEntity(c));
-    const localUsers = safeParseArr('ucore_registered_users').filter((u) => !isBannedSchoolOrEntity(u));
+    const localUsers = safeParseArr('ucore_registered_users', CANONICAL_USERS).filter((u) => !isBannedSchoolOrEntity(u));
     const localQuickRequests = safeParseArr('sigre_quick_services_local_cache').filter((q) => !isBannedSchoolOrEntity(q));
     const localTombstones = Array.from(getEntityTombstones());
 

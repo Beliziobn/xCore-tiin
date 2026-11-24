@@ -25,6 +25,7 @@ import {
   isEntityTombstoned,
 } from './firestoreSync';
 import { purgeDeletedAccountCredentials } from './authApprovalStorage';
+import { CANONICAL_TEACHERS } from '../data/canonicalNetworkSeed';
 
 export const STORAGE_KEY_TEACHERS = 'ucore_registered_teachers_v2';
 
@@ -203,8 +204,10 @@ export const REGIME_TRABALHO_OPTIONS: TeacherRegimeTrabalho[] = [
   'Outro',
 ];
 
-// Initial Seed Data with rich profiles
-export const initialTeachersList: TeacherRegistrationData[] = [];
+// Initial Seed Data with rich profiles from canonical network baseline
+export const initialTeachersList: TeacherRegistrationData[] = (CANONICAL_TEACHERS as any[])
+  .map((t: any) => t?.registrationData || t)
+  .filter((t: any) => t && t.nomeCompleto);
 
 // LocalStorage Management
 export function getStoredTeachers(): TeacherRegistrationData[] {
@@ -225,11 +228,14 @@ export function getStoredTeachers(): TeacherRegistrationData[] {
           !isBannedSchoolOrEntity(t) &&
           !isEntityTombstoned('teachers', t.id)
       );
-      if (filtered.length !== parsed.length) {
-        localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(filtered));
+      if (filtered.length > 0) {
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(filtered));
+        }
+        return filtered;
       }
-      return filtered;
     }
+    localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(initialTeachersList));
     return initialTeachersList;
   } catch {
     return initialTeachersList;

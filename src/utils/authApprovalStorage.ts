@@ -1,5 +1,6 @@
 import type { PendingApplication, UserAccount, AdminSchool, PendingApprovalComplementaryData } from '../types';
 import { initialAdminSchools, initialAdminDirectors } from '../data/adminData';
+import { CANONICAL_APPLICATIONS, CANONICAL_USERS } from '../data/canonicalNetworkSeed';
 import { directorTeachersData } from '../data/directorData';
 import {
   saveApplicationToFirestore,
@@ -214,8 +215,8 @@ export function removeDeletedApplicationId(...ids: (string | undefined)[]) {
   } catch {}
 }
 
-// Seed initial demo applications if not already present
-export const SEED_PENDING_APPLICATIONS: PendingApplication[] = [];
+// Seed initial canonical municipal applications so new devices immediately have the synchronized roster
+export const SEED_PENDING_APPLICATIONS: PendingApplication[] = CANONICAL_APPLICATIONS as PendingApplication[];
 
 export function stripAppIdPrefix(val?: string): string {
   return String(val || '')
@@ -344,11 +345,19 @@ export function getPendingApplications(type?: string): PendingApplication[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        list = deduplicateApplicationsList(parsed);
+        list = deduplicateApplicationsList([...parsed, ...SEED_PENDING_APPLICATIONS]);
       }
     }
+    if (list.length === 0) {
+      list = deduplicateApplicationsList(SEED_PENDING_APPLICATIONS);
+      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(list));
+    }
+    const rawUsers = localStorage.getItem(STORAGE_KEY_USERS);
+    if (!rawUsers || rawUsers === '[]') {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(CANONICAL_USERS));
+    }
   } catch {
-    // ignore
+    list = deduplicateApplicationsList(SEED_PENDING_APPLICATIONS);
   }
   return type ? list.filter((a) => a.type === type) : list;
 }

@@ -183,12 +183,13 @@ export default function App() {
     purgeModeloCentralData();
   }
 
-  // Admin dynamic state (hydrated from both admin and detailed registration keys)
+  // Admin dynamic state (hydrated from both admin and detailed registration keys, falling back to canonical seed if empty)
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_schools');
-      const list: AdminSchool[] = saved ? JSON.parse(saved) : initialAdminSchools;
-      return Array.isArray(list) ? list.filter((s) => s && !isModeloCentralSchool(s.name)) : [];
+      const parsed: AdminSchool[] = saved ? JSON.parse(saved) : [];
+      const list = Array.isArray(parsed) && parsed.length > 0 ? parsed : initialAdminSchools;
+      return Array.isArray(list) ? list.filter((s) => s && !isModeloCentralSchool(s.name)) : initialAdminSchools;
     } catch {
       return initialAdminSchools;
     }
@@ -197,7 +198,8 @@ export default function App() {
   const [adminTeachers, setAdminTeachers] = useState<AdminTeacher[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_teachers');
-      const list: AdminTeacher[] = saved ? JSON.parse(saved) : initialAdminTeachers;
+      const parsed: AdminTeacher[] = saved ? JSON.parse(saved) : [];
+      const list = Array.isArray(parsed) && parsed.length > 0 ? parsed : initialAdminTeachers;
       if (Array.isArray(list) && list.length > 0) {
         return list.filter((t) => t && !isModeloCentralSchool(t.schoolName));
       }
@@ -227,7 +229,7 @@ export default function App() {
             }));
         }
       }
-      return [];
+      return initialAdminTeachers;
     } catch {
       return initialAdminTeachers;
     }
@@ -236,7 +238,8 @@ export default function App() {
   const [adminStudents, setAdminStudents] = useState<AdminStudent[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_students');
-      const list: AdminStudent[] = saved ? JSON.parse(saved) : initialAdminStudents;
+      const parsed: AdminStudent[] = saved ? JSON.parse(saved) : [];
+      const list = Array.isArray(parsed) && parsed.length > 0 ? parsed : initialAdminStudents;
       if (Array.isArray(list) && list.length > 0) {
         return list.filter((st) => st && !isModeloCentralSchool(st.schoolName));
       }
@@ -272,7 +275,7 @@ export default function App() {
             }));
         }
       }
-      return [];
+      return initialAdminStudents;
     } catch {
       return initialAdminStudents;
     }
@@ -281,12 +284,15 @@ export default function App() {
   const [adminDirectors, setAdminDirectors] = useState<AdminDirector[]>(() => {
     try {
       const saved = localStorage.getItem('ucore_admin_directors');
-      const list: AdminDirector[] = saved ? JSON.parse(saved) : initialAdminDirectors;
-      return Array.isArray(list) ? list.filter((d) => d && !isModeloCentralSchool(d.schoolName)) : [];
+      const parsed: AdminDirector[] = saved ? JSON.parse(saved) : [];
+      const list = Array.isArray(parsed) && parsed.length > 0 ? parsed : initialAdminDirectors;
+      return Array.isArray(list) ? list.filter((d) => d && !isModeloCentralSchool(d.schoolName)) : initialAdminDirectors;
     } catch {
       return initialAdminDirectors;
     }
   });
+
+  const isInitialSyncCompleteRef = useRef(false);
 
   const [adminModalType, setAdminModalType] = useState<AdminModalType>(null);
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
@@ -321,20 +327,31 @@ export default function App() {
   // Initialize theme mode and sync network schools/data from server
   useEffect(() => {
     initTheme();
-    syncSchoolsFromServer().catch(() => {
-      // ignore offline
-    });
+    syncSchoolsFromServer()
+      .then((syncedSchools) => {
+        isInitialSyncCompleteRef.current = true;
+        if (Array.isArray(syncedSchools) && syncedSchools.length > 0) {
+          setAdminSchools(syncedSchools);
+        }
+      })
+      .catch(() => {
+        isInitialSyncCompleteRef.current = true;
+      });
   }, []);
 
-  // Persist admin entities on change and sync to backend network store
+  // Persist admin entities on change and sync to backend network store (only after initial sync or if non-empty)
   useEffect(() => {
     try {
-      localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schools: adminSchools }),
-      }).catch(() => {});
+      if (adminSchools.length > 0) {
+        localStorage.setItem('ucore_admin_schools', JSON.stringify(adminSchools));
+        if (isInitialSyncCompleteRef.current) {
+          fetch('/api/network/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schools: adminSchools }),
+          }).catch(() => {});
+        }
+      }
     } catch {
       // ignore
     }
@@ -342,12 +359,16 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teachers: adminTeachers }),
-      }).catch(() => {});
+      if (adminTeachers.length > 0) {
+        localStorage.setItem('ucore_admin_teachers', JSON.stringify(adminTeachers));
+        if (isInitialSyncCompleteRef.current) {
+          fetch('/api/network/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ teachers: adminTeachers }),
+          }).catch(() => {});
+        }
+      }
     } catch {
       // ignore
     }
@@ -355,12 +376,16 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directors: adminDirectors }),
-      }).catch(() => {});
+      if (adminDirectors.length > 0) {
+        localStorage.setItem('ucore_admin_directors', JSON.stringify(adminDirectors));
+        if (isInitialSyncCompleteRef.current) {
+          fetch('/api/network/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ directors: adminDirectors }),
+          }).catch(() => {});
+        }
+      }
     } catch {
       // ignore
     }
@@ -368,12 +393,16 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
-      fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: adminStudents }),
-      }).catch(() => {});
+      if (adminStudents.length > 0) {
+        localStorage.setItem('ucore_admin_students', JSON.stringify(adminStudents));
+        if (isInitialSyncCompleteRef.current) {
+          fetch('/api/network/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ students: adminStudents }),
+          }).catch(() => {});
+        }
+      }
     } catch {
       // ignore
     }
@@ -385,33 +414,55 @@ export default function App() {
       try {
         const savedStudents = localStorage.getItem('ucore_admin_students');
         if (savedStudents) {
-          setAdminStudents((prev) => (JSON.stringify(prev) === savedStudents ? prev : JSON.parse(savedStudents)));
+          const parsed = JSON.parse(savedStudents);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAdminStudents((prev) => (JSON.stringify(prev) === savedStudents ? prev : parsed));
+          }
         }
         const savedTeachers = localStorage.getItem('ucore_admin_teachers');
         if (savedTeachers) {
-          setAdminTeachers((prev) => (JSON.stringify(prev) === savedTeachers ? prev : JSON.parse(savedTeachers)));
+          const parsed = JSON.parse(savedTeachers);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAdminTeachers((prev) => (JSON.stringify(prev) === savedTeachers ? prev : parsed));
+          }
         }
         const savedSchools = localStorage.getItem('ucore_admin_schools');
         if (savedSchools) {
-          setAdminSchools((prev) => (JSON.stringify(prev) === savedSchools ? prev : JSON.parse(savedSchools)));
+          const parsed = JSON.parse(savedSchools);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAdminSchools((prev) => (JSON.stringify(prev) === savedSchools ? prev : parsed));
+          }
         }
         const savedDirectors = localStorage.getItem('ucore_admin_directors');
         if (savedDirectors) {
-          setAdminDirectors((prev) => (JSON.stringify(prev) === savedDirectors ? prev : JSON.parse(savedDirectors)));
+          const parsed = JSON.parse(savedDirectors);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAdminDirectors((prev) => (JSON.stringify(prev) === savedDirectors ? prev : parsed));
+          }
         }
         const savedTeacherStudents = localStorage.getItem('ucore_teacher_students');
         if (savedTeacherStudents) {
-          setTeacherStudents((prev) =>
-            JSON.stringify(prev) === savedTeacherStudents ? prev : JSON.parse(savedTeacherStudents)
-          );
+          const parsed = JSON.parse(savedTeacherStudents);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTeacherStudents((prev) =>
+              JSON.stringify(prev) === savedTeacherStudents ? prev : parsed
+            );
+          }
         }
       } catch {
         // ignore
       }
     };
     const triggerFullNetworkSync = () => {
-      syncApplicationsFromServer().catch(() => {});
-      syncSchoolsFromServer().catch(() => {});
+      syncApplicationsFromServer()
+        .then(() => handleSync())
+        .catch(() => {});
+      syncSchoolsFromServer()
+        .then(() => {
+          isInitialSyncCompleteRef.current = true;
+          handleSync();
+        })
+        .catch(() => {});
     };
     triggerFullNetworkSync();
     const unsubApps = initRealtimeApplicationsSync();
@@ -1020,6 +1071,34 @@ export default function App() {
     if (user.role === 'admin' || user.role === 'diretor' || user.role === 'professor') {
       setActiveRole(user.role);
     }
+    // Immediately synchronize all network collections upon login so any device sees the latest shared data
+    syncApplicationsFromServer().catch(() => {});
+    syncSchoolsFromServer()
+      .then((syncedSchools) => {
+        if (Array.isArray(syncedSchools) && syncedSchools.length > 0) {
+          setAdminSchools(syncedSchools);
+        }
+        try {
+          const tRaw = localStorage.getItem('ucore_admin_teachers');
+          if (tRaw) {
+            const tParsed = JSON.parse(tRaw);
+            if (Array.isArray(tParsed) && tParsed.length > 0) setAdminTeachers(tParsed);
+          }
+          const dRaw = localStorage.getItem('ucore_admin_directors');
+          if (dRaw) {
+            const dParsed = JSON.parse(dRaw);
+            if (Array.isArray(dParsed) && dParsed.length > 0) setAdminDirectors(dParsed);
+          }
+          const sRaw = localStorage.getItem('ucore_admin_students');
+          if (sRaw) {
+            const sParsed = JSON.parse(sRaw);
+            if (Array.isArray(sParsed) && sParsed.length > 0) setAdminStudents(sParsed);
+          }
+        } catch {}
+        window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
+      })
+      .catch(() => {});
     setCurrentPage('home');
     setCurrentView('home');
     showToast(`${user.greeting || 'Olá ' + user.firstName}! Interface e configurações carregadas.`);
