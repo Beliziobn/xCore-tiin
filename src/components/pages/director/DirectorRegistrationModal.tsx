@@ -4,6 +4,8 @@ import { TeacherRegistrationModal } from '../../modals/TeacherRegistrationModal'
 import { RoomRegistrationModal } from '../../modals/RoomRegistrationModal';
 import { ClassMatrixRegistrationModal } from '../../modals/ClassMatrixRegistrationModal';
 
+import type { AdminSchool } from '../../../types';
+
 interface DirectorRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -11,6 +13,9 @@ interface DirectorRegistrationModalProps {
   onSuccess: (newItem: any) => void;
   initialData?: any;
   schoolName?: string;
+  schoolId?: string;
+  schools?: AdminSchool[];
+  lockSchool?: boolean;
   directorName?: string;
 }
 
@@ -21,6 +26,9 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
   onSuccess,
   initialData,
   schoolName = '',
+  schoolId,
+  schools,
+  lockSchool = true,
   directorName = 'Diretor de Escola',
 }) => {
   if (!isOpen) return null;
@@ -38,6 +46,9 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
         defaultRoom="Sala 03"
         defaultPeriod="Manhã"
         schoolName={schoolName}
+        schoolId={schoolId}
+        schools={schools}
+        lockSchool={lockSchool}
       />
     );
   }

@@ -7,9 +7,19 @@ import {
   deleteDoc,
   onSnapshot,
   writeBatch,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getCountFromServer,
+  increment,
   Unsubscribe,
+  QueryConstraint,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth, OperationType } from '../firebase';
 import type {
   PendingApplication,
   QuickServiceRequest,
@@ -31,6 +41,12 @@ import type {
 import { defaultDisciplinasList } from '../data/teacherData';
 import { extractFlatRegistrationData, stripNestedRegistrationData } from './svgSanitizer';
 import { isExpressApiAvailable } from './apiAvailability';
+import {
+  areSameCanonicalSchool,
+  deduplicateSchoolsCanonical,
+  isPlaceholderSchoolName,
+  isRetiredDuplicateOrPlaceholderSchoolId,
+} from './schoolMatcher';
 
 const APPLICATIONS_COL = 'applications';
 const QUICK_REQUESTS_COL = 'quickRequests';
@@ -54,6 +70,17 @@ const GUIAS_COLOCACAO_COL = 'guias_colocacao';
 const FICHAS_AVALIACAO_COL = 'fichas_avaliacao';
 const CADASTRO_DOCENTE_COL = 'cadastro_docente';
 const TOMBSTONES_COL = 'tombstones';
+const STATS_COL = 'stats';
+const DASHBOARD_STATS_DOC_ID = 'dashboard';
+
+export const REALTIME_LISTENER_LIMIT = 30;
+export const PAGINATION_PAGE_SIZE = 30;
+const ACTIVE_QUICK_REQUEST_STATUSES = [
+  'PENDENTE',
+  'EM_ANALISE',
+  'AGUARDANDO_VAGA_DESTINO',
+  'VAGA_CONFIRMADA',
+] as const;
 
 const DELETED_ENTITIES_KEY = 'sigre_deleted_entities_tombstones_v1';
 
@@ -137,6 +164,254 @@ export function markFirestoreQuotaIfExhausted(err: any, operation: 'read' | 'wri
     if (!wasWriteExhausted) {
       notifyFirestoreQuotaStatus(isFirestoreReadQuotaExhausted(), true);
     }
+  }
+}
+
+function logFirestorePermissionOrQuotaError(
+  err: unknown,
+  operationType: OperationType,
+  path: string
+): void {
+  markFirestoreQuotaIfExhausted(err, operationType === OperationType.WRITE || operationType === OperationType.CREATE || operationType === OperationType.UPDATE || operationType === OperationType.DELETE ? 'write' : 'read');
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.toLowerCase().includes('missing or insufficient permissions') || msg.toLowerCase().includes('permission-denied')) {
+    const errInfo = {
+      error: msg,
+      operationType,
+      path,
+      authInfo: {
+        userId: auth.currentUser?.uid,
+        email: auth.currentUser?.email,
+        emailVerified: auth.currentUser?.emailVerified,
+        isAnonymous: auth.currentUser?.isAnonymous,
+        tenantId: auth.currentUser?.tenantId,
+      },
+    };
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  }
+}
+
+function resolveNowTimestamp(existingTs?: any): { nowTs: number; nowIso: string } {
+  const numeric = typeof existingTs === 'number' && Number.isFinite(existingTs) && existingTs > 1_000_000_000_000
+    ? existingTs
+    : Date.now();
+  return {
+    nowTs: numeric,
+    nowIso: new Date(numeric).toISOString(),
+  };
+}
+
+// ============================================================================
+// 0. DASHBOARD STATS AGGREGATOR (stats/dashboard) & SERVER COUNTING
+// Eliminates full-collection .length / .size client counts (Rule 4)
+// ============================================================================
+
+export interface DashboardStats {
+  totalSchools: number;
+  totalTeachers: number;
+  totalStudents: number;
+  totalDirectors: number;
+  totalStaff: number;
+  totalUsers: number;
+  totalApplications: number;
+  pendingApplications: number;
+  approvedApplications: number;
+  rejectedApplications: number;
+  totalQuickRequests: number;
+  pendingQuickRequests: number;
+  totalEfectividade: number;
+  totalDeclaracaoServico: number;
+  updatedAt?: string;
+}
+
+export async function fetchDashboardStats(): Promise<DashboardStats | null> {
+  if (isFirestoreReadQuotaExhausted()) return null;
+  try {
+    const snap = await getDoc(doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID));
+    if (snap.exists()) {
+      return snap.data() as DashboardStats;
+    }
+    return await refreshDashboardStatsFromServerCounts();
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.GET, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
+    return null;
+  }
+}
+
+export function subscribeToDashboardStats(
+  onUpdate: (stats: DashboardStats) => void
+): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
+  try {
+    return onSnapshot(
+      doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID),
+      (snap) => {
+        if (snap.exists()) {
+          onUpdate(snap.data() as DashboardStats);
+        }
+      },
+      (err) => {
+        logFirestorePermissionOrQuotaError(err, OperationType.GET, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
+      }
+    );
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
+    return () => {};
+  }
+}
+
+export async function incrementDashboardStats(
+  deltas: Partial<Record<Exclude<keyof DashboardStats, 'updatedAt'>, number>>
+): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
+  try {
+    const updatePayload: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+    let hasNonZero = false;
+    for (const [k, v] of Object.entries(deltas)) {
+      if (typeof v === 'number' && v !== 0) {
+        updatePayload[k] = increment(v);
+        hasNonZero = true;
+      }
+    }
+    if (!hasNonZero) return;
+    await setDoc(doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID), updatePayload, { merge: true });
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.UPDATE, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
+  }
+}
+
+export async function fetchCollectionCount(
+  colName: string,
+  filters?: Array<{ field: string; op?: '==' | 'in'; value: any }>
+): Promise<number> {
+  if (isFirestoreReadQuotaExhausted()) return 0;
+  try {
+    const constraints: QueryConstraint[] = [];
+    if (filters && filters.length > 0) {
+      filters.forEach((f) => constraints.push(where(f.field, f.op || '==', f.value)));
+    }
+    const q = constraints.length > 0 ? query(collection(db, colName), ...constraints) : collection(db, colName);
+    const snap = await getCountFromServer(q);
+    return snap.data().count;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, colName);
+    return 0;
+  }
+}
+
+export async function refreshDashboardStatsFromServerCounts(): Promise<DashboardStats | null> {
+  if (isFirestoreReadQuotaExhausted()) return null;
+  try {
+    const [
+      totalSchools,
+      totalTeachers,
+      totalStudents,
+      totalDirectors,
+      totalStaff,
+      totalUsers,
+      totalApplications,
+      pendingApplications,
+      approvedApplications,
+      rejectedApplications,
+      totalQuickRequests,
+      pendingQuickRequests,
+      totalEfectividade,
+      totalDeclaracaoServico,
+    ] = await Promise.all([
+      fetchCollectionCount(SCHOOLS_COL),
+      fetchCollectionCount(TEACHERS_COL),
+      fetchCollectionCount(STUDENTS_COL),
+      fetchCollectionCount(DIRECTORS_COL),
+      fetchCollectionCount(STAFF_COL),
+      fetchCollectionCount(USERS_COL),
+      fetchCollectionCount(APPLICATIONS_COL),
+      fetchCollectionCount(APPLICATIONS_COL, [{ field: 'status', value: 'pendente' }]),
+      fetchCollectionCount(APPLICATIONS_COL, [{ field: 'status', value: 'aprovado' }]),
+      fetchCollectionCount(APPLICATIONS_COL, [{ field: 'status', value: 'rejeitado' }]),
+      fetchCollectionCount(QUICK_REQUESTS_COL),
+      fetchCollectionCount(QUICK_REQUESTS_COL, [
+        { field: 'status', op: 'in', value: [...ACTIVE_QUICK_REQUEST_STATUSES] },
+      ]),
+      fetchCollectionCount(EFECTIVIDADE_COL),
+      fetchCollectionCount(DECLARACAO_SERVICO_COL),
+    ]);
+
+    const payload: DashboardStats = {
+      totalSchools,
+      totalTeachers,
+      totalStudents,
+      totalDirectors,
+      totalStaff,
+      totalUsers,
+      totalApplications,
+      pendingApplications,
+      approvedApplications,
+      rejectedApplications,
+      totalQuickRequests,
+      pendingQuickRequests,
+      totalEfectividade,
+      totalDeclaracaoServico,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (!isFirestoreWriteQuotaExhausted()) {
+      await setDoc(doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID), payload, { merge: true }).catch(() => {});
+    }
+    return payload;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.GET, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
+    return null;
+  }
+}
+
+export interface FirestorePageResult<T> {
+  items: T[];
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+  hasMore: boolean;
+  ok: boolean;
+  quotaExhausted: boolean;
+}
+
+export async function fetchCollectionPage<T = any>(
+  colName: string,
+  options?: {
+    pageSize?: number;
+    cursor?: QueryDocumentSnapshot<DocumentData> | null;
+    constraints?: QueryConstraint[];
+    orderField?: string;
+    orderDirection?: 'asc' | 'desc';
+  }
+): Promise<FirestorePageResult<T>> {
+  if (isFirestoreReadQuotaExhausted()) {
+    return { items: [], lastDoc: null, hasMore: false, ok: false, quotaExhausted: true };
+  }
+  const pageSize = Math.min(Math.max(options?.pageSize ?? PAGINATION_PAGE_SIZE, 1), 49);
+  const orderField = options?.orderField || 'updatedAt';
+  const orderDirection = options?.orderDirection || 'desc';
+  try {
+    const queryParts: QueryConstraint[] = [
+      ...(options?.constraints || []),
+      orderBy(orderField, orderDirection),
+      ...(options?.cursor ? [startAfter(options.cursor)] : []),
+      limit(pageSize + 1),
+    ];
+    const snap = await getDocs(query(collection(db, colName), ...queryParts));
+    const hasMore = snap.docs.length > pageSize;
+    const docs = hasMore ? snap.docs.slice(0, pageSize) : snap.docs;
+    const items = docs.map((d) => d.data() as T);
+    const lastDoc = docs.length > 0 ? docs[docs.length - 1] : null;
+    return { items, lastDoc, hasMore, ok: true, quotaExhausted: false };
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, colName);
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+      ok: false,
+      quotaExhausted: isFirestoreReadQuotaExhausted(),
+    };
   }
 }
 
@@ -257,9 +532,10 @@ export function addEntityTombstone(col: string, id: string, skipRemotePropagatio
       if (!isFirestoreWriteQuotaExhausted()) {
         const tombDocId = sanitizeDocId(tombKey);
         if (tombDocId) {
+          const { nowTs, nowIso } = resolveNowTimestamp();
           setDoc(
             doc(db, TOMBSTONES_COL, tombDocId),
-            { key: tombKey, col, id: cleanId, deletedAt: new Date().toISOString() },
+            { key: tombKey, col, id: cleanId, deletedAt: nowIso, updatedAt: nowIso, _updatedAt: nowTs },
             { merge: true }
           ).catch((e) => markFirestoreQuotaIfExhausted(e, 'write'));
         }
@@ -362,6 +638,7 @@ export async function saveApplicationToFirestore(app: PendingApplication): Promi
       ? 'rejeitado'
       : 'pendente';
 
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const rawPayload: Record<string, any> = {
       ...app,
       id: app.id || docId,
@@ -370,7 +647,8 @@ export async function saveApplicationToFirestore(app: PendingApplication): Promi
       targetApproverEmail: 'dmedoquessua@gmail.com',
       approverDirectorName: 'Director Municipal da Educação (dmedoquessua@gmail.com)',
       status: safeStatus,
-      _updatedAt: Date.now(),
+      updatedAt: nowIso,
+      _updatedAt: nowTs,
     };
     if (cleanEmail) {
       rawPayload.email = cleanEmail;
@@ -385,10 +663,47 @@ export async function saveApplicationToFirestore(app: PendingApplication): Promi
     });
 
     const ref = doc(db, APPLICATIONS_COL, docId);
+    let prevStatus: string | null = null;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const existingSnap = await getDoc(ref);
+        if (existingSnap.exists()) {
+          prevStatus = String(existingSnap.data()?.status || 'pendente');
+        }
+      } catch {}
+    }
+
     await setDoc(ref, cleanObject(rawPayload), { merge: true });
+
+    // Keep stats/dashboard atomically synchronized without client full-collection counts
+    if (prevStatus === null) {
+      incrementDashboardStats({
+        totalApplications: 1,
+        ...(safeStatus === 'pendente'
+          ? { pendingApplications: 1 }
+          : safeStatus === 'aprovado'
+          ? { approvedApplications: 1 }
+          : { rejectedApplications: 1 }),
+      }).catch(() => {});
+    } else if (prevStatus !== safeStatus) {
+      incrementDashboardStats({
+        ...(prevStatus === 'pendente'
+          ? { pendingApplications: -1 }
+          : prevStatus === 'aprovado'
+          ? { approvedApplications: -1 }
+          : prevStatus === 'rejeitado'
+          ? { rejectedApplications: -1 }
+          : {}),
+        ...(safeStatus === 'pendente'
+          ? { pendingApplications: 1 }
+          : safeStatus === 'aprovado'
+          ? { approvedApplications: 1 }
+          : { rejectedApplications: 1 }),
+      }).catch(() => {});
+    }
     return true;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, APPLICATIONS_COL);
     console.warn('[Firestore] Erro ao gravar candidatura no Firestore:', error);
     return false;
   }
@@ -398,35 +713,61 @@ export interface FirestoreApplicationsFetchResult {
   apps: PendingApplication[];
   ok: boolean;
   quotaExhausted: boolean;
+  lastDoc?: QueryDocumentSnapshot<DocumentData> | null;
+  hasMore?: boolean;
 }
 
-export async function fetchApplicationsFromFirestoreWithStatus(): Promise<FirestoreApplicationsFetchResult> {
+/**
+ * Paginated on-demand query via getDocs (Rule 2: archived/completed states fetched on demand, never onSnapshot).
+ */
+export async function fetchApplicationsByStatusPage(options?: {
+  status?: 'pendente' | 'aprovado' | 'rejeitado' | 'todos';
+  pageSize?: number;
+  cursor?: QueryDocumentSnapshot<DocumentData> | null;
+}): Promise<FirestorePageResult<PendingApplication>> {
+  const status = options?.status || 'pendente';
+  const constraints: QueryConstraint[] =
+    status !== 'todos' ? [where('status', '==', status)] : [];
+  return fetchCollectionPage<PendingApplication>(APPLICATIONS_COL, {
+    pageSize: options?.pageSize ?? PAGINATION_PAGE_SIZE,
+    cursor: options?.cursor ?? null,
+    constraints,
+    orderField: 'updatedAt',
+    orderDirection: 'desc',
+  });
+}
+
+export async function fetchApplicationsFromFirestoreWithStatus(
+  statusFilter: 'pendente' | 'aprovado' | 'rejeitado' | 'todos' = 'pendente',
+  pageSize: number = REALTIME_LISTENER_LIMIT
+): Promise<FirestoreApplicationsFetchResult> {
   if (isFirestoreReadQuotaExhausted()) {
     return { apps: [], ok: false, quotaExhausted: true };
   }
   try {
-    const ref = collection(db, APPLICATIONS_COL);
-    const snapshot = await Promise.race([
-      getDocs(ref),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 5000)),
+    const res = await Promise.race([
+      fetchApplicationsByStatusPage({ status: statusFilter, pageSize }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 5500)),
     ]);
-    const list: PendingApplication[] = [];
-    snapshot.forEach((d) => {
-      list.push(d.data() as PendingApplication);
-    });
-    if (firestoreReadCooldownUntil !== 0) {
+    if (res.ok && firestoreReadCooldownUntil !== 0) {
       firestoreReadCooldownUntil = 0;
       notifyFirestoreQuotaStatus(false, isFirestoreWriteQuotaExhausted());
     }
-    return { apps: list, ok: true, quotaExhausted: false };
+    return {
+      apps: res.items,
+      ok: res.ok,
+      quotaExhausted: res.quotaExhausted,
+      lastDoc: res.lastDoc,
+      hasMore: res.hasMore,
+    };
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'read');
+    logFirestorePermissionOrQuotaError(error, OperationType.LIST, APPLICATIONS_COL);
     return { apps: [], ok: false, quotaExhausted: isFirestoreReadQuotaExhausted() };
   }
 }
 
 export async function fetchApplicationsFromFirestore(): Promise<PendingApplication[]> {
-  const res = await fetchApplicationsFromFirestoreWithStatus();
+  const res = await fetchApplicationsFromFirestoreWithStatus('pendente', REALTIME_LISTENER_LIMIT);
   return res.apps;
 }
 
@@ -439,9 +780,40 @@ export async function updateApplicationInFirestore(
     const docId = sanitizeDocId(appId);
     if (!docId) return;
     const ref = doc(db, APPLICATIONS_COL, docId);
-    await setDoc(ref, cleanObject(updates), { merge: true });
+    const { nowTs, nowIso } = resolveNowTimestamp();
+    let prevStatus: string | null = null;
+    if (updates.status && !isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) prevStatus = String(snap.data()?.status || 'pendente');
+      } catch {}
+    }
+    await setDoc(
+      ref,
+      cleanObject({ ...updates, updatedAt: nowIso, _updatedAt: nowTs }),
+      { merge: true }
+    );
+    if (updates.status && prevStatus !== null && prevStatus !== updates.status) {
+      const nextStatus = updates.status;
+      incrementDashboardStats({
+        ...(prevStatus === 'pendente'
+          ? { pendingApplications: -1 }
+          : prevStatus === 'aprovado'
+          ? { approvedApplications: -1 }
+          : prevStatus === 'rejeitado'
+          ? { rejectedApplications: -1 }
+          : {}),
+        ...(nextStatus === 'pendente'
+          ? { pendingApplications: 1 }
+          : nextStatus === 'aprovado'
+          ? { approvedApplications: 1 }
+          : nextStatus === 'rejeitado'
+          ? { rejectedApplications: 1 }
+          : {}),
+      }).catch(() => {});
+    }
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
+    logFirestorePermissionOrQuotaError(error, OperationType.UPDATE, APPLICATIONS_COL);
   }
 }
 
@@ -452,47 +824,83 @@ export async function deleteApplicationFromFirestore(appId: string): Promise<voi
     addEntityTombstone(APPLICATIONS_COL, docId);
     if (isFirestoreWriteQuotaExhausted()) return;
     const ref = doc(db, APPLICATIONS_COL, docId);
+    let prevStatus: string | null = null;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) prevStatus = String(snap.data()?.status || 'pendente');
+      } catch {}
+    }
     await deleteDoc(ref);
+    if (prevStatus !== null) {
+      incrementDashboardStats({
+        totalApplications: -1,
+        ...(prevStatus === 'pendente'
+          ? { pendingApplications: -1 }
+          : prevStatus === 'aprovado'
+          ? { approvedApplications: -1 }
+          : prevStatus === 'rejeitado'
+          ? { rejectedApplications: -1 }
+          : {}),
+      }).catch(() => {});
+    }
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, APPLICATIONS_COL);
   }
 }
 
 export async function clearApprovedApplicationsFromFirestore(): Promise<number> {
   if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
-    const ref = collection(db, APPLICATIONS_COL);
-    const snapshot = await getDocs(ref);
-    const batch = writeBatch(db);
-    let count = 0;
-
-    snapshot.forEach((d) => {
-      const data = d.data() as PendingApplication;
-      if (data.status === 'aprovado' || data.approvedAt) {
+    let totalDeleted = 0;
+    while (true) {
+      const q = query(
+        collection(db, APPLICATIONS_COL),
+        where('status', '==', 'aprovado'),
+        orderBy('updatedAt', 'desc'),
+        limit(50)
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) break;
+      const batch = writeBatch(db);
+      snapshot.forEach((d) => {
         addEntityTombstone(APPLICATIONS_COL, d.id);
         batch.delete(d.ref);
-        count++;
-      }
-    });
-
-    if (count > 0) {
+        totalDeleted++;
+      });
       await batch.commit();
+      if (snapshot.size < 50) break;
     }
-    return count;
+    if (totalDeleted > 0) {
+      incrementDashboardStats({
+        totalApplications: -totalDeleted,
+        approvedApplications: -totalDeleted,
+      }).catch(() => {});
+    }
+    return totalDeleted;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'read');
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, APPLICATIONS_COL);
     return 0;
   }
 }
 
+/**
+ * Rule 1 & Rule 2: Operational work-queue listener strictly bounded to
+ * active/pending items, ordered by updatedAt desc, limited to 30 records.
+ */
 export function subscribeToApplications(
   onUpdate: (apps: PendingApplication[]) => void
 ): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    const ref = collection(db, APPLICATIONS_COL);
+    const q = query(
+      collection(db, APPLICATIONS_COL),
+      where('status', '==', 'pendente'),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
     return onSnapshot(
-      ref,
+      q,
       (snapshot) => {
         if (firestoreReadCooldownUntil !== 0) {
           firestoreReadCooldownUntil = 0;
@@ -505,7 +913,7 @@ export function subscribeToApplications(
         onUpdate(apps);
       },
       (error) => {
-        markFirestoreQuotaIfExhausted(error, 'read');
+        logFirestorePermissionOrQuotaError(error, OperationType.LIST, APPLICATIONS_COL);
       }
     );
   } catch (err) {
@@ -525,24 +933,85 @@ export async function saveQuickRequestToFirestore(request: QuickServiceRequest):
     if (!docId) return;
     removeEntityTombstone(QUICK_REQUESTS_COL, docId);
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
-    await setDoc(ref, cleanObject(request), { merge: true });
+    const { nowTs, nowIso } = resolveNowTimestamp();
+    let prevStatus: string | null = null;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) prevStatus = String(snap.data()?.status || '');
+      } catch {}
+    }
+    await setDoc(
+      ref,
+      cleanObject({ ...request, updatedAt: nowIso, _updatedAt: nowTs }),
+      { merge: true }
+    );
+    const isNowActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(request.status as any);
+    if (prevStatus === null) {
+      incrementDashboardStats({
+        totalQuickRequests: 1,
+        ...(isNowActive ? { pendingQuickRequests: 1 } : {}),
+      }).catch(() => {});
+    } else if (prevStatus !== request.status) {
+      const wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(prevStatus as any);
+      if (wasActive !== isNowActive) {
+        incrementDashboardStats({
+          pendingQuickRequests: isNowActive ? 1 : -1,
+        }).catch(() => {});
+      }
+    }
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, QUICK_REQUESTS_COL);
   }
 }
 
-export async function fetchQuickRequestsFromFirestore(): Promise<QuickServiceRequest[]> {
+export async function fetchQuickRequestsByStatusPage(options?: {
+  status?: string;
+  statuses?: string[];
+  schoolId?: string;
+  protocol?: string;
+  pageSize?: number;
+  cursor?: QueryDocumentSnapshot<DocumentData> | null;
+}): Promise<FirestorePageResult<QuickServiceRequest>> {
+  const constraints: QueryConstraint[] = [];
+  if (options?.protocol) {
+    constraints.push(where('protocol', '==', options.protocol.toUpperCase()));
+  } else if (options?.statuses && options.statuses.length > 0) {
+    constraints.push(where('status', 'in', options.statuses));
+  } else if (options?.status && options.status !== 'TODOS') {
+    constraints.push(where('status', '==', options.status));
+  }
+  if (options?.schoolId) {
+    constraints.push(where('targetSchoolId', '==', options.schoolId));
+  }
+  return fetchCollectionPage<QuickServiceRequest>(QUICK_REQUESTS_COL, {
+    pageSize: options?.pageSize ?? PAGINATION_PAGE_SIZE,
+    cursor: options?.cursor ?? null,
+    constraints,
+    orderField: 'updatedAt',
+    orderDirection: 'desc',
+  });
+}
+
+export async function fetchQuickRequestsFromFirestore(options?: {
+  includeArchived?: boolean;
+  status?: string;
+  protocol?: string;
+  limitCount?: number;
+}): Promise<QuickServiceRequest[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const ref = collection(db, QUICK_REQUESTS_COL);
-    const snapshot = await getDocs(ref);
-    const list: QuickServiceRequest[] = [];
-    snapshot.forEach((d) => {
-      list.push(d.data() as QuickServiceRequest);
+    const res = await fetchQuickRequestsByStatusPage({
+      protocol: options?.protocol,
+      status: options?.status,
+      statuses: !options?.includeArchived && !options?.status && !options?.protocol
+        ? [...ACTIVE_QUICK_REQUEST_STATUSES]
+        : undefined,
+      pageSize: options?.limitCount ?? REALTIME_LISTENER_LIMIT,
     });
-    return list;
+    return res.items;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'read');
+    logFirestorePermissionOrQuotaError(error, OperationType.LIST, QUICK_REQUESTS_COL);
     return [];
   }
 }
@@ -556,9 +1025,28 @@ export async function updateQuickRequestInFirestore(
     const docId = sanitizeDocId(id);
     if (!docId) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
-    await setDoc(ref, cleanObject(updates), { merge: true });
+    const { nowTs, nowIso } = resolveNowTimestamp();
+    let prevStatus: string | null = null;
+    if (updates.status && !isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) prevStatus = String(snap.data()?.status || '');
+      } catch {}
+    }
+    await setDoc(
+      ref,
+      cleanObject({ ...updates, updatedAt: nowIso, _updatedAt: nowTs }),
+      { merge: true }
+    );
+    if (updates.status && prevStatus !== null && prevStatus !== updates.status) {
+      const wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(prevStatus as any);
+      const isNowActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(updates.status as any);
+      if (wasActive !== isNowActive) {
+        incrementDashboardStats({ pendingQuickRequests: isNowActive ? 1 : -1 }).catch(() => {});
+      }
+    }
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
+    logFirestorePermissionOrQuotaError(error, OperationType.UPDATE, QUICK_REQUESTS_COL);
   }
 }
 
@@ -569,44 +1057,76 @@ export async function deleteQuickRequestFromFirestore(id: string): Promise<void>
     addEntityTombstone(QUICK_REQUESTS_COL, docId);
     if (isFirestoreWriteQuotaExhausted()) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
+    let wasActive = false;
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          existed = true;
+          wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(snap.data()?.status);
+        }
+      } catch {}
+    }
     await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({
+        totalQuickRequests: -1,
+        ...(wasActive ? { pendingQuickRequests: -1 } : {}),
+      }).catch(() => {});
+    }
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, QUICK_REQUESTS_COL);
   }
 }
 
 export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
   if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
-    const ref = collection(db, QUICK_REQUESTS_COL);
-    const snapshot = await getDocs(ref);
-    const batch = writeBatch(db);
-    let count = 0;
-
-    snapshot.forEach((d) => {
-      addEntityTombstone(QUICK_REQUESTS_COL, d.id);
-      batch.delete(d.ref);
-      count++;
-    });
-
-    if (count > 0) {
+    let totalDeleted = 0;
+    while (true) {
+      const snapshot = await getDocs(
+        query(collection(db, QUICK_REQUESTS_COL), orderBy('updatedAt', 'desc'), limit(50))
+      );
+      if (snapshot.empty) break;
+      const batch = writeBatch(db);
+      snapshot.forEach((d) => {
+        addEntityTombstone(QUICK_REQUESTS_COL, d.id);
+        batch.delete(d.ref);
+        totalDeleted++;
+      });
       await batch.commit();
+      if (snapshot.size < 50) break;
     }
-    return count;
+    if (totalDeleted > 0) {
+      incrementDashboardStats({
+        totalQuickRequests: -totalDeleted,
+      }).catch(() => {});
+    }
+    return totalDeleted;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'read');
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, QUICK_REQUESTS_COL);
     return 0;
   }
 }
 
+/**
+ * Rule 1 & Rule 2: Listen strictly to active/pending quick requests (max 30),
+ * ordered by updatedAt desc. Completed/rejected/cancelled requests are loaded on demand via getDocs.
+ */
 export function subscribeToQuickRequests(
   onUpdate: (requests: QuickServiceRequest[]) => void
 ): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    const ref = collection(db, QUICK_REQUESTS_COL);
+    const q = query(
+      collection(db, QUICK_REQUESTS_COL),
+      where('status', 'in', [...ACTIVE_QUICK_REQUEST_STATUSES]),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
     return onSnapshot(
-      ref,
+      q,
       (snapshot) => {
         const list: QuickServiceRequest[] = [];
         snapshot.forEach((docSnap) => {
@@ -615,7 +1135,7 @@ export function subscribeToQuickRequests(
         onUpdate(list);
       },
       (error) => {
-        markFirestoreQuotaIfExhausted(error, 'read');
+        logFirestorePermissionOrQuotaError(error, OperationType.LIST, QUICK_REQUESTS_COL);
       }
     );
   } catch (err) {
@@ -647,10 +1167,13 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
         : user.status === 'rejeitado'
         ? 'rejeitado'
         : 'pendente';
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const rawUser: Record<string, any> = {
       ...user,
       userId: user.id || docId,
       status: safeStatus,
+      updatedAt: nowIso,
+      _updatedAt: nowTs,
       ...(normBi ? { biNumber: normBi } : {}),
     };
     if (cleanEmail) {
@@ -664,9 +1187,19 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
       }
     });
     const ref = doc(db, USERS_COL, docId);
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
     await setDoc(ref, cleanObject(rawUser), { merge: true });
+    if (isNew) {
+      incrementDashboardStats({ totalUsers: 1 }).catch(() => {});
+    }
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, USERS_COL);
   }
 }
 
@@ -705,7 +1238,18 @@ export async function deleteUserFromFirestore(userIdOrEmail: string): Promise<vo
     if (!docId) return;
     addEntityTombstone(USERS_COL, docId);
     if (isFirestoreWriteQuotaExhausted()) return;
-    await deleteDoc(doc(db, USERS_COL, docId));
+    const ref = doc(db, USERS_COL, docId);
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        existed = snap.exists();
+      } catch {}
+    }
+    await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({ totalUsers: -1 }).catch(() => {});
+    }
   } catch (error) {
     markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar usuário no Firestore:', error);
@@ -741,16 +1285,21 @@ export function subscribeToSingleUserStatus(
 export function subscribeToUsers(onUpdate: (users: UserAccount[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    const ref = collection(db, USERS_COL);
+    const q = query(
+      collection(db, USERS_COL),
+      where('status', '==', 'pendente'),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
     return onSnapshot(
-      ref,
+      q,
       (snapshot) => {
         const list: UserAccount[] = [];
         snapshot.forEach((d) => list.push(d.data() as UserAccount));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, USERS_COL);
         console.warn('[Firestore] Users subscription error:', err);
       }
     );
@@ -765,6 +1314,7 @@ export function subscribeToUsers(onUpdate: (users: UserAccount[]) => void): Unsu
 // ============================================================================
 
 export async function saveSchoolToFirestore(school: AdminSchool): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     if (!school || !school.name || school.name.toLowerCase().includes('modelo central')) return;
     const docId = sanitizeDocId(school.id || school.name.toLowerCase());
@@ -775,45 +1325,74 @@ export async function saveSchoolToFirestore(school: AdminSchool): Promise<void> 
     if (school.codigoSIGE) {
       removeEntityTombstone(SCHOOLS_COL, school.codigoSIGE);
     }
-    const nowTs = Number((school as any)._updatedAt || Date.now());
+    const { nowTs, nowIso } = resolveNowTimestamp((school as any)._updatedAt);
     const ref = doc(db, SCHOOLS_COL, docId);
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
     await setDoc(
       ref,
       cleanObject({
         ...school,
         _updatedAt: nowTs,
-        updatedAt: new Date(nowTs).toISOString(),
+        updatedAt: nowIso,
       }),
       { merge: true }
     );
+    if (isNew) {
+      incrementDashboardStats({ totalSchools: 1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar escola no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, SCHOOLS_COL);
   }
 }
 
 export async function deleteSchoolFromFirestore(schoolId: string, schoolName?: string): Promise<void> {
   try {
     const docId = sanitizeDocId(schoolId);
+    let existed = false;
     if (docId) {
       addEntityTombstone(SCHOOLS_COL, docId);
-      await deleteDoc(doc(db, SCHOOLS_COL, docId));
+      if (!isFirestoreWriteQuotaExhausted()) {
+        const ref = doc(db, SCHOOLS_COL, docId);
+        if (!isFirestoreReadQuotaExhausted()) {
+          try {
+            const snap = await getDoc(ref);
+            existed = snap.exists();
+          } catch {}
+        }
+        await deleteDoc(ref);
+      }
     }
-    if (schoolName) {
+    if (schoolName && !isFirestoreWriteQuotaExhausted()) {
       const nameId = sanitizeDocId(schoolName.trim().toLowerCase());
       addEntityTombstone(SCHOOLS_COL, schoolName.trim().toLowerCase());
       if (nameId && nameId !== docId) {
         await deleteDoc(doc(db, SCHOOLS_COL, nameId)).catch(() => {});
       }
     }
+    if (existed) {
+      incrementDashboardStats({ totalSchools: -1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao apagar escola no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, SCHOOLS_COL);
   }
 }
 
-export async function fetchSchoolsFromFirestore(): Promise<AdminSchool[]> {
+export async function fetchSchoolsFromFirestore(limitCount: number = 50): Promise<AdminSchool[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, SCHOOLS_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, SCHOOLS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: AdminSchool[] = [];
     snapshot.forEach((d) => {
       const data = d.data() as AdminSchool;
@@ -823,17 +1402,25 @@ export async function fetchSchoolsFromFirestore(): Promise<AdminSchool[]> {
     });
     return list;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'read');
-    console.warn('[Firestore] Erro ao buscar escolas no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.LIST, SCHOOLS_COL);
     return [];
   }
 }
 
-export function subscribeToSchools(onUpdate: (schools: AdminSchool[]) => void): Unsubscribe {
+export function subscribeToSchools(
+  onUpdate: (schools: AdminSchool[]) => void,
+  maxLimit: number = REALTIME_LISTENER_LIMIT
+): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const safeLimit = Math.min(Math.max(maxLimit, 1), 50);
+    const q = query(
       collection(db, SCHOOLS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: AdminSchool[] = [];
         snapshot.forEach((d) => {
@@ -845,8 +1432,7 @@ export function subscribeToSchools(onUpdate: (schools: AdminSchool[]) => void): 
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Schools subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, SCHOOLS_COL);
       }
     );
   } catch (err) {
@@ -862,6 +1448,7 @@ export function subscribeToSchools(onUpdate: (schools: AdminSchool[]) => void): 
 export async function saveTeacherToFirestore(
   teacher: AdminTeacher | TeacherRegistrationData | DirectorTeacher
 ): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const rawName = (teacher as any).nomeCompleto || (teacher as any).name || (teacher as any).registrationData?.nomeCompleto || '';
     const rawBi = (teacher as any).biNif || (teacher as any).bi || (teacher as any).registrationData?.biNif || '';
@@ -872,7 +1459,15 @@ export async function saveTeacherToFirestore(
     if (rawName) removeEntityTombstone(TEACHERS_COL, rawName);
     if (rawBi) removeEntityTombstone(TEACHERS_COL, rawBi);
     const cleanTeacher = stripNestedRegistrationData(teacher as any);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, TEACHERS_COL, id);
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
     await setDoc(
       ref,
       cleanObject({
@@ -880,12 +1475,16 @@ export async function saveTeacherToFirestore(
         id,
         name: rawName || (cleanTeacher as any).name,
         nomeCompleto: rawName || (cleanTeacher as any).nomeCompleto,
-        updatedAt: new Date().toISOString(),
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
       }),
       { merge: true }
     );
+    if (isNew) {
+      incrementDashboardStats({ totalTeachers: 1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar professor no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, TEACHERS_COL);
   }
 }
 
@@ -894,56 +1493,95 @@ export async function deleteTeacherFromFirestore(teacherId: string): Promise<voi
     const docId = sanitizeDocId(teacherId);
     if (!docId) return;
     addEntityTombstone(TEACHERS_COL, docId);
-    await deleteDoc(doc(db, TEACHERS_COL, docId));
+    if (isFirestoreWriteQuotaExhausted()) return;
+    const ref = doc(db, TEACHERS_COL, docId);
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        existed = snap.exists();
+      } catch {}
+    }
+    await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({ totalTeachers: -1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar professor no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, TEACHERS_COL);
   }
 }
 
 export async function clearAllTeachersFromFirestore(): Promise<number> {
+  if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
-    const snapshot = await getDocs(collection(db, TEACHERS_COL));
-    const batch = writeBatch(db);
-    let count = 0;
-    snapshot.forEach((d) => {
-      addEntityTombstone(TEACHERS_COL, d.id);
-      batch.delete(d.ref);
-      count++;
-    });
-    if (count > 0) await batch.commit();
-    return count;
+    let totalDeleted = 0;
+    while (true) {
+      const snapshot = await getDocs(
+        query(collection(db, TEACHERS_COL), orderBy('updatedAt', 'desc'), limit(50))
+      );
+      if (snapshot.empty) break;
+      const batch = writeBatch(db);
+      snapshot.forEach((d) => {
+        addEntityTombstone(TEACHERS_COL, d.id);
+        batch.delete(d.ref);
+        totalDeleted++;
+      });
+      await batch.commit();
+      if (snapshot.size < 50) break;
+    }
+    if (totalDeleted > 0) {
+      incrementDashboardStats({ totalTeachers: -totalDeleted }).catch(() => {});
+    }
+    return totalDeleted;
   } catch (error) {
-    console.warn('[Firestore] Erro ao limpar professores no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, TEACHERS_COL);
     return 0;
   }
 }
 
-export async function fetchTeachersFromFirestore(): Promise<any[]> {
+export async function fetchTeachersFromFirestore(options?: {
+  schoolId?: string;
+  limitCount?: number;
+}): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, TEACHERS_COL));
+    const constraints: QueryConstraint[] = [];
+    if (options?.schoolId) {
+      constraints.push(where('schoolId', '==', options.schoolId));
+    }
+    const safeLimit = Math.min(Math.max(options?.limitCount ?? PAGINATION_PAGE_SIZE, 1), 50);
+    constraints.push(orderBy('updatedAt', 'desc'), limit(safeLimit));
+    const snapshot = await getDocs(query(collection(db, TEACHERS_COL), ...constraints));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, TEACHERS_COL);
     return [];
   }
 }
 
-export function subscribeToTeachers(onUpdate: (teachers: any[]) => void): Unsubscribe {
+export function subscribeToTeachers(
+  onUpdate: (teachers: any[]) => void,
+  options?: { schoolId?: string; limitCount?: number }
+): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
+    const constraints: QueryConstraint[] = [];
+    if (options?.schoolId) {
+      constraints.push(where('schoolId', '==', options.schoolId));
+    }
+    const safeLimit = Math.min(Math.max(options?.limitCount ?? REALTIME_LISTENER_LIMIT, 1), 50);
+    constraints.push(orderBy('updatedAt', 'desc'), limit(safeLimit));
     return onSnapshot(
-      collection(db, TEACHERS_COL),
+      query(collection(db, TEACHERS_COL), ...constraints),
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Teachers subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, TEACHERS_COL);
       }
     );
   } catch (err) {
@@ -959,6 +1597,7 @@ export function subscribeToTeachers(onUpdate: (teachers: any[]) => void): Unsubs
 export async function saveStudentToFirestore(
   student: StudentRegistrationData | AdminStudent | DirectorStudent | Record<string, any>
 ): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const nomeCompleto =
       (student as any).nomeCompleto ||
@@ -990,7 +1629,15 @@ export async function saveStudentToFirestore(
     const cleanStudent = stripNestedRegistrationData(student as any);
     const flatReg = extractFlatRegistrationData(cleanStudent) || {};
     const { registrationData: _omitStReg, ...studentRoot } = cleanStudent;
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, STUDENTS_COL, id);
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
     await setDoc(
       ref,
       cleanObject({
@@ -1002,12 +1649,16 @@ export async function saveStudentToFirestore(
         schoolId,
         turma,
         classe,
-        updatedAt: new Date().toISOString(),
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
       }),
       { merge: true }
     );
+    if (isNew) {
+      incrementDashboardStats({ totalStudents: 1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar aluno no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, STUDENTS_COL);
   }
 }
 
@@ -1016,56 +1667,95 @@ export async function deleteStudentFromFirestore(studentId: string): Promise<voi
     const docId = sanitizeDocId(studentId);
     if (!docId) return;
     addEntityTombstone(STUDENTS_COL, docId);
-    await deleteDoc(doc(db, STUDENTS_COL, docId));
+    if (isFirestoreWriteQuotaExhausted()) return;
+    const ref = doc(db, STUDENTS_COL, docId);
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        existed = snap.exists();
+      } catch {}
+    }
+    await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({ totalStudents: -1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar aluno no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, STUDENTS_COL);
   }
 }
 
 export async function clearAllStudentsFromFirestore(): Promise<number> {
+  if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
-    const snapshot = await getDocs(collection(db, STUDENTS_COL));
-    const batch = writeBatch(db);
-    let count = 0;
-    snapshot.forEach((d) => {
-      addEntityTombstone(STUDENTS_COL, d.id);
-      batch.delete(d.ref);
-      count++;
-    });
-    if (count > 0) await batch.commit();
-    return count;
+    let totalDeleted = 0;
+    while (true) {
+      const snapshot = await getDocs(
+        query(collection(db, STUDENTS_COL), orderBy('updatedAt', 'desc'), limit(50))
+      );
+      if (snapshot.empty) break;
+      const batch = writeBatch(db);
+      snapshot.forEach((d) => {
+        addEntityTombstone(STUDENTS_COL, d.id);
+        batch.delete(d.ref);
+        totalDeleted++;
+      });
+      await batch.commit();
+      if (snapshot.size < 50) break;
+    }
+    if (totalDeleted > 0) {
+      incrementDashboardStats({ totalStudents: -totalDeleted }).catch(() => {});
+    }
+    return totalDeleted;
   } catch (error) {
-    console.warn('[Firestore] Erro ao limpar alunos no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, STUDENTS_COL);
     return 0;
   }
 }
 
-export async function fetchStudentsFromFirestore(): Promise<any[]> {
+export async function fetchStudentsFromFirestore(options?: {
+  schoolId?: string;
+  limitCount?: number;
+}): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, STUDENTS_COL));
+    const constraints: QueryConstraint[] = [];
+    if (options?.schoolId) {
+      constraints.push(where('schoolId', '==', options.schoolId));
+    }
+    const safeLimit = Math.min(Math.max(options?.limitCount ?? PAGINATION_PAGE_SIZE, 1), 50);
+    constraints.push(orderBy('updatedAt', 'desc'), limit(safeLimit));
+    const snapshot = await getDocs(query(collection(db, STUDENTS_COL), ...constraints));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, STUDENTS_COL);
     return [];
   }
 }
 
-export function subscribeToStudents(onUpdate: (students: any[]) => void): Unsubscribe {
+export function subscribeToStudents(
+  onUpdate: (students: any[]) => void,
+  options?: { schoolId?: string; limitCount?: number }
+): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
+    const constraints: QueryConstraint[] = [];
+    if (options?.schoolId) {
+      constraints.push(where('schoolId', '==', options.schoolId));
+    }
+    const safeLimit = Math.min(Math.max(options?.limitCount ?? REALTIME_LISTENER_LIMIT, 1), 50);
+    constraints.push(orderBy('updatedAt', 'desc'), limit(safeLimit));
     return onSnapshot(
-      collection(db, STUDENTS_COL),
+      query(collection(db, STUDENTS_COL), ...constraints),
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Students subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, STUDENTS_COL);
       }
     );
   } catch (err) {
@@ -1081,6 +1771,7 @@ export function subscribeToStudents(onUpdate: (students: any[]) => void): Unsubs
 export async function saveDirectorToFirestore(
   director: AdminDirector | DirectorRegistrationData | Record<string, any>
 ): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const rawName = (director as any).nomeCompleto || (director as any).name || (director as any).registrationData?.nomeCompleto || '';
     const id = sanitizeDocId(director.id || rawName);
@@ -1089,7 +1780,15 @@ export async function saveDirectorToFirestore(
     if (director.id) removeEntityTombstone(DIRECTORS_COL, String(director.id));
     if (rawName) removeEntityTombstone(DIRECTORS_COL, String(rawName));
     const cleanDirector = stripNestedRegistrationData(director as any);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, DIRECTORS_COL, id);
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
     await setDoc(
       ref,
       cleanObject({
@@ -1097,12 +1796,16 @@ export async function saveDirectorToFirestore(
         id,
         name: rawName || (cleanDirector as any).name,
         nomeCompleto: rawName || (cleanDirector as any).nomeCompleto,
-        updatedAt: new Date().toISOString(),
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
       }),
       { merge: true }
     );
+    if (isNew) {
+      incrementDashboardStats({ totalDirectors: 1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar diretor no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, DIRECTORS_COL);
   }
 }
 
@@ -1111,25 +1814,41 @@ export async function deleteDirectorFromFirestore(directorId: string): Promise<v
     const docId = sanitizeDocId(directorId);
     if (!docId) return;
     addEntityTombstone(DIRECTORS_COL, docId);
-    await deleteDoc(doc(db, DIRECTORS_COL, docId));
+    if (isFirestoreWriteQuotaExhausted()) return;
+    const ref = doc(db, DIRECTORS_COL, docId);
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        existed = snap.exists();
+      } catch {}
+    }
+    await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({ totalDirectors: -1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar diretor no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, DIRECTORS_COL);
   }
 }
 
 export function subscribeToDirectors(onUpdate: (directors: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, DIRECTORS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Directors subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, DIRECTORS_COL);
       }
     );
   } catch (err) {
@@ -1144,11 +1863,11 @@ export async function saveDmeStaffToFirestore(staff: Record<string, any>): Promi
     const id = sanitizeDocId(staff.id || staff.email || staff.role);
     if (!id) return;
     removeEntityTombstone(DME_STAFF_COL, id);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, DME_STAFF_COL, id);
-    await setDoc(ref, cleanObject({ ...staff, id, updatedAt: new Date().toISOString() }), { merge: true });
+    await setDoc(ref, cleanObject({ ...staff, id, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true });
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar membro DME no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, DME_STAFF_COL);
   }
 }
 
@@ -1160,24 +1879,46 @@ export async function deleteDmeStaffFromFirestore(staffId: string): Promise<void
     if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, DME_STAFF_COL, docId));
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao eliminar membro DME no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, DME_STAFF_COL);
+  }
+}
+
+export async function fetchDmeStaffFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, DME_STAFF_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, DME_STAFF_COL);
+    return [];
   }
 }
 
 export function subscribeToDmeStaff(onUpdate: (staff: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, DME_STAFF_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] DME Staff subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, DME_STAFF_COL);
       }
     );
   } catch (err) {
@@ -1191,6 +1932,7 @@ export function subscribeToDmeStaff(onUpdate: (staff: any[]) => void): Unsubscri
 // ============================================================================
 
 export async function saveStaffToFirestore(staffMember: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const id = sanitizeDocId(
       staffMember.id || staffMember.bi || staffMember.agente || staffMember.nomeCompleto || staffMember.name
@@ -1201,7 +1943,15 @@ export async function saveStaffToFirestore(staffMember: Record<string, any>): Pr
     const funcao = staffMember.funcao || staffMember.role || staffMember.cargo || 'Administrativo / Apoio';
     const schoolName =
       staffMember.schoolName || staffMember.escola || staffMember.nomeEscola || 'Direcção Municipal de Educação';
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, STAFF_COL, id);
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
     await setDoc(
       ref,
       cleanObject({
@@ -1211,12 +1961,16 @@ export async function saveStaffToFirestore(staffMember: Record<string, any>): Pr
         name: nomeCompleto,
         funcao,
         schoolName,
-        updatedAt: new Date().toISOString(),
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
       }),
       { merge: true }
     );
+    if (isNew) {
+      incrementDashboardStats({ totalStaff: 1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar funcionário no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, STAFF_COL);
   }
 }
 
@@ -1225,21 +1979,39 @@ export async function deleteStaffFromFirestore(staffId: string): Promise<void> {
     const docId = sanitizeDocId(staffId);
     if (!docId) return;
     addEntityTombstone(STAFF_COL, docId);
-    await deleteDoc(doc(db, STAFF_COL, docId));
+    if (isFirestoreWriteQuotaExhausted()) return;
+    const ref = doc(db, STAFF_COL, docId);
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        existed = snap.exists();
+      } catch {}
+    }
+    await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({ totalStaff: -1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar funcionário no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, STAFF_COL);
   }
 }
 
-export async function fetchStaffFromFirestore(): Promise<any[]> {
+export async function fetchStaffFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, STAFF_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, STAFF_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, STAFF_COL);
     return [];
   }
 }
@@ -1247,16 +2019,20 @@ export async function fetchStaffFromFirestore(): Promise<any[]> {
 export function subscribeToStaff(onUpdate: (staff: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, STAFF_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Staff subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, STAFF_COL);
       }
     );
   } catch (err) {
@@ -1267,9 +2043,10 @@ export function subscribeToStaff(onUpdate: (staff: any[]) => void): Unsubscribe 
 
 // High-capacity chunked batch writers (supports thousands of records in chunks of 450)
 export async function saveBatchStudentsToFirestore(students: Record<string, any>[]): Promise<number> {
-  if (!Array.isArray(students) || students.length === 0) return 0;
+  if (!Array.isArray(students) || students.length === 0 || isFirestoreWriteQuotaExhausted()) return 0;
   let saved = 0;
   const CHUNK_SIZE = 450;
+  const { nowTs, nowIso } = resolveNowTimestamp();
   for (let i = 0; i < students.length; i += CHUNK_SIZE) {
     const chunk = students.slice(i, i + CHUNK_SIZE);
     const batch = writeBatch(db);
@@ -1291,7 +2068,8 @@ export async function saveBatchStudentsToFirestore(students: Record<string, any>
           schoolId,
           turma,
           classe,
-          updatedAt: new Date().toISOString(),
+          _updatedAt: nowTs,
+          updatedAt: nowIso,
         }),
         { merge: true }
       );
@@ -1299,13 +2077,17 @@ export async function saveBatchStudentsToFirestore(students: Record<string, any>
     });
     await batch.commit();
   }
+  if (saved > 0) {
+    refreshDashboardStatsFromServerCounts().catch(() => {});
+  }
   return saved;
 }
 
 export async function saveBatchTeachersToFirestore(teachers: Record<string, any>[]): Promise<number> {
-  if (!Array.isArray(teachers) || teachers.length === 0) return 0;
+  if (!Array.isArray(teachers) || teachers.length === 0 || isFirestoreWriteQuotaExhausted()) return 0;
   let saved = 0;
   const CHUNK_SIZE = 450;
+  const { nowTs, nowIso } = resolveNowTimestamp();
   for (let i = 0; i < teachers.length; i += CHUNK_SIZE) {
     const chunk = teachers.slice(i, i + CHUNK_SIZE);
     const batch = writeBatch(db);
@@ -1313,18 +2095,26 @@ export async function saveBatchTeachersToFirestore(teachers: Record<string, any>
       const id = sanitizeDocId(teacher.id || teacher.nomeCompleto || teacher.name);
       if (!id) return;
       const ref = doc(db, TEACHERS_COL, id);
-      batch.set(ref, cleanObject({ ...teacher, id, updatedAt: new Date().toISOString() }), { merge: true });
+      batch.set(
+        ref,
+        cleanObject({ ...teacher, id, _updatedAt: nowTs, updatedAt: nowIso }),
+        { merge: true }
+      );
       saved++;
     });
     await batch.commit();
+  }
+  if (saved > 0) {
+    refreshDashboardStatsFromServerCounts().catch(() => {});
   }
   return saved;
 }
 
 export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]): Promise<number> {
-  if (!Array.isArray(staffList) || staffList.length === 0) return 0;
+  if (!Array.isArray(staffList) || staffList.length === 0 || isFirestoreWriteQuotaExhausted()) return 0;
   let saved = 0;
   const CHUNK_SIZE = 450;
+  const { nowTs, nowIso } = resolveNowTimestamp();
   for (let i = 0; i < staffList.length; i += CHUNK_SIZE) {
     const chunk = staffList.slice(i, i + CHUNK_SIZE);
     const batch = writeBatch(db);
@@ -1347,13 +2137,17 @@ export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]
           name: nomeCompleto,
           funcao,
           schoolName,
-          updatedAt: new Date().toISOString(),
+          _updatedAt: nowTs,
+          updatedAt: nowIso,
         }),
         { merge: true }
       );
       saved++;
     });
     await batch.commit();
+  }
+  if (saved > 0) {
+    refreshDashboardStatsFromServerCounts().catch(() => {});
   }
   return saved;
 }
@@ -1363,14 +2157,30 @@ export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]
 // ============================================================================
 
 export async function saveEfectividadeToFirestore(record: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(record.id || record.bi || record.agente);
     if (!docId) return;
     removeEntityTombstone(EFECTIVIDADE_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, EFECTIVIDADE_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
+    if (isNew) {
+      incrementDashboardStats({ totalEfectividade: 1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar efectividade no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, EFECTIVIDADE_COL);
   }
 }
 
@@ -1379,39 +2189,67 @@ export async function deleteEfectividadeFromFirestore(id: string): Promise<void>
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(EFECTIVIDADE_COL, docId);
-    await deleteDoc(doc(db, EFECTIVIDADE_COL, docId));
+    if (isFirestoreWriteQuotaExhausted()) return;
+    const ref = doc(db, EFECTIVIDADE_COL, docId);
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        existed = snap.exists();
+      } catch {}
+    }
+    await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({ totalEfectividade: -1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar efectividade no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, EFECTIVIDADE_COL);
   }
 }
 
 export async function clearAllEfectividadeFromFirestore(): Promise<number> {
+  if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
-    const snapshot = await getDocs(collection(db, EFECTIVIDADE_COL));
-    const batch = writeBatch(db);
-    let count = 0;
-    snapshot.forEach((d) => {
-      addEntityTombstone(EFECTIVIDADE_COL, d.id);
-      batch.delete(d.ref);
-      count++;
-    });
-    if (count > 0) await batch.commit();
-    return count;
+    let totalDeleted = 0;
+    while (true) {
+      const snapshot = await getDocs(
+        query(collection(db, EFECTIVIDADE_COL), orderBy('updatedAt', 'desc'), limit(50))
+      );
+      if (snapshot.empty) break;
+      const batch = writeBatch(db);
+      snapshot.forEach((d) => {
+        addEntityTombstone(EFECTIVIDADE_COL, d.id);
+        batch.delete(d.ref);
+        totalDeleted++;
+      });
+      await batch.commit();
+      if (snapshot.size < 50) break;
+    }
+    if (totalDeleted > 0) {
+      incrementDashboardStats({ totalEfectividade: -totalDeleted }).catch(() => {});
+    }
+    return totalDeleted;
   } catch (error) {
-    console.warn('[Firestore] Erro ao esvaziar efectividade no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, EFECTIVIDADE_COL);
     return 0;
   }
 }
 
-export async function fetchEfectividadeFromFirestore(): Promise<any[]> {
+export async function fetchEfectividadeFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, EFECTIVIDADE_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, EFECTIVIDADE_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, EFECTIVIDADE_COL);
     return [];
   }
 }
@@ -1419,16 +2257,20 @@ export async function fetchEfectividadeFromFirestore(): Promise<any[]> {
 export function subscribeToEfectividade(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, EFECTIVIDADE_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Efectividade subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, EFECTIVIDADE_COL);
       }
     );
   } catch (err) {
@@ -1442,14 +2284,30 @@ export function subscribeToEfectividade(onUpdate: (records: any[]) => void): Uns
 // ============================================================================
 
 export async function saveDeclaracaoServicoToFirestore(record: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(record.id || record.ref || record.bi || record.agente);
     if (!docId) return;
     removeEntityTombstone(DECLARACAO_SERVICO_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, DECLARACAO_SERVICO_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+    let isNew = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        isNew = !snap.exists();
+      } catch {}
+    }
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
+    if (isNew) {
+      incrementDashboardStats({ totalDeclaracaoServico: 1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar Declaração de Serviço no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, DECLARACAO_SERVICO_COL);
   }
 }
 
@@ -1458,39 +2316,67 @@ export async function deleteDeclaracaoServicoFromFirestore(id: string): Promise<
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(DECLARACAO_SERVICO_COL, docId);
-    await deleteDoc(doc(db, DECLARACAO_SERVICO_COL, docId));
+    if (isFirestoreWriteQuotaExhausted()) return;
+    const ref = doc(db, DECLARACAO_SERVICO_COL, docId);
+    let existed = false;
+    if (!isFirestoreReadQuotaExhausted()) {
+      try {
+        const snap = await getDoc(ref);
+        existed = snap.exists();
+      } catch {}
+    }
+    await deleteDoc(ref);
+    if (existed) {
+      incrementDashboardStats({ totalDeclaracaoServico: -1 }).catch(() => {});
+    }
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar Declaração de Serviço no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, DECLARACAO_SERVICO_COL);
   }
 }
 
 export async function clearAllDeclaracaoServicoFromFirestore(): Promise<number> {
+  if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
-    const snapshot = await getDocs(collection(db, DECLARACAO_SERVICO_COL));
-    const batch = writeBatch(db);
-    let count = 0;
-    snapshot.forEach((d) => {
-      addEntityTombstone(DECLARACAO_SERVICO_COL, d.id);
-      batch.delete(d.ref);
-      count++;
-    });
-    if (count > 0) await batch.commit();
-    return count;
+    let totalDeleted = 0;
+    while (true) {
+      const snapshot = await getDocs(
+        query(collection(db, DECLARACAO_SERVICO_COL), orderBy('updatedAt', 'desc'), limit(50))
+      );
+      if (snapshot.empty) break;
+      const batch = writeBatch(db);
+      snapshot.forEach((d) => {
+        addEntityTombstone(DECLARACAO_SERVICO_COL, d.id);
+        batch.delete(d.ref);
+        totalDeleted++;
+      });
+      await batch.commit();
+      if (snapshot.size < 50) break;
+    }
+    if (totalDeleted > 0) {
+      incrementDashboardStats({ totalDeclaracaoServico: -totalDeleted }).catch(() => {});
+    }
+    return totalDeleted;
   } catch (error) {
-    console.warn('[Firestore] Erro ao esvaziar Declaração de Serviço no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, DECLARACAO_SERVICO_COL);
     return 0;
   }
 }
 
-export async function fetchDeclaracaoServicoFromFirestore(): Promise<any[]> {
+export async function fetchDeclaracaoServicoFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, DECLARACAO_SERVICO_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, DECLARACAO_SERVICO_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, DECLARACAO_SERVICO_COL);
     return [];
   }
 }
@@ -1498,16 +2384,20 @@ export async function fetchDeclaracaoServicoFromFirestore(): Promise<any[]> {
 export function subscribeToDeclaracaoServico(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, DECLARACAO_SERVICO_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Declaração de Serviço subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, DECLARACAO_SERVICO_COL);
       }
     );
   } catch (err) {
@@ -1528,27 +2418,54 @@ export async function saveMiniPautaToFirestore(record: Record<string, any>): Pro
       .toLowerCase();
     const docId = sanitizeDocId(record.id || key);
     if (!docId) return;
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, GRADES_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar mini-pauta no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, GRADES_COL);
+  }
+}
+
+export async function fetchMiniPautasFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, GRADES_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, GRADES_COL);
+    return [];
   }
 }
 
 export function subscribeToMiniPautas(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, GRADES_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Grades/MiniPautas subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, GRADES_COL);
       }
     );
   } catch (err) {
@@ -1565,14 +2482,20 @@ export async function saveAttendanceToFirestore(
   record: Record<string, any>,
   kind: 'student' | 'teacher'
 ): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const targetId = kind === 'student' ? record.studentId : record.teacherId;
     const docId = sanitizeDocId(`${kind}_${targetId}_${record.date}`);
     if (!docId) return;
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, ATTENDANCE_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, attendanceKind: kind, docId }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...record, attendanceKind: kind, docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar presença no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ATTENDANCE_COL);
   }
 }
 
@@ -1580,36 +2503,65 @@ export async function saveBatchAttendanceToFirestore(
   records: Record<string, any>[],
   kind: 'student' | 'teacher'
 ): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     if (!Array.isArray(records) || records.length === 0) return;
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const batch = writeBatch(db);
     records.forEach((record) => {
       const targetId = kind === 'student' ? record.studentId : record.teacherId;
       const docId = sanitizeDocId(`${kind}_${targetId}_${record.date}`);
       if (docId) {
         const ref = doc(db, ATTENDANCE_COL, docId);
-        batch.set(ref, cleanObject({ ...record, attendanceKind: kind, docId }), { merge: true });
+        batch.set(
+          ref,
+          cleanObject({ ...record, attendanceKind: kind, docId, _updatedAt: nowTs, updatedAt: nowIso }),
+          { merge: true }
+        );
       }
     });
     await batch.commit();
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar lote de presenças no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ATTENDANCE_COL);
+  }
+}
+
+export async function fetchAttendanceFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, ATTENDANCE_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, ATTENDANCE_COL);
+    return [];
   }
 }
 
 export function subscribeToAttendance(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, ATTENDANCE_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Attendance subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, ATTENDANCE_COL);
       }
     );
   } catch (err) {
@@ -1628,11 +2580,15 @@ export async function saveAnnouncementToFirestore(announcement: SchoolAnnounceme
     const docId = sanitizeDocId(announcement.id);
     if (!docId) return;
     removeEntityTombstone(ANNOUNCEMENTS_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, ANNOUNCEMENTS_COL, docId);
-    await setDoc(ref, cleanObject(announcement), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...announcement, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar anúncio no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ANNOUNCEMENTS_COL);
   }
 }
 
@@ -1644,24 +2600,27 @@ export async function deleteAnnouncementFromFirestore(id: string): Promise<void>
     if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, ANNOUNCEMENTS_COL, docId));
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao eliminar anúncio no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, ANNOUNCEMENTS_COL);
   }
 }
 
 export function subscribeToAnnouncements(onUpdate: (list: SchoolAnnouncement[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, ANNOUNCEMENTS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: SchoolAnnouncement[] = [];
         snapshot.forEach((d) => list.push(d.data() as SchoolAnnouncement));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Announcements subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, ANNOUNCEMENTS_COL);
       }
     );
   } catch (err) {
@@ -1676,11 +2635,11 @@ export async function saveRoomToFirestore(room: DirectorRoom): Promise<void> {
     const docId = sanitizeDocId(room.id || room.roomNumber);
     if (!docId) return;
     removeEntityTombstone(ROOMS_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, ROOMS_COL, docId);
-    await setDoc(ref, cleanObject(room), { merge: true });
+    await setDoc(ref, cleanObject({ ...room, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true });
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar sala no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ROOMS_COL);
   }
 }
 
@@ -1692,24 +2651,27 @@ export async function deleteRoomFromFirestore(id: string): Promise<void> {
     if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, ROOMS_COL, docId));
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao eliminar sala no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, ROOMS_COL);
   }
 }
 
 export function subscribeToRooms(onUpdate: (list: DirectorRoom[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, ROOMS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: DirectorRoom[] = [];
         snapshot.forEach((d) => list.push(d.data() as DirectorRoom));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Rooms subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, ROOMS_COL);
       }
     );
   } catch (err) {
@@ -1724,11 +2686,11 @@ export async function saveClassToFirestore(cls: DirectorClass): Promise<void> {
     const docId = sanitizeDocId(cls.id || cls.name);
     if (!docId) return;
     removeEntityTombstone(CLASSES_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, CLASSES_COL, docId);
-    await setDoc(ref, cleanObject(cls), { merge: true });
+    await setDoc(ref, cleanObject({ ...cls, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true });
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar classe no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, CLASSES_COL);
   }
 }
 
@@ -1740,24 +2702,27 @@ export async function deleteClassFromFirestore(id: string): Promise<void> {
     if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, CLASSES_COL, docId));
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao eliminar classe no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, CLASSES_COL);
   }
 }
 
 export function subscribeToClasses(onUpdate: (list: DirectorClass[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, CLASSES_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: DirectorClass[] = [];
         snapshot.forEach((d) => list.push(d.data() as DirectorClass));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Classes subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, CLASSES_COL);
       }
     );
   } catch (err) {
@@ -1771,27 +2736,35 @@ export async function saveChatMessageToFirestore(message: ChatMessage): Promise<
   try {
     const docId = sanitizeDocId(message.id);
     if (!docId) return;
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, CHAT_MESSAGES_COL, docId);
-    await setDoc(ref, cleanObject(message), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...message, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar mensagem de chat no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, CHAT_MESSAGES_COL);
   }
 }
 
 export function subscribeToChatMessages(onUpdate: (list: ChatMessage[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, CHAT_MESSAGES_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: ChatMessage[] = [];
         snapshot.forEach((d) => list.push(d.data() as ChatMessage));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] ChatMessages subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, CHAT_MESSAGES_COL);
       }
     );
   } catch (err) {
@@ -1805,14 +2778,20 @@ export function subscribeToChatMessages(onUpdate: (list: ChatMessage[]) => void)
 // ============================================================================
 
 export async function saveGuiaFeriasToFirestore(record: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(record.id || `${record.ng || ''}_${record.ang || ''}_${record.agente || ''}`);
     if (!docId) return;
     removeEntityTombstone(GUIAS_FERIAS_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, GUIAS_FERIAS_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    console.warn('[Firestore] Erro ao gravar Guia de Férias no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, GUIAS_FERIAS_COL);
   }
 }
 
@@ -1821,21 +2800,28 @@ export async function deleteGuiaFeriasFromFirestore(id: string): Promise<void> {
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(GUIAS_FERIAS_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, GUIAS_FERIAS_COL, docId));
   } catch (error) {
-    console.warn('[Firestore] Erro ao eliminar Guia de Férias no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, GUIAS_FERIAS_COL);
   }
 }
 
-export async function fetchGuiasFeriasFromFirestore(): Promise<any[]> {
+export async function fetchGuiasFeriasFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, GUIAS_FERIAS_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, GUIAS_FERIAS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, GUIAS_FERIAS_COL);
     return [];
   }
 }
@@ -1843,16 +2829,20 @@ export async function fetchGuiasFeriasFromFirestore(): Promise<any[]> {
 export function subscribeToGuiasFerias(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, GUIAS_FERIAS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Guias de Férias subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, GUIAS_FERIAS_COL);
       }
     );
   } catch (err) {
@@ -1867,11 +2857,15 @@ export async function saveGuiaColocacaoToFirestore(record: Record<string, any>):
     const docId = sanitizeDocId(record.id || `${record.num || ''}_${record.ano || ''}_${record.agente || ''}`);
     if (!docId) return;
     removeEntityTombstone(GUIAS_COLOCACAO_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, GUIAS_COLOCACAO_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar Guia de Colocação no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, GUIAS_COLOCACAO_COL);
   }
 }
 
@@ -1883,20 +2877,25 @@ export async function deleteGuiaColocacaoFromFirestore(id: string): Promise<void
     if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, GUIAS_COLOCACAO_COL, docId));
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao eliminar Guia de Colocação no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, GUIAS_COLOCACAO_COL);
   }
 }
 
-export async function fetchGuiasColocacaoFromFirestore(): Promise<any[]> {
+export async function fetchGuiasColocacaoFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, GUIAS_COLOCACAO_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, GUIAS_COLOCACAO_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, GUIAS_COLOCACAO_COL);
     return [];
   }
 }
@@ -1904,16 +2903,20 @@ export async function fetchGuiasColocacaoFromFirestore(): Promise<any[]> {
 export function subscribeToGuiasColocacao(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, GUIAS_COLOCACAO_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Guias de Colocação subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, GUIAS_COLOCACAO_COL);
       }
     );
   } catch (err) {
@@ -1928,11 +2931,15 @@ export async function saveFichaAvaliacaoToFirestore(record: Record<string, any>)
     const docId = sanitizeDocId(record.id || `${record.agente || ''}_${record.dataAval || ''}`);
     if (!docId) return;
     removeEntityTombstone(FICHAS_AVALIACAO_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, FICHAS_AVALIACAO_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar Ficha de Avaliação no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, FICHAS_AVALIACAO_COL);
   }
 }
 
@@ -1944,20 +2951,25 @@ export async function deleteFichaAvaliacaoFromFirestore(id: string): Promise<voi
     if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, FICHAS_AVALIACAO_COL, docId));
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao eliminar Ficha de Avaliação no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, FICHAS_AVALIACAO_COL);
   }
 }
 
-export async function fetchFichasAvaliacaoFromFirestore(): Promise<any[]> {
+export async function fetchFichasAvaliacaoFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, FICHAS_AVALIACAO_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, FICHAS_AVALIACAO_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, FICHAS_AVALIACAO_COL);
     return [];
   }
 }
@@ -1965,16 +2977,20 @@ export async function fetchFichasAvaliacaoFromFirestore(): Promise<any[]> {
 export function subscribeToFichasAvaliacao(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, FICHAS_AVALIACAO_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Fichas de Avaliação subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, FICHAS_AVALIACAO_COL);
       }
     );
   } catch (err) {
@@ -1989,11 +3005,15 @@ export async function saveCadastroDocenteToFirestore(record: Record<string, any>
     const docId = sanitizeDocId(record.id || `${record.numNota || ''}_${record.bi || ''}_${record.nome || ''}`);
     if (!docId) return;
     removeEntityTombstone(CADASTRO_DOCENTE_COL, docId);
+    const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, CADASTRO_DOCENTE_COL, docId);
-    await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
+    );
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao gravar Cadastro Docente no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, CADASTRO_DOCENTE_COL);
   }
 }
 
@@ -2005,20 +3025,25 @@ export async function deleteCadastroDocenteFromFirestore(id: string): Promise<vo
     if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, CADASTRO_DOCENTE_COL, docId));
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error, 'write');
-    console.warn('[Firestore] Erro ao eliminar Cadastro Docente no Firestore:', error);
+    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, CADASTRO_DOCENTE_COL);
   }
 }
 
-export async function fetchCadastroDocenteFromFirestore(): Promise<any[]> {
+export async function fetchCadastroDocenteFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const snapshot = await getDocs(collection(db, CADASTRO_DOCENTE_COL));
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, CADASTRO_DOCENTE_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err, 'read');
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, CADASTRO_DOCENTE_COL);
     return [];
   }
 }
@@ -2026,16 +3051,20 @@ export async function fetchCadastroDocenteFromFirestore(): Promise<any[]> {
 export function subscribeToCadastroDocente(onUpdate: (records: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, CADASTRO_DOCENTE_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const list: any[] = [];
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Cadastro Docente subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, CADASTRO_DOCENTE_COL);
       }
     );
   } catch (err) {
@@ -2047,8 +3076,13 @@ export function subscribeToCadastroDocente(onUpdate: (records: any[]) => void): 
 export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    return onSnapshot(
+    const q = query(
       collection(db, TOMBSTONES_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
       (snapshot) => {
         const keys: string[] = [];
         snapshot.forEach((d) => {
@@ -2062,8 +3096,7 @@ export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsub
         onUpdate(keys);
       },
       (err) => {
-        markFirestoreQuotaIfExhausted(err, 'read');
-        console.warn('[Firestore] Tombstones subscription error:', err);
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, TOMBSTONES_COL);
       }
     );
   } catch (err) {
@@ -2073,11 +3106,18 @@ export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsub
 }
 
 // ============================================================================
-// 12. GLOBAL REAL-TIME UNIFIED DATABASE ORCHESTRATOR
-// Synchronizes and unifies all collections between Firestore, localStorage, and Backend
+// 12. VIEW-SCOPED REAL-TIME DATABASE ORCHESTRATOR
+// Synchronizes ONLY active view collections (Rule 1, 2, 3, 5) with clean teardowns
 // ============================================================================
 
+export interface RealtimeSyncScope {
+  view?: string;
+  role?: string;
+  schoolId?: string;
+}
+
 let globalRealtimeUnsubscribe: (() => void) | null = null;
+let activeRealtimeScopeKey: string | null = null;
 
 function safeReadJsonArray<T = any>(key: string): T[] {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
@@ -2110,1130 +3150,1065 @@ function safeWriteJsonIfChanged(key: string, data: any): boolean {
   }
 }
 
-export function initUnifiedRealtimeDatabaseSync(): () => void {
-  if (typeof window === 'undefined') return () => {};
-  if (isFirestoreReadQuotaExhausted()) return () => {};
-  if (globalRealtimeUnsubscribe) {
-    return globalRealtimeUnsubscribe;
+function resolveScopeCollections(scope?: RealtimeSyncScope): Set<string> {
+  const view = String(scope?.view || 'admin-dashboard').toLowerCase();
+  const role = String(scope?.role || 'admin').toLowerCase();
+  const active = new Set<string>(['tombstones']);
+
+  if (view.includes('dashboard') || view === 'overview' || view === 'home') {
+    active.add('announcements');
+    if (role === 'admin' || role === 'director' || role === 'diretor') {
+      active.add('applications_pending');
+      active.add('quickRequests_active');
+    }
+    if (role === 'admin') {
+      active.add('schools');
+    }
+  } else if (view.includes('approvals') || view.includes('aprovac') || view.includes('inscric')) {
+    active.add('applications_pending');
+    active.add('users_pending');
+  } else if (view.includes('schools') || view.includes('escola')) {
+    active.add('schools');
+    active.add('directors');
+  } else if (view.includes('directors') || view.includes('directores') || view.includes('diretores')) {
+    active.add('directors');
+    active.add('dme_staff');
+    active.add('schools');
+  } else if (view.includes('teachers') || view.includes('professor')) {
+    active.add('teachers');
+    active.add('schools');
+  } else if (view.includes('students') || view.includes('aluno')) {
+    active.add('students');
+    active.add('schools');
+  } else if (view.includes('staff') || view.includes('funcionar')) {
+    active.add('staff');
+    active.add('schools');
+  } else if (view.includes('efectividade')) {
+    active.add('efectividade');
+    active.add('schools');
+  } else if (view.includes('declaracao')) {
+    active.add('declaracao_servico');
+  } else if (view.includes('cadastro-docente') || view.includes('guias') || view.includes('ferias')) {
+    active.add('cadastro_docente');
+    active.add('guias_ferias');
+    active.add('guias_colocacao');
+    active.add('fichas_avaliacao');
+  } else if (view.includes('grades') || view.includes('pauta') || view.includes('analytics')) {
+    active.add('grades');
+    active.add('students');
+  } else if (view.includes('attendance') || view.includes('assiduidade') || view.includes('presenca')) {
+    active.add('attendance');
+  } else if (view.includes('rooms') || view.includes('salas')) {
+    active.add('rooms');
+  } else if (view.includes('classes') || view.includes('turmas')) {
+    active.add('classes');
+  } else if (view.includes('announcements') || view.includes('comunicados') || view.includes('anuncios')) {
+    active.add('announcements');
+  } else if (view.includes('quick-services') || view.includes('servicos')) {
+    active.add('quickRequests_active');
+    active.add('schools');
+  } else if (view.includes('statistics') || view.includes('estatistic')) {
+    active.add('schools');
+  } else {
+    active.add('schools');
   }
 
+  return active;
+}
+
+export function initViewScopedRealtimeSync(scope?: RealtimeSyncScope): () => void {
+  if (typeof window === 'undefined') return () => {};
+  if (isFirestoreReadQuotaExhausted()) return () => {};
+
+  const scopeKey = `${scope?.view || 'default'}::${scope?.role || 'default'}::${scope?.schoolId || 'all'}`;
+  if (globalRealtimeUnsubscribe && activeRealtimeScopeKey === scopeKey) {
+    return globalRealtimeUnsubscribe;
+  }
+  if (globalRealtimeUnsubscribe) {
+    globalRealtimeUnsubscribe();
+  }
+
+  const enabledCols = resolveScopeCollections(scope);
+  const roleLower = String(scope?.role || '').toLowerCase();
+  const scopedSchoolId =
+    roleLower === 'director' || roleLower === 'diretor' || roleLower === 'teacher' || roleLower === 'professor'
+      ? scope?.schoolId
+      : undefined;
   const unsubs: Unsubscribe[] = [];
   const norm = (s?: string) => (s || '').trim().toLowerCase();
-  const pushedMissingKeys = new Set<string>();
-  const shouldPushMissing = (col: string, key: string): boolean => {
-    const token = `${col}::${key}`;
-    if (!key || pushedMissingKeys.has(token)) return false;
-    pushedMissingKeys.add(token);
-    return true;
-  };
 
-  // 0. REAL-TIME TOMBSTONES & BANNED ENTITY PURGE ORCHESTRATION
-  // Union-merge Firestore tombstones with local/server tombstones so neither side overwrites the other
+  // 0. DASHBOARD AGGREGATOR LISTENER (Single doc: stats/dashboard)
   unsubs.push(
-    subscribeToTombstones((cloudTombstoneKeys) => {
+    subscribeToDashboardStats((stats) => {
       try {
-        if (!Array.isArray(cloudTombstoneKeys)) return;
-        const existingLocal = getEntityTombstones();
-        const normalizedUnion = Array.from(
-          new Set(
-            [...existingLocal, ...cloudTombstoneKeys]
-              .filter((k) => typeof k === 'string' && k.trim() !== '' && !k.toLowerCase().includes('socienciadaeduca2018'))
-              .map((k) => k.trim().toLowerCase())
-          )
-        );
-        if (safeWriteJsonIfChanged(DELETED_ENTITIES_KEY, normalizedUnion)) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
+        window.dispatchEvent(new CustomEvent('sigre-dashboard-stats-updated', { detail: { stats } }));
       } catch {}
     })
   );
 
-  // 1. REAL-TIME SCHOOLS UNIFICATION (ucore_admin_schools & sigre_school_registrations)
-  unsubs.push(
-    subscribeToSchools((cloudSchools) => {
-      try {
-        const localAdminSchools = safeReadJsonArray<AdminSchool>('ucore_admin_schools');
-        const localRegSchools = safeReadJsonArray<any>('sigre_school_registrations');
-        const map = new Map<string, AdminSchool>();
-
-        // Push any unsynced local schools to Firestore
-        localAdminSchools.forEach((ls) => {
-          if (!ls || !ls.name || isBannedSchoolOrEntity(ls)) return;
-          const k = norm(ls.id || ls.name);
-          if (isEntityTombstoned(SCHOOLS_COL, ls.id) || isEntityTombstoned(SCHOOLS_COL, ls.name)) return;
-          map.set(k, ls);
-          const inCloud = cloudSchools.some(
-            (cs) => norm(cs.id) === norm(ls.id) || norm(cs.name) === norm(ls.name)
+  // 0B. REAL-TIME TOMBSTONES MERGE (Bounded limit 30)
+  if (enabledCols.has('tombstones')) {
+    unsubs.push(
+      subscribeToTombstones((cloudTombstoneKeys) => {
+        try {
+          if (!Array.isArray(cloudTombstoneKeys)) return;
+          const existingLocal = getEntityTombstones();
+          const normalizedUnion = Array.from(
+            new Set(
+              [...existingLocal, ...cloudTombstoneKeys]
+                .filter((k) => typeof k === 'string' && k.trim() !== '' && !k.toLowerCase().includes('socienciadaeduca2018'))
+                .map((k) => k.trim().toLowerCase())
+            )
           );
-          if (!inCloud && shouldPushMissing(SCHOOLS_COL, k)) {
-            saveSchoolToFirestore(ls).catch(() => {});
+          if (safeWriteJsonIfChanged(DELETED_ENTITIES_KEY, normalizedUnion)) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        });
+        } catch {}
+      })
+    );
+  }
 
-        // Also ensure schools registered in sigre_school_registrations are represented
-        localRegSchools.forEach((reg) => {
-          if (!reg || !reg.nomeOficial || isBannedSchoolOrEntity(reg)) return;
-          if (isEntityTombstoned(SCHOOLS_COL, reg.id) || isEntityTombstoned(SCHOOLS_COL, reg.nomeOficial)) return;
-          const matchKey =
-            Array.from(map.keys()).find((k) => {
-              const item = map.get(k);
-              return item && (norm(item.id) === norm(reg.id) || norm(item.name) === norm(reg.nomeOficial));
-            }) || norm(reg.id || reg.nomeOficial);
-          const existing = map.get(matchKey);
-          if (existing) {
-            if (!existing.registrationData) {
-              map.set(matchKey, { ...existing, registrationData: reg });
+  // 1. REAL-TIME SCHOOLS UNIFICATION (Bounded)
+  if (enabledCols.has('schools')) {
+    unsubs.push(
+      subscribeToSchools((cloudSchools) => {
+        try {
+          const localAdminSchools = safeReadJsonArray<AdminSchool>('ucore_admin_schools');
+          const localRegSchools = safeReadJsonArray<any>('sigre_school_registrations');
+          const map = new Map<string, AdminSchool>();
+
+          localAdminSchools.forEach((ls) => {
+            if (
+              !ls ||
+              !ls.name ||
+              isBannedSchoolOrEntity(ls) ||
+              isPlaceholderSchoolName(ls.name) ||
+              isRetiredDuplicateOrPlaceholderSchoolId(ls.id)
+            ) {
+              return;
             }
-          }
-        });
-
-        // Merge authoritative cloud schools (and delete banned ones from Firestore), comparing timestamps so newest edits win
-        cloudSchools.forEach((cs) => {
-          if (!cs || !cs.name) return;
-          if (isBannedSchoolOrEntity(cs)) {
-            if (cs.id) deleteDoc(doc(db, SCHOOLS_COL, sanitizeDocId(cs.id))).catch(() => {});
-            return;
-          }
-          if (isEntityTombstoned(SCHOOLS_COL, cs.id) || isEntityTombstoned(SCHOOLS_COL, cs.name)) return;
-          const matchKey =
-            Array.from(map.keys()).find((k) => {
-              const item = map.get(k);
-              return item && (norm(item.id) === norm(cs.id) || norm(item.name) === norm(cs.name));
-            }) || norm(cs.id || cs.name);
-          const existing = map.get(matchKey);
-          if (existing) {
-            const eTs = Number((existing as any)._updatedAt || Date.parse((existing as any).updatedAt || '') || 0);
-            const cTs = Number((cs as any)._updatedAt || Date.parse((cs as any).updatedAt || '') || 0);
-            const primary = cTs >= eTs ? cs : existing;
-            const secondary = cTs >= eTs ? existing : cs;
-            map.set(matchKey, {
-              ...secondary,
-              ...primary,
-              registrationData: primary.registrationData || secondary.registrationData,
-            });
-          } else {
-            map.set(matchKey, cs);
-          }
-        });
-
-        const unifiedSchools = Array.from(map.values());
-        const changedSchools = safeWriteJsonIfChanged('ucore_admin_schools', unifiedSchools);
-        safeWriteJsonIfChanged('ucore_registered_schools_v1', unifiedSchools);
-
-        const unifiedRegs = unifiedSchools
-          .map((s) => s.registrationData)
-          .filter(Boolean);
-        safeWriteJsonIfChanged('sigre_school_registrations', unifiedRegs);
-
-        // Mirror unified schools into local Express backend so both stay 100% consistent across containers
-        const validUnifiedSchools = unifiedSchools.filter(
-          (cs) => cs && cs.name && !isBannedSchoolOrEntity(cs) && !isEntityTombstoned(SCHOOLS_COL, cs.id) && !isEntityTombstoned(SCHOOLS_COL, cs.name)
-        );
-        if (
-          isExpressApiAvailable() &&
-          validUnifiedSchools.length > 0 &&
-          (changedSchools || validUnifiedSchools.length !== localAdminSchools.length)
-        ) {
-          fetch('/api/network/schools', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ schools: validUnifiedSchools }),
-          }).catch(() => {});
-        }
-        if (changedSchools) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar escolas:', e);
-      }
-    })
-  );
-
-  // 2. REAL-TIME TEACHERS UNIFICATION (ucore_registered_teachers_v2, ucore_admin_teachers, ucore_director_teachers_v1)
-  unsubs.push(
-    subscribeToTeachers((cloudTeachers) => {
-      try {
-        const localReg = safeReadJsonArray<TeacherRegistrationData>('ucore_registered_teachers_v2');
-        const localAdmin = safeReadJsonArray<AdminTeacher>('ucore_admin_teachers');
-        const localDir = safeReadJsonArray<DirectorTeacher>('ucore_director_teachers_v1');
-
-        const regMap = new Map<string, TeacherRegistrationData>();
-        const adminMap = new Map<string, AdminTeacher>();
-        const dirMap = new Map<string, DirectorTeacher>();
-
-        const ingestTeacherItem = (item: any, fromCloud: boolean) => {
-          if (!item) return;
-          if (isBannedSchoolOrEntity(item)) {
-            if (fromCloud && item.id) {
-              deleteDoc(doc(db, TEACHERS_COL, sanitizeDocId(item.id))).catch(() => {});
-            }
-            return;
-          }
-          const id = String(item.id || item.nomeCompleto || item.name || '').trim();
-          const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
-          if (!id && !name) return;
-          if (isEntityTombstoned(TEACHERS_COL, id) || isEntityTombstoned(TEACHERS_COL, name)) return;
-
-          const schoolName = String(
-            item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua'
-          ).trim();
-          if (isBannedSchoolOrEntity(schoolName)) return;
-
-          const key = norm(id || name);
-          const regData = extractFlatRegistrationData(item) as TeacherRegistrationData | undefined;
-
-          if (regData && regData.nomeCompleto) {
-            regMap.set(key, { ...(regMap.get(key) || {}), ...regData });
-          }
-
-          const existingAdmin = adminMap.get(key);
-          const existingDir = dirMap.get(key);
-          const mergedReg = regMap.get(key) || regData;
-
-          const assignedTurmas =
-            item.assignedTurmas ||
-            mergedReg?.assignedTurmas ||
-            existingDir?.assignedTurmas ||
-            existingAdmin?.assignedTurmas;
-
-          const primaryTurmaEntry = assignedTurmas?.[0];
-
-          const subject = String(
-            item.subject ||
-              primaryTurmaEntry?.subject ||
-              item.disciplinas ||
-              mergedReg?.disciplinas ||
-              existingDir?.subject ||
-              'Língua Portuguesa'
-          );
-          const gradeClass = String(
-            item.gradeClass ||
-              item.primaryGradeClass ||
-              mergedReg?.primaryGradeClass ||
-              primaryTurmaEntry?.gradeClass ||
-              existingDir?.gradeClass ||
-              item.niveisLecciona?.[0]?.nome ||
-              mergedReg?.niveisLecciona?.[0]?.nome ||
-              'Ensino Primário'
-          );
-          const phone = String(item.phone || item.telefone || mergedReg?.telefone || existingDir?.phone || '+244 923 000 000');
-          const email = String(item.email || mergedReg?.email || existingDir?.email || '');
-          const room = String(
-            item.room ||
-              item.primaryRoom ||
-              mergedReg?.primaryRoom ||
-              primaryTurmaEntry?.room ||
-              existingDir?.room ||
-              existingAdmin?.room ||
-              'Sala 01'
-          );
-          const turma = String(
-            item.turma ||
-              item.primaryTurma ||
-              mergedReg?.primaryTurma ||
-              primaryTurmaEntry?.turma ||
-              existingDir?.turma ||
-              existingAdmin?.turma ||
-              'Turma A'
-          );
-
-          const adminObj: AdminTeacher = {
-            id: id || existingAdmin?.id || `prof-${Date.now()}`,
-            name: name,
-            phone,
-            gradeClass,
-            room,
-            turma,
-            category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || existingAdmin?.category || 'Docente / Professor',
-            location: item.location || existingAdmin?.location || `${item.municipioEscola || mergedReg?.municipioEscola || 'Quêssua'}`,
-            schoolName,
-            schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId || existingAdmin?.schoolId,
-            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : (existingAdmin?.presenceRate ?? 100),
-            subject,
-            gender: (item.gender || (item.sexo === 'Feminino' || mergedReg?.sexo === 'Feminino' ? 'F' : 'M')) as 'M' | 'F',
-            qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico || existingAdmin?.qualification,
-            assignedTurmas,
-            registrationData: mergedReg || existingAdmin?.registrationData,
-          };
-          adminMap.set(key, { ...(existingAdmin || {}), ...adminObj });
-
-          const shiftVal = (
-            item.shift ||
-            item.primaryShift ||
-            mergedReg?.primaryShift ||
-            primaryTurmaEntry?.shift ||
-            existingDir?.shift ||
-            (item.turnos?.[0] === 'Tarde' || mergedReg?.turnos?.[0] === 'Tarde' ? 'Tarde' : 'Manhã')
-          ) as 'Manhã' | 'Tarde' | 'Integral';
-
-          const dirObj: DirectorTeacher = {
-            id: adminObj.id,
-            name: adminObj.name,
-            schoolName: adminObj.schoolName,
-            gradeClass: adminObj.gradeClass,
-            room: adminObj.room,
-            turma: adminObj.turma,
-            directorName: item.directorName || existingDir?.directorName || 'Direção Escolar',
-            location: adminObj.location,
-            subject: adminObj.subject,
-            presenceRate: adminObj.presenceRate,
-            shift: shiftVal,
-            phone: adminObj.phone,
-            email: email || undefined,
-            assignedTurmas,
-            registrationData: adminObj.registrationData,
-            schedule: item.schedule || existingDir?.schedule || [
-              {
-                day: 'Segunda',
-                period: shiftVal === 'Tarde' ? '13h00 - 17h15' : '07h30 - 12h00',
-                subject: adminObj.subject,
-                room: adminObj.room,
-              },
-            ],
-          };
-          dirMap.set(key, { ...(existingDir || {}), ...dirObj });
-
-          if (!fromCloud) {
-            const existsInCloud = cloudTeachers.some(
-              (ct) => norm(ct.id) === norm(id) || norm(ct.nomeCompleto || ct.name) === norm(name)
-            );
-            if (!existsInCloud && shouldPushMissing(TEACHERS_COL, key)) {
-              saveTeacherToFirestore(regData || adminObj).catch(() => {});
-            }
-          }
-        };
-
-        localReg.forEach((t) => ingestTeacherItem(t, false));
-        localAdmin.forEach((t) => ingestTeacherItem(t, false));
-        localDir.forEach((t) => ingestTeacherItem(t, false));
-        cloudTeachers.forEach((t) => ingestTeacherItem(t, true));
-
-        const c1 = safeWriteJsonIfChanged('ucore_registered_teachers_v2', Array.from(regMap.values()));
-        const c2 = safeWriteJsonIfChanged('ucore_admin_teachers', Array.from(adminMap.values()));
-        const c3 = safeWriteJsonIfChanged('ucore_director_teachers_v1', Array.from(dirMap.values()));
-
-        if (c1 || c2 || c3) {
-          window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar professores:', e);
-      }
-    })
-  );
-
-  // 3. REAL-TIME STUDENTS UNIFICATION (ucore_registered_students_v2, ucore_admin_students, ucore_director_students, ucore_teacher_students)
-  unsubs.push(
-    subscribeToStudents((cloudStudents) => {
-      try {
-        const localReg = safeReadJsonArray<StudentRegistrationData>('ucore_registered_students_v2');
-        const localAdmin = safeReadJsonArray<AdminStudent>('ucore_admin_students');
-        const localDir = safeReadJsonArray<DirectorStudent>('ucore_director_students');
-        const localTeacher = safeReadJsonArray<any>('ucore_teacher_students');
-
-        const regMap = new Map<string, StudentRegistrationData>();
-        const adminMap = new Map<string, AdminStudent>();
-        const dirMap = new Map<string, DirectorStudent>();
-        const teacherMap = new Map<string, any>();
-
-        const ingestStudentItem = (item: any, fromCloud: boolean) => {
-          if (!item) return;
-          if (isBannedSchoolOrEntity(item)) {
-            if (fromCloud && item.id) {
-              deleteDoc(doc(db, STUDENTS_COL, sanitizeDocId(item.id))).catch(() => {});
-            }
-            return;
-          }
-          const id = String(item.id || '').trim();
-          const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
-          if (!id && !name) return;
-          if (isEntityTombstoned(STUDENTS_COL, id) || isEntityTombstoned(STUDENTS_COL, name)) return;
-
-          const schoolName = String(
-            item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial'
-          ).trim();
-          if (isBannedSchoolOrEntity(schoolName)) return;
-
-          const key = norm(id || `${name}::${schoolName}`);
-          const studentId = id || `std-${Math.abs(key.split('').reduce((a, c) => a + c.charCodeAt(0), 1000))}`;
-          const genero: 'M' | 'F' =
-            item.genero === 'M' || item.gender === 'M' || item.registrationData?.genero === 'M' ? 'M' : 'F';
-          const classe = String(
-            item.classeEtapaModulo || item.classe || item.gradeClass || item.registrationData?.classe || '1.ª Classe'
-          );
-          const turma = String(item.turma || item.registrationData?.turma || 'Turma A');
-          const sala = String(item.sala || item.room || item.registrationData?.sala || 'Sala 01');
-          const tipoDoc = item.tipoDocumento || item.documentType || item.registrationData?.tipoDocumento || (item.hasDocuments === false ? 'sem Documento' : 'BI');
-          const hasDocs = tipoDoc !== 'sem Documento';
-          const encarregado = String(
-            item.encarregado || item.guardianName || item.registrationData?.encarregado || 'Encarregado de Educação'
-          );
-          const endereco = String(
-            item.endereco || item.location || item.registrationData?.endereco || 'Quêssua, Malanje'
-          );
-          const dataNascimento = String(
-            item.dataNascimento || item.registrationData?.dataNascimento || '2016-05-10'
-          );
-          const idade = Number(item.idade ?? item.age ?? item.registrationData?.idade ?? 9);
-
-          const flatStudentBase = extractFlatRegistrationData(item) || {};
-          const regObj: StudentRegistrationData = {
-            ...(regMap.get(key) || {}),
-            ...flatStudentBase,
-            id: studentId,
-            name,
-            nomeCompleto: name,
-            genero,
-            dataNascimento,
-            idade,
-            tipoDocumento: tipoDoc as any,
-            numeroDocumento: item.numeroDocumento || item.registrationData?.numeroDocumento,
-            naturezaEscola: item.naturezaEscola || item.schoolType || item.registrationData?.naturezaEscola || 'Pública',
-            tipoEscolaModalidade: item.tipoEscolaModalidade || item.registrationData?.tipoEscolaModalidade || 'primario_regular',
-            classeEtapaModulo: classe,
-            classe,
-            turma,
-            sala,
-            escola: schoolName,
-            schoolId: item.schoolId || item.registrationData?.schoolId,
-            condicaoMatricula: item.condicaoMatricula || item.registrationData?.condicaoMatricula || 'primeira_vez',
-            alunoRepetente: Boolean(item.alunoRepetente || item.condicaoMatricula === 'repetente'),
-            encarregado,
-            telefone: item.telefone || item.registrationData?.telefone || '+244 923 000 000',
-            endereco,
-          };
-          delete (regObj as any).registrationData;
-          regMap.set(key, regObj);
-
-          const adminObj: AdminStudent = {
-            id: studentId,
-            name,
-            gender: genero,
-            gradeClass: classe,
-            room: sala,
-            turma,
-            guardianName: encarregado,
-            location: endereco,
-            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 98,
-            hasDocuments: hasDocs,
-            documentType: tipoDoc,
-            numeroDocumento: regObj.numeroDocumento,
-            dataNascimento,
-            idade,
-            condicaoMatricula: regObj.condicaoMatricula,
-            foto: item.foto || regObj.foto,
-            anexoDocumentoNome: item.anexoDocumentoNome || regObj.anexoDocumentoNome,
-            performanceScore: typeof item.performanceScore === 'number' ? item.performanceScore : 8.5,
-            schoolName,
-            schoolId: regObj.schoolId,
-            schoolType: regObj.naturezaEscola,
-            registrationData: regObj,
-          };
-          adminMap.set(key, adminObj);
-
-          const dirObj: DirectorStudent = {
-            id: studentId,
-            name,
-            gradeClass: classe,
-            room: sala,
-            turma,
-            teacherName: item.teacherName || 'Corpo Docente',
-            guardianName: encarregado,
-            location: endereco,
-            hasDocuments: hasDocs,
-            documentType: tipoDoc,
-            numeroDocumento: regObj.numeroDocumento,
-            dataNascimento,
-            idade,
-            condicaoMatricula: regObj.condicaoMatricula,
-            foto: adminObj.foto,
-            anexoDocumentoNome: adminObj.anexoDocumentoNome,
-            performanceScore: adminObj.performanceScore,
-            presenceRate: adminObj.presenceRate,
-          };
-          dirMap.set(key, dirObj);
-
-          const existingTeacherSt = teacherMap.get(key);
-          const teacherStObj = {
-            ...(existingTeacherSt || {}),
-            id: studentId,
-            name,
-            numeroChamada: existingTeacherSt?.numeroChamada || teacherMap.size + 1,
-            sala,
-            turma,
-            periodo: item.periodo || regObj.periodo || 'Manhã',
-            classe,
-            genero,
-            idade,
-            dataNascimento,
-            condicaoMatricula: regObj.condicaoMatricula,
-            foto: adminObj.foto,
-            tipoDocumento: tipoDoc,
-            numeroDocumento: regObj.numeroDocumento,
-            anexoDocumentoNome: adminObj.anexoDocumentoNome,
-            temDocumentos: hasDocs,
-            nomePai: item.nomePai || regObj.nomePai,
-            nomeMae: item.nomeMae || regObj.nomeMae,
-            encarregado,
-            parentescoEncarregado: item.parentescoEncarregado || regObj.parentescoEncarregado,
-            telefone: regObj.telefone,
-            endereco,
-            observacoes: item.observacoes || regObj.observacoes,
-            presencaPercent: item.presencaPercent ?? existingTeacherSt?.presencaPercent ?? 100,
-            faltas: item.faltas ?? existingTeacherSt?.faltas ?? 0,
-            disciplinas: item.disciplinas || existingTeacherSt?.disciplinas || defaultDisciplinasList,
-            grades:
-              item.grades ||
-              existingTeacherSt?.grades ||
-              defaultDisciplinasList.map((disc) => ({
-                subject: disc,
-                p1: 0,
-                p2: 0,
-                trabalho: 0,
-                media: 0,
-                status: 'Aprovado' as const,
-              })),
-          };
-          teacherMap.set(key, teacherStObj);
-
-          if (!fromCloud) {
-            const existsInCloud = cloudStudents.some(
-              (cs) => norm(cs.id) === norm(studentId) || norm(cs.nomeCompleto || cs.name) === norm(name)
-            );
-            if (!existsInCloud && shouldPushMissing(STUDENTS_COL, key)) {
-              saveStudentToFirestore(regObj).catch(() => {});
-            }
-          }
-        };
-
-        localReg.forEach((s) => ingestStudentItem(s, false));
-        localAdmin.forEach((s) => ingestStudentItem(s, false));
-        localDir.forEach((s) => ingestStudentItem(s, false));
-        localTeacher.forEach((s) => ingestStudentItem(s, false));
-        cloudStudents.forEach((s) => ingestStudentItem(s, true));
-
-        const unifiedAdminStudents = Array.from(adminMap.values());
-        const c1 = safeWriteJsonIfChanged('ucore_registered_students_v2', Array.from(regMap.values()));
-        const c2 = safeWriteJsonIfChanged('ucore_admin_students', unifiedAdminStudents);
-        const c3 = safeWriteJsonIfChanged('ucore_director_students', Array.from(dirMap.values()));
-        const c4 = safeWriteJsonIfChanged('ucore_teacher_students', Array.from(teacherMap.values()));
-
-        // Reconcile school student counters automatically
-        const currentSchools = safeReadJsonArray<AdminSchool>('ucore_admin_schools');
-        if (currentSchools.length > 0) {
-          const updatedSchools = currentSchools.map((sc) => {
-            const belongs = unifiedAdminStudents.filter(
-              (st) =>
-                (st.schoolId && st.schoolId === sc.id) ||
-                norm(st.schoolName) === norm(sc.name) ||
-                norm(st.registrationData?.escola) === norm(sc.name)
-            );
-            const preservedDeclared =
-              typeof sc.declaredStudentsCount === 'number'
-                ? sc.declaredStudentsCount
-                : typeof sc.registrationData?.pessoal?.totalAlunosDeclarados === 'number'
-                ? sc.registrationData.pessoal.totalAlunosDeclarados
-                : (sc.studentsWithDocs || 0) + (sc.studentsWithoutDocs || 0);
-            const withDocs = belongs.filter((st) => st.hasDocuments).length;
-            const withoutDocs = belongs.length - withDocs;
-            return {
-              ...sc,
-              declaredStudentsCount: preservedDeclared,
-              studentsWithDocs: withDocs,
-              studentsWithoutDocs: withoutDocs,
-            };
+            const k = norm(ls.id || ls.name);
+            if (isEntityTombstoned(SCHOOLS_COL, ls.id) || isEntityTombstoned(SCHOOLS_COL, ls.name)) return;
+            map.set(k, ls);
           });
-          safeWriteJsonIfChanged('ucore_admin_schools', updatedSchools);
-        }
 
-        if (c1 || c2 || c3 || c4) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar alunos:', e);
-      }
-    })
-  );
-
-  // 4. REAL-TIME DIRECTORS & DME STAFF UNIFICATION
-  unsubs.push(
-    subscribeToDirectors((cloudDirs) => {
-      try {
-        const localReg = safeReadJsonArray<DirectorRegistrationData>('ucore_registered_directors_v2');
-        const localAdmin = safeReadJsonArray<AdminDirector>('ucore_admin_directors');
-
-        const regMap = new Map<string, DirectorRegistrationData>();
-        const adminMap = new Map<string, AdminDirector>();
-
-        const ingestDirector = (item: any, fromCloud: boolean) => {
-          if (!item) return;
-          if (isBannedSchoolOrEntity(item)) {
-            if (fromCloud && item.id) {
-              deleteDoc(doc(db, DIRECTORS_COL, sanitizeDocId(item.id))).catch(() => {});
+          localRegSchools.forEach((reg) => {
+            if (!reg || !reg.nomeOficial || isBannedSchoolOrEntity(reg) || isPlaceholderSchoolName(reg.nomeOficial)) return;
+            if (isEntityTombstoned(SCHOOLS_COL, reg.id) || isEntityTombstoned(SCHOOLS_COL, reg.nomeOficial)) return;
+            const matchKey = Array.from(map.keys()).find((k) => {
+              const item = map.get(k);
+              return item && areSameCanonicalSchool(item, { id: reg.id, name: reg.nomeOficial });
+            });
+            if (matchKey) {
+              const existing = map.get(matchKey);
+              if (existing && !existing.registrationData) {
+                map.set(matchKey, { ...existing, registrationData: reg });
+              }
             }
-            return;
-          }
-          const id = String(item.id || '').trim();
-          const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
-          if (!id && !name) return;
-          if (isEntityTombstoned(DIRECTORS_COL, id) || isEntityTombstoned(DIRECTORS_COL, name)) return;
+          });
 
-          const schoolName = String(
-            item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || ''
-          ).trim();
-          if (isBannedSchoolOrEntity(schoolName)) return;
-
-          const key = norm(id || name);
-          const regData = extractFlatRegistrationData(item) as DirectorRegistrationData | undefined;
-          if (regData && regData.nomeCompleto) {
-            regMap.set(key, { ...(regMap.get(key) || {}), ...regData });
-          }
-
-          const adminObj: AdminDirector = {
-            id: id || `dir-${Date.now()}`,
-            name,
-            schoolName: schoolName || 'Unidade Escolar Municipal',
-            phone: item.phone || item.telefone || regData?.telefone || '+244 923 000 000',
-            email: item.email || item.emailInstitucional || item.emailPessoal || regData?.emailPessoal || '',
-            appointmentYear: item.appointmentYear || (regData?.dataNomeacao ? parseInt(regData.dataNomeacao.split('-')[0], 10) : 2026) || 2026,
-            status: item.status || (regData?.situacaoMandato === 'Anterior / Histórico' ? 'Anterior' : 'Ativo'),
-            performanceRating: item.performanceRating ?? 95,
-            teachersCount: item.teachersCount ?? regData?.professoresSobDirecao ?? 0,
-            studentsCount: item.studentsCount ?? regData?.alunosSobDirecao ?? 0,
-            location: item.location || `${regData?.municipioEscola || 'Quêssua'}`,
-            registrationData: regData || adminMap.get(key)?.registrationData,
-          };
-          adminMap.set(key, { ...(adminMap.get(key) || {}), ...adminObj });
-
-          if (!fromCloud) {
-            const existsInCloud = cloudDirs.some(
-              (cd) => norm(cd.id) === norm(id) || norm(cd.nomeCompleto || cd.name) === norm(name)
-            );
-            if (!existsInCloud && shouldPushMissing(DIRECTORS_COL, key)) {
-              saveDirectorToFirestore(regData || adminObj).catch(() => {});
+          cloudSchools.forEach((cs) => {
+            if (!cs || !cs.name) return;
+            if (isBannedSchoolOrEntity(cs) || isPlaceholderSchoolName(cs.name) || isRetiredDuplicateOrPlaceholderSchoolId(cs.id)) {
+              return;
             }
-          }
-        };
+            if (isEntityTombstoned(SCHOOLS_COL, cs.id) || isEntityTombstoned(SCHOOLS_COL, cs.name)) return;
+            const matchKey =
+              Array.from(map.keys()).find((k) => {
+                const item = map.get(k);
+                return item && areSameCanonicalSchool(item, cs);
+              }) || norm(cs.id || cs.name);
+            const existing = map.get(matchKey);
+            if (existing) {
+              const eTs = Number((existing as any)._updatedAt || Date.parse((existing as any).updatedAt || '') || 0);
+              const cTs = Number((cs as any)._updatedAt || Date.parse((cs as any).updatedAt || '') || 0);
+              const primary = cTs >= eTs ? cs : existing;
+              const secondary = cTs >= eTs ? existing : cs;
+              map.set(matchKey, {
+                ...secondary,
+                ...primary,
+                registrationData: primary.registrationData || secondary.registrationData,
+              });
+            } else {
+              map.set(matchKey, cs);
+            }
+          });
 
-        localReg.forEach((d) => ingestDirector(d, false));
-        localAdmin.forEach((d) => ingestDirector(d, false));
-        cloudDirs.forEach((d) => ingestDirector(d, true));
-
-        const c1 = safeWriteJsonIfChanged('ucore_registered_directors_v2', Array.from(regMap.values()));
-        const c2 = safeWriteJsonIfChanged('ucore_admin_directors', Array.from(adminMap.values()));
-
-        if (c1 || c2) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar diretores:', e);
-      }
-    })
-  );
-
-  unsubs.push(
-    subscribeToDmeStaff((cloudStaff) => {
-      try {
-        const localStaff = safeReadJsonArray<any>('ucore_dme_staff_list');
-        const map = new Map<string, any>();
-
-        localStaff.forEach((s) => {
-          if (!s || isBannedSchoolOrEntity(s)) return;
-          const k = norm(s.id || s.email || s.role);
-          if (!k || isEntityTombstoned(DME_STAFF_COL, k)) return;
-          map.set(k, s);
-          const inCloud = cloudStaff.some((cs) => norm(cs.id || cs.email || cs.role) === k);
-          if (!inCloud && shouldPushMissing(DME_STAFF_COL, k)) {
-            saveDmeStaffToFirestore(s).catch(() => {});
-          }
-        });
-
-        cloudStaff.forEach((cs) => {
-          if (!cs || isBannedSchoolOrEntity(cs)) return;
-          const k = norm(cs.id || cs.email || cs.role);
-          if (!k || isEntityTombstoned(DME_STAFF_COL, k)) return;
-          map.set(k, { ...(map.get(k) || {}), ...cs });
-        });
-
-        if (safeWriteJsonIfChanged('ucore_dme_staff_list', Array.from(map.values()))) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar equipa DME:', e);
-      }
-    })
-  );
-
-  // 5. REAL-TIME EFECTIVIDADE UNIFICATION
-  unsubs.push(
-    subscribeToEfectividade((cloudRecords) => {
-      try {
-        const localRecs = safeReadJsonArray<any>('sigre_cadastramento_efectividade_v2');
-        const deletedRaw = safeReadJsonArray<string>('sigre_deleted_efectividade_ids_v2');
-        const deletedSet = new Set(deletedRaw.map((id) => norm(id)));
-        const map = new Map<string, any>();
-
-        localRecs.forEach((lr) => {
-          if (!lr || !lr.id || isBannedSchoolOrEntity(lr)) return;
-          if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(EFECTIVIDADE_COL, lr.id)) return;
-          map.set(lr.id, lr);
-          const inCloud = cloudRecords.some((cr) => cr && cr.id === lr.id);
-          if (!inCloud && shouldPushMissing(EFECTIVIDADE_COL, norm(lr.id))) {
-            saveEfectividadeToFirestore(lr).catch(() => {});
-          }
-        });
-
-        cloudRecords.forEach((cr) => {
-          if (!cr || !cr.id) return;
-          if (isBannedSchoolOrEntity(cr)) {
-            deleteDoc(doc(db, EFECTIVIDADE_COL, sanitizeDocId(cr.id))).catch(() => {});
-            return;
-          }
-          if (deletedSet.has(norm(cr.id)) || isEntityTombstoned(EFECTIVIDADE_COL, cr.id)) return;
-          map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
-        });
-
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('sigre_cadastramento_efectividade_v2', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { records: merged } }));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar efectividade:', e);
-      }
-    })
-  );
-
-  // 5B. REAL-TIME DECLARAÇÃO DE SERVIÇO UNIFICATION (ISOLATED FROM EFECTIVIDADE)
-  unsubs.push(
-    subscribeToDeclaracaoServico((cloudRecords) => {
-      try {
-        const localRecs = safeReadJsonArray<any>('sigre_declaracao_servico_v1');
-        const deletedRaw = safeReadJsonArray<string>('sigre_deleted_declaracao_servico_ids_v1');
-        const deletedSet = new Set(deletedRaw.map((id) => norm(id)));
-        const map = new Map<string, any>();
-
-        localRecs.forEach((lr) => {
-          if (!lr || !lr.id || isBannedSchoolOrEntity(lr)) return;
-          if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, lr.id)) return;
-          map.set(lr.id, lr);
-          const inCloud = cloudRecords.some((cr) => cr && cr.id === lr.id);
-          if (!inCloud && shouldPushMissing(DECLARACAO_SERVICO_COL, norm(lr.id))) {
-            saveDeclaracaoServicoToFirestore(lr).catch(() => {});
-          }
-        });
-
-        cloudRecords.forEach((cr) => {
-          if (!cr || !cr.id || isBannedSchoolOrEntity(cr)) return;
-          if (deletedSet.has(norm(cr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, cr.id)) return;
-          map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
-        });
-
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('sigre_declaracao_servico_v1', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-declaracao-servico-updated', { detail: { records: merged } }));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar Declaração de Serviço:', e);
-      }
-    })
-  );
-
-  // 5C. REAL-TIME OUTROS FUNCIONÁRIOS (STAFF) UNIFICATION
-  unsubs.push(
-    subscribeToStaff((cloudStaff) => {
-      try {
-        const localStaff = safeReadJsonArray<any>('ucore_registered_staff_v1');
-        const map = new Map<string, any>();
-
-        localStaff.forEach((ls) => {
-          if (!ls || isBannedSchoolOrEntity(ls)) return;
-          const k = norm(ls.id || ls.bi || ls.agente || ls.nomeCompleto || ls.name);
-          if (!k || isEntityTombstoned(STAFF_COL, k) || (ls.id && isEntityTombstoned(STAFF_COL, ls.id))) return;
-          map.set(k, ls);
-          const inCloud = cloudStaff.some(
-            (cs) => norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name) === k
+          const unifiedSchools = deduplicateSchoolsCanonical(
+            Array.from(map.values()),
+            (sc) =>
+              isBannedSchoolOrEntity(sc) ||
+              isEntityTombstoned(SCHOOLS_COL, sc.id) ||
+              isEntityTombstoned(SCHOOLS_COL, sc.name)
           );
-          if (!inCloud && shouldPushMissing(STAFF_COL, k)) {
-            saveStaffToFirestore(ls).catch(() => {});
-          }
-        });
+          const changedSchools = safeWriteJsonIfChanged('ucore_admin_schools', unifiedSchools);
+          safeWriteJsonIfChanged('ucore_registered_schools_v1', unifiedSchools);
 
-        cloudStaff.forEach((cs) => {
-          if (!cs || isBannedSchoolOrEntity(cs)) return;
-          const k = norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name);
-          if (!k || isEntityTombstoned(STAFF_COL, k) || (cs.id && isEntityTombstoned(STAFF_COL, cs.id))) return;
-          map.set(k, { ...(map.get(k) || {}), ...cs });
-        });
+          const unifiedRegs = unifiedSchools.map((s) => s.registrationData).filter(Boolean);
+          safeWriteJsonIfChanged('sigre_school_registrations', unifiedRegs);
 
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('ucore_registered_staff_v1', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-staff-updated', { detail: { records: merged } }));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar outros funcionários:', e);
-      }
-    })
-  );
-
-  // 6. REAL-TIME MINI-PAUTAS / GRADES UNIFICATION
-  unsubs.push(
-    subscribeToMiniPautas((cloudPautas) => {
-      try {
-        const localPautas = safeReadJsonArray<any>('sigre_teacher_mini_pautas_v5_blank');
-        const map = new Map<string, any>();
-        const getKey = (r: any) =>
-          `${norm(r.classe)}::${norm(r.turma)}::${norm(r.disciplina)}::${norm(r.schoolName)}`;
-
-        localPautas.forEach((lp) => {
-          if (!lp || isBannedSchoolOrEntity(lp)) return;
-          const k = getKey(lp);
-          map.set(k, lp);
-          const inCloud = cloudPautas.some((cp) => getKey(cp) === k);
-          if (!inCloud && shouldPushMissing(GRADES_COL, k)) {
-            saveMiniPautaToFirestore(lp).catch(() => {});
-          }
-        });
-
-        cloudPautas.forEach((cp) => {
-          if (!cp || isBannedSchoolOrEntity(cp)) return;
-          const k = getKey(cp);
-          map.set(k, { ...(map.get(k) || {}), ...cp });
-        });
-
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('sigre_teacher_mini_pautas_v5_blank', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-minipautas-updated'));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar mini-pautas:', e);
-      }
-    })
-  );
-
-  // 7. REAL-TIME ATTENDANCE UNIFICATION
-  unsubs.push(
-    subscribeToAttendance((cloudAttendance) => {
-      try {
-        const localStudentsAtt = safeReadJsonArray<any>('ucore_student_attendance_records_v2');
-        const localTeachersAtt = safeReadJsonArray<any>('ucore_teacher_attendance_records_v2');
-
-        const stuMap = new Map<string, any>();
-        const teaMap = new Map<string, any>();
-
-        localStudentsAtt.forEach((r) => {
-          if (!r || !r.studentId || !r.date || isBannedSchoolOrEntity(r)) return;
-          const k = `${r.studentId}_${r.date}`;
-          stuMap.set(k, r);
-          const inCloud = cloudAttendance.some(
-            (ca) => ca.attendanceKind === 'student' && ca.studentId === r.studentId && ca.date === r.date
+          const validUnifiedSchools = unifiedSchools.filter(
+            (cs) => cs && cs.name && !isBannedSchoolOrEntity(cs) && !isEntityTombstoned(SCHOOLS_COL, cs.id) && !isEntityTombstoned(SCHOOLS_COL, cs.name)
           );
-          if (!inCloud && shouldPushMissing(`${ATTENDANCE_COL}_student`, k)) {
-            saveAttendanceToFirestore(r, 'student').catch(() => {});
-          }
-        });
-
-        localTeachersAtt.forEach((r) => {
-          if (!r || !r.teacherId || !r.date || isBannedSchoolOrEntity(r)) return;
-          const k = `${r.teacherId}_${r.date}`;
-          teaMap.set(k, r);
-          const inCloud = cloudAttendance.some(
-            (ca) => ca.attendanceKind === 'teacher' && ca.teacherId === r.teacherId && ca.date === r.date
-          );
-          if (!inCloud && shouldPushMissing(`${ATTENDANCE_COL}_teacher`, k)) {
-            saveAttendanceToFirestore(r, 'teacher').catch(() => {});
-          }
-        });
-
-        cloudAttendance.forEach((ca) => {
-          if (!ca || isBannedSchoolOrEntity(ca)) return;
-          if (ca.attendanceKind === 'student' || ca.studentId) {
-            const k = `${ca.studentId}_${ca.date}`;
-            stuMap.set(k, { ...(stuMap.get(k) || {}), ...ca });
-          } else if (ca.attendanceKind === 'teacher' || ca.teacherId) {
-            const k = `${ca.teacherId}_${ca.date}`;
-            teaMap.set(k, { ...(teaMap.get(k) || {}), ...ca });
-          }
-        });
-
-        const c1 = safeWriteJsonIfChanged('ucore_student_attendance_records_v2', Array.from(stuMap.values()));
-        const c2 = safeWriteJsonIfChanged('ucore_teacher_attendance_records_v2', Array.from(teaMap.values()));
-        if (c1 || c2) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch (e) {
-        console.warn('[UnifiedSync] Erro ao unificar presenças:', e);
-      }
-    })
-  );
-
-  // 8. REAL-TIME ANNOUNCEMENTS, ROOMS, CLASSES & USERS UNIFICATION
-  unsubs.push(
-    subscribeToAnnouncements((cloudAnn) => {
-      try {
-        const localAnn = safeReadJsonArray<SchoolAnnouncement>('ucore_school_announcements_v1');
-        const map = new Map<string, SchoolAnnouncement>();
-
-        localAnn.forEach((la) => {
-          if (!la || !la.id || isEntityTombstoned(ANNOUNCEMENTS_COL, la.id) || isBannedSchoolOrEntity(la)) return;
-          map.set(la.id, la);
-          if (!cloudAnn.some((ca) => ca.id === la.id) && shouldPushMissing(ANNOUNCEMENTS_COL, la.id)) {
-            saveAnnouncementToFirestore(la).catch(() => {});
-          }
-        });
-
-        cloudAnn.forEach((ca) => {
-          if (!ca || !ca.id || isEntityTombstoned(ANNOUNCEMENTS_COL, ca.id) || isBannedSchoolOrEntity(ca)) return;
-          map.set(ca.id, { ...(map.get(ca.id) || {}), ...ca });
-        });
-
-        if (safeWriteJsonIfChanged('ucore_school_announcements_v1', Array.from(map.values()))) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
-
-  unsubs.push(
-    subscribeToRooms((cloudRooms) => {
-      try {
-        const localRooms = safeReadJsonArray<DirectorRoom>('ucore_director_rooms');
-        const map = new Map<string, DirectorRoom>();
-        localRooms.forEach((lr) => {
-          if (!lr || !lr.id || isEntityTombstoned(ROOMS_COL, lr.id) || isBannedSchoolOrEntity(lr)) return;
-          map.set(lr.id, lr);
-          if (!cloudRooms.some((cr) => cr.id === lr.id) && shouldPushMissing(ROOMS_COL, lr.id)) {
-            saveRoomToFirestore(lr).catch(() => {});
-          }
-        });
-        cloudRooms.forEach((cr) => {
-          if (!cr || !cr.id || isEntityTombstoned(ROOMS_COL, cr.id) || isBannedSchoolOrEntity(cr)) return;
-          map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
-        });
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('ucore_director_rooms', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
-
-  unsubs.push(
-    subscribeToClasses((cloudClasses) => {
-      try {
-        const localClasses = safeReadJsonArray<DirectorClass>('ucore_director_classes');
-        const map = new Map<string, DirectorClass>();
-        localClasses.forEach((lc) => {
-          if (!lc || !lc.id || isEntityTombstoned(CLASSES_COL, lc.id) || isBannedSchoolOrEntity(lc)) return;
-          map.set(lc.id, lc);
-          if (!cloudClasses.some((cc) => cc.id === lc.id) && shouldPushMissing(CLASSES_COL, lc.id)) {
-            saveClassToFirestore(lc).catch(() => {});
-          }
-        });
-        cloudClasses.forEach((cc) => {
-          if (!cc || !cc.id || isEntityTombstoned(CLASSES_COL, cc.id) || isBannedSchoolOrEntity(cc)) return;
-          map.set(cc.id, { ...(map.get(cc.id) || {}), ...cc });
-        });
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('ucore_director_classes', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
-
-  // 9. REAL-TIME GUIAS DE FÉRIAS, GUIAS DE COLOCAÇÃO, FICHAS DE AVALIAÇÃO & CADASTRO DOCENTE UNIFICATION
-  unsubs.push(
-    subscribeToGuiasFerias((cloudGuias) => {
-      try {
-        const localGuias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1');
-        const map = new Map<string, any>();
-
-        localGuias.forEach((lg) => {
-          if (!lg || !lg.id || isEntityTombstoned(GUIAS_FERIAS_COL, lg.id) || isBannedSchoolOrEntity(lg)) return;
-          map.set(lg.id, lg);
-          if (!cloudGuias.some((cg) => cg && cg.id === lg.id) && shouldPushMissing(GUIAS_FERIAS_COL, lg.id)) {
-            saveGuiaFeriasToFirestore(lg).catch(() => {});
-          }
-        });
-
-        cloudGuias.forEach((cg) => {
-          if (!cg || !cg.id || isEntityTombstoned(GUIAS_FERIAS_COL, cg.id) || isBannedSchoolOrEntity(cg)) return;
-          map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
-        });
-
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('sigre_guias_ferias_records_v1', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
-
-  unsubs.push(
-    subscribeToGuiasColocacao((cloudGuias) => {
-      try {
-        const localGuias = safeReadJsonArray<any>('sigre_guias_colocacao_records_v1');
-        const map = new Map<string, any>();
-
-        localGuias.forEach((lg) => {
-          if (!lg || !lg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, lg.id) || isBannedSchoolOrEntity(lg)) return;
-          map.set(lg.id, lg);
-          if (!cloudGuias.some((cg) => cg && cg.id === lg.id) && shouldPushMissing(GUIAS_COLOCACAO_COL, lg.id)) {
-            saveGuiaColocacaoToFirestore(lg).catch(() => {});
-          }
-        });
-
-        cloudGuias.forEach((cg) => {
-          if (!cg || !cg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, cg.id) || isBannedSchoolOrEntity(cg)) return;
-          map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
-        });
-
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('sigre_guias_colocacao_records_v1', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
-
-  unsubs.push(
-    subscribeToFichasAvaliacao((cloudFichas) => {
-      try {
-        const localFichas = safeReadJsonArray<any>('sigre_fichas_avaliacao_records_v1');
-        const map = new Map<string, any>();
-
-        localFichas.forEach((lf) => {
-          if (!lf || !lf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, lf.id) || isBannedSchoolOrEntity(lf)) return;
-          map.set(lf.id, lf);
-          if (!cloudFichas.some((cf) => cf && cf.id === lf.id) && shouldPushMissing(FICHAS_AVALIACAO_COL, lf.id)) {
-            saveFichaAvaliacaoToFirestore(lf).catch(() => {});
-          }
-        });
-
-        cloudFichas.forEach((cf) => {
-          if (!cf || !cf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, cf.id) || isBannedSchoolOrEntity(cf)) return;
-          map.set(cf.id, { ...(map.get(cf.id) || {}), ...cf });
-        });
-
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('sigre_fichas_avaliacao_records_v1', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
-
-  unsubs.push(
-    subscribeToCadastroDocente((cloudCadastros) => {
-      try {
-        const localCadastros = safeReadJsonArray<any>('cadastro-docente-registos');
-        const map = new Map<string, any>();
-
-        localCadastros.forEach((lc) => {
-          if (!lc || !lc.id || isEntityTombstoned(CADASTRO_DOCENTE_COL, lc.id) || isBannedSchoolOrEntity(lc)) return;
-          map.set(String(lc.id), lc);
-          if (!cloudCadastros.some((cc) => cc && String(cc.id) === String(lc.id)) && shouldPushMissing(CADASTRO_DOCENTE_COL, String(lc.id))) {
-            saveCadastroDocenteToFirestore(lc).catch(() => {});
-          }
-        });
-
-        cloudCadastros.forEach((cc) => {
-          if (!cc || !cc.id || isEntityTombstoned(CADASTRO_DOCENTE_COL, cc.id) || isBannedSchoolOrEntity(cc)) return;
-          map.set(String(cc.id), { ...(map.get(String(cc.id)) || {}), ...cc });
-        });
-
-        const merged = Array.from(map.values());
-        if (safeWriteJsonIfChanged('cadastro-docente-registos', merged)) {
-          window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated', { detail: { records: merged } }));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
-
-  unsubs.push(
-    subscribeToUsers((cloudUsers) => {
-      try {
-        const localUsers = safeReadJsonArray<UserAccount>('ucore_registered_users');
-        const localApps = safeReadJsonArray<PendingApplication>('ucore_pending_applications');
-        const approvedEmails = new Set<string>();
-        const approvedIds = new Set<string>();
-        localApps.forEach((a) => {
-          if (a && (a.status === 'aprovado' || Boolean(a.approvedAt))) {
-            if (a.email) approvedEmails.add(norm(a.email));
-            if (a.userId) approvedIds.add(norm(a.userId));
-            if (a.id) approvedIds.add(norm(a.id));
-          }
-        });
-
-        const map = new Map<string, UserAccount>();
-        localUsers.forEach((lu) => {
-          if (!lu || !lu.email || isBannedSchoolOrEntity(lu)) return;
           if (
-            isEntityTombstoned(USERS_COL, lu.email) ||
-            (lu.id && isEntityTombstoned(USERS_COL, lu.id)) ||
-            isEntityTombstoned(APPLICATIONS_COL, lu.email) ||
-            (lu.id && isEntityTombstoned(APPLICATIONS_COL, lu.id))
+            isExpressApiAvailable() &&
+            validUnifiedSchools.length > 0 &&
+            (changedSchools || validUnifiedSchools.length !== localAdminSchools.length)
           ) {
-            return;
+            fetch('/api/network/schools', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ schools: validUnifiedSchools }),
+            }).catch(() => {});
           }
-          const k = norm(lu.email);
-          const isApproved = approvedEmails.has(k) || (lu.id ? approvedIds.has(norm(lu.id)) : false);
-          const normalizedLocal: UserAccount = isApproved && lu.status !== 'ativo' ? { ...lu, status: 'ativo' } : lu;
-          map.set(k, normalizedLocal);
-          if (!cloudUsers.some((cu) => norm(cu.email) === k) && shouldPushMissing(USERS_COL, k)) {
-            saveUserToFirestore(normalizedLocal).catch(() => {});
+          if (changedSchools) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        });
-        cloudUsers.forEach((cu) => {
-          if (!cu || !cu.email) return;
-          if (isBannedSchoolOrEntity(cu)) {
-            deleteDoc(doc(db, USERS_COL, sanitizeDocId(cu.email))).catch(() => {});
-            return;
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar escolas:', e);
+        }
+      })
+    );
+  }
+
+  // 2. REAL-TIME TEACHERS UNIFICATION (Bounded limit 30)
+  if (enabledCols.has('teachers')) {
+    unsubs.push(
+      subscribeToTeachers(
+        (cloudTeachers) => {
+          try {
+            const localReg = safeReadJsonArray<TeacherRegistrationData>('ucore_registered_teachers_v2');
+            const localAdmin = safeReadJsonArray<AdminTeacher>('ucore_admin_teachers');
+            const localDir = safeReadJsonArray<DirectorTeacher>('ucore_director_teachers_v1');
+
+            const regMap = new Map<string, TeacherRegistrationData>();
+            const adminMap = new Map<string, AdminTeacher>();
+            const dirMap = new Map<string, DirectorTeacher>();
+
+            const ingestTeacherItem = (item: any) => {
+              if (!item || isBannedSchoolOrEntity(item)) return;
+              const id = String(item.id || item.nomeCompleto || item.name || '').trim();
+              const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
+              if (!id && !name) return;
+              if (isEntityTombstoned(TEACHERS_COL, id) || isEntityTombstoned(TEACHERS_COL, name)) return;
+
+              const schoolName = String(
+                item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua'
+              ).trim();
+              if (isBannedSchoolOrEntity(schoolName)) return;
+
+              const key = norm(id || name);
+              const regData = extractFlatRegistrationData(item) as TeacherRegistrationData | undefined;
+              if (regData && regData.nomeCompleto) {
+                regMap.set(key, { ...(regMap.get(key) || {}), ...regData });
+              }
+
+              const existingAdmin = adminMap.get(key);
+              const existingDir = dirMap.get(key);
+              const mergedReg = regMap.get(key) || regData;
+              const assignedTurmas =
+                item.assignedTurmas ||
+                mergedReg?.assignedTurmas ||
+                existingDir?.assignedTurmas ||
+                existingAdmin?.assignedTurmas;
+              const primaryTurmaEntry = assignedTurmas?.[0];
+
+              const subject = String(
+                item.subject ||
+                  primaryTurmaEntry?.subject ||
+                  item.disciplinas ||
+                  mergedReg?.disciplinas ||
+                  existingDir?.subject ||
+                  'Língua Portuguesa'
+              );
+              const gradeClass = String(
+                item.gradeClass ||
+                  item.primaryGradeClass ||
+                  mergedReg?.primaryGradeClass ||
+                  primaryTurmaEntry?.gradeClass ||
+                  existingDir?.gradeClass ||
+                  item.niveisLecciona?.[0]?.nome ||
+                  mergedReg?.niveisLecciona?.[0]?.nome ||
+                  'Ensino Primário'
+              );
+              const phone = String(item.phone || item.telefone || mergedReg?.telefone || existingDir?.phone || '+244 923 000 000');
+              const email = String(item.email || mergedReg?.email || existingDir?.email || '');
+              const room = String(
+                item.room ||
+                  item.primaryRoom ||
+                  mergedReg?.primaryRoom ||
+                  primaryTurmaEntry?.room ||
+                  existingDir?.room ||
+                  existingAdmin?.room ||
+                  'Sala 01'
+              );
+              const turma = String(
+                item.turma ||
+                  item.primaryTurma ||
+                  mergedReg?.primaryTurma ||
+                  primaryTurmaEntry?.turma ||
+                  existingDir?.turma ||
+                  existingAdmin?.turma ||
+                  'Turma A'
+              );
+
+              const adminObj: AdminTeacher = {
+                id: id || existingAdmin?.id || `prof-${Date.now()}`,
+                name,
+                phone,
+                gradeClass,
+                room,
+                turma,
+                category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || existingAdmin?.category || 'Docente / Professor',
+                location: item.location || existingAdmin?.location || `${item.municipioEscola || mergedReg?.municipioEscola || 'Quêssua'}`,
+                schoolName,
+                schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId || existingAdmin?.schoolId,
+                presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : (existingAdmin?.presenceRate ?? 100),
+                subject,
+                gender: (item.gender || (item.sexo === 'Feminino' || mergedReg?.sexo === 'Feminino' ? 'F' : 'M')) as 'M' | 'F',
+                qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico || existingAdmin?.qualification,
+                assignedTurmas,
+                registrationData: mergedReg || existingAdmin?.registrationData,
+              };
+              adminMap.set(key, { ...(existingAdmin || {}), ...adminObj });
+
+              const shiftVal = (
+                item.shift ||
+                item.primaryShift ||
+                mergedReg?.primaryShift ||
+                primaryTurmaEntry?.shift ||
+                existingDir?.shift ||
+                (item.turnos?.[0] === 'Tarde' || mergedReg?.turnos?.[0] === 'Tarde' ? 'Tarde' : 'Manhã')
+              ) as 'Manhã' | 'Tarde' | 'Integral';
+
+              const dirObj: DirectorTeacher = {
+                id: adminObj.id,
+                name: adminObj.name,
+                schoolName: adminObj.schoolName,
+                gradeClass: adminObj.gradeClass,
+                room: adminObj.room,
+                turma: adminObj.turma,
+                directorName: item.directorName || existingDir?.directorName || 'Direção Escolar',
+                location: adminObj.location,
+                subject: adminObj.subject,
+                presenceRate: adminObj.presenceRate,
+                shift: shiftVal,
+                phone: adminObj.phone,
+                email: email || undefined,
+                assignedTurmas,
+                registrationData: adminObj.registrationData,
+                schedule: item.schedule || existingDir?.schedule || [
+                  {
+                    day: 'Segunda',
+                    period: shiftVal === 'Tarde' ? '13h00 - 17h15' : '07h30 - 12h00',
+                    subject: adminObj.subject,
+                    room: adminObj.room,
+                  },
+                ],
+              };
+              dirMap.set(key, { ...(existingDir || {}), ...dirObj });
+            };
+
+            localReg.forEach(ingestTeacherItem);
+            localAdmin.forEach(ingestTeacherItem);
+            localDir.forEach(ingestTeacherItem);
+            cloudTeachers.forEach(ingestTeacherItem);
+
+            const c1 = safeWriteJsonIfChanged('ucore_registered_teachers_v2', Array.from(regMap.values()));
+            const c2 = safeWriteJsonIfChanged('ucore_admin_teachers', Array.from(adminMap.values()));
+            const c3 = safeWriteJsonIfChanged('ucore_director_teachers_v1', Array.from(dirMap.values()));
+
+            if (c1 || c2 || c3) {
+              window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
+              window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+            }
+          } catch (e) {
+            console.warn('[UnifiedSync] Erro ao unificar professores:', e);
           }
-          if (
-            isEntityTombstoned(USERS_COL, cu.email) ||
-            (cu.id && isEntityTombstoned(USERS_COL, cu.id)) ||
-            isEntityTombstoned(APPLICATIONS_COL, cu.email) ||
-            (cu.id && isEntityTombstoned(APPLICATIONS_COL, cu.id))
-          ) {
-            return;
+        },
+        scopedSchoolId ? { schoolId: scopedSchoolId } : undefined
+      )
+    );
+  }
+
+  // 3. REAL-TIME STUDENTS UNIFICATION (Bounded limit 30)
+  if (enabledCols.has('students')) {
+    unsubs.push(
+      subscribeToStudents(
+        (cloudStudents) => {
+          try {
+            const localReg = safeReadJsonArray<StudentRegistrationData>('ucore_registered_students_v2');
+            const localAdmin = safeReadJsonArray<AdminStudent>('ucore_admin_students');
+            const localDir = safeReadJsonArray<DirectorStudent>('ucore_director_students');
+            const localTeacher = safeReadJsonArray<any>('ucore_teacher_students');
+
+            const regMap = new Map<string, StudentRegistrationData>();
+            const adminMap = new Map<string, AdminStudent>();
+            const dirMap = new Map<string, DirectorStudent>();
+            const teacherMap = new Map<string, any>();
+
+            const ingestStudentItem = (item: any) => {
+              if (!item || isBannedSchoolOrEntity(item)) return;
+              const id = String(item.id || '').trim();
+              const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
+              if (!id && !name) return;
+              if (isEntityTombstoned(STUDENTS_COL, id) || isEntityTombstoned(STUDENTS_COL, name)) return;
+
+              const schoolName = String(
+                item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial'
+              ).trim();
+              if (isBannedSchoolOrEntity(schoolName)) return;
+
+              const key = norm(id || `${name}::${schoolName}`);
+              const studentId = id || `std-${Math.abs(key.split('').reduce((a, c) => a + c.charCodeAt(0), 1000))}`;
+              const genero: 'M' | 'F' =
+                item.genero === 'M' || item.gender === 'M' || item.registrationData?.genero === 'M' ? 'M' : 'F';
+              const classe = String(
+                item.classeEtapaModulo || item.classe || item.gradeClass || item.registrationData?.classe || '1.ª Classe'
+              );
+              const turma = String(item.turma || item.registrationData?.turma || 'Turma A');
+              const sala = String(item.sala || item.room || item.registrationData?.sala || 'Sala 01');
+              const tipoDoc = item.tipoDocumento || item.documentType || item.registrationData?.tipoDocumento || (item.hasDocuments === false ? 'sem Documento' : 'BI');
+              const hasDocs = tipoDoc !== 'sem Documento';
+              const encarregado = String(
+                item.encarregado || item.guardianName || item.registrationData?.encarregado || 'Encarregado de Educação'
+              );
+              const endereco = String(
+                item.endereco || item.location || item.registrationData?.endereco || 'Quêssua, Malanje'
+              );
+              const dataNascimento = String(
+                item.dataNascimento || item.registrationData?.dataNascimento || '2016-05-10'
+              );
+              const idade = Number(item.idade ?? item.age ?? item.registrationData?.idade ?? 9);
+
+              const flatStudentBase = extractFlatRegistrationData(item) || {};
+              const regObj: StudentRegistrationData = {
+                ...(regMap.get(key) || {}),
+                ...flatStudentBase,
+                id: studentId,
+                name,
+                nomeCompleto: name,
+                genero,
+                dataNascimento,
+                idade,
+                tipoDocumento: tipoDoc as any,
+                numeroDocumento: item.numeroDocumento || item.registrationData?.numeroDocumento,
+                naturezaEscola: item.naturezaEscola || item.schoolType || item.registrationData?.naturezaEscola || 'Pública',
+                tipoEscolaModalidade: item.tipoEscolaModalidade || item.registrationData?.tipoEscolaModalidade || 'primario_regular',
+                classeEtapaModulo: classe,
+                classe,
+                turma,
+                sala,
+                escola: schoolName,
+                schoolId: item.schoolId || item.registrationData?.schoolId,
+                condicaoMatricula: item.condicaoMatricula || item.registrationData?.condicaoMatricula || 'primeira_vez',
+                alunoRepetente: Boolean(item.alunoRepetente || item.condicaoMatricula === 'repetente'),
+                encarregado,
+                telefone: item.telefone || item.registrationData?.telefone || '+244 923 000 000',
+                endereco,
+              };
+              delete (regObj as any).registrationData;
+              regMap.set(key, regObj);
+
+              const adminObj: AdminStudent = {
+                id: studentId,
+                name,
+                gender: genero,
+                gradeClass: classe,
+                room: sala,
+                turma,
+                guardianName: encarregado,
+                location: endereco,
+                presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 98,
+                hasDocuments: hasDocs,
+                documentType: tipoDoc,
+                numeroDocumento: regObj.numeroDocumento,
+                dataNascimento,
+                idade,
+                condicaoMatricula: regObj.condicaoMatricula,
+                foto: item.foto || regObj.foto,
+                anexoDocumentoNome: item.anexoDocumentoNome || regObj.anexoDocumentoNome,
+                performanceScore: typeof item.performanceScore === 'number' ? item.performanceScore : 8.5,
+                schoolName,
+                schoolId: regObj.schoolId,
+                schoolType: regObj.naturezaEscola,
+                registrationData: regObj,
+              };
+              adminMap.set(key, adminObj);
+
+              const dirObj: DirectorStudent = {
+                id: studentId,
+                name,
+                gradeClass: classe,
+                room: sala,
+                turma,
+                teacherName: item.teacherName || 'Corpo Docente',
+                guardianName: encarregado,
+                location: endereco,
+                hasDocuments: hasDocs,
+                documentType: tipoDoc,
+                numeroDocumento: regObj.numeroDocumento,
+                dataNascimento,
+                idade,
+                condicaoMatricula: regObj.condicaoMatricula,
+                foto: adminObj.foto,
+                anexoDocumentoNome: adminObj.anexoDocumentoNome,
+                performanceScore: adminObj.performanceScore,
+                presenceRate: adminObj.presenceRate,
+              };
+              dirMap.set(key, dirObj);
+
+              const existingTeacherSt = teacherMap.get(key);
+              const teacherStObj = {
+                ...(existingTeacherSt || {}),
+                id: studentId,
+                name,
+                numeroChamada: existingTeacherSt?.numeroChamada || teacherMap.size + 1,
+                sala,
+                turma,
+                periodo: item.periodo || regObj.periodo || 'Manhã',
+                classe,
+                genero,
+                idade,
+                dataNascimento,
+                condicaoMatricula: regObj.condicaoMatricula,
+                foto: adminObj.foto,
+                tipoDocumento: tipoDoc,
+                numeroDocumento: regObj.numeroDocumento,
+                anexoDocumentoNome: adminObj.anexoDocumentoNome,
+                temDocumentos: hasDocs,
+                nomePai: item.nomePai || regObj.nomePai,
+                nomeMae: item.nomeMae || regObj.nomeMae,
+                encarregado,
+                parentescoEncarregado: item.parentescoEncarregado || regObj.parentescoEncarregado,
+                telefone: regObj.telefone,
+                endereco,
+                observacoes: item.observacoes || regObj.observacoes,
+                presencaPercent: item.presencaPercent ?? existingTeacherSt?.presencaPercent ?? 100,
+                faltas: item.faltas ?? existingTeacherSt?.faltas ?? 0,
+                disciplinas: item.disciplinas || existingTeacherSt?.disciplinas || defaultDisciplinasList,
+                grades:
+                  item.grades ||
+                  existingTeacherSt?.grades ||
+                  defaultDisciplinasList.map((disc) => ({
+                    subject: disc,
+                    p1: 0,
+                    p2: 0,
+                    trabalho: 0,
+                    media: 0,
+                    status: 'Aprovado' as const,
+                  })),
+              };
+              teacherMap.set(key, teacherStObj);
+            };
+
+            localReg.forEach(ingestStudentItem);
+            localAdmin.forEach(ingestStudentItem);
+            localDir.forEach(ingestStudentItem);
+            localTeacher.forEach(ingestStudentItem);
+            cloudStudents.forEach(ingestStudentItem);
+
+            const unifiedAdminStudents = Array.from(adminMap.values());
+            const c1 = safeWriteJsonIfChanged('ucore_registered_students_v2', Array.from(regMap.values()));
+            const c2 = safeWriteJsonIfChanged('ucore_admin_students', unifiedAdminStudents);
+            const c3 = safeWriteJsonIfChanged('ucore_director_students', Array.from(dirMap.values()));
+            const c4 = safeWriteJsonIfChanged('ucore_teacher_students', Array.from(teacherMap.values()));
+
+            if (c1 || c2 || c3 || c4) {
+              window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+            }
+          } catch (e) {
+            console.warn('[UnifiedSync] Erro ao unificar alunos:', e);
           }
-          const k = norm(cu.email);
-          const prev = map.get(k);
-          const isApproved =
-            prev?.status === 'ativo' ||
-            cu.status === 'ativo' ||
-            approvedEmails.has(k) ||
-            (cu.id ? approvedIds.has(norm(cu.id)) : false);
-          const mergedUser: UserAccount = {
-            ...(prev || {}),
-            ...cu,
-            status: isApproved ? 'ativo' : cu.status || prev?.status || 'pendente',
+        },
+        scopedSchoolId ? { schoolId: scopedSchoolId } : undefined
+      )
+    );
+  }
+
+  // 4. REAL-TIME DIRECTORS & DME STAFF UNIFICATION (Bounded limit 30)
+  if (enabledCols.has('directors')) {
+    unsubs.push(
+      subscribeToDirectors((cloudDirs) => {
+        try {
+          const localReg = safeReadJsonArray<DirectorRegistrationData>('ucore_registered_directors_v2');
+          const localAdmin = safeReadJsonArray<AdminDirector>('ucore_admin_directors');
+          const regMap = new Map<string, DirectorRegistrationData>();
+          const adminMap = new Map<string, AdminDirector>();
+
+          const ingestDirector = (item: any) => {
+            if (!item || isBannedSchoolOrEntity(item)) return;
+            const id = String(item.id || '').trim();
+            const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
+            if (!id && !name) return;
+            if (isEntityTombstoned(DIRECTORS_COL, id) || isEntityTombstoned(DIRECTORS_COL, name)) return;
+
+            const schoolName = String(
+              item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || ''
+            ).trim();
+            if (isBannedSchoolOrEntity(schoolName)) return;
+
+            const key = norm(id || name);
+            const regData = extractFlatRegistrationData(item) as DirectorRegistrationData | undefined;
+            if (regData && regData.nomeCompleto) {
+              regMap.set(key, { ...(regMap.get(key) || {}), ...regData });
+            }
+
+            const adminObj: AdminDirector = {
+              id: id || `dir-${Date.now()}`,
+              name,
+              schoolName: schoolName || 'Unidade Escolar Municipal',
+              phone: item.phone || item.telefone || regData?.telefone || '+244 923 000 000',
+              email: item.email || item.emailInstitucional || item.emailPessoal || regData?.emailPessoal || '',
+              appointmentYear: item.appointmentYear || (regData?.dataNomeacao ? parseInt(regData.dataNomeacao.split('-')[0], 10) : 2026) || 2026,
+              status: item.status || (regData?.situacaoMandato === 'Anterior / Histórico' ? 'Anterior' : 'Ativo'),
+              performanceRating: item.performanceRating ?? 95,
+              teachersCount: item.teachersCount ?? regData?.professoresSobDirecao ?? 0,
+              studentsCount: item.studentsCount ?? regData?.alunosSobDirecao ?? 0,
+              location: item.location || `${regData?.municipioEscola || 'Quêssua'}`,
+              registrationData: regData || adminMap.get(key)?.registrationData,
+            };
+            adminMap.set(key, { ...(adminMap.get(key) || {}), ...adminObj });
           };
-          map.set(k, mergedUser);
-          // Self-heal stale Firestore users doc if application was already approved
-          if (isApproved && cu.status === 'pendente' && shouldPushMissing(USERS_COL, `heal_active_${k}`)) {
-            saveUserToFirestore(mergedUser).catch(() => {});
-          }
-        });
-        if (safeWriteJsonIfChanged('ucore_registered_users', Array.from(map.values()))) {
-          window.dispatchEvent(new CustomEvent('sigre-users-updated'));
-          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-        }
-      } catch {}
-    })
-  );
 
-  // Real-time persistence is handled immediately by explicit API/Firestore writes and the dirty-tracked sync engine
-  // (No blind full-localStorage startup/25s dumps that could push stale client state to the server)
+          localReg.forEach(ingestDirector);
+          localAdmin.forEach(ingestDirector);
+          cloudDirs.forEach(ingestDirector);
+
+          const c1 = safeWriteJsonIfChanged('ucore_registered_directors_v2', Array.from(regMap.values()));
+          const c2 = safeWriteJsonIfChanged('ucore_admin_directors', Array.from(adminMap.values()));
+          if (c1 || c2) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar diretores:', e);
+        }
+      })
+    );
+  }
+
+  if (enabledCols.has('dme_staff')) {
+    unsubs.push(
+      subscribeToDmeStaff((cloudStaff) => {
+        try {
+          const localStaff = safeReadJsonArray<any>('ucore_dme_staff_list');
+          const map = new Map<string, any>();
+          localStaff.forEach((s) => {
+            if (!s || isBannedSchoolOrEntity(s)) return;
+            const k = norm(s.id || s.email || s.role);
+            if (!k || isEntityTombstoned(DME_STAFF_COL, k)) return;
+            map.set(k, s);
+          });
+          cloudStaff.forEach((cs) => {
+            if (!cs || isBannedSchoolOrEntity(cs)) return;
+            const k = norm(cs.id || cs.email || cs.role);
+            if (!k || isEntityTombstoned(DME_STAFF_COL, k)) return;
+            map.set(k, { ...(map.get(k) || {}), ...cs });
+          });
+          if (safeWriteJsonIfChanged('ucore_dme_staff_list', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar equipa DME:', e);
+        }
+      })
+    );
+  }
+
+  // 5. REAL-TIME EFECTIVIDADE UNIFICATION (Bounded limit 30)
+  if (enabledCols.has('efectividade')) {
+    unsubs.push(
+      subscribeToEfectividade((cloudRecords) => {
+        try {
+          const localRecs = safeReadJsonArray<any>('sigre_cadastramento_efectividade_v2');
+          const deletedRaw = safeReadJsonArray<string>('sigre_deleted_efectividade_ids_v2');
+          const deletedSet = new Set(deletedRaw.map((id) => norm(id)));
+          const map = new Map<string, any>();
+
+          localRecs.forEach((lr) => {
+            if (!lr || !lr.id || isBannedSchoolOrEntity(lr)) return;
+            if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(EFECTIVIDADE_COL, lr.id)) return;
+            map.set(lr.id, lr);
+          });
+          cloudRecords.forEach((cr) => {
+            if (!cr || !cr.id || isBannedSchoolOrEntity(cr)) return;
+            if (deletedSet.has(norm(cr.id)) || isEntityTombstoned(EFECTIVIDADE_COL, cr.id)) return;
+            map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
+          });
+
+          const merged = Array.from(map.values());
+          if (safeWriteJsonIfChanged('sigre_cadastramento_efectividade_v2', merged)) {
+            window.dispatchEvent(new CustomEvent('sigre-efectividade-updated', { detail: { records: merged } }));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar efectividade:', e);
+        }
+      })
+    );
+  }
+
+  // 5B. REAL-TIME DECLARAÇÃO DE SERVIÇO UNIFICATION (Bounded limit 30)
+  if (enabledCols.has('declaracao_servico')) {
+    unsubs.push(
+      subscribeToDeclaracaoServico((cloudRecords) => {
+        try {
+          const localRecs = safeReadJsonArray<any>('sigre_declaracao_servico_v1');
+          const deletedRaw = safeReadJsonArray<string>('sigre_deleted_declaracao_servico_ids_v1');
+          const deletedSet = new Set(deletedRaw.map((id) => norm(id)));
+          const map = new Map<string, any>();
+
+          localRecs.forEach((lr) => {
+            if (!lr || !lr.id || isBannedSchoolOrEntity(lr)) return;
+            if (deletedSet.has(norm(lr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, lr.id)) return;
+            map.set(lr.id, lr);
+          });
+          cloudRecords.forEach((cr) => {
+            if (!cr || !cr.id || isBannedSchoolOrEntity(cr)) return;
+            if (deletedSet.has(norm(cr.id)) || isEntityTombstoned(DECLARACAO_SERVICO_COL, cr.id)) return;
+            map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
+          });
+
+          const merged = Array.from(map.values());
+          if (safeWriteJsonIfChanged('sigre_declaracao_servico_v1', merged)) {
+            window.dispatchEvent(new CustomEvent('sigre-declaracao-servico-updated', { detail: { records: merged } }));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar Declaração de Serviço:', e);
+        }
+      })
+    );
+  }
+
+  // 5C. REAL-TIME OUTROS FUNCIONÁRIOS (Bounded limit 30)
+  if (enabledCols.has('staff')) {
+    unsubs.push(
+      subscribeToStaff((cloudStaff) => {
+        try {
+          const localStaff = safeReadJsonArray<any>('ucore_registered_staff_v1');
+          const map = new Map<string, any>();
+          localStaff.forEach((ls) => {
+            if (!ls || isBannedSchoolOrEntity(ls)) return;
+            const k = norm(ls.id || ls.bi || ls.agente || ls.nomeCompleto || ls.name);
+            if (!k || isEntityTombstoned(STAFF_COL, k) || (ls.id && isEntityTombstoned(STAFF_COL, ls.id))) return;
+            map.set(k, ls);
+          });
+          cloudStaff.forEach((cs) => {
+            if (!cs || isBannedSchoolOrEntity(cs)) return;
+            const k = norm(cs.id || cs.bi || cs.agente || cs.nomeCompleto || cs.name);
+            if (!k || isEntityTombstoned(STAFF_COL, k) || (cs.id && isEntityTombstoned(STAFF_COL, cs.id))) return;
+            map.set(k, { ...(map.get(k) || {}), ...cs });
+          });
+          const merged = Array.from(map.values());
+          if (safeWriteJsonIfChanged('ucore_registered_staff_v1', merged)) {
+            window.dispatchEvent(new CustomEvent('sigre-staff-updated', { detail: { records: merged } }));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar outros funcionários:', e);
+        }
+      })
+    );
+  }
+
+  // 6. REAL-TIME MINI-PAUTAS / GRADES (Bounded limit 30)
+  if (enabledCols.has('grades')) {
+    unsubs.push(
+      subscribeToMiniPautas((cloudPautas) => {
+        try {
+          const localPautas = safeReadJsonArray<any>('sigre_teacher_mini_pautas_v5_blank');
+          const map = new Map<string, any>();
+          const getKey = (r: any) =>
+            `${norm(r.classe)}::${norm(r.turma)}::${norm(r.disciplina)}::${norm(r.schoolName)}`;
+          localPautas.forEach((lp) => {
+            if (!lp || isBannedSchoolOrEntity(lp)) return;
+            map.set(getKey(lp), lp);
+          });
+          cloudPautas.forEach((cp) => {
+            if (!cp || isBannedSchoolOrEntity(cp)) return;
+            const k = getKey(cp);
+            map.set(k, { ...(map.get(k) || {}), ...cp });
+          });
+          if (safeWriteJsonIfChanged('sigre_teacher_mini_pautas_v5_blank', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-minipautas-updated'));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar mini-pautas:', e);
+        }
+      })
+    );
+  }
+
+  // 7. REAL-TIME ATTENDANCE (Bounded limit 30)
+  if (enabledCols.has('attendance')) {
+    unsubs.push(
+      subscribeToAttendance((cloudAttendance) => {
+        try {
+          const localStudentsAtt = safeReadJsonArray<any>('ucore_student_attendance_records_v2');
+          const localTeachersAtt = safeReadJsonArray<any>('ucore_teacher_attendance_records_v2');
+          const stuMap = new Map<string, any>();
+          const teaMap = new Map<string, any>();
+
+          localStudentsAtt.forEach((r) => {
+            if (!r || !r.studentId || !r.date || isBannedSchoolOrEntity(r)) return;
+            stuMap.set(`${r.studentId}_${r.date}`, r);
+          });
+          localTeachersAtt.forEach((r) => {
+            if (!r || !r.teacherId || !r.date || isBannedSchoolOrEntity(r)) return;
+            teaMap.set(`${r.teacherId}_${r.date}`, r);
+          });
+          cloudAttendance.forEach((ca) => {
+            if (!ca || isBannedSchoolOrEntity(ca)) return;
+            if (ca.attendanceKind === 'student' || ca.studentId) {
+              const k = `${ca.studentId}_${ca.date}`;
+              stuMap.set(k, { ...(stuMap.get(k) || {}), ...ca });
+            } else if (ca.attendanceKind === 'teacher' || ca.teacherId) {
+              const k = `${ca.teacherId}_${ca.date}`;
+              teaMap.set(k, { ...(teaMap.get(k) || {}), ...ca });
+            }
+          });
+          const c1 = safeWriteJsonIfChanged('ucore_student_attendance_records_v2', Array.from(stuMap.values()));
+          const c2 = safeWriteJsonIfChanged('ucore_teacher_attendance_records_v2', Array.from(teaMap.values()));
+          if (c1 || c2) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch (e) {
+          console.warn('[UnifiedSync] Erro ao unificar presenças:', e);
+        }
+      })
+    );
+  }
+
+  // 8. REAL-TIME ANNOUNCEMENTS, ROOMS, CLASSES (Bounded limit 30)
+  if (enabledCols.has('announcements')) {
+    unsubs.push(
+      subscribeToAnnouncements((cloudAnn) => {
+        try {
+          const localAnn = safeReadJsonArray<SchoolAnnouncement>('ucore_school_announcements_v1');
+          const map = new Map<string, SchoolAnnouncement>();
+          localAnn.forEach((la) => {
+            if (!la || !la.id || isEntityTombstoned(ANNOUNCEMENTS_COL, la.id) || isBannedSchoolOrEntity(la)) return;
+            map.set(la.id, la);
+          });
+          cloudAnn.forEach((ca) => {
+            if (!ca || !ca.id || isEntityTombstoned(ANNOUNCEMENTS_COL, ca.id) || isBannedSchoolOrEntity(ca)) return;
+            map.set(ca.id, { ...(map.get(ca.id) || {}), ...ca });
+          });
+          if (safeWriteJsonIfChanged('ucore_school_announcements_v1', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  if (enabledCols.has('rooms')) {
+    unsubs.push(
+      subscribeToRooms((cloudRooms) => {
+        try {
+          const localRooms = safeReadJsonArray<DirectorRoom>('ucore_director_rooms');
+          const map = new Map<string, DirectorRoom>();
+          localRooms.forEach((lr) => {
+            if (!lr || !lr.id || isEntityTombstoned(ROOMS_COL, lr.id) || isBannedSchoolOrEntity(lr)) return;
+            map.set(lr.id, lr);
+          });
+          cloudRooms.forEach((cr) => {
+            if (!cr || !cr.id || isEntityTombstoned(ROOMS_COL, cr.id) || isBannedSchoolOrEntity(cr)) return;
+            map.set(cr.id, { ...(map.get(cr.id) || {}), ...cr });
+          });
+          if (safeWriteJsonIfChanged('ucore_director_rooms', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  if (enabledCols.has('classes')) {
+    unsubs.push(
+      subscribeToClasses((cloudClasses) => {
+        try {
+          const localClasses = safeReadJsonArray<DirectorClass>('ucore_director_classes');
+          const map = new Map<string, DirectorClass>();
+          localClasses.forEach((lc) => {
+            if (!lc || !lc.id || isEntityTombstoned(CLASSES_COL, lc.id) || isBannedSchoolOrEntity(lc)) return;
+            map.set(lc.id, lc);
+          });
+          cloudClasses.forEach((cc) => {
+            if (!cc || !cc.id || isEntityTombstoned(CLASSES_COL, cc.id) || isBannedSchoolOrEntity(cc)) return;
+            map.set(cc.id, { ...(map.get(cc.id) || {}), ...cc });
+          });
+          if (safeWriteJsonIfChanged('ucore_director_classes', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  // 9. REAL-TIME GUIAS, FICHAS, CADASTRO DOCENTE & ACTIVE USERS (Bounded limit 30)
+  if (enabledCols.has('guias_ferias')) {
+    unsubs.push(
+      subscribeToGuiasFerias((cloudGuias) => {
+        try {
+          const localGuias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1');
+          const map = new Map<string, any>();
+          localGuias.forEach((lg) => {
+            if (!lg || !lg.id || isEntityTombstoned(GUIAS_FERIAS_COL, lg.id) || isBannedSchoolOrEntity(lg)) return;
+            map.set(lg.id, lg);
+          });
+          cloudGuias.forEach((cg) => {
+            if (!cg || !cg.id || isEntityTombstoned(GUIAS_FERIAS_COL, cg.id) || isBannedSchoolOrEntity(cg)) return;
+            map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
+          });
+          if (safeWriteJsonIfChanged('sigre_guias_ferias_records_v1', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  if (enabledCols.has('guias_colocacao')) {
+    unsubs.push(
+      subscribeToGuiasColocacao((cloudGuias) => {
+        try {
+          const localGuias = safeReadJsonArray<any>('sigre_guias_colocacao_records_v1');
+          const map = new Map<string, any>();
+          localGuias.forEach((lg) => {
+            if (!lg || !lg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, lg.id) || isBannedSchoolOrEntity(lg)) return;
+            map.set(lg.id, lg);
+          });
+          cloudGuias.forEach((cg) => {
+            if (!cg || !cg.id || isEntityTombstoned(GUIAS_COLOCACAO_COL, cg.id) || isBannedSchoolOrEntity(cg)) return;
+            map.set(cg.id, { ...(map.get(cg.id) || {}), ...cg });
+          });
+          if (safeWriteJsonIfChanged('sigre_guias_colocacao_records_v1', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  if (enabledCols.has('fichas_avaliacao')) {
+    unsubs.push(
+      subscribeToFichasAvaliacao((cloudFichas) => {
+        try {
+          const localFichas = safeReadJsonArray<any>('sigre_fichas_avaliacao_records_v1');
+          const map = new Map<string, any>();
+          localFichas.forEach((lf) => {
+            if (!lf || !lf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, lf.id) || isBannedSchoolOrEntity(lf)) return;
+            map.set(lf.id, lf);
+          });
+          cloudFichas.forEach((cf) => {
+            if (!cf || !cf.id || isEntityTombstoned(FICHAS_AVALIACAO_COL, cf.id) || isBannedSchoolOrEntity(cf)) return;
+            map.set(cf.id, { ...(map.get(cf.id) || {}), ...cf });
+          });
+          if (safeWriteJsonIfChanged('sigre_fichas_avaliacao_records_v1', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  if (enabledCols.has('cadastro_docente')) {
+    unsubs.push(
+      subscribeToCadastroDocente((cloudCadastros) => {
+        try {
+          const localCadastros = safeReadJsonArray<any>('cadastro-docente-registos');
+          const map = new Map<string, any>();
+          localCadastros.forEach((lc) => {
+            if (!lc || !lc.id || isEntityTombstoned(CADASTRO_DOCENTE_COL, lc.id) || isBannedSchoolOrEntity(lc)) return;
+            map.set(String(lc.id), lc);
+          });
+          cloudCadastros.forEach((cc) => {
+            if (!cc || !cc.id || isEntityTombstoned(CADASTRO_DOCENTE_COL, cc.id) || isBannedSchoolOrEntity(cc)) return;
+            map.set(String(cc.id), { ...(map.get(String(cc.id)) || {}), ...cc });
+          });
+          const merged = Array.from(map.values());
+          if (safeWriteJsonIfChanged('cadastro-docente-registos', merged)) {
+            window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated', { detail: { records: merged } }));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  // Pending Users queue listener (Rule 2: status == 'pendente', limit 30)
+  if (enabledCols.has('users_pending')) {
+    unsubs.push(
+      subscribeToUsers((cloudUsers) => {
+        try {
+          const localUsers = safeReadJsonArray<UserAccount>('ucore_registered_users');
+          const localApps = safeReadJsonArray<PendingApplication>('ucore_pending_applications');
+          const approvedEmails = new Set<string>();
+          const approvedIds = new Set<string>();
+          localApps.forEach((a) => {
+            if (a && (a.status === 'aprovado' || Boolean(a.approvedAt))) {
+              if (a.email) approvedEmails.add(norm(a.email));
+              if (a.userId) approvedIds.add(norm(a.userId));
+              if (a.id) approvedIds.add(norm(a.id));
+            }
+          });
+
+          const map = new Map<string, UserAccount>();
+          localUsers.forEach((lu) => {
+            if (!lu || !lu.email || isBannedSchoolOrEntity(lu)) return;
+            if (
+              isEntityTombstoned(USERS_COL, lu.email) ||
+              (lu.id && isEntityTombstoned(USERS_COL, lu.id)) ||
+              isEntityTombstoned(APPLICATIONS_COL, lu.email) ||
+              (lu.id && isEntityTombstoned(APPLICATIONS_COL, lu.id))
+            ) {
+              return;
+            }
+            const k = norm(lu.email);
+            const isApproved = approvedEmails.has(k) || (lu.id ? approvedIds.has(norm(lu.id)) : false);
+            const normalizedLocal: UserAccount = isApproved && lu.status !== 'ativo' ? { ...lu, status: 'ativo' } : lu;
+            map.set(k, normalizedLocal);
+          });
+          cloudUsers.forEach((cu) => {
+            if (!cu || !cu.email || isBannedSchoolOrEntity(cu)) return;
+            if (
+              isEntityTombstoned(USERS_COL, cu.email) ||
+              (cu.id && isEntityTombstoned(USERS_COL, cu.id)) ||
+              isEntityTombstoned(APPLICATIONS_COL, cu.email) ||
+              (cu.id && isEntityTombstoned(APPLICATIONS_COL, cu.id))
+            ) {
+              return;
+            }
+            const k = norm(cu.email);
+            const prev = map.get(k);
+            const isApproved =
+              prev?.status === 'ativo' ||
+              cu.status === 'ativo' ||
+              approvedEmails.has(k) ||
+              (cu.id ? approvedIds.has(norm(cu.id)) : false);
+            const mergedUser: UserAccount = {
+              ...(prev || {}),
+              ...cu,
+              status: isApproved ? 'ativo' : cu.status || prev?.status || 'pendente',
+            };
+            map.set(k, mergedUser);
+          });
+          if (safeWriteJsonIfChanged('ucore_registered_users', Array.from(map.values()))) {
+            window.dispatchEvent(new CustomEvent('sigre-users-updated'));
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+          }
+        } catch {}
+      })
+    );
+  }
+
+  activeRealtimeScopeKey = scopeKey;
   globalRealtimeUnsubscribe = () => {
     unsubs.forEach((fn) => {
       try {
@@ -3241,9 +4216,14 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
       } catch {}
     });
     globalRealtimeUnsubscribe = null;
+    activeRealtimeScopeKey = null;
   };
 
   return globalRealtimeUnsubscribe;
+}
+
+export function initUnifiedRealtimeDatabaseSync(): () => void {
+  return initViewScopedRealtimeSync();
 }
 
 /**

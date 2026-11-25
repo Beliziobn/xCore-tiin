@@ -32,9 +32,12 @@ import { submitQuickServiceRequest } from '../../utils/quickServicesStorage';
 import {
   saveCadastroDocenteToFirestore,
   deleteCadastroDocenteFromFirestore,
+  fetchCadastroDocenteFromFirestore,
+  subscribeToCadastroDocente,
   isEntityTombstoned,
   isBannedSchoolOrEntity,
 } from '../../utils/firestoreSync';
+import { isExpressApiAvailable } from '../../utils/apiAvailability';
 
 export type VagaDocenteStatusFluxo =
   | 'Aguardando Direção da Escola'
@@ -453,10 +456,45 @@ export function recordBelongsToDirectorSchool(
   );
 }
 
+export function mergeCadastroDocenteCloudSnapshot(
+  cloudRecords: any[]
+): CadastroDocenteVagaRecord[] {
+  const local = loadVagaDocenteRecords();
+  const mergedMap = new Map<string, CadastroDocenteVagaRecord>();
+  local.forEach((r) => {
+    if (r && r.id && !isEntityTombstoned('cadastro_docente', r.id) && !isBannedSchoolOrEntity(r)) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  (Array.isArray(cloudRecords) ? cloudRecords : []).forEach((r: CadastroDocenteVagaRecord) => {
+    if (r && r.id && !isEntityTombstoned('cadastro_docente', r.id) && !isBannedSchoolOrEntity(r)) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  const merged = Array.from(mergedMap.values());
+  if (typeof window !== 'undefined') {
+    const prevRaw = localStorage.getItem(STORAGE_KEY);
+    const nextRaw = JSON.stringify(merged);
+    if (prevRaw !== nextRaw) {
+      localStorage.setItem(STORAGE_KEY, nextRaw);
+    }
+  }
+  return merged;
+}
+
 export async function syncVagasDocentesFromFirestore(): Promise<CadastroDocenteVagaRecord[]> {
   if (typeof window === 'undefined') return [];
   const local = loadVagaDocenteRecords();
   try {
+    if (!isExpressApiAvailable()) {
+      const cloudRecords = await fetchCadastroDocenteFromFirestore(30);
+      if (Array.isArray(cloudRecords) && cloudRecords.length > 0) {
+        const merged = mergeCadastroDocenteCloudSnapshot(cloudRecords);
+        window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
+        return merged;
+      }
+      return local;
+    }
     const res = await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -465,19 +503,7 @@ export async function syncVagasDocentesFromFirestore(): Promise<CadastroDocenteV
     if (!res.ok) return local;
     const data = await res.json();
     if (Array.isArray(data.cadastroDocente)) {
-      const mergedMap = new Map<string, CadastroDocenteVagaRecord>();
-      local.forEach((r) => {
-        if (r && r.id && !isEntityTombstoned('cadastro_docente', r.id) && !isBannedSchoolOrEntity(r)) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      data.cadastroDocente.forEach((r: CadastroDocenteVagaRecord) => {
-        if (r && r.id && !isEntityTombstoned('cadastro_docente', r.id) && !isBannedSchoolOrEntity(r)) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      const merged = Array.from(mergedMap.values());
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      const merged = mergeCadastroDocenteCloudSnapshot(data.cadastroDocente);
       window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
       window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
       return merged;
@@ -549,11 +575,16 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
   useEffect(() => {
     reloadRecords();
     syncVagasDocentesFromFirestore().then(() => reloadRecords()).catch(() => {});
+    const unsub = subscribeToCadastroDocente((cloudRecords) => {
+      const merged = mergeCadastroDocenteCloudSnapshot(cloudRecords);
+      setRecords(merged);
+    });
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-cadastro-docente-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);
     window.addEventListener('storage', handleUpdated);
     return () => {
+      unsub();
       window.removeEventListener('sigre-cadastro-docente-updated', handleUpdated);
       window.removeEventListener('sigre-data-synced', handleUpdated);
       window.removeEventListener('storage', handleUpdated);

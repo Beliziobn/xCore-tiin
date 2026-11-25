@@ -284,6 +284,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ==========================================
+    // Collection: /stats/{statId}
+    // Single-document dashboard aggregator counters
+    // ==========================================
+    match /stats/{statId} {
+      allow read: if true;
+      allow create, update: if isValidEntityWrite(statId);
+      allow delete: if false;
+    }
+
     // Connection test document
     match /test/connection {
       allow read: if true;

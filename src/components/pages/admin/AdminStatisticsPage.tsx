@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Hero } from '../../Hero';
 import type { AdminSchool, AdminTeacher, AdminStudent, AdminDirector } from '../../../types';
+import type { DashboardStats } from '../../../utils/firestoreSync';
 import { 
   historicalSchoolPerformance, 
   historicalAttendanceTrends 
@@ -35,6 +36,7 @@ interface AdminStatisticsPageProps {
   teachers: AdminTeacher[];
   students: AdminStudent[];
   directors?: AdminDirector[];
+  dashboardStats?: DashboardStats | null;
   onOpenRegisterModal?: () => void;
   onOpenExcelExport?: () => void;
   onOpenGoogleSheets?: () => void;
@@ -51,6 +53,7 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
   teachers,
   students,
   directors = [],
+  dashboardStats,
   onOpenExcelExport,
   onOpenGoogleSheets,
   onOpenAuditLogs,
@@ -81,11 +84,28 @@ export const AdminStatisticsPage: React.FC<AdminStatisticsPageProps> = ({
     setFilters(defaultFilterCriteria);
   };
 
-  // Compute live real statistics dynamically from filtered dataset!
-  const totalStudents = filterStats.totalStudents;
-  const totalTeachers = filterStats.totalTeachers;
-  const totalSchools = filterStats.totalSchools;
-  const totalDirectors = filterStats.totalDirectors;
+  // Compute live statistics: use single-doc aggregator stats/dashboard for global unfiltered totals (Rule 4)
+  const isUnfilteredGlobal =
+    filters.schools.length === 1 &&
+    filters.schools[0] === 'all' &&
+    filters.gradeClass === 'all' &&
+    filters.turma === 'all';
+  const totalStudents =
+    isUnfilteredGlobal && typeof dashboardStats?.totalStudents === 'number'
+      ? Math.max(filterStats.totalStudents, dashboardStats.totalStudents)
+      : filterStats.totalStudents;
+  const totalTeachers =
+    isUnfilteredGlobal && typeof dashboardStats?.totalTeachers === 'number'
+      ? Math.max(filterStats.totalTeachers, dashboardStats.totalTeachers)
+      : filterStats.totalTeachers;
+  const totalSchools =
+    isUnfilteredGlobal && typeof dashboardStats?.totalSchools === 'number'
+      ? Math.max(filterStats.totalSchools, dashboardStats.totalSchools)
+      : filterStats.totalSchools;
+  const totalDirectors =
+    isUnfilteredGlobal && typeof dashboardStats?.totalDirectors === 'number'
+      ? Math.max(filterStats.totalDirectors, dashboardStats.totalDirectors)
+      : filterStats.totalDirectors;
   const uniqueTurmas = filterStats.uniqueTurmasCount;
 
   // Gender counts directly from filtered students

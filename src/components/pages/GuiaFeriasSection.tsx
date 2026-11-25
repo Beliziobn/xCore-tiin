@@ -22,7 +22,9 @@ import {
   getTodayIso,
   formatDateExtenso,
   calculateFimDate,
+  getGuiaFeriasDateBreakdown,
   getStoredGuiaFeriasRecords,
+  mergeGuiaFeriasCloudSnapshot,
   syncGuiaFeriasFromServer,
   saveGuiaFeriasRecord,
   deleteGuiaFeriasRecord,
@@ -34,6 +36,7 @@ import {
 } from '../../utils/declaracaoPdfGenerator';
 import type { UserAccount } from '../../types';
 import { submitQuickServiceRequest } from '../../utils/quickServicesStorage';
+import { subscribeToGuiasFerias } from '../../utils/firestoreSync';
 
 export interface GuiaFeriasSectionProps {
   isLoggedIn?: boolean;
@@ -181,11 +184,16 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
   useEffect(() => {
     reloadRecords();
     syncGuiaFeriasFromServer().then(() => reloadRecords()).catch(() => {});
+    const unsub = subscribeToGuiasFerias((cloudRecords) => {
+      const merged = mergeGuiaFeriasCloudSnapshot(cloudRecords);
+      setRecords(merged);
+    });
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-guia-ferias-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);
     window.addEventListener('storage', handleUpdated);
     return () => {
+      unsub();
       window.removeEventListener('sigre-guia-ferias-updated', handleUpdated);
       window.removeEventListener('sigre-data-synced', handleUpdated);
       window.removeEventListener('storage', handleUpdated);
@@ -1371,7 +1379,7 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                       htmlFor="f-guia-dias"
                       className="block text-[13px] font-semibold text-slate-800 mb-1.5"
                     >
-                      Duração (dias) <span className="text-[#d92d20]">*</span>
+                      Duração (dias úteis) <span className="text-[#d92d20]">*</span>
                     </label>
                     <input
                       id="f-guia-dias"
@@ -1383,6 +1391,9 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                       onBlur={() => handleFieldBlur('dias')}
                       className={`${pillInputClass(Boolean(errors.dias))} font-mono`}
                     />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Sábados e domingos não contam na duração.
+                    </p>
                     {errors.dias && (
                       <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.dias}</p>
                     )}
@@ -1414,7 +1425,7 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                     htmlFor="f-guia-fim"
                     className="block text-[13px] font-semibold text-slate-800 mb-1.5"
                   >
-                    Data de término (calculada automaticamente; pode alterar){' '}
+                    Data de término / regresso (dias úteis; pode alterar){' '}
                     <span className="text-[#d92d20]">*</span>
                   </label>
                   <input
@@ -1425,6 +1436,15 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
                     onBlur={() => handleFieldBlur('fim')}
                     className={pillInputClass(Boolean(errors.fim))}
                   />
+                  {(() => {
+                    const bd = getGuiaFeriasDateBreakdown(formData.ini, parseInt(formData.dias, 10));
+                    if (!bd) return null;
+                    return (
+                      <p className="text-[11px] text-emerald-700 mt-1 font-medium">
+                        {bd.businessDays} dias úteis + {bd.weekendDaysExcluded} sábados/domingos não contabilizados ({bd.totalCalendarDays} dias de calendário).
+                      </p>
+                    );
+                  })()}
                   {errors.fim && (
                     <p className="text-xs text-[#d92d20] mt-1 font-medium">{errors.fim}</p>
                   )}

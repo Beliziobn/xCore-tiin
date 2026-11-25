@@ -23,6 +23,14 @@ import {
   validateTrimestre,
 } from "./src/utils/formConstraints";
 import {
+  areSameCanonicalSchool,
+  deduplicateSchoolsCanonical,
+  isPlaceholderSchoolName,
+  isRetiredDuplicateOrPlaceholderSchoolId,
+  RETIRED_DUPLICATE_SCHOOL_ID_MAP,
+  RETIRED_PLACEHOLDER_SCHOOL_IDS,
+} from "./src/utils/schoolMatcher";
+import {
   CANONICAL_SCHOOLS,
   CANONICAL_DIRECTORS,
   CANONICAL_TEACHERS,
@@ -874,43 +882,84 @@ async function startServer() {
 
     networkStore.applications = canonicalApps;
 
-    // 1. Build unified school map keyed by normalized school name
+    // 1. Build unified school map using canonical school identity (never duplicates dashes/accents/suffixes/numbers)
     const schoolByNormName = new Map<string, any>();
     const schoolById = new Map<string, any>();
 
+    const findExistingCanonicalSchool = (candidate: { id?: string; name?: string; nomeOficial?: string; codigoSIGE?: string }): any => {
+      const cId = String(candidate?.id || "").trim().toLowerCase();
+      if (cId && schoolById.has(cId)) return schoolById.get(cId);
+      const remapped = cId ? RETIRED_DUPLICATE_SCHOOL_ID_MAP[cId] : undefined;
+      if (remapped && schoolById.has(remapped.id.toLowerCase())) {
+        return schoolById.get(remapped.id.toLowerCase());
+      }
+      const rawName = cleanSchoolNameSpaces(candidate?.name || candidate?.nomeOficial || "");
+      const normName = normalizeAscii(rawName);
+      if (normName && schoolByNormName.has(normName)) return schoolByNormName.get(normName);
+      for (const existing of schoolByNormName.values()) {
+        if (areSameCanonicalSchool(existing, { id: cId, name: rawName, codigoSIGE: candidate?.codigoSIGE })) {
+          return existing;
+        }
+      }
+      return undefined;
+    };
+
     const registerSchoolCandidate = (sc: any) => {
       if (!sc || typeof sc !== "object") return;
+      const rawId = String(sc.id || "").trim().toLowerCase();
+      if (rawId && RETIRED_PLACEHOLDER_SCHOOL_IDS.has(rawId)) return;
       const rawName = cleanSchoolNameSpaces(sc.name || sc.nomeOficial || sc.registrationData?.nomeOficial || "");
-      if (!rawName) return;
+      if (!rawName || isPlaceholderSchoolName(rawName)) return;
       if (isEliminatedSchoolOrRecord(sc) || isItemTombstoned("schools", sc, tombstonesSet)) return;
       const normName = normalizeAscii(rawName);
       if (!normName || normName.includes("direccao municipal") || normName.includes("direcao municipal")) return;
 
-      const existingById = sc.id ? schoolById.get(String(sc.id).toLowerCase()) : undefined;
-      const existing = existingById || schoolByNormName.get(normName);
+      const remapped = rawId ? RETIRED_DUPLICATE_SCHOOL_ID_MAP[rawId] : undefined;
+      const normalizedSc = remapped
+        ? {
+            ...sc,
+            id: remapped.id,
+            name: remapped.name,
+            registrationData: sc.registrationData
+              ? { ...sc.registrationData, id: remapped.id, nomeOficial: remapped.name }
+              : sc.registrationData,
+          }
+        : sc;
+
+      const existing = findExistingCanonicalSchool(normalizedSc);
       if (existing) {
         const oldNorm = normalizeAscii(existing.name || existing.nomeOficial || "");
-        const incomingNewer = Number(sc._updatedAt || 0) >= Number(existing._updatedAt || 0);
-        const resolvedName = incomingNewer ? (rawName || existing.name) : (existing.name || rawName);
+        const existingIsReal = String(existing.id || "").startsWith("sch-179");
+        const incomingIsReal = String(normalizedSc.id || "").startsWith("sch-179");
+        const incomingNewer = Number(normalizedSc._updatedAt || 0) >= Number(existing._updatedAt || 0);
+        const preferIncomingMeta = (incomingIsReal && !existingIsReal) || (incomingIsReal === existingIsReal && incomingNewer);
+        const resolvedId = existingIsReal ? existing.id : (normalizedSc.id || existing.id);
+        const resolvedName = preferIncomingMeta ? (normalizedSc.name || rawName || existing.name) : (existing.name || normalizedSc.name || rawName);
         if (oldNorm && oldNorm !== normalizeAscii(resolvedName)) {
           schoolByNormName.delete(oldNorm);
         }
         const merged = {
-          ...existing,
-          ...sc,
-          id: existing.id?.startsWith("sch-179") ? existing.id : (sc.id || existing.id),
+          ...(preferIncomingMeta ? existing : normalizedSc),
+          ...(preferIncomingMeta ? normalizedSc : existing),
+          id: resolvedId,
           name: resolvedName,
           directorName:
-            sc.directorName && sc.directorName !== "Diretor a Designar" && sc.directorName !== "Fert Horlan"
-              ? sc.directorName
+            normalizedSc.directorName && normalizedSc.directorName !== "Diretor a Designar" && normalizedSc.directorName !== "Fert Horlan"
+              ? normalizedSc.directorName
               : existing.directorName,
-          registrationData: sc.registrationData || existing.registrationData,
+          teachersCount: Math.max(Number(existing.teachersCount || 0), Number(normalizedSc.teachersCount || 0)),
+          registrationData: (preferIncomingMeta ? normalizedSc.registrationData : existing.registrationData) || existing.registrationData || normalizedSc.registrationData,
         };
+        if (merged.registrationData) {
+          merged.registrationData = { ...merged.registrationData, id: resolvedId, nomeOficial: resolvedName };
+        }
         schoolByNormName.set(normalizeAscii(resolvedName), merged);
         if (merged.id) schoolById.set(String(merged.id).toLowerCase(), merged);
       } else {
-        const full = sc.registrationData ? { ...sc, name: rawName } : { ...buildDefaultSchoolRecord(rawName, sc.id, sc.directorName, sc.email, sc.phone), ...sc, name: rawName };
-        schoolByNormName.set(normName, full);
+        const full = normalizedSc.registrationData
+          ? { ...normalizedSc, name: normalizedSc.name || rawName }
+          : { ...buildDefaultSchoolRecord(normalizedSc.name || rawName, normalizedSc.id, normalizedSc.directorName, normalizedSc.email, normalizedSc.phone), ...normalizedSc, name: normalizedSc.name || rawName };
+        schoolByNormName.set(normalizeAscii(full.name), full);
         if (full.id) schoolById.set(String(full.id).toLowerCase(), full);
       }
     };
@@ -918,21 +967,21 @@ async function startServer() {
     // First register existing schools in networkStore.schools
     (networkStore.schools || []).forEach(registerSchoolCandidate);
 
-    // Register schools referenced in applications (preserving their exact schoolId!)
+    // Register schools referenced in active/pending applications (never rejected/test or placeholder schools!)
     (networkStore.applications || []).forEach((appItem) => {
-      if (!appItem || !appItem.schoolName) return;
+      if (!appItem || !appItem.schoolName || appItem.status === "rejeitado") return;
       const sName = cleanSchoolNameSpaces(appItem.schoolName);
       const normS = normalizeAscii(sName);
-      if (!normS || normS.includes("direccao municipal") || normS.includes("direcao municipal")) return;
+      if (!normS || isPlaceholderSchoolName(sName)) return;
       const isApprovedDir = (appItem.type === "diretor" || appItem.schoolRole === "diretor_geral") && appItem.status === "aprovado";
-      const existing = (appItem.schoolId ? schoolById.get(String(appItem.schoolId).toLowerCase()) : undefined) || schoolByNormName.get(normS);
+      const existing = findExistingCanonicalSchool({ id: appItem.schoolId, name: sName });
       if (existing) {
-        if (appItem.schoolId && String(existing.id || "").startsWith("sch-quessua-")) {
+        if (appItem.schoolId && !isRetiredDuplicateOrPlaceholderSchoolId(appItem.schoolId) && String(existing.id || "").startsWith("sch-quessua-") && String(appItem.schoolId).startsWith("sch-179")) {
           existing.id = appItem.schoolId;
           if (existing.registrationData) existing.registrationData.id = appItem.schoolId;
           schoolById.set(String(appItem.schoolId).toLowerCase(), existing);
         }
-        if (isApprovedDir && appItem.fullName) {
+        if (isApprovedDir && appItem.fullName && (!existing.directorName || existing.directorName === "Diretor a Designar")) {
           existing.directorName = appItem.fullName;
           if (existing.registrationData?.director) {
             existing.registrationData.director.nome = appItem.fullName;
@@ -940,7 +989,7 @@ async function startServer() {
             if (appItem.phone) existing.registrationData.director.contacto = appItem.phone;
           }
         }
-      } else {
+      } else if (!isRetiredDuplicateOrPlaceholderSchoolId(appItem.schoolId)) {
         const candidate = buildDefaultSchoolRecord(
           sName,
           appItem.schoolId,
@@ -952,28 +1001,26 @@ async function startServer() {
       }
     });
 
-    // Register all 30 official Quêssua schools so every device has the complete municipal network
+    // Register all 30 official Quêssua schools ONLY if no canonical match already exists
     OFFICIAL_QUESSUA_SCHOOL_NAMES.forEach((officialName) => {
-      const normS = normalizeAscii(officialName);
       const defaultRec = buildDefaultSchoolRecord(officialName);
-      if (!schoolByNormName.has(normS) && !schoolById.has(String(defaultRec.id).toLowerCase())) {
+      if (!findExistingCanonicalSchool({ id: defaultRec.id, name: officialName })) {
         registerSchoolCandidate(defaultRec);
       }
     });
 
-    // Also register any additional Quêssua schools referenced in directors or teachers
+    // Also register any additional real Quêssua schools referenced in directors (ignoring placeholders and duplicates)
     (networkStore.directors || []).forEach((dir) => {
       if (dir?.schoolName) {
         const cleanS = cleanSchoolNameSpaces(dir.schoolName);
-        const normS = normalizeAscii(cleanS);
-        if (!normS || normS.includes("direccao municipal") || normS.includes("direcao municipal")) return;
-        const existing = schoolByNormName.get(normS);
-        if (existing && (dir.name || dir.nomeCompleto)) {
+        if (!cleanS || isPlaceholderSchoolName(cleanS)) return;
+        const existing = findExistingCanonicalSchool({ id: dir.schoolId, name: cleanS });
+        if (existing && (dir.name || dir.nomeCompleto) && (!existing.directorName || existing.directorName === "Diretor a Designar")) {
           existing.directorName = dir.name || dir.nomeCompleto;
           if (existing.registrationData?.director) {
             existing.registrationData.director.nome = dir.name || dir.nomeCompleto;
           }
-        } else if (!existing) {
+        } else if (!existing && !isRetiredDuplicateOrPlaceholderSchoolId(dir.schoolId)) {
           registerSchoolCandidate(buildDefaultSchoolRecord(cleanS, dir.schoolId, dir.name || dir.nomeCompleto, dir.email, dir.phone));
         }
       }
@@ -1778,7 +1825,9 @@ async function startServer() {
       (sc) =>
         sc &&
         (sc.name || sc.nomeOficial) &&
-        !isEliminatedSchoolOrRecord(sc)
+        !isEliminatedSchoolOrRecord(sc) &&
+        !isPlaceholderSchoolName(sc.name || sc.nomeOficial) &&
+        !isRetiredDuplicateOrPlaceholderSchoolId(sc.id)
     );
 
     if (validIncoming.length > 0) {
@@ -1787,15 +1836,10 @@ async function startServer() {
       });
       const nextList: any[] = [...(networkStore.schools || [])];
       for (const sc of validIncoming) {
-        const sId = String(sc.id || "").trim().toLowerCase();
-        const sName = normalizeAscii(sc.name || sc.nomeOficial || "");
         const sCode = normalizeAscii(sc.codigoSIGE || sc.registrationData?.codigoSIGE || "");
         const idx = nextList.findIndex((ex) => {
-          const eId = String(ex?.id || "").trim().toLowerCase();
-          const eName = normalizeAscii(ex?.name || ex?.nomeOficial || "");
+          if (areSameCanonicalSchool(ex, sc)) return true;
           const eCode = normalizeAscii(ex?.codigoSIGE || ex?.registrationData?.codigoSIGE || "");
-          if (sId && eId && sId === eId) return true;
-          if (sName && eName && sName === eName) return true;
           if (sCode && eCode && sCode !== "sige-102012" && sCode === eCode) return true;
           return false;
         });
@@ -1803,14 +1847,14 @@ async function startServer() {
           const prev = nextList[idx];
           const prevTs = Number(prev?._updatedAt || Date.parse(prev?.updatedAt || "") || 0);
           const nextTs = Number(sc?._updatedAt || Date.parse(sc?.updatedAt || "") || 0);
-          // Single school POST (explicit edit/create) or newer timestamp always wins
           const isExplicitSingle = Boolean(school && sc === school);
           const primary = isExplicitSingle || nextTs >= prevTs ? sc : prev;
           const secondary = isExplicitSingle || nextTs >= prevTs ? prev : sc;
+          const resolvedId = String(prev?.id || "").startsWith("sch-179") ? prev.id : (primary.id || secondary.id);
           nextList[idx] = {
             ...secondary,
             ...primary,
-            id: primary.id || secondary.id,
+            id: resolvedId,
             name: primary.name || primary.nomeOficial || secondary.name,
             registrationData: primary.registrationData || secondary.registrationData,
             _updatedAt: Number(primary._updatedAt || Date.now()),
@@ -1823,7 +1867,7 @@ async function startServer() {
           });
         }
       }
-      networkStore.schools = nextList;
+      networkStore.schools = deduplicateSchoolsCanonical(nextList);
       persistNetworkStore();
     }
 

@@ -41,6 +41,11 @@ import {
 } from '../data/canonicalNetworkSeed';
 import { io, Socket } from 'socket.io-client';
 import { extractFlatRegistrationData, stripNestedRegistrationData } from './svgSanitizer';
+import {
+  areSameCanonicalSchool,
+  deduplicateSchoolsCanonical,
+  isPlaceholderSchoolName,
+} from './schoolMatcher';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
 
@@ -831,38 +836,47 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
       ? existingList.filter((s) => s && s.name && !isModeloCentralSchool(s.name))
       : [];
 
-    // Match by ID first so renaming an existing school replaces the old record cleanly
+    // Match by ID first, then canonical school identity (dashes, accents, number, Quêssua suffix) so editing/saving never creates duplicates
     let existingIdx = safeList.findIndex(
       (s) => s.id && schoolWithReg.id && String(s.id).trim().toLowerCase() === String(schoolWithReg.id).trim().toLowerCase()
     );
     if (existingIdx < 0) {
-      existingIdx = safeList.findIndex((s) => norm(s.name) === norm(schoolWithReg.name));
+      existingIdx = safeList.findIndex((s) => areSameCanonicalSchool(s, schoolWithReg));
     }
 
     const oldSchoolName = existingIdx >= 0 ? safeList[existingIdx].name : undefined;
 
     let nextSchools: AdminSchool[];
     if (existingIdx >= 0) {
+      const targetId = safeList[existingIdx].id || schoolWithReg.id;
+      const mergedSchool: AdminSchool = {
+        ...safeList[existingIdx],
+        ...schoolWithReg,
+        id: targetId,
+        registrationData: schoolWithReg.registrationData
+          ? { ...schoolWithReg.registrationData, id: targetId }
+          : safeList[existingIdx].registrationData,
+      };
       nextSchools = safeList
-        .map((s, idx) =>
-          idx === existingIdx
-            ? {
-                ...s,
-                ...schoolWithReg,
-                registrationData: schoolWithReg.registrationData || s.registrationData,
-              }
-            : s
-        )
-        // Remove any duplicate entry that had the old or new name under a different ID
+        .map((s, idx) => (idx === existingIdx ? mergedSchool : s))
+        // Remove any duplicate entry that matched canonically or had the old name under a different ID
         .filter(
           (s, idx) =>
             idx === existingIdx ||
-            (norm(s.name) !== norm(schoolWithReg.name) &&
+            (!areSameCanonicalSchool(s, mergedSchool) &&
               (!oldSchoolName || norm(s.name) !== norm(oldSchoolName)))
         );
     } else {
+      if (isPlaceholderSchoolName(schoolWithReg.name)) {
+        return safeList;
+      }
       nextSchools = [schoolWithReg, ...safeList];
     }
+
+    nextSchools = deduplicateSchoolsCanonical(
+      nextSchools,
+      (sc) => isBannedSchoolOrEntity(sc) || isEntityTombstoned('schools', sc.id) || isEntityTombstoned('schools', sc.name)
+    );
 
     localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(nextSchools));
     localStorage.setItem('ucore_registered_schools_v1', JSON.stringify(nextSchools));
@@ -1499,39 +1513,25 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         }
       }
 
-      // 1. Merge Schools (Non-destructive union of Server + Local/Firestore, deduplicating by ID and normalized name)
+      // 1. Merge Schools (Non-destructive union of Server + Local/Firestore, deduplicating canonically by ID/name/number)
       if (Array.isArray(data.schools) && !dirtyCollections.has('schools')) {
-        const validServerSchools = data.schools.filter((s: any) => s && s.name && !isModeloCentralSchool(s.name));
+        const validServerSchools = data.schools.filter(
+          (s: any) => s && s.name && !isModeloCentralSchool(s.name) && !isPlaceholderSchoolName(s.name)
+        );
         const rawMergedSchools = reconcileList(
           localSchools,
           validServerSchools,
           'schools',
           (s) => String(s.id || norm(s.name)).trim().toLowerCase()
-        ).filter((s) => !isEntityTombstoned('schools', s.name));
+        );
 
-        // Deduplicate any schools that matched by normalized name under different IDs, keeping newest edit
-        const dedupedSchools: AdminSchool[] = [];
-        rawMergedSchools.forEach((sc: AdminSchool) => {
-          const n = norm(sc.name);
-          const sId = String(sc.id || '').trim().toLowerCase();
-          const idx = dedupedSchools.findIndex(
-            (ex) => (sId && ex.id && String(ex.id).trim().toLowerCase() === sId) || norm(ex.name) === n
-          );
-          if (idx >= 0) {
-            const prev = dedupedSchools[idx];
-            const prevTs = Number((prev as any)._updatedAt || Date.parse((prev as any).updatedAt || '') || 0);
-            const nextTs = Number((sc as any)._updatedAt || Date.parse((sc as any).updatedAt || '') || 0);
-            const primary = nextTs >= prevTs ? sc : prev;
-            const secondary = nextTs >= prevTs ? prev : sc;
-            dedupedSchools[idx] = {
-              ...secondary,
-              ...primary,
-              registrationData: primary.registrationData || secondary.registrationData,
-            };
-          } else {
-            dedupedSchools.push(sc);
-          }
-        });
+        const dedupedSchools = deduplicateSchoolsCanonical(
+          rawMergedSchools,
+          (sc) =>
+            isBannedSchoolOrEntity(sc) ||
+            isEntityTombstoned('schools', sc.id) ||
+            isEntityTombstoned('schools', sc.name)
+        );
 
         if (JSON.stringify(dedupedSchools) !== JSON.stringify(localSchools)) {
           setLocalStorageFromServer(STORAGE_KEY_SCHOOLS, JSON.stringify(dedupedSchools));

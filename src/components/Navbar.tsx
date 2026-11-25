@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText, Archive, Zap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
-import { getPendingApplications, syncApplicationsFromServer, isSchoolDirectorApproval, schoolsMatch, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
+import { getPendingApplications, isSchoolDirectorApproval, schoolsMatch, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
 import { getCachedQuickRequests } from '../utils/quickServicesStorage';
+import { fetchDashboardStats, type DashboardStats } from '../utils/firestoreSync';
 import {
   loadVagaDocenteRecords,
   recordBelongsToDirectorSchool,
@@ -206,13 +207,29 @@ export const Navbar: React.FC<NavbarProps> = ({
       } catch {}
     };
 
+    const applyDashboardStats = (stats?: DashboardStats | null) => {
+      if (!stats) return;
+      if (typeof stats.pendingApplications === 'number') {
+        setPendingAppsCount({ director: 0, admin: stats.pendingApplications });
+      }
+      if (
+        (activeRole === 'admin' || currentUser?.role === 'admin') &&
+        typeof stats.pendingQuickRequests === 'number'
+      ) {
+        setPendingQuickRequestsCount(stats.pendingQuickRequests);
+      }
+    };
+
     const refreshCountsFromLocal = () => {
       updateQuickRequests();
       updateVagasWorkflow();
       try {
         const all = getPendingApplications();
         const admPending = all.filter((a) => a.status === 'pendente').length;
-        setPendingAppsCount({ director: 0, admin: admPending });
+        setPendingAppsCount((prev) => ({
+          director: 0,
+          admin: prev.admin > 0 ? prev.admin : admPending,
+        }));
       } catch {}
     };
 
@@ -226,11 +243,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         lastNavbarCloudSyncAt = now;
         syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
         if (currentUser.role === 'admin') {
-          syncApplicationsFromServer()
-            .then((all) => {
-              const admPending = all.filter((a) => a.status === 'pendente').length;
-              setPendingAppsCount({ director: 0, admin: admPending });
-            })
+          fetchDashboardStats()
+            .then((stats) => applyDashboardStats(stats))
             .catch(() => {});
         }
       }
@@ -238,17 +252,23 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     updateCounts();
     const handleSync = () => refreshCountsFromLocal();
+    const handleStatsUpdated = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ stats?: DashboardStats }>).detail;
+      if (detail?.stats) applyDashboardStats(detail.stats);
+    };
     window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('sigre-dashboard-stats-updated', handleStatsUpdated);
     window.addEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
     window.addEventListener('sigre_quick_request_created', updateQuickRequests);
     window.addEventListener('sigre_quick_request_updated', updateQuickRequests);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('sigre-dashboard-stats-updated', handleStatsUpdated);
       window.removeEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
       window.removeEventListener('sigre_quick_request_created', updateQuickRequests);
       window.removeEventListener('sigre_quick_request_updated', updateQuickRequests);
     };
-  }, [activeRole, currentUser?.id, currentUser?.email, currentUser?.role, currentUser?.schoolName, currentUser?.schoolId]);
+  }, [activeRole, currentUser?.id, currentUser?.email, currentUser?.role, currentUser?.status, currentUser?.schoolName, currentUser?.schoolId]);
 
   const isLoginLoading = (isAuthLoading && authLoadingAction === 'login') || navLoadingAction === 'login';
   const isRegisterLoading = (isAuthLoading && authLoadingAction === 'register') || navLoadingAction === 'register';

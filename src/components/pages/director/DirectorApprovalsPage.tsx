@@ -40,6 +40,7 @@ import type {
   PendingApprovalComplementaryData, 
   TeacherRegistrationData 
 } from '../../../types';
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import {
   getPendingApplications,
   approveApplication,
@@ -52,8 +53,10 @@ import {
   deduplicateApplicationsList,
   normalizeSchoolText,
   syncApplicationsFromServer,
+  syncArchivedApplicationsPage,
   OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
+import { PAGINATION_PAGE_SIZE } from '../../../utils/firestoreSync';
 import { isSubdirectorOrNonTeachingRole } from '../../../utils/teacherStorage';
 import { Hero } from '../../Hero';
 
@@ -84,6 +87,9 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
   const [roleFilter, setRoleFilter] = useState<'todos' | 'professor' | 'aluno' | 'funcionario'>('todos');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
+  const [archiveCursor, setArchiveCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMoreArchive, setHasMoreArchive] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const hasInitializedStatusRef = useRef(false);
 
   // Approval Modal State
@@ -144,6 +150,28 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
     }
   };
 
+  const loadArchivePage = async (
+    targetStatus: 'todos' | 'pendente' | 'aprovado' | 'rejeitado',
+    append: boolean = false
+  ) => {
+    if (isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await syncArchivedApplicationsPage({
+        status: targetStatus,
+        pageSize: PAGINATION_PAGE_SIZE,
+        cursor: append ? archiveCursor : null,
+      });
+      setApplications(res.merged.filter((a) => isSchoolDirectorApproval(a)));
+      setArchiveCursor(res.lastDoc);
+      setHasMoreArchive(res.hasMore);
+    } catch {
+      // ignore
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
     loadApplications();
     const handleSync = () => {
@@ -157,6 +185,14 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       window.removeEventListener('sigre-data-synced', handleSync);
     };
   }, []);
+
+  useEffect(() => {
+    setArchiveCursor(null);
+    setHasMoreArchive(false);
+    if (statusFilter === 'aprovado' || statusFilter === 'rejeitado' || statusFilter === 'todos') {
+      loadArchivePage(statusFilter, false);
+    }
+  }, [statusFilter]);
 
   // Applications scoped strictly to this Director's chosen school
   const schoolScopedApps = useMemo(() => {
@@ -1098,6 +1134,24 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {hasMoreArchive && (
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              disabled={isLoadingMore}
+              onClick={() => loadArchivePage(statusFilter, true)}
+              className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-[#002133] shadow-xs flex items-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingMore ? 'animate-spin' : ''}`} />
+              <span>
+                {isLoadingMore
+                  ? 'A carregar mais registos...'
+                  : `Carregar mais registos (próximos ${PAGINATION_PAGE_SIZE})`}
+              </span>
+            </button>
           </div>
         )}
       </main>

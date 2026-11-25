@@ -56,7 +56,8 @@ import {
   saveRegisteredSchool,
 } from '../../utils/schoolStorage';
 import { getStoredTeachers } from '../../utils/teacherStorage';
-import { getStoredStudents } from '../../utils/studentStorage';
+import { getStoredStudents, getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
+import { findPotentialDuplicateSchool, isPlaceholderSchoolName } from '../../utils/schoolMatcher';
 import { SmartAutofillBar } from '../common/SmartAutofillBar';
 import type { AutofillProfile } from '../../utils/smartAutofill';
 
@@ -423,12 +424,48 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
   const totalClassesCount = useMemo(() => calculateTotalClassesOffered(oferta), [oferta]);
   const totalSalas = salasDefinitivas + salasProvisorias + salasImprovisadas + salasAoArLivre;
 
+  const existingSchoolsList = useMemo(() => {
+    if (!isOpen) return [];
+    return getRegisteredSchoolsFromStorage();
+  }, [isOpen]);
+
+  const duplicateCheck = useMemo(() => {
+    if (!nomeOficial.trim()) return null;
+    const editingId = initialData?.id || existingSchool?.id;
+    return findPotentialDuplicateSchool(nomeOficial, existingSchoolsList, {
+      excludeId: editingId,
+      codigoSIGE,
+    });
+  }, [nomeOficial, codigoSIGE, existingSchoolsList, initialData?.id, existingSchool?.id]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     if (!nomeOficial.trim()) {
       setErrorMessage('Por favor informe o Nome Oficial da Escola.');
+      setActiveTab(1);
+      return;
+    }
+
+    if (isPlaceholderSchoolName(nomeOficial)) {
+      setErrorMessage('Informe o nome oficial real da unidade escolar (nomes genéricos ou de teste não são permitidos).');
+      setActiveTab(1);
+      return;
+    }
+
+    if (duplicateCheck) {
+      const reasonText =
+        duplicateCheck.reason === 'exact'
+          ? 'já existe cadastrada no sistema com este nome'
+          : duplicateCheck.reason === 'same_sige'
+          ? 'já possui este Código SIGE atribuído'
+          : duplicateCheck.reason === 'same_number'
+          ? 'já existe cadastrada com o mesmo número oficial'
+          : 'possui grafia quase idêntica (possível duplicação por letra trocada ou pontuação)';
+      setErrorMessage(
+        `Cadastro duplicado bloqueado: a escola "${duplicateCheck.matchedSchool.name}" ${reasonText}. Edite o registo já existente em "Minhas Escolas" em vez de criar uma duplicata.`
+      );
       setActiveTab(1);
       return;
     }
@@ -672,8 +709,26 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
                   value={nomeOficial}
                   onChange={(e) => setNomeOficial(e.target.value)}
                   placeholder="Ex: Escola Primária N.º 42 de Quêssua"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all font-medium"
+                  className={`w-full px-4 py-3 bg-white border rounded-2xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all font-medium ${
+                    duplicateCheck
+                      ? 'border-rose-400 focus:ring-rose-200 focus:border-rose-600'
+                      : 'border-slate-200 focus:ring-slate-900/10 focus:border-slate-800'
+                  }`}
                 />
+
+                {duplicateCheck && (
+                  <div className="mt-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Possível escola duplicada detectada</p>
+                      <p className="mt-0.5 text-rose-700">
+                        Já existe no sistema: <strong>{duplicateCheck.matchedSchool.name}</strong>
+                        {duplicateCheck.matchedSchool.directorName ? ` (Dir.: ${duplicateCheck.matchedSchool.directorName})` : ''}.
+                        Para evitar duplicação, edite a escola existente em &quot;Minhas Escolas&quot;.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Quick Assist Chips (Matches Image format chips) */}
                 <div className="flex items-center gap-2 flex-wrap mt-2">

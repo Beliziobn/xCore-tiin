@@ -111,18 +111,46 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
     return propSchools && propSchools.length > 0 ? propSchools : getRegisteredSchoolsFromStorage();
   }, [propSchools, isModalOpen, isEditModalOpen]);
 
+  const isSchoolBoundUser = useMemo(() => {
+    return Boolean(
+      currentUser &&
+      currentUser.role !== 'admin' &&
+      (currentUser.schoolId || currentUser.schoolName)
+    );
+  }, [currentUser]);
+
   const [selectedDirectorSchoolId, setSelectedDirectorSchoolId] = useState<string>(() => {
-    const initial = getActiveDirectorSchool(propSchools, currentUser?.schoolName);
+    const initial = getActiveDirectorSchool(propSchools, currentUser?.schoolName, currentUser?.schoolId);
     return initial?.id || '';
   });
 
   const activeDirectorSchool = useMemo(() => {
+    if (isSchoolBoundUser) {
+      const norm = (str?: string) =>
+        (str || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, ' ');
+      const targetId = String(currentUser?.schoolId || '').trim().toLowerCase();
+      const targetName = norm(currentUser?.schoolName);
+      if (targetId) {
+        const byId = availableSchools.find((s) => String(s.id || '').trim().toLowerCase() === targetId);
+        if (byId) return byId;
+      }
+      if (targetName && !targetName.includes('modelo central')) {
+        const byName = availableSchools.find((s) => norm(s.name) === targetName);
+        if (byName) return byName;
+      }
+      return undefined;
+    }
     if (selectedDirectorSchoolId) {
       const found = availableSchools.find((s) => s.id === selectedDirectorSchoolId);
       if (found) return found;
     }
-    return getActiveDirectorSchool(availableSchools, currentUser?.schoolName);
-  }, [availableSchools, selectedDirectorSchoolId, currentUser?.schoolName]);
+    return getActiveDirectorSchool(availableSchools, currentUser?.schoolName, currentUser?.schoolId);
+  }, [availableSchools, selectedDirectorSchoolId, isSchoolBoundUser, currentUser?.schoolName, currentUser?.schoolId]);
 
   const directorSchoolQuota = useMemo(() => {
     if (!activeDirectorSchool) {
@@ -272,8 +300,8 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
       classe: formatted.gradeClass,
       turma: formatted.turma,
       sala: formatted.room,
-      escola: newStudent.escola || directorSchoolQuota.schoolName || '',
-      schoolId: newStudent.schoolId || activeDirectorSchool?.id,
+      escola: directorSchoolQuota.schoolName || newStudent.escola || '',
+      schoolId: activeDirectorSchool?.id || currentUser?.schoolId || newStudent.schoolId,
       condicaoMatricula: (formatted.condicaoMatricula as any) || 'primeira_vez',
       alunoRepetente: formatted.condicaoMatricula === 'repetente',
       encarregado: formatted.guardianName,
@@ -301,10 +329,14 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
         foto: formatted.foto,
         anexoDocumentoNome: formatted.anexoDocumentoNome,
         performanceScore: formatted.performanceScore,
-        schoolName: newStudent.escola || directorSchoolQuota.schoolName || '',
-        schoolId: newStudent.schoolId,
+        schoolName: directorSchoolQuota.schoolName || newStudent.escola || '',
+        schoolId: activeDirectorSchool?.id || currentUser?.schoolId || newStudent.schoolId,
         schoolType: newStudent.naturezaEscola || 'Pública',
-        registrationData: newStudent,
+        registrationData: {
+          ...newStudent,
+          escola: directorSchoolQuota.schoolName || newStudent.escola || '',
+          schoolId: activeDirectorSchool?.id || currentUser?.schoolId || newStudent.schoolId,
+        },
       };
       onAddStudentGlobal(adminFormatted);
     }
@@ -338,7 +370,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {availableSchools.length > 1 && (
+              {!isSchoolBoundUser && availableSchools.length > 1 && (
                 <select
                   value={activeDirectorSchool?.id || ''}
                   onChange={(e) => {
@@ -777,6 +809,9 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
         entityType="alunos"
         onSuccess={handleCreateSuccess}
         schoolName={directorSchoolQuota.schoolName}
+        schoolId={activeDirectorSchool?.id || currentUser?.schoolId}
+        schools={activeDirectorSchool ? [activeDirectorSchool] : undefined}
+        lockSchool={true}
       />
 
       {/* Analytical Matrix Modal */}
@@ -857,6 +892,9 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
           setEditingStudent(null);
         }}
         schoolName={directorSchoolQuota.schoolName || ''}
+        schoolId={activeDirectorSchool?.id || currentUser?.schoolId}
+        schools={activeDirectorSchool ? [activeDirectorSchool] : undefined}
+        lockSchool={true}
       />
 
       {/* Turma Student List PDF Modal (A-Z) */}

@@ -5,9 +5,11 @@
 import {
   saveGuiaFeriasToFirestore,
   deleteGuiaFeriasFromFirestore,
+  fetchGuiasFeriasFromFirestore,
   isEntityTombstoned,
   isBannedSchoolOrEntity,
 } from './firestoreSync';
+import { isExpressApiAvailable } from './apiAvailability';
 
 export interface GuiaFeriasRecord {
   id: string;
@@ -71,11 +73,63 @@ export function formatDateExtenso(s: string): string {
   return `${d.d} de ${MESES[d.m - 1]} de ${d.y}`;
 }
 
+export interface GuiaFeriasDateBreakdown {
+  ini: string;
+  fim: string;
+  businessDays: number;
+  weekendDaysExcluded: number;
+  totalCalendarDays: number;
+}
+
+/**
+ * Calcula a data de término / regresso da Guia de Férias contando APENAS dias úteis
+ * (segunda a sexta-feira). Sábados e domingos não são contabilizados nem subtraídos da duração.
+ */
 export function calculateFimDate(ini: string, dias: number): string {
+  const breakdown = getGuiaFeriasDateBreakdown(ini, dias);
+  return breakdown ? breakdown.fim : '';
+}
+
+export function getGuiaFeriasDateBreakdown(
+  ini: string,
+  dias: number
+): GuiaFeriasDateBreakdown | null {
   const d = parseDateParts(ini);
-  if (!d || !dias) return '';
-  const dateObj = new Date(Date.UTC(d.y, d.m - 1, d.d + dias));
-  return dateObj.toISOString().slice(0, 10);
+  const totalBusinessDays = Math.floor(Number(dias));
+  if (!d || !Number.isFinite(totalBusinessDays) || totalBusinessDays < 1) return null;
+
+  const startMs = Date.UTC(d.y, d.m - 1, d.d);
+  const cur = new Date(startMs);
+  let weekendDaysExcluded = 0;
+
+  // Se a data de início cair num sábado (6) ou domingo (0), o gozo em dias úteis inicia no próximo dia útil
+  while (cur.getUTCDay() === 0 || cur.getUTCDay() === 6) {
+    weekendDaysExcluded++;
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+
+  // Avança exactamente `totalBusinessDays` dias úteis (segunda a sexta), saltando todos os sábados e domingos
+  let counted = 0;
+  while (counted < totalBusinessDays) {
+    cur.setUTCDate(cur.getUTCDate() + 1);
+    const dow = cur.getUTCDay();
+    if (dow === 0 || dow === 6) {
+      weekendDaysExcluded++;
+    } else {
+      counted++;
+    }
+  }
+
+  const endMs = cur.getTime();
+  const totalCalendarDays = Math.round((endMs - startMs) / (24 * 60 * 60 * 1000));
+
+  return {
+    ini,
+    fim: cur.toISOString().slice(0, 10),
+    businessDays: totalBusinessDays,
+    weekendDaysExcluded,
+    totalCalendarDays,
+  };
 }
 
 export function getStoredGuiaFeriasRecords(): GuiaFeriasRecord[] {
@@ -97,10 +151,41 @@ export function getStoredGuiaFeriasRecords(): GuiaFeriasRecord[] {
   }
 }
 
+export function mergeGuiaFeriasCloudSnapshot(cloudRecords: any[]): GuiaFeriasRecord[] {
+  const local = getStoredGuiaFeriasRecords();
+  const mergedMap = new Map<string, GuiaFeriasRecord>();
+  local.forEach((r) => {
+    if (r && r.id && !isEntityTombstoned('guias_ferias', r.id) && !isBannedSchoolOrEntity(r)) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  (Array.isArray(cloudRecords) ? cloudRecords : []).forEach((r: GuiaFeriasRecord) => {
+    if (r && r.id && !isEntityTombstoned('guias_ferias', r.id) && !isBannedSchoolOrEntity(r)) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  const merged = Array.from(mergedMap.values());
+  if (typeof window !== 'undefined') {
+    const prevRaw = localStorage.getItem(STORAGE_KEY);
+    const nextRaw = JSON.stringify(merged);
+    if (prevRaw !== nextRaw) {
+      localStorage.setItem(STORAGE_KEY, nextRaw);
+    }
+  }
+  return merged;
+}
+
 export async function syncGuiaFeriasFromServer(): Promise<GuiaFeriasRecord[]> {
   if (typeof window === 'undefined') return [];
   const local = getStoredGuiaFeriasRecords();
   try {
+    if (!isExpressApiAvailable()) {
+      const cloudRecords = await fetchGuiasFeriasFromFirestore(30);
+      if (Array.isArray(cloudRecords) && cloudRecords.length > 0) {
+        return mergeGuiaFeriasCloudSnapshot(cloudRecords);
+      }
+      return local;
+    }
     const res = await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,19 +194,7 @@ export async function syncGuiaFeriasFromServer(): Promise<GuiaFeriasRecord[]> {
     if (!res.ok) return local;
     const data = await res.json();
     if (Array.isArray(data.guiasFerias)) {
-      const mergedMap = new Map<string, GuiaFeriasRecord>();
-      local.forEach((r) => {
-        if (r && r.id && !isEntityTombstoned('guias_ferias', r.id) && !isBannedSchoolOrEntity(r)) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      data.guiasFerias.forEach((r: GuiaFeriasRecord) => {
-        if (r && r.id && !isEntityTombstoned('guias_ferias', r.id) && !isBannedSchoolOrEntity(r)) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      const merged = Array.from(mergedMap.values());
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      const merged = mergeGuiaFeriasCloudSnapshot(data.guiasFerias);
       window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
       return merged;
     }

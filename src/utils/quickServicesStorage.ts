@@ -5,9 +5,15 @@ import type {
   QuickServiceGradeItem,
 } from '../types';
 import { MAX_TURMA_CAPACITY } from '../types';
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import {
   saveQuickRequestToFirestore,
   fetchQuickRequestsFromFirestore,
+  fetchQuickRequestsByStatusPage,
+  fetchCollectionCount,
+  fetchDashboardStats,
+  type FirestorePageResult,
+  PAGINATION_PAGE_SIZE,
   updateQuickRequestInFirestore,
   deleteQuickRequestFromFirestore,
   clearAllQuickRequestsFromFirestore,
@@ -632,9 +638,11 @@ export async function fetchQuickRequests(filters?: {
   const runFetch = async (): Promise<QuickServiceRequest[]> => {
     const map = new Map<string, QuickServiceRequest>();
 
-    // 1. Fetch from Firestore Cloud Database (Multi-device source of truth)
+    // 1. Fetch from Firestore Cloud Database (bounded to active queue or explicit status/protocol)
     try {
-      const cloudRequests = await fetchQuickRequestsFromFirestore();
+      const cloudRequests = await fetchQuickRequestsFromFirestore({
+        protocol: filters?.protocol,
+      });
       if (Array.isArray(cloudRequests) && cloudRequests.length > 0) {
         cloudRequests.forEach((r) => {
           if (r && r.id) map.set(r.id, r);
@@ -1106,7 +1114,78 @@ export async function clearAllQuickRequests(): Promise<{ success: boolean; count
 }
 
 /**
- * Initializes real-time listener for quick requests
+ * Fetches archived/completed quick requests on demand via paginated getDocs (Rule 2).
+ */
+export async function fetchArchivedQuickRequestsPage(options: {
+  status?: QuickServiceStatus | 'TODOS';
+  pageSize?: number;
+  cursor?: QueryDocumentSnapshot<DocumentData> | null;
+}): Promise<FirestorePageResult<QuickServiceRequest>> {
+  const page = await fetchQuickRequestsByStatusPage({
+    status: options.status === 'TODOS' ? undefined : options.status,
+    pageSize: options.pageSize ?? PAGINATION_PAGE_SIZE,
+    cursor: options.cursor ?? null,
+  });
+
+  if (page.items.length > 0) {
+    const cached = getCachedQuickRequests();
+    const map = new Map<string, QuickServiceRequest>();
+    cached.forEach((item) => {
+      if (item && item.id) map.set(item.id, item);
+    });
+    page.items.forEach((item) => {
+      if (item && item.id) map.set(item.id, { ...(map.get(item.id) || {}), ...item });
+    });
+    writeQuickCacheQuietly(Array.from(map.values()));
+  }
+
+  return page;
+}
+
+/**
+ * Returns authoritative quick requests counts from stats/dashboard or getCountFromServer (Rule 4).
+ */
+export async function getQuickRequestsServerCounts(): Promise<{
+  total: number;
+  pendentes: number;
+  concluidos: number;
+}> {
+  try {
+    const stats = await fetchDashboardStats();
+    if (stats && typeof stats.totalQuickRequests === 'number') {
+      const concluidos =
+        (await fetchCollectionCount('quickRequests', [
+          { field: 'status', op: '==', value: 'CONCLUIDO' },
+        ])) ?? 0;
+      return {
+        total: stats.totalQuickRequests,
+        pendentes: stats.pendingQuickRequests ?? 0,
+        concluidos,
+      };
+    }
+    const [total, pendentes, concluidos] = await Promise.all([
+      fetchCollectionCount('quickRequests'),
+      fetchCollectionCount('quickRequests', [{ field: 'status', op: '==', value: 'PENDENTE' }]),
+      fetchCollectionCount('quickRequests', [{ field: 'status', op: '==', value: 'CONCLUIDO' }]),
+    ]);
+    return {
+      total: total ?? 0,
+      pendentes: pendentes ?? 0,
+      concluidos: concluidos ?? 0,
+    };
+  } catch {
+    const cached = getCachedQuickRequests();
+    return {
+      total: cached.length,
+      pendentes: cached.filter((r) => r.status === 'PENDENTE').length,
+      concluidos: cached.filter((r) => r.status === 'CONCLUIDO').length,
+    };
+  }
+}
+
+/**
+ * Initializes real-time listener strictly for active quick requests (limit 30) and merges
+ * cleanly with cached archive entries, guaranteeing clean unsubscribe teardown (Rules 1, 2, 3).
  */
 let quickRequestsUnsubscribe: (() => void) | null = null;
 export function initRealtimeQuickRequestsSync(
@@ -1116,18 +1195,46 @@ export function initRealtimeQuickRequestsSync(
     return quickRequestsUnsubscribe;
   }
 
-  quickRequestsUnsubscribe = subscribeToQuickRequests((list) => {
+  const fsUnsub = subscribeToQuickRequests((activeCloudList) => {
     try {
-      const changed = writeQuickCacheQuietly(list);
+      const cached = getCachedQuickRequests();
+      const map = new Map<string, QuickServiceRequest>();
+      // Retain previously loaded archived requests in local cache
+      cached.forEach((item) => {
+        if (
+          item &&
+          item.id &&
+          (item.status === 'CONCLUIDO' ||
+            item.status === 'REJEITADO' ||
+            item.status === 'CANCELADO' ||
+            item.status === 'SEM_VAGA_DESTINO')
+        ) {
+          map.set(item.id, item);
+        }
+      });
+      activeCloudList.forEach((item) => {
+        if (item && item.id) {
+          map.set(item.id, { ...(map.get(item.id) || {}), ...item });
+        }
+      });
+      const merged = Array.from(map.values());
+      const changed = writeQuickCacheQuietly(merged);
       lastQuickRequestsFetchAt = Date.now();
       if (changed && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sigre-data-synced'));
       }
-      onUpdate?.(list);
+      onUpdate?.(merged);
     } catch (e) {
       console.warn('[QuickServices] Erro no listener em tempo real:', e);
     }
   });
+
+  quickRequestsUnsubscribe = () => {
+    try {
+      fsUnsub();
+    } catch {}
+    quickRequestsUnsubscribe = null;
+  };
 
   return quickRequestsUnsubscribe;
 }

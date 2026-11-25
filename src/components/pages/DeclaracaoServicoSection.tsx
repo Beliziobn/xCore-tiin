@@ -31,7 +31,7 @@ import {
   getStoredDeclaracaoServicoRecords,
   saveDeclaracaoServicoRecord,
   deleteDeclaracaoServicoRecord,
-  syncDeclaracaoServicoFromServer,
+  mergeDeclaracaoServicoCloudSnapshot,
   findDuplicateDeclaracaoServico,
 } from '../../utils/declaracaoServicoStorage';
 import {
@@ -168,18 +168,10 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
 
   useEffect(() => {
     reloadRecords();
-    syncDeclaracaoServicoFromServer()
-      .then((synced) => {
-        if (Array.isArray(synced)) setRecords(synced);
-      })
-      .catch(() => {});
 
-    const unsub = subscribeToDeclaracaoServico(() => {
-      syncDeclaracaoServicoFromServer()
-        .then((synced) => {
-          if (Array.isArray(synced)) setRecords(synced);
-        })
-        .catch(() => {});
+    const unsub = subscribeToDeclaracaoServico((cloudRecords) => {
+      const merged = mergeDeclaracaoServicoCloudSnapshot(cloudRecords);
+      setRecords(merged);
     });
 
     const handleUpdated = () => reloadRecords();

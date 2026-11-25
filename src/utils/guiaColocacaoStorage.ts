@@ -5,9 +5,11 @@
 import {
   saveGuiaColocacaoToFirestore,
   deleteGuiaColocacaoFromFirestore,
+  fetchGuiasColocacaoFromFirestore,
   isEntityTombstoned,
   isBannedSchoolOrEntity,
 } from './firestoreSync';
+import { isExpressApiAvailable } from './apiAvailability';
 
 export interface GuiaColocacaoRecord {
   id: string;
@@ -144,10 +146,53 @@ export function getStoredGuiaColocacaoRecords(): GuiaColocacaoRecord[] {
   }
 }
 
+export function mergeGuiaColocacaoCloudSnapshot(cloudRecords: any[]): GuiaColocacaoRecord[] {
+  const local = getStoredGuiaColocacaoRecords();
+  const mergedMap = new Map<string, GuiaColocacaoRecord>();
+  local.forEach((r) => {
+    if (
+      r &&
+      r.id &&
+      r.id !== 'guia-colocacao-default-1' &&
+      !isEntityTombstoned('guias_colocacao', r.id) &&
+      !isBannedSchoolOrEntity(r)
+    ) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  (Array.isArray(cloudRecords) ? cloudRecords : []).forEach((r: GuiaColocacaoRecord) => {
+    if (
+      r &&
+      r.id &&
+      r.id !== 'guia-colocacao-default-1' &&
+      !isEntityTombstoned('guias_colocacao', r.id) &&
+      !isBannedSchoolOrEntity(r)
+    ) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  const merged = Array.from(mergedMap.values());
+  if (typeof window !== 'undefined') {
+    const prevRaw = localStorage.getItem(STORAGE_KEY);
+    const nextRaw = JSON.stringify(merged);
+    if (prevRaw !== nextRaw) {
+      localStorage.setItem(STORAGE_KEY, nextRaw);
+    }
+  }
+  return merged;
+}
+
 export async function syncGuiaColocacaoFromServer(): Promise<GuiaColocacaoRecord[]> {
   if (typeof window === 'undefined') return [];
   const local = getStoredGuiaColocacaoRecords();
   try {
+    if (!isExpressApiAvailable()) {
+      const cloudRecords = await fetchGuiasColocacaoFromFirestore(30);
+      if (Array.isArray(cloudRecords) && cloudRecords.length > 0) {
+        return mergeGuiaColocacaoCloudSnapshot(cloudRecords);
+      }
+      return local;
+    }
     const res = await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -156,31 +201,7 @@ export async function syncGuiaColocacaoFromServer(): Promise<GuiaColocacaoRecord
     if (!res.ok) return local;
     const data = await res.json();
     if (Array.isArray(data.guiasColocacao)) {
-      const mergedMap = new Map<string, GuiaColocacaoRecord>();
-      local.forEach((r) => {
-        if (
-          r &&
-          r.id &&
-          r.id !== 'guia-colocacao-default-1' &&
-          !isEntityTombstoned('guias_colocacao', r.id) &&
-          !isBannedSchoolOrEntity(r)
-        ) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      data.guiasColocacao.forEach((r: GuiaColocacaoRecord) => {
-        if (
-          r &&
-          r.id &&
-          r.id !== 'guia-colocacao-default-1' &&
-          !isEntityTombstoned('guias_colocacao', r.id) &&
-          !isBannedSchoolOrEntity(r)
-        ) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      const merged = Array.from(mergedMap.values());
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      const merged = mergeGuiaColocacaoCloudSnapshot(data.guiasColocacao);
       window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
       return merged;
     }

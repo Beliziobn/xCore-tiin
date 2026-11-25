@@ -554,9 +554,37 @@
         }
       },
       "required": ["id", "nomeCompleto", "funcao", "schoolName"]
+    },
+    "DashboardStats": {
+      "title": "DashboardStats",
+      "description": "Documento agregador único (stats/dashboard) com contadores totais atualizados atomicamente via increment()",
+      "type": "object",
+      "properties": {
+        "totalSchools": { "type": "number", "description": "Total de escolas" },
+        "totalTeachers": { "type": "number", "description": "Total de professores" },
+        "totalStudents": { "type": "number", "description": "Total de alunos" },
+        "totalDirectors": { "type": "number", "description": "Total de directores" },
+        "totalStaff": { "type": "number", "description": "Total de funcionários" },
+        "totalUsers": { "type": "number", "description": "Total de utilizadores" },
+        "totalApplications": { "type": "number", "description": "Total de candidaturas" },
+        "pendingApplications": { "type": "number", "description": "Candidaturas pendentes" },
+        "approvedApplications": { "type": "number", "description": "Candidaturas aprovadas" },
+        "rejectedApplications": { "type": "number", "description": "Candidaturas rejeitadas" },
+        "totalQuickRequests": { "type": "number", "description": "Total de pedidos rápidos" },
+        "pendingQuickRequests": { "type": "number", "description": "Pedidos rápidos ativos/pendentes" },
+        "totalEfectividade": { "type": "number", "description": "Total de registos de efectividade" },
+        "totalDeclaracaoServico": { "type": "number", "description": "Total de declarações de serviço" },
+        "updatedAt": { "type": "string", "description": "Data ISO da última atualização" }
+      }
     }
   },
   "firestore": {
+    "/stats/{statId}": {
+      "schema": {
+        "$ref": "#/entities/DashboardStats"
+      },
+      "description": "Contadores agregados globais do painel (lidos em 1 único documento em vez de ler coleções inteiras)"
+    },
     "/applications/{applicationId}": {
       "schema": {
         "$ref": "#/entities/Application"

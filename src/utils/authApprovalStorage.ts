@@ -2,9 +2,15 @@ import type { PendingApplication, UserAccount, AdminSchool, PendingApprovalCompl
 import { initialAdminSchools, initialAdminDirectors } from '../data/adminData';
 import { CANONICAL_APPLICATIONS, CANONICAL_USERS } from '../data/canonicalNetworkSeed';
 import { directorTeachersData } from '../data/directorData';
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import {
   saveApplicationToFirestore,
   fetchApplicationsFromFirestoreWithStatus,
+  fetchApplicationsByStatusPage,
+  fetchCollectionCount,
+  fetchDashboardStats,
+  type FirestorePageResult,
+  PAGINATION_PAGE_SIZE,
   isFirestoreReadQuotaExhausted,
   updateApplicationInFirestore,
   deleteApplicationFromFirestore,
@@ -819,9 +825,91 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
 }
 
 /**
- * Initializes a real-time Cloud Firestore listener that keeps this device's application list
- * AND local Express server updated instantaneously whenever any candidate signs up OR any admin
- * approves/rejects a homologation on ANY other device (Preview, Shared URL, Mobile, Desktop).
+ * Fetches archived/completed or status-filtered applications on demand via paginated getDocs (Rule 2).
+ * Never attaches an onSnapshot listener to completed/rejected archives.
+ */
+export async function syncArchivedApplicationsPage(options: {
+  status?: 'aprovado' | 'rejeitado' | 'pendente' | 'todos';
+  pageSize?: number;
+  cursor?: QueryDocumentSnapshot<DocumentData> | null;
+}): Promise<FirestorePageResult<PendingApplication> & { merged: PendingApplication[] }> {
+  const targetStatus = options.status || 'aprovado';
+  const pageSize = options.pageSize ?? PAGINATION_PAGE_SIZE;
+
+  const page = await fetchApplicationsByStatusPage({
+    status: targetStatus,
+    pageSize,
+    cursor: options.cursor ?? null,
+  });
+
+  const liveCloud = (page.items || []).filter((a) => a && !isApplicationTombstoned(a));
+  liveCloud.forEach((fa) => {
+    removeDeletedApplicationId(fa.id, fa.userId, fa.email, normalizeBi(fa.biNumber));
+  });
+
+  const localApps = getPendingApplications();
+  const merged = deduplicateApplicationsList([...liveCloud, ...localApps]);
+  reconcileApprovedAppsIntoLocalUsersAndRosters(merged);
+
+  const prevRaw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY_APPLICATIONS) : null;
+  const nextRaw = JSON.stringify(merged);
+  if (prevRaw !== nextRaw) {
+    writeApplicationsWithoutDirtyEcho(merged);
+  }
+
+  return {
+    ...page,
+    items: liveCloud,
+    merged,
+  };
+}
+
+/**
+ * Returns authoritative application counts from stats/dashboard (single doc) or getCountFromServer (Rule 4).
+ */
+export async function getApplicationsCountsFromServer(): Promise<{
+  total: number;
+  pendentes: number;
+  aprovados: number;
+  rejeitados: number;
+}> {
+  try {
+    const stats = await fetchDashboardStats();
+    if (stats && typeof stats.totalApplications === 'number') {
+      return {
+        total: stats.totalApplications,
+        pendentes: stats.pendingApplications ?? 0,
+        aprovados: stats.approvedApplications ?? 0,
+        rejeitados: stats.rejectedApplications ?? 0,
+      };
+    }
+    const [total, pendentes, aprovados, rejeitados] = await Promise.all([
+      fetchCollectionCount('applications'),
+      fetchCollectionCount('applications', [{ field: 'status', op: '==', value: 'pendente' }]),
+      fetchCollectionCount('applications', [{ field: 'status', op: '==', value: 'aprovado' }]),
+      fetchCollectionCount('applications', [{ field: 'status', op: '==', value: 'rejeitado' }]),
+    ]);
+    return {
+      total: total ?? 0,
+      pendentes: pendentes ?? 0,
+      aprovados: aprovados ?? 0,
+      rejeitados: rejeitados ?? 0,
+    };
+  } catch {
+    const local = getPendingApplications();
+    return {
+      total: local.length,
+      pendentes: local.filter((a) => a.status === 'pendente').length,
+      aprovados: local.filter((a) => a.status === 'aprovado').length,
+      rejeitados: local.filter((a) => a.status === 'rejeitado').length,
+    };
+  }
+}
+
+/**
+ * Initializes a real-time Cloud Firestore listener strictly scoped to active pending applications
+ * (where status == 'pendente', orderBy updatedAt desc, limit 30). Archived/completed items stay preserved
+ * in local cache when loaded via syncArchivedApplicationsPage without redundant cloud writes.
  */
 let realtimeUnsubscribe: (() => void) | null = null;
 export function initRealtimeApplicationsSync(
@@ -852,32 +940,12 @@ export function initRealtimeApplicationsSync(
       const nextRaw = JSON.stringify(validApps);
       if (prevRaw !== nextRaw) {
         writeApplicationsWithoutDirtyEcho(validApps);
-        // Mirror Cloud Firestore updates to this container's Express backend only when Express API is active
         if (isExpressApiAvailable() && liveFsApps.length > 0) {
           fetch('/api/network/applications', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ applications: validApps }),
           }).catch(() => {});
-        }
-        // Push any user-backed app missing from Firestore ONLY when a real snapshot arrived
-        if (hasReceivedSnapshot) {
-          userBackedApps.forEach((ua) => {
-            const inFs = liveFsApps.some(
-              (fa) =>
-                fa.id === ua.id ||
-                (fa.userId && ua.userId && fa.userId === ua.userId) ||
-                (normalizeBi(fa.biNumber).length >= 5 && normalizeBi(fa.biNumber) === normalizeBi(ua.biNumber))
-            );
-            const sig = `${ua.status}:${ua.approvedAt || ''}`;
-            if (!inFs && pushedAppStatusToFirestore.get(ua.id) !== sig) {
-              saveApplicationToFirestore(ua)
-                .then((ok) => {
-                  if (ok) pushedAppStatusToFirestore.set(ua.id, sig);
-                })
-                .catch(() => {});
-            }
-          });
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));

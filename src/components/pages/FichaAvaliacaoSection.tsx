@@ -34,6 +34,7 @@ import {
   formatAvaliacaoNumber,
   computeFichaAvaliacaoMetrics,
   getStoredFichaAvaliacaoRecords,
+  mergeFichaAvaliacaoCloudSnapshot,
   syncFichaAvaliacaoFromServer,
   saveFichaAvaliacaoRecord,
   deleteFichaAvaliacaoRecord,
@@ -45,6 +46,7 @@ import {
 } from '../../utils/declaracaoPdfGenerator';
 import type { UserAccount } from '../../types';
 import { submitQuickServiceRequest } from '../../utils/quickServicesStorage';
+import { subscribeToFichasAvaliacao } from '../../utils/firestoreSync';
 
 export interface FichaAvaliacaoSectionProps {
   isLoggedIn?: boolean;
@@ -185,11 +187,16 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
   useEffect(() => {
     reloadRecords();
     syncFichaAvaliacaoFromServer().then(() => reloadRecords()).catch(() => {});
+    const unsub = subscribeToFichasAvaliacao((cloudRecords) => {
+      const merged = mergeFichaAvaliacaoCloudSnapshot(cloudRecords);
+      setRecords(merged);
+    });
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-ficha-avaliacao-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);
     window.addEventListener('storage', handleUpdated);
     return () => {
+      unsub();
       window.removeEventListener('sigre-ficha-avaliacao-updated', handleUpdated);
       window.removeEventListener('sigre-data-synced', handleUpdated);
       window.removeEventListener('storage', handleUpdated);

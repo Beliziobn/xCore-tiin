@@ -56,7 +56,9 @@ interface StudentRegistrationModalProps {
   defaultRoom?: string;
   defaultPeriod?: string;
   schoolName?: string;
+  schoolId?: string;
   schools?: AdminSchool[];
+  lockSchool?: boolean;
 }
 
 export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
@@ -67,7 +69,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   defaultTurma = 'Turma A',
   defaultRoom = 'Sala 03',
   schoolName = '',
+  schoolId,
   schools: propSchools,
+  lockSchool = false,
 }) => {
   const photoInputId = useId();
   const docInputId = useId();
@@ -91,24 +95,25 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     };
   }, [isOpen]);
 
+  const normSchoolText = (str?: string) =>
+    (str || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+
   const registeredSchools = useMemo(() => {
-    const norm = (str?: string) =>
-      (str || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, ' ');
     const fromStorage = getRegisteredSchoolsFromStorage();
     const combined = [...(propSchools || []), ...fromStorage];
     const list: AdminSchool[] = [];
     combined.forEach((sc) => {
       if (!sc || !sc.name) return;
-      const n = norm(sc.name);
+      const n = normSchoolText(sc.name);
       if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) return;
       const sId = String(sc.id || '').trim().toLowerCase();
       const idx = list.findIndex(
-        (ex) => (sId && ex.id && String(ex.id).trim().toLowerCase() === sId) || norm(ex.name) === n
+        (ex) => (sId && ex.id && String(ex.id).trim().toLowerCase() === sId) || normSchoolText(ex.name) === n
       );
       if (idx >= 0) {
         list[idx] = { ...list[idx], ...sc, registrationData: sc.registrationData || list[idx].registrationData };
@@ -118,6 +123,51 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     });
     return list;
   }, [propSchools, isOpen, schoolRefreshTick]);
+
+  // Strict school scoping: when a specific school is registering a student, ONLY that school is allowed as a predefined option
+  const lockedSchoolObj = useMemo<AdminSchool | null>(() => {
+    const targetId = String(schoolId || '').trim().toLowerCase();
+    const targetNameNorm = normSchoolText(schoolName);
+    const hasExplicitTarget = Boolean(
+      targetId || (targetNameNorm && !targetNameNorm.includes('modelo central'))
+    );
+    const shouldLock = Boolean(lockSchool && hasExplicitTarget);
+    if (!shouldLock) return null;
+
+    const matched = registeredSchools.find((sc) => {
+      const scId = String(sc.id || '').trim().toLowerCase();
+      if (targetId && scId && scId === targetId) return true;
+      if (targetNameNorm && normSchoolText(sc.name) === targetNameNorm) return true;
+      return false;
+    });
+    if (matched) return matched;
+
+    const cleanName = schoolName.trim() || 'Unidade Escolar';
+    return {
+      id: schoolId?.trim() || `esc-locked-${normSchoolText(cleanName).replace(/[^a-z0-9]+/g, '-')}`,
+      name: cleanName,
+      directorName: '',
+      teachersCount: 0,
+      classesCount: 0,
+      roomsCount: 0,
+      turmasCount: 0,
+      location: 'Quêssua - Malanje',
+      studentsWithDocs: 0,
+      studentsWithoutDocs: 0,
+      performanceRate: 0,
+      attendanceRate: 0,
+      category: 'Ensino Primário',
+      phone: '',
+      email: '',
+    };
+  }, [lockSchool, schoolId, schoolName, registeredSchools]);
+
+  const isSchoolLocked = Boolean(lockedSchoolObj);
+
+  const selectableSchools = useMemo<AdminSchool[]>(() => {
+    if (lockedSchoolObj) return [lockedSchoolObj];
+    return registeredSchools;
+  }, [lockedSchoolObj, registeredSchools]);
 
   // Active Wizard Step: 1=Aluno, 2=Escolaridade, 3=Classe e idade, 4=Responsável e documentos
   const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
@@ -143,26 +193,28 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   const [municipio, setMunicipio] = useState(initialData?.municipio || 'Quéssua');
 
   // 2. Natureza & Modalidade da Escola
+  const initialTargetSchool = lockedSchoolObj || selectableSchools[0];
   const [nomeEscola, setNomeEscola] = useState(
-    initialData?.escola || (registeredSchools[0]?.name ?? schoolName)
+    lockedSchoolObj?.name || initialData?.escola || (initialTargetSchool?.name ?? schoolName)
   );
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | undefined>(
-    initialData?.schoolId || registeredSchools[0]?.id
+    lockedSchoolObj?.id || initialData?.schoolId || initialTargetSchool?.id
   );
   const [tipoEscolaModalidade, setTipoEscolaModalidade] = useState<StudentModalidadeKey>(
-    initialData?.tipoEscolaModalidade || getSuggestedModalityForSchool(registeredSchools[0])
+    initialData?.tipoEscolaModalidade || getSuggestedModalityForSchool(initialTargetSchool)
   );
   const [naturezaEscola, setNaturezaEscola] = useState<StudentNaturezaEscola>(
-    initialData?.naturezaEscola || (registeredSchools[0]?.natureza as StudentNaturezaEscola) || 'Pública'
+    initialData?.naturezaEscola || (initialTargetSchool?.natureza as StudentNaturezaEscola) || 'Pública'
   );
 
   const selectedSchoolObj = useMemo(() => {
-    return registeredSchools.find(
+    if (lockedSchoolObj) return lockedSchoolObj;
+    return selectableSchools.find(
       (sc) =>
         (selectedSchoolId && sc.id === selectedSchoolId) ||
-        sc.name.trim().toLowerCase() === nomeEscola.trim().toLowerCase()
+        normSchoolText(sc.name) === normSchoolText(nomeEscola)
     );
-  }, [registeredSchools, selectedSchoolId, nomeEscola]);
+  }, [lockedSchoolObj, selectableSchools, selectedSchoolId, nomeEscola]);
 
   const selectedSchoolStudentQuota = useMemo(() => {
     if (!selectedSchoolObj) return null;
@@ -170,35 +222,50 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   }, [selectedSchoolObj, isOpen, nomeEscola]);
 
   const handleSelectSchoolFromSystem = (school: AdminSchool) => {
-    setNomeEscola(school.name);
-    setSelectedSchoolId(school.id);
-    if (school.natureza) {
-      setNaturezaEscola(school.natureza as StudentNaturezaEscola);
+    const targetSchool = lockedSchoolObj || school;
+    setNomeEscola(targetSchool.name);
+    setSelectedSchoolId(targetSchool.id);
+    if (targetSchool.natureza) {
+      setNaturezaEscola(targetSchool.natureza as StudentNaturezaEscola);
     }
-    if (school.registrationData?.endereco?.provincia) {
-      setProvincia(school.registrationData.endereco.provincia);
+    if (targetSchool.registrationData?.endereco?.provincia) {
+      setProvincia(targetSchool.registrationData.endereco.provincia);
     }
-    if (school.registrationData?.endereco?.municipio) {
-      setMunicipio(school.registrationData.endereco.municipio);
+    if (targetSchool.registrationData?.endereco?.municipio) {
+      setMunicipio(targetSchool.registrationData.endereco.municipio);
     }
-    const suggestedMod = getSuggestedModalityForSchool(school);
+    const suggestedMod = getSuggestedModalityForSchool(targetSchool);
     setTipoEscolaModalidade(suggestedMod);
   };
 
   useEffect(() => {
     if (!prevIsOpenRef.current && isOpen) {
       setRegisteredStudentForBoletim(null);
-      if (!initialData && registeredSchools.length > 0) {
+      if (lockedSchoolObj) {
+        setNomeEscola(lockedSchoolObj.name);
+        setSelectedSchoolId(lockedSchoolObj.id);
+        if (!initialData) {
+          handleSelectSchoolFromSystem(lockedSchoolObj);
+        }
+      } else if (!initialData && selectableSchools.length > 0) {
         const matched =
-          registeredSchools.find((s) => s.name.trim().toLowerCase() === schoolName.trim().toLowerCase()) ||
-          registeredSchools[0];
+          selectableSchools.find((s) => normSchoolText(s.name) === normSchoolText(schoolName)) ||
+          selectableSchools[0];
         if (matched) {
           handleSelectSchoolFromSystem(matched);
         }
       }
     }
     prevIsOpenRef.current = isOpen;
-  }, [isOpen, initialData, registeredSchools, schoolName]);
+  }, [isOpen, initialData, lockedSchoolObj, selectableSchools, schoolName]);
+
+  // Continuously enforce locked school while modal is open so no draft/state race can switch schools
+  useEffect(() => {
+    if (isOpen && lockedSchoolObj) {
+      setNomeEscola(lockedSchoolObj.name);
+      setSelectedSchoolId(lockedSchoolObj.id);
+    }
+  }, [isOpen, lockedSchoolObj]);
 
   // 3. Classe / Etapa / Módulo e Idade específica
   const selectedModalityConfig = useMemo(() => {
@@ -300,7 +367,12 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       setEndereco(initialData.endereco || '');
       setProvincia(initialData.provincia || 'Malanje');
       setMunicipio(initialData.municipio || 'Quéssua');
-      if (initialData.escola) setNomeEscola(initialData.escola);
+      if (lockedSchoolObj) {
+        setNomeEscola(lockedSchoolObj.name);
+        setSelectedSchoolId(lockedSchoolObj.id);
+      } else if (initialData.escola) {
+        setNomeEscola(initialData.escola);
+      }
       if (initialData.tipoEscolaModalidade) setTipoEscolaModalidade(initialData.tipoEscolaModalidade);
       if (initialData.naturezaEscola) setNaturezaEscola(initialData.naturezaEscola);
       if (initialData.classeEtapaModulo) setClasseEtapaModulo(initialData.classeEtapaModulo);
@@ -334,7 +406,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
             if (d.endereco !== undefined) setEndereco(d.endereco);
             if (d.provincia) setProvincia(d.provincia);
             if (d.municipio) setMunicipio(d.municipio);
-            if (d.nomeEscola) setNomeEscola(d.nomeEscola);
+            if (!lockedSchoolObj && d.nomeEscola) setNomeEscola(d.nomeEscola);
             if (d.tipoEscolaModalidade) setTipoEscolaModalidade(d.tipoEscolaModalidade);
             if (d.naturezaEscola) setNaturezaEscola(d.naturezaEscola);
             if (d.classeEtapaModulo) setClasseEtapaModulo(d.classeEtapaModulo);
@@ -345,8 +417,12 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
           }
         }
       } catch {}
+      if (lockedSchoolObj) {
+        setNomeEscola(lockedSchoolObj.name);
+        setSelectedSchoolId(lockedSchoolObj.id);
+      }
     }
-  }, [initialData, defaultTurma, defaultRoom]);
+  }, [initialData, defaultTurma, defaultRoom, lockedSchoolObj]);
 
   const handleSaveDraft = (silent = false) => {
     try {
@@ -585,13 +661,16 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       }
     }
 
+    const effectiveSchoolName = (lockedSchoolObj?.name || nomeEscola).trim();
+    const effectiveSchoolId = lockedSchoolObj?.id || selectedSchoolObj?.id || selectedSchoolId;
+
     // Validação Dual Simultânea (Frontend + Backend)
     const dualVal = await DualValidationService.validateStudent({
       nomeCompleto,
       biOuCedula: numeroDocumento,
       tipoDocumento,
       dataNascimento,
-      nomeEscola,
+      nomeEscola: effectiveSchoolName,
     });
     if (!dualVal.isValid) {
       setErrorMessage(dualVal.errors.join(' | '));
@@ -686,9 +765,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       periodo: turno,
       turno,
       sala,
-      escola: nomeEscola.trim(),
-      schoolId: selectedSchoolObj?.id || selectedSchoolId,
-      categoriaEscola: selectedSchoolObj?.category || selectedModalityConfig.categoryName,
+      escola: effectiveSchoolName,
+      schoolId: effectiveSchoolId,
+      categoriaEscola: (lockedSchoolObj || selectedSchoolObj)?.category || selectedModalityConfig.categoryName,
       condicaoMatricula: alunoRepetente ? 'repetente' : 'primeira_vez',
       alunoRepetente,
       temNecessidadesEspeciais: temNecessidadesEspeciais || selectedModalityConfig.isSpecialEducation,
@@ -1244,7 +1323,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                             Unidade escolar e modalidade
                           </h2>
                           <p className="mt-1 mb-0 text-[13px] leading-[1.5] text-[#6d7c91]">
-                            Seleccione a escola de matrícula, a modalidade de ensino e a natureza da instituição.
+                            {isSchoolLocked
+                              ? 'Unidade escolar pré-definida rigorosamente para esta escola. Seleccione a modalidade de ensino e a natureza da instituição.'
+                              : 'Seleccione a escola de matrícula, a modalidade de ensino e a natureza da instituição.'}
                           </p>
                         </div>
                       </div>
@@ -1291,20 +1372,26 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                       );
                     })()}
 
-                    {registeredSchools.length > 0 && (
+                    {selectableSchools.length > 0 && (
                       <div className="flex flex-col gap-[7px] mb-5">
                         <label className="text-[13px] font-bold text-[#132238]">
                           Escola cadastrada <span className="text-[#b42318]">*</span>
                         </label>
                         <select
-                          value={selectedSchoolObj?.id || selectedSchoolId || ''}
+                          value={selectedSchoolObj?.id || selectedSchoolId || selectableSchools[0]?.id || ''}
+                          disabled={isSchoolLocked}
                           onChange={(e) => {
-                            const found = registeredSchools.find((s) => s.id === e.target.value);
+                            if (isSchoolLocked) return;
+                            const found = selectableSchools.find((s) => s.id === e.target.value);
                             if (found) handleSelectSchoolFromSystem(found);
                           }}
-                          className="w-full h-[43px] px-3.5 rounded-[6px] border border-[#cfd8e3] bg-white text-[#26364d] text-sm font-semibold"
+                          className={`w-full h-[43px] px-3.5 rounded-[6px] border text-sm font-semibold ${
+                            isSchoolLocked
+                              ? 'border-[#cbd5e1] bg-[#f1f5f9] text-[#132238] cursor-not-allowed'
+                              : 'border-[#cfd8e3] bg-white text-[#26364d]'
+                          }`}
                         >
-                          {registeredSchools.map((sc) => {
+                          {selectableSchools.map((sc) => {
                             const reg = getSchoolRegistrationData(sc);
                             return (
                               <option key={sc.id} value={sc.id}>
@@ -1313,6 +1400,11 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                             );
                           })}
                         </select>
+                        {isSchoolLocked && (
+                          <span className="text-[12px] text-[#475569] font-medium">
+                            Escola pré-definida rigorosamente para esta unidade escolar (apenas esta escola pode cadastrar alunos aqui).
+                          </span>
+                        )}
                       </div>
                     )}
 

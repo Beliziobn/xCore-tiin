@@ -42,7 +42,7 @@ import {
   fmtKz,
   extensoKz,
 } from '../../utils/declaracaoServicoStorage';
-import { calculateFimDate } from '../../utils/guiaFeriasStorage';
+import { calculateFimDate, getGuiaFeriasDateBreakdown } from '../../utils/guiaFeriasStorage';
 import {
   downloadQuickServiceReceiptPdf,
   printSinglePageA4Clean,
@@ -3519,7 +3519,7 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                           htmlFor="field-ferias-dias"
                           className="text-sm font-bold text-[#1c2927]"
                         >
-                          Número de dias (1 a 90) *
+                          Número de dias úteis (1 a 90) *
                         </label>
                         <input
                           id="field-ferias-dias"
@@ -3531,12 +3531,16 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                           onChange={(e) => {
                             const nextDias = e.target.value;
                             setDiasFerias(nextDias);
-                            setFimFerias(
-                              calculateFimDate(iniFerias, parseInt(nextDias, 10) || 30)
-                            );
+                            const parsed = parseInt(nextDias, 10);
+                            if (iniFerias && parsed >= 1) {
+                              setFimFerias(calculateFimDate(iniFerias, parsed));
+                            }
                           }}
                           className="w-full min-h-[42px] px-3 py-2.5 rounded-[10px] border border-[#dce4df] bg-[#fbfcfb] text-sm text-[#1c2927] outline-none focus:border-[#176b5b]"
                         />
+                        <span className="text-[11px] text-[#556966]">
+                          Sábados e domingos não contam na duração.
+                        </span>
                       </div>
 
                       <div className="flex flex-col gap-1.5">
@@ -3554,9 +3558,10 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                           onChange={(e) => {
                             const nextIni = e.target.value;
                             setIniFerias(nextIni);
-                            setFimFerias(
-                              calculateFimDate(nextIni, parseInt(diasFerias, 10) || 30)
-                            );
+                            const parsed = parseInt(diasFerias, 10);
+                            if (nextIni && parsed >= 1) {
+                              setFimFerias(calculateFimDate(nextIni, parsed));
+                            }
                           }}
                           className="w-full min-h-[42px] px-3 py-2.5 rounded-[10px] border border-[#dce4df] bg-[#fbfcfb] text-sm text-[#1c2927] outline-none focus:border-[#176b5b]"
                         />
@@ -3567,7 +3572,7 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                           htmlFor="field-ferias-fim"
                           className="text-sm font-bold text-[#1c2927]"
                         >
-                          Data de término *
+                          Data de término / regresso *
                         </label>
                         <input
                           id="field-ferias-fim"
@@ -3577,6 +3582,15 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
                           onChange={(e) => setFimFerias(e.target.value)}
                           className="w-full min-h-[42px] px-3 py-2.5 rounded-[10px] border border-[#dce4df] bg-[#fbfcfb] text-sm text-[#1c2927] outline-none focus:border-[#176b5b]"
                         />
+                        {(() => {
+                          const bd = getGuiaFeriasDateBreakdown(iniFerias, parseInt(diasFerias, 10));
+                          if (!bd) return null;
+                          return (
+                            <span className="text-[11px] text-[#176b5b] font-medium">
+                              {bd.businessDays} dias úteis + {bd.weekendDaysExcluded} sábados/domingos excluídos.
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex flex-col gap-1.5">

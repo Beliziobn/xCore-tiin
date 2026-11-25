@@ -470,3 +470,40 @@ export async function syncDeclaracaoServicoFromServer(): Promise<DeclaracaoServi
     return getStoredDeclaracaoServicoRecords();
   }
 }
+
+export function mergeDeclaracaoServicoCloudSnapshot(
+  cloudRecords: any[]
+): DeclaracaoServicoRecord[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
+  try {
+    const localRecords = getStoredDeclaracaoServicoRecords();
+    const deletedIds = getDeletedServicoIds();
+    const recordMap = new Map<string, DeclaracaoServicoRecord>();
+
+    localRecords.forEach((lr) => {
+      if (lr && lr.id && !deletedIds.has(lr.id)) {
+        recordMap.set(lr.id, lr);
+      }
+    });
+
+    if (Array.isArray(cloudRecords)) {
+      cloudRecords.forEach((cr: any) => {
+        if (cr && cr.id && !deletedIds.has(cr.id)) {
+          recordMap.set(cr.id, { ...(recordMap.get(cr.id) || {}), ...(cr as DeclaracaoServicoRecord) });
+        }
+      });
+    }
+
+    const merged = Array.from(recordMap.values()).sort((a, b) =>
+      String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''))
+    );
+    const prevRaw = localStorage.getItem(STORAGE_KEY_SERVICO);
+    const nextRaw = JSON.stringify(merged);
+    if (prevRaw !== nextRaw) {
+      localStorage.setItem(STORAGE_KEY_SERVICO, nextRaw);
+    }
+    return merged;
+  } catch {
+    return getStoredDeclaracaoServicoRecords();
+  }
+}

@@ -32,6 +32,7 @@ import {
 } from '../../utils/declaracaoServicoStorage';
 import {
   getStoredGuiaFeriasRecords,
+  calculateFimDate,
   formatDateExtenso,
 } from '../../utils/guiaFeriasStorage';
 import {
@@ -1410,7 +1411,14 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                 ano: sigre.ano || matched?.ano || '2025',
                 dias: sigre.dias || matched?.dias || 30,
                 ini: sigre.ini || matched?.ini || new Date().toISOString().slice(0, 10),
-                fim: sigre.fim || matched?.fim || new Date().toISOString().slice(0, 10),
+                fim:
+                  sigre.fim ||
+                  matched?.fim ||
+                  calculateFimDate(
+                    sigre.ini || matched?.ini || new Date().toISOString().slice(0, 10),
+                    Number(sigre.dias || matched?.dias || 30)
+                  ) ||
+                  new Date().toISOString().slice(0, 10),
                 lemi: sigre.lemi || matched?.lemi || 'Quêssua',
                 demi: sigre.demi || details.dataEmissao || matched?.demi || new Date().toISOString().slice(0, 10),
                 dir: sigre.dir || details.director || matched?.dir || 'Belízio Miguel dos Santos António',

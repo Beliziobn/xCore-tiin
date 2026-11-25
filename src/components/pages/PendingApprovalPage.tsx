@@ -86,7 +86,16 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     matchedApp?.roleRequested ||
     (isTeacher ? 'Professor(a) / Docente' : isAdminScopeMember ? 'Membro da Direção Municipal' : 'Pessoal do Âmbito Escolar');
 
-  // Single-document real-time Firestore listener + focus/visibility sync + 60s visible-only fallback
+  const currentUserRef = React.useRef(currentUser);
+  currentUserRef.current = currentUser;
+  const onApprovalConfirmedRef = React.useRef(onApprovalConfirmed);
+  onApprovalConfirmedRef.current = onApprovalConfirmed;
+  const showToastRef = React.useRef(showToast);
+  showToastRef.current = showToast;
+  const approverRoleRef = React.useRef(approverRole);
+  approverRoleRef.current = approverRole;
+
+  // Single-document real-time Firestore listener (1 doc read) + 60s visible-only fallback
   React.useEffect(() => {
     let isMounted = true;
     let promoted = false;
@@ -94,20 +103,24 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     const triggerPromotion = (approvedByName?: string, approvedAtDate?: string) => {
       if (!isMounted || promoted) return;
       promoted = true;
-      const finalApprover = approvedByName || approverRole;
-      showToast?.(`A sua conta foi homologada por ${finalApprover}! A carregar o seu ambiente de trabalho...`);
+      const latestUser = currentUserRef.current;
+      const finalApprover = approvedByName || approverRoleRef.current;
+      showToastRef.current?.(
+        `A sua conta foi homologada por ${finalApprover}! A carregar o seu ambiente de trabalho...`
+      );
       const updated: UserAccount = {
-        ...currentUser,
+        ...latestUser,
         status: 'ativo',
-        approvedAt: approvedAtDate || currentUser.approvedAt || new Date().toLocaleString('pt-AO'),
+        approvedAt: approvedAtDate || latestUser.approvedAt || new Date().toLocaleString('pt-AO'),
         approvedBy: finalApprover,
       };
-      onApprovalConfirmed(updated);
+      onApprovalConfirmedRef.current(updated);
     };
 
     const promoteIfApproved = () => {
       if (!isMounted || promoted) return false;
-      const res = checkUserApprovalStatus(currentUser.id, currentUser.email, currentUser.biNumber);
+      const latestUser = currentUserRef.current;
+      const res = checkUserApprovalStatus(latestUser.id, latestUser.email, latestUser.biNumber);
       if (res.status === 'ativo') {
         triggerPromotion(res.app?.approvedBy, res.app?.approvedAt);
         return true;
@@ -118,15 +131,15 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     const pollStatus = async (useExpressOnlyIfQuotaExhausted: boolean = false) => {
       try {
         if (promoteIfApproved()) return;
+        const latestUser = currentUserRef.current;
         if (isExpressApiAvailable()) {
           await syncApplicationsFromServer(false);
         } else if (!useExpressOnlyIfQuotaExhausted && !isFirestoreReadQuotaExhausted()) {
-          const singleUser = await fetchUserFromFirestore(currentUser.email || currentUser.id);
+          const singleUser = await fetchUserFromFirestore(latestUser.email || latestUser.id);
           if (singleUser && (singleUser.status === 'ativo' || Boolean(singleUser.approvedAt))) {
             triggerPromotion(singleUser.approvedBy, singleUser.approvedAt);
             return;
           }
-          await syncApplicationsFromServer(false);
         }
         if (isMounted) setSyncTick((t) => t + 1);
         promoteIfApproved();
@@ -140,21 +153,15 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       promoteIfApproved();
     };
 
-    const handleFocusOrVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      if (!promoted) pollStatus(false);
-    };
-
-    const unsubUserDoc = subscribeToSingleUserStatus(currentUser.email || currentUser.id, (cloudUser) => {
+    const userKey = currentUser.email || currentUser.id;
+    const unsubUserDoc = subscribeToSingleUserStatus(userKey, (cloudUser) => {
       if (cloudUser && (cloudUser.status === 'ativo' || Boolean(cloudUser.approvedAt))) {
         triggerPromotion(cloudUser.approvedBy, cloudUser.approvedAt);
       }
     });
 
     window.addEventListener('sigre-data-synced', handleRealtimeSync);
-    window.addEventListener('focus', handleFocusOrVisible);
-    document.addEventListener('visibilitychange', handleFocusOrVisible);
-    pollStatus(false);
+    promoteIfApproved();
 
     const intervalId = window.setInterval(() => {
       if (!promoted && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
@@ -167,10 +174,8 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       unsubUserDoc();
       window.clearInterval(intervalId);
       window.removeEventListener('sigre-data-synced', handleRealtimeSync);
-      window.removeEventListener('focus', handleFocusOrVisible);
-      document.removeEventListener('visibilitychange', handleFocusOrVisible);
     };
-  }, [currentUser, onApprovalConfirmed, showToast, approverRole]);
+  }, [currentUser.id, currentUser.email, currentUser.biNumber, currentUser.status]);
 
   const handleCheckStatus = async () => {
     if (checking) return;

@@ -18,6 +18,7 @@ class RealtimeChatManager {
   private messageListeners: Set<MessageListener> = new Set();
   private typingListeners: Set<TypingListener> = new Set();
   private seenMessageIds: Set<string> = new Set();
+  private firestoreUnsub: (() => void) | null = null;
 
   constructor() {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -54,18 +55,31 @@ class RealtimeChatManager {
           }
         }
       });
+    }
+  }
 
-      // Cloud real-time Firestore subscription for cross-device messages
-      try {
-        subscribeToChatMessages((cloudMessages) => {
-          cloudMessages.forEach((msg) => {
-            if (msg && msg.id && !this.seenMessageIds.has(msg.id)) {
-              this.seenMessageIds.add(msg.id);
-              this.messageListeners.forEach((fn) => fn(msg));
-            }
-          });
+  private ensureCloudSync() {
+    if (typeof window === 'undefined' || this.firestoreUnsub || this.messageListeners.size === 0) {
+      return;
+    }
+    try {
+      this.firestoreUnsub = subscribeToChatMessages((cloudMessages) => {
+        cloudMessages.forEach((msg) => {
+          if (msg && msg.id && !this.seenMessageIds.has(msg.id)) {
+            this.seenMessageIds.add(msg.id);
+            this.messageListeners.forEach((fn) => fn(msg));
+          }
         });
+      });
+    } catch {}
+  }
+
+  public stopCloudSync() {
+    if (this.firestoreUnsub) {
+      try {
+        this.firestoreUnsub();
       } catch {}
+      this.firestoreUnsub = null;
     }
   }
 
@@ -119,8 +133,12 @@ class RealtimeChatManager {
 
   public subscribeMessages(callback: MessageListener): () => void {
     this.messageListeners.add(callback);
+    this.ensureCloudSync();
     return () => {
       this.messageListeners.delete(callback);
+      if (this.messageListeners.size === 0) {
+        this.stopCloudSync();
+      }
     };
   }
 

@@ -10,7 +10,7 @@ import { StudentProfile, defaultDisciplinasList } from '../../data/teacherData';
 import { StudentRegistrationModal } from '../modals/StudentRegistrationModal';
 import { TurmaStudentListPdfModal } from '../modals/TurmaStudentListPdfModal';
 import { PautaPdfExportModal } from '../modals/PautaPdfExportModal';
-import type { StudentRegistrationData, SchoolAnnouncement } from '../../types';
+import type { StudentRegistrationData, SchoolAnnouncement, AdminSchool } from '../../types';
 import { getStoredAnnouncements, isAnnouncementExpired } from '../../utils/announcementStorage';
 import { deleteStudent } from '../../utils/studentStorage';
 import {
@@ -34,6 +34,9 @@ interface TeacherClassPageProps {
   onAddStudent?: (newStudent: StudentRegistrationData) => void;
   onNavigateToAttendance?: () => void;
   students: StudentProfile[];
+  schoolName?: string;
+  schoolId?: string;
+  schools?: AdminSchool[];
 }
 
 export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
@@ -42,6 +45,9 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
   onAddStudent,
   onNavigateToAttendance,
   students,
+  schoolName = '',
+  schoolId,
+  schools,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDoc, setFilterDoc] = useState<'all' | 'docs' | 'nodocs'>('all');
@@ -1646,7 +1652,10 @@ export const TeacherClassPage: React.FC<TeacherClassPageProps> = ({
         defaultTurma="Turma 1"
         defaultRoom="Sala 04"
         defaultPeriod="Manhã"
-        schoolName=""
+        schoolName={schoolName}
+        schoolId={schoolId}
+        schools={schools}
+        lockSchool={true}
       />
 
       {/* Modal de Lista de Alunos em PDF (A-Z) */}

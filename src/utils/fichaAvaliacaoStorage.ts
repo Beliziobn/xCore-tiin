@@ -6,9 +6,11 @@
 import {
   saveFichaAvaliacaoToFirestore,
   deleteFichaAvaliacaoFromFirestore,
+  fetchFichasAvaliacaoFromFirestore,
   isEntityTombstoned,
   isBannedSchoolOrEntity,
 } from './firestoreSync';
+import { isExpressApiAvailable } from './apiAvailability';
 
 export const INDICADORES_AVALIACAO = [
   'Qualidade do processo de ensino e aprendizagem',
@@ -254,10 +256,53 @@ export function getStoredFichaAvaliacaoRecords(): FichaAvaliacaoRecord[] {
   }
 }
 
+export function mergeFichaAvaliacaoCloudSnapshot(cloudRecords: any[]): FichaAvaliacaoRecord[] {
+  const local = getStoredFichaAvaliacaoRecords();
+  const mergedMap = new Map<string, FichaAvaliacaoRecord>();
+  local.forEach((r) => {
+    if (
+      r &&
+      r.id &&
+      r.id !== 'ficha-avaliacao-default-1' &&
+      !isEntityTombstoned('fichas_avaliacao', r.id) &&
+      !isBannedSchoolOrEntity(r)
+    ) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  (Array.isArray(cloudRecords) ? cloudRecords : []).forEach((r: FichaAvaliacaoRecord) => {
+    if (
+      r &&
+      r.id &&
+      r.id !== 'ficha-avaliacao-default-1' &&
+      !isEntityTombstoned('fichas_avaliacao', r.id) &&
+      !isBannedSchoolOrEntity(r)
+    ) {
+      mergedMap.set(r.id, r);
+    }
+  });
+  const merged = Array.from(mergedMap.values());
+  if (typeof window !== 'undefined') {
+    const prevRaw = localStorage.getItem(STORAGE_KEY);
+    const nextRaw = JSON.stringify(merged);
+    if (prevRaw !== nextRaw) {
+      localStorage.setItem(STORAGE_KEY, nextRaw);
+    }
+  }
+  return merged;
+}
+
 export async function syncFichaAvaliacaoFromServer(): Promise<FichaAvaliacaoRecord[]> {
   if (typeof window === 'undefined') return [];
   const local = getStoredFichaAvaliacaoRecords();
   try {
+    if (!isExpressApiAvailable()) {
+      const cloudRecords = await fetchFichasAvaliacaoFromFirestore(30);
+      if (Array.isArray(cloudRecords) && cloudRecords.length > 0) {
+        return mergeFichaAvaliacaoCloudSnapshot(cloudRecords);
+      }
+      return local;
+    }
     const res = await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -266,31 +311,7 @@ export async function syncFichaAvaliacaoFromServer(): Promise<FichaAvaliacaoReco
     if (!res.ok) return local;
     const data = await res.json();
     if (Array.isArray(data.fichasAvaliacao)) {
-      const mergedMap = new Map<string, FichaAvaliacaoRecord>();
-      local.forEach((r) => {
-        if (
-          r &&
-          r.id &&
-          r.id !== 'ficha-avaliacao-default-1' &&
-          !isEntityTombstoned('fichas_avaliacao', r.id) &&
-          !isBannedSchoolOrEntity(r)
-        ) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      data.fichasAvaliacao.forEach((r: FichaAvaliacaoRecord) => {
-        if (
-          r &&
-          r.id &&
-          r.id !== 'ficha-avaliacao-default-1' &&
-          !isEntityTombstoned('fichas_avaliacao', r.id) &&
-          !isBannedSchoolOrEntity(r)
-        ) {
-          mergedMap.set(r.id, r);
-        }
-      });
-      const merged = Array.from(mergedMap.values());
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      const merged = mergeFichaAvaliacaoCloudSnapshot(data.fichasAvaliacao);
       window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
       return merged;
     }

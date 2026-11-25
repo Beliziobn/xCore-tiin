@@ -40,12 +40,15 @@ import type {
   AdminSchool, 
   PendingApprovalComplementaryData 
 } from '../../../types';
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import {
   getPendingApplications,
   approveApplicationAsync,
   rejectApplicationAsync,
   savePendingApplicationAsync,
   syncApplicationsFromServer,
+  syncArchivedApplicationsPage,
+  getApplicationsCountsFromServer,
   deleteApplication,
   clearAllHomologatedData,
   isSchoolDirectorApproval,
@@ -55,7 +58,11 @@ import {
   OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
 import { buildInitialDirectorDossier, saveDirector } from '../../../utils/directorStorage';
-import { isFirestoreReadQuotaExhausted } from '../../../utils/firestoreSync';
+import {
+  isFirestoreReadQuotaExhausted,
+  PAGINATION_PAGE_SIZE,
+  type DashboardStats,
+} from '../../../utils/firestoreSync';
 import { isExpressApiAvailable } from '../../../utils/apiAvailability';
 import { Hero } from '../../Hero';
 
@@ -91,6 +98,15 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [cloudReadQuotaBlocked, setCloudReadQuotaBlocked] = useState<boolean>(
     () => isFirestoreReadQuotaExhausted() && !isExpressApiAvailable()
   );
+  const [archiveCursor, setArchiveCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMoreArchive, setHasMoreArchive] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [serverCounts, setServerCounts] = useState<{
+    total: number;
+    pendentes: number;
+    aprovados: number;
+    rejeitados: number;
+  } | null>(null);
   const hasInitializedStatusRef = useRef(false);
 
   // Approval Modal State
@@ -138,8 +154,8 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     try {
       const result = await clearAllHomologatedData();
       await loadApplications();
-      const notify = showToast || alert;
-      notify(result.message || 'Todos os dados homologados foram eliminados com sucesso!');
+      getApplicationsCountsFromServer().then(setServerCounts).catch(() => {});
+      showToast?.(result.message || 'Todos os dados homologados foram eliminados com sucesso!');
     } catch (e) {
       console.error('Erro ao limpar homologados:', e);
     } finally {
@@ -154,8 +170,8 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     try {
       await deleteApplication(appToDelete.id);
       await loadApplications();
-      const notify = showToast || alert;
-      notify(`Registo de "${appToDelete.fullName}" eliminado com sucesso.`);
+      getApplicationsCountsFromServer().then(setServerCounts).catch(() => {});
+      showToast?.(`Registo de "${appToDelete.fullName}" eliminado com sucesso.`);
     } catch (e) {
       console.error('Erro ao eliminar:', e);
     } finally {
@@ -189,6 +205,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     }
     setApplications(unified);
     setCloudReadQuotaBlocked(isFirestoreReadQuotaExhausted() && !isExpressApiAvailable());
+    getApplicationsCountsFromServer().then(setServerCounts).catch(() => {});
     if (!hasInitializedStatusRef.current && unified.length > 0) {
       hasInitializedStatusRef.current = true;
       const pendCount = unified.filter((a) => a.status === 'pendente').length;
@@ -199,8 +216,30 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     }
   };
 
+  const loadArchiveStatusPage = async (
+    targetStatus: 'todos' | 'pendente' | 'aprovado' | 'rejeitado',
+    append: boolean = false
+  ) => {
+    if (isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await syncArchivedApplicationsPage({
+        status: targetStatus,
+        pageSize: PAGINATION_PAGE_SIZE,
+        cursor: append ? archiveCursor : null,
+      });
+      setApplications(res.merged);
+      setArchiveCursor(res.lastDoc);
+      setHasMoreArchive(res.hasMore);
+    } catch {
+      refreshLocalApplications();
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
-    loadApplications(true);
+    loadApplications(false);
     const handleSync = () => refreshLocalApplications();
     const handleQuotaStatus = (ev: Event) => {
       const detail = (ev as CustomEvent<{ readExhausted?: boolean }>).detail;
@@ -210,23 +249,37 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
           : isFirestoreReadQuotaExhausted();
       setCloudReadQuotaBlocked(blocked && !isExpressApiAvailable());
     };
-    const handleVisibilityOrFocus = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      loadApplications(false);
+    const handleStatsUpdated = (ev: Event) => {
+      const s = (ev as CustomEvent<{ stats?: DashboardStats }>).detail?.stats;
+      if (s && typeof s.totalApplications === 'number') {
+        setServerCounts({
+          total: s.totalApplications,
+          pendentes: s.pendingApplications ?? 0,
+          aprovados: s.approvedApplications ?? 0,
+          rejeitados: s.rejectedApplications ?? 0,
+        });
+      }
     };
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('sigre-homologados-cleared', handleSync);
     window.addEventListener('sigre-firestore-quota-status', handleQuotaStatus);
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('sigre-dashboard-stats-updated', handleStatsUpdated);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('sigre-homologados-cleared', handleSync);
       window.removeEventListener('sigre-firestore-quota-status', handleQuotaStatus);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('sigre-dashboard-stats-updated', handleStatsUpdated);
     };
   }, []);
+
+  // Load archived/completed records strictly on demand via paginated getDocs when switching tabs (Rule 2)
+  useEffect(() => {
+    setArchiveCursor(null);
+    setHasMoreArchive(false);
+    if (statusFilter === 'aprovado' || statusFilter === 'rejeitado' || statusFilter === 'todos') {
+      loadArchiveStatusPage(statusFilter, false);
+    }
+  }, [statusFilter]);
 
   // Unified school options from registered schools and applications
   const availableSchoolOptions = useMemo(() => {
@@ -291,12 +344,18 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     });
   }, [applications, statusFilter, roleScopeFilter, selectedSchoolFilter, searchQuery]);
 
-  // Metric counts
+  // Metric counts (prefer stats/dashboard / getCountFromServer for global totals - Rule 4)
   const counts = useMemo(() => {
-    const total = applications.length;
-    const pendentes = applications.filter((a) => a.status === 'pendente').length;
-    const aprovados = applications.filter((a) => a.status === 'aprovado').length;
-    const rejeitados = applications.filter((a) => a.status === 'rejeitado').length;
+    const localTotal = applications.length;
+    const localPendentes = applications.filter((a) => a.status === 'pendente').length;
+    const localAprovados = applications.filter((a) => a.status === 'aprovado').length;
+    const localRejeitados = applications.filter((a) => a.status === 'rejeitado').length;
+
+    const total = serverCounts ? Math.max(serverCounts.total, localTotal) : localTotal;
+    const pendentes = serverCounts ? Math.max(serverCounts.pendentes, localPendentes) : localPendentes;
+    const aprovados = serverCounts ? Math.max(serverCounts.aprovados, localAprovados) : localAprovados;
+    const rejeitados = serverCounts ? Math.max(serverCounts.rejeitados, localRejeitados) : localRejeitados;
+
     const directores = applications.filter((a) => a.type === 'diretor' || a.schoolRole === 'diretor_geral').length;
     const professores = applications.filter((a) => a.type === 'professor' || a.schoolRole === 'professor').length;
     const funcionarios = applications.filter(
@@ -319,7 +378,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       membrosDme,
       taxaAprovacao,
     };
-  }, [applications]);
+  }, [applications, serverCounts]);
 
   // Open approve modal
   const handleOpenApprove = (app: PendingApplication) => {
@@ -1256,6 +1315,25 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Paginated Load More for Archived/All Queries (Rule 2) */}
+        {hasMoreArchive && (
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              disabled={isLoadingMore}
+              onClick={() => loadArchiveStatusPage(statusFilter, true)}
+              className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-[#002133] shadow-xs flex items-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingMore ? 'animate-spin' : ''}`} />
+              <span>
+                {isLoadingMore
+                  ? 'A carregar mais registos...'
+                  : `Carregar mais registos (próximos ${PAGINATION_PAGE_SIZE})`}
+              </span>
+            </button>
           </div>
         )}
 

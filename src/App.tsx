@@ -52,6 +52,7 @@ import {
   saveRegisteredSchool,
   syncSchoolsFromServer,
 } from './utils/schoolStorage';
+import { deduplicateSchoolsCanonical } from './utils/schoolMatcher';
 import {
   syncApplicationsFromServer,
   initRealtimeApplicationsSync,
@@ -62,7 +63,10 @@ import {
 } from './utils/authApprovalStorage';
 import { initRealtimeQuickRequestsSync } from './utils/quickServicesStorage';
 import {
-  initUnifiedRealtimeDatabaseSync,
+  initViewScopedRealtimeSync,
+  fetchDashboardStats,
+  subscribeToDashboardStats,
+  type DashboardStats,
   isFirestoreReadQuotaExhausted,
   saveTeacherToFirestore,
   saveStudentToFirestore,
@@ -192,9 +196,11 @@ export default function App() {
       const saved = localStorage.getItem('ucore_admin_schools');
       const parsed: AdminSchool[] = saved ? JSON.parse(saved) : [];
       const list = Array.isArray(parsed) && parsed.length > 0 ? parsed : initialAdminSchools;
-      return Array.isArray(list) ? list.filter((s) => s && !isModeloCentralSchool(s.name)) : initialAdminSchools;
+      return deduplicateSchoolsCanonical(
+        Array.isArray(list) ? list.filter((s) => s && !isModeloCentralSchool(s.name)) : initialAdminSchools
+      );
     } catch {
-      return initialAdminSchools;
+      return deduplicateSchoolsCanonical(initialAdminSchools);
     }
   });
 
@@ -296,6 +302,7 @@ export default function App() {
   });
 
   const isInitialSyncCompleteRef = useRef(false);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
 
   const [adminModalType, setAdminModalType] = useState<AdminModalType>(null);
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
@@ -312,13 +319,16 @@ export default function App() {
   const handleHomeAICommand = (prompt: string) => {
     if (!prompt.trim()) return;
     const p = prompt.toLowerCase();
+    const totalTeachersCount = dashboardStats?.totalTeachers ?? adminTeachers.length;
+    const totalStudentsCount = dashboardStats?.totalStudents ?? adminStudents.length;
+    const totalSchoolsCount = dashboardStats?.totalSchools ?? adminSchools.length;
     if (p.includes('ponto') || p.includes('presen') || p.includes('falta') || p.includes('docente') || p.includes('professor')) {
       setHomeAIResponse(
-        `📊 Análise de Presenças (Livro de Ponto Docente):\n• Total de Professores Cadastrados: ${adminTeachers.length} docentes.\n• Presentes: 0 docentes.\n• Falta Justificada: 0 docentes.\n• O sistema está pronto para registo de novos docentes.`
+        `📊 Análise de Presenças (Livro de Ponto Docente):\n• Total de Professores Cadastrados: ${totalTeachersCount} docentes.\n• Presentes: 0 docentes.\n• Falta Justificada: 0 docentes.\n• O sistema está pronto para registo de novos docentes.`
       );
     } else if (p.includes('turma') || p.includes('aluno') || p.includes('sala')) {
       setHomeAIResponse(
-        `🎓 Panorama Discente & Turmas:\n• ${adminStudents.length} alunos cadastrados em ${adminSchools.length} escolas ativas.\n• Sem pendências ou registros arquivados no momento.`
+        `🎓 Panorama Discente & Turmas:\n• ${totalStudentsCount} alunos cadastrados em ${totalSchoolsCount} escolas ativas.\n• Sem pendências ou registros arquivados no momento.`
       );
     } else {
       setHomeAIResponse(
@@ -409,7 +419,9 @@ export default function App() {
         if (savedSchools) {
           const parsed = JSON.parse(savedSchools);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setAdminSchools((prev) => (JSON.stringify(prev) === savedSchools ? prev : parsed));
+            const cleanSchools = deduplicateSchoolsCanonical(parsed);
+            const cleanJson = JSON.stringify(cleanSchools);
+            setAdminSchools((prev) => (JSON.stringify(prev) === cleanJson ? prev : cleanSchools));
           }
         }
         const savedDirectors = localStorage.getItem('ucore_admin_directors');
@@ -529,17 +541,21 @@ export default function App() {
     }
   });
 
+  const currentUserRef = useRef<UserAccount | null>(currentUser);
+  currentUserRef.current = currentUser;
+
   // Immediately terminate active session if revoked OR auto-promote if approved on another device
   useEffect(() => {
     const checkActiveAccountStatus = () => {
-      if (!currentUser) return;
-      const emailLow = (currentUser.email || '').trim().toLowerCase();
+      const user = currentUserRef.current;
+      if (!user) return;
+      const emailLow = (user.email || '').trim().toLowerCase();
       if (emailLow === 'dmedoquessua@gmail.com' || emailLow === 'beliziodos20@gmail.com') {
         return;
       }
       const lookup = emailLow ? findRegisteredAccountByEmail(emailLow) : { exists: true };
       if (
-        isAccountDeleted(currentUser.id, currentUser.email, currentUser.biNumber) ||
+        isAccountDeleted(user.id, user.email, user.biNumber) ||
         lookup.wasDeletedByAdmin
       ) {
         setCurrentUser(null);
@@ -557,14 +573,14 @@ export default function App() {
       }
 
       // If this session is still marked 'pendente' but the application is now 'aprovado', promote immediately!
-      if (currentUser.status === 'pendente') {
-        const approvalCheck = checkUserApprovalStatus(currentUser.id, currentUser.email, currentUser.biNumber);
+      if (user.status === 'pendente') {
+        const approvalCheck = checkUserApprovalStatus(user.id, user.email, user.biNumber);
         if (approvalCheck.status === 'ativo') {
           const promotedUser: UserAccount = {
-            ...currentUser,
+            ...user,
             status: 'ativo',
-            approvedAt: approvalCheck.app?.approvedAt || currentUser.approvedAt || new Date().toLocaleString('pt-AO'),
-            approvedBy: approvalCheck.app?.approvedBy || currentUser.approvedBy || 'Director Municipal da Educação (dmedoquessua@gmail.com)',
+            approvedAt: approvalCheck.app?.approvedAt || user.approvedAt || new Date().toLocaleString('pt-AO'),
+            approvedBy: approvalCheck.app?.approvedBy || user.approvedBy || 'Director Municipal da Educação (dmedoquessua@gmail.com)',
           };
           setCurrentUser(promotedUser);
           try {
@@ -583,37 +599,7 @@ export default function App() {
       window.removeEventListener('sigre-account-revoked', checkActiveAccountStatus);
       window.removeEventListener('sigre-data-synced', checkActiveAccountStatus);
     };
-  }, [currentUser]);
-
-  // Role-scoped & session-gated real-time Firestore listeners:
-  // Never open 21 full-collection onSnapshot listeners for unauthenticated landing visitors.
-  useEffect(() => {
-    if (!currentUser) return;
-    if (isFirestoreReadQuotaExhausted()) return;
-
-    const cleanups: Array<() => void> = [];
-
-    if (currentUser.status === 'ativo') {
-      if (currentUser.role === 'admin') {
-        const unsubApps = initRealtimeApplicationsSync();
-        if (typeof unsubApps === 'function') cleanups.push(unsubApps);
-      }
-      if (currentUser.role === 'admin' || currentUser.role === 'diretor') {
-        const unsubQuick = initRealtimeQuickRequestsSync();
-        if (typeof unsubQuick === 'function') cleanups.push(unsubQuick);
-      }
-      const unsubUnified = initUnifiedRealtimeDatabaseSync();
-      if (typeof unsubUnified === 'function') cleanups.push(unsubUnified);
-    }
-
-    return () => {
-      cleanups.forEach((fn) => {
-        try {
-          fn();
-        } catch {}
-      });
-    };
-  }, [currentUser?.id, currentUser?.role, currentUser?.status]);
+  }, [currentUser?.id, currentUser?.email, currentUser?.biNumber, currentUser?.status]);
 
   // Active Role and session configuration state
   const [activeRole, setActiveRole] = useState<'admin' | 'diretor' | 'professor'>(() => {
@@ -630,6 +616,68 @@ export default function App() {
     }
     return 'diretor'; // default to diretor as requested by user
   });
+
+  // View-scoped, role-scoped & session-gated real-time Firestore listeners (Rules 1-5):
+  // Attaches ONLY listeners needed for the current view/role + single-doc stats/dashboard,
+  // and cleanly tears down previous listeners on tab/view change or logout.
+  useEffect(() => {
+    if (!currentUser || currentUser.status !== 'ativo') return;
+    if (isFirestoreReadQuotaExhausted()) return;
+
+    const cleanups: Array<() => void> = [];
+    const viewLow = String(currentView || 'home').toLowerCase();
+
+    fetchDashboardStats()
+      .then((stats) => {
+        if (stats) setDashboardStats(stats);
+      })
+      .catch(() => {});
+
+    const unsubStats = subscribeToDashboardStats((stats) => {
+      setDashboardStats(stats);
+    });
+    cleanups.push(unsubStats);
+
+    if (
+      currentUser.role === 'admin' &&
+      (viewLow === 'home' ||
+        viewLow.includes('dashboard') ||
+        viewLow.includes('aprovac') ||
+        viewLow.includes('approvals') ||
+        viewLow.includes('inscric'))
+    ) {
+      const unsubApps = initRealtimeApplicationsSync();
+      if (typeof unsubApps === 'function') cleanups.push(unsubApps);
+    }
+
+    if (
+      (currentUser.role === 'admin' || currentUser.role === 'diretor') &&
+      (viewLow === 'home' ||
+        viewLow.includes('dashboard') ||
+        viewLow.includes('servicos') ||
+        viewLow.includes('quick'))
+    ) {
+      const unsubQuick = initRealtimeQuickRequestsSync();
+      if (typeof unsubQuick === 'function') cleanups.push(unsubQuick);
+    }
+
+    const unsubViewScoped = initViewScopedRealtimeSync({
+      view: currentView,
+      role: activeRole,
+      schoolId: currentUser.schoolId,
+    });
+    if (typeof unsubViewScoped === 'function') cleanups.push(unsubViewScoped);
+
+    return () => {
+      cleanups.forEach((fn) => {
+        try {
+          fn();
+        } catch {}
+      });
+    };
+  }, [currentUser?.id, currentUser?.role, currentUser?.status, currentUser?.schoolId, currentView, activeRole]);
+
+
 
   // Persist currentView in sessionStorage only while a session is active
   useEffect(() => {
@@ -819,8 +867,12 @@ export default function App() {
     }
   }, [chatChannels]);
 
-  // Real-time synchronization across browser tabs and windows
+  // Session-gated real-time chat synchronization (Rule 3: never subscribe before login)
   useEffect(() => {
+    if (!currentUser || currentUser.status !== 'ativo') {
+      realtimeChat.stopCloudSync();
+      return;
+    }
     const unsub = realtimeChat.subscribeMessages((newMsg) => {
       setChatMessages((prev) => {
         if (prev.some((m) => m.id === newMsg.id)) return prev;
@@ -842,8 +894,9 @@ export default function App() {
 
     return () => {
       unsub();
+      realtimeChat.stopCloudSync();
     };
-  }, []);
+  }, [currentUser?.id, currentUser?.status]);
 
   // Initialize Lenis global smooth scrolling and scroll reveals across all pages
   useEffect(() => {
@@ -1009,11 +1062,16 @@ export default function App() {
     const base = allSessions[activeRole] || allSessions.diretor;
     let computedBase = { ...base };
 
-    // Dynamic real data reflection for Admin session cards
+    // Dynamic real data reflection for Admin session cards (prefers stats/dashboard aggregator - Rule 4)
     if (activeRole === 'admin') {
-      const totalTeachers = adminSchools.reduce((acc, s) => acc + s.teachersCount, 0);
-      const totalStudents = adminSchools.reduce((acc, s) => acc + s.studentsWithDocs + s.studentsWithoutDocs, 0);
-      const avgPerf = adminSchools.length > 0 
+      const totalSchoolsVal = dashboardStats?.totalSchools ?? adminSchools.length;
+      const totalTeachers =
+        dashboardStats?.totalTeachers ??
+        adminSchools.reduce((acc, s) => acc + s.teachersCount, 0);
+      const totalStudents =
+        dashboardStats?.totalStudents ??
+        adminSchools.reduce((acc, s) => acc + s.studentsWithDocs + s.studentsWithoutDocs, 0);
+      const avgPerf = adminSchools.length > 0
         ? Math.round(adminSchools.reduce((acc, s) => acc + s.performanceRate, 0) / adminSchools.length)
         : 0;
 
@@ -1021,7 +1079,7 @@ export default function App() {
         ...base,
         cards: base.cards.map((c) => {
           if (c.id.includes('escola') && !c.id.includes('desempenho')) {
-            return { ...c, value: String(adminSchools.length) };
+            return { ...c, value: String(totalSchoolsVal) };
           }
           if (c.id.includes('professor')) {
             return { ...c, value: String(totalTeachers) };
@@ -1066,7 +1124,7 @@ export default function App() {
       };
     }
     return computedBase;
-  }, [allSessions, activeRole, currentUser, adminSchools, teacherStudents]);
+  }, [allSessions, activeRole, currentUser, adminSchools, teacherStudents, dashboardStats]);
 
   const toastTimerRef = useRef<any>(null);
 
@@ -1768,6 +1826,7 @@ export default function App() {
           teachers={adminTeachers}
           students={adminStudents}
           directors={adminDirectors}
+          dashboardStats={dashboardStats}
           onOpenExcelExport={() => setIsExcelExportModalOpen(true)}
           onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
           onOpenAuditLogs={() => setIsAuditLogsModalOpen(true)}
@@ -2314,7 +2373,8 @@ export default function App() {
                 sala: newStudent.sala || 'Sala 04',
                 periodo: (newStudent.periodo as any) || 'Manhã',
                 turno: (newStudent.periodo as any) || 'Manhã',
-                escola: currentUser?.schoolName || adminSchools[0]?.name || 'Escola Municipal de Quêssua',
+                escola: currentUser?.schoolName || newStudentData.escola || adminSchools[0]?.name || 'Escola Municipal de Quêssua',
+                schoolId: currentUser?.schoolId || newStudentData.schoolId,
                 condicaoMatricula: (newStudent.condicaoMatricula as any) || 'primeira_vez',
                 alunoRepetente: newStudent.condicaoMatricula === 'repetente',
                 encarregado: newStudent.encarregado || 'Encarregado de Educação',
@@ -2324,6 +2384,9 @@ export default function App() {
               showToast(`Aluno(a) ${newStudent.name} matriculado(a) com sucesso!`);
             }}
             students={teacherStudents}
+            schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
+            schoolId={currentUser?.schoolId}
+            schools={adminSchools}
           />
         </div>
       );

@@ -30,6 +30,7 @@ import {
   formatColocacaoDateShort,
   formatCategoriaGrauColocacao,
   getStoredGuiaColocacaoRecords,
+  mergeGuiaColocacaoCloudSnapshot,
   syncGuiaColocacaoFromServer,
   saveGuiaColocacaoRecord,
   deleteGuiaColocacaoRecord,
@@ -41,6 +42,7 @@ import {
 } from '../../utils/declaracaoPdfGenerator';
 import type { UserAccount } from '../../types';
 import { submitQuickServiceRequest } from '../../utils/quickServicesStorage';
+import { subscribeToGuiasColocacao } from '../../utils/firestoreSync';
 
 export interface GuiaColocacaoSectionProps {
   isLoggedIn?: boolean;
@@ -159,11 +161,16 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
   useEffect(() => {
     reloadRecords();
     syncGuiaColocacaoFromServer().then(() => reloadRecords()).catch(() => {});
+    const unsub = subscribeToGuiasColocacao((cloudRecords) => {
+      const merged = mergeGuiaColocacaoCloudSnapshot(cloudRecords);
+      setRecords(merged);
+    });
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-guia-colocacao-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);
     window.addEventListener('storage', handleUpdated);
     return () => {
+      unsub();
       window.removeEventListener('sigre-guia-colocacao-updated', handleUpdated);
       window.removeEventListener('sigre-data-synced', handleUpdated);
       window.removeEventListener('storage', handleUpdated);

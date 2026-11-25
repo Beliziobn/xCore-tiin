@@ -66,8 +66,9 @@ import {
 } from '../../utils/authApprovalStorage';
 import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
-import { getSchoolRegistrationData, getOfferedLevelsBadges, syncSchoolsFromServer, setLocalStorageFromServer } from '../../utils/schoolStorage';
-import { saveUserToFirestore, fetchUserFromFirestore, fetchSchoolsFromFirestore } from '../../utils/firestoreSync';
+import { getSchoolRegistrationData, getOfferedLevelsBadges, syncSchoolsFromServer } from '../../utils/schoolStorage';
+import { saveUserToFirestore, fetchUserFromFirestore, isEntityTombstoned, isBannedSchoolOrEntity } from '../../utils/firestoreSync';
+import { deduplicateSchoolsCanonical } from '../../utils/schoolMatcher';
 
 let lastAuthSchoolSyncAt = 0;
 
@@ -272,7 +273,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [storageRevision, setStorageRevision] = useState(0);
 
-  // Sync registered schools once per session cooldown so users signing up see all registered & edited schools without triggering CDN request loops
+  // Sync registered schools via the single authoritative pipeline so account creation ALWAYS matches "Minhas Escolas"
   useEffect(() => {
     let mounted = true;
     const now = Date.now();
@@ -280,51 +281,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       lastAuthSchoolSyncAt = now;
       syncSchoolsFromServer()
         .then(() => {
-          if (mounted) setStorageRevision((r) => r + 1);
-        })
-        .catch(() => {});
-
-      fetchSchoolsFromFirestore()
-        .then((cloudSchools) => {
-          if (!mounted || !Array.isArray(cloudSchools) || cloudSchools.length === 0) return;
-          let updated = false;
-          try {
-            const raw = localStorage.getItem('ucore_admin_schools');
-            const localList: AdminSchool[] = raw ? JSON.parse(raw) : [];
-            const norm = (str?: string) =>
-              (str || '')
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
-                .trim()
-                .toLowerCase()
-                .replace(/\s+/g, ' ');
-            const merged = [...localList];
-            cloudSchools.forEach((cs) => {
-              if (!cs || !cs.name) return;
-              const n = norm(cs.name);
-              if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) return;
-              const idx = merged.findIndex(
-                (ls) =>
-                  (ls.id && cs.id && String(ls.id).trim().toLowerCase() === String(cs.id).trim().toLowerCase()) ||
-                  norm(ls.name) === n
-              );
-              if (idx >= 0) {
-                const lTs = Number((merged[idx] as any)._updatedAt || Date.parse((merged[idx] as any).updatedAt || '') || 0);
-                const cTs = Number((cs as any)._updatedAt || Date.parse((cs as any).updatedAt || '') || 0);
-                if (cTs >= lTs && JSON.stringify(merged[idx]) !== JSON.stringify(cs)) {
-                  merged[idx] = { ...merged[idx], ...cs, registrationData: cs.registrationData || merged[idx].registrationData };
-                  updated = true;
-                }
-              } else {
-                merged.push(cs);
-                updated = true;
-              }
-            });
-            if (updated) {
-              setLocalStorageFromServer('ucore_admin_schools', JSON.stringify(merged));
-              setLocalStorageFromServer('ucore_registered_schools_v1', JSON.stringify(merged));
-            }
-          } catch {}
           if (mounted) setStorageRevision((r) => r + 1);
         })
         .catch(() => {});
@@ -342,57 +298,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     };
   }, []);
 
-  // Escolas já cadastradas no sistema (initialAdminSchools como base, sobrepostas por propSchools e localStorage/Firestore)
+  // Lista única e rigorosamente idêntica à aba "Minhas Escolas" (AdminSchoolsPage):
+  // Usa propSchools (estado oficial adminSchools) ou ucore_admin_schools sincronizado, NUNCA re-injectando escolas apagadas/duplicadas do seed antigo.
   const registeredSchools = React.useMemo(() => {
-    const norm = (str?: string) =>
-      (str || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, ' ');
-
     const fromStorage = getRegisteredSchoolsFromStorage();
-    // Base canonical schools first, then propSchools, then latest fromStorage so new/edited schools ALWAYS win
-    const combined = [...initialAdminSchools, ...(propSchools || []), ...fromStorage];
-    const list: AdminSchool[] = [];
+    const authoritativeSource =
+      Array.isArray(propSchools) && propSchools.length > 0
+        ? propSchools
+        : fromStorage.length > 0
+        ? fromStorage
+        : initialAdminSchools;
 
-    combined.forEach((sc) => {
-      if (!sc || !sc.name) return;
-      const n = norm(sc.name);
-      if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) {
-        return;
-      }
-      const sId = String(sc.id || '').trim().toLowerCase();
-      const sCode = norm(sc.codigoSIGE || sc.registrationData?.codigoSIGE);
-      const existingIdx = list.findIndex((item) => {
-        const iId = String(item.id || '').trim().toLowerCase();
-        const iName = norm(item.name);
-        const iCode = norm(item.codigoSIGE || item.registrationData?.codigoSIGE);
-        if (sId && iId && sId === iId) return true;
-        if (n && iName && n === iName) return true;
-        if (sCode && iCode && sCode !== 'sige-102012' && sCode === iCode) return true;
-        return false;
-      });
-
-      if (existingIdx >= 0) {
-        const prev = list[existingIdx];
-        const prevTs = Number((prev as any)._updatedAt || Date.parse((prev as any).updatedAt || '') || 0);
-        const nextTs = Number((sc as any)._updatedAt || Date.parse((sc as any).updatedAt || '') || 0);
-        const primary = nextTs >= prevTs ? sc : prev;
-        const secondary = nextTs >= prevTs ? prev : sc;
-        list[existingIdx] = {
-          ...secondary,
-          ...primary,
-          id: primary.id || secondary.id,
-          registrationData: primary.registrationData || secondary.registrationData,
-        };
-      } else {
-        list.push(sc);
-      }
-    });
-
-    return list;
+    return deduplicateSchoolsCanonical(
+      authoritativeSource,
+      (sc) =>
+        isBannedSchoolOrEntity(sc) ||
+        isEntityTombstoned('schools', sc.id) ||
+        isEntityTombstoned('schools', sc.name)
+    );
   }, [propSchools, mode, storageRevision]);
 
   // Form fields

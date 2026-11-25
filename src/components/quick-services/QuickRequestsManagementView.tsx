@@ -39,8 +39,11 @@ import {
 } from 'lucide-react';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import type { QuickServiceRequest, QuickServiceStatus, QuickServiceType, UserAccount } from '../../types';
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import {
   fetchQuickRequests,
+  fetchArchivedQuickRequestsPage,
+  getQuickRequestsServerCounts,
   submitQuickServiceRequest,
   updateQuickRequestStatus,
   deleteQuickRequest,
@@ -51,6 +54,7 @@ import {
   schoolsMatch,
   type DestinationTurmaVacancyInfo,
 } from '../../utils/quickServicesStorage';
+import { PAGINATION_PAGE_SIZE } from '../../utils/firestoreSync';
 import { getRegisteredSchoolsFromStorage, getStoredStudents } from '../../utils/studentStorage';
 import { formatAngolanDateExtenso } from '../../utils/efectividadeStorage';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
@@ -91,6 +95,14 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   const [statusFilter, setStatusFilter] = useState<'TODOS' | QuickServiceStatus>('TODOS');
   const [typeFilter, setTypeFilter] = useState<'TODOS' | QuickServiceType>('TODOS');
   const [managementTab, setManagementTab] = useState<'PEDIDOS_ORIGEM' | 'CONSULTAS_VAGA_DESTINO'>('PEDIDOS_ORIGEM');
+  const [archiveCursor, setArchiveCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMoreArchive, setHasMoreArchive] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [serverCounts, setServerCounts] = useState<{
+    total: number;
+    pendentes: number;
+    concluidos: number;
+  } | null>(null);
 
   // Modals state
   const [documentModalRequest, setDocumentModalRequest] = useState<QuickServiceRequest | null>(null);
@@ -167,10 +179,44 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
     try {
       const data = await fetchQuickRequests();
       setRequests(data);
+      if (isMasterAdmin) {
+        getQuickRequestsServerCounts().then(setServerCounts).catch(() => {});
+      }
     } catch (e) {
       console.error('[QuickServices] Failed to load requests:', e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadArchivePage = async (
+    targetStatus: 'TODOS' | QuickServiceStatus,
+    append: boolean = false
+  ) => {
+    if (isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const page = await fetchArchivedQuickRequestsPage({
+        status: targetStatus,
+        pageSize: PAGINATION_PAGE_SIZE,
+        cursor: append ? archiveCursor : null,
+      });
+      setRequests((prev) => {
+        const map = new Map<string, QuickServiceRequest>();
+        prev.forEach((r) => {
+          if (r && r.id) map.set(r.id, r);
+        });
+        page.items.forEach((r) => {
+          if (r && r.id) map.set(r.id, { ...(map.get(r.id) || {}), ...r });
+        });
+        return Array.from(map.values());
+      });
+      setArchiveCursor(page.lastDoc);
+      setHasMoreArchive(page.hasMore);
+    } catch (e) {
+      console.error('[QuickServices] Failed to load archived page:', e);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -180,6 +226,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
     try {
       await clearAllQuickRequests();
       setRequests([]);
+      setServerCounts({ total: 0, pendentes: 0, concluidos: 0 });
       showToast?.(`Todos os pedidos foram zerados com sucesso.`);
     } catch {
       showToast?.('Erro ao zerar pedidos.');
@@ -221,6 +268,21 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       window.removeEventListener('sigre-data-synced', handleDataSynced);
     };
   }, []);
+
+  // Load archived/completed requests via paginated getDocs on demand (Rule 2)
+  useEffect(() => {
+    setArchiveCursor(null);
+    setHasMoreArchive(false);
+    if (
+      statusFilter === 'CONCLUIDO' ||
+      statusFilter === 'REJEITADO' ||
+      statusFilter === 'CANCELADO' ||
+      statusFilter === 'SEM_VAGA_DESTINO' ||
+      statusFilter === 'TODOS'
+    ) {
+      loadArchivePage(statusFilter, false);
+    }
+  }, [statusFilter]);
 
   // Requests where the user's school is the Origin School (or all for Master Admin)
   const originScopedRequests = useMemo(() => {
@@ -301,16 +363,19 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   }, [activeListSource, managementTab, typeFilter, statusFilter, searchQuery]);
 
   const counts = useMemo(() => {
+    const localTotal = originScopedRequests.length;
+    const localPendentes = originScopedRequests.filter((r) => r.status === 'PENDENTE').length;
+    const localConcluidos = originScopedRequests.filter((r) => r.status === 'CONCLUIDO').length;
     return {
-      total: originScopedRequests.length,
-      pendentes: originScopedRequests.filter((r) => r.status === 'PENDENTE').length,
+      total: isMasterAdmin && serverCounts ? Math.max(serverCounts.total, localTotal) : localTotal,
+      pendentes: isMasterAdmin && serverCounts ? Math.max(serverCounts.pendentes, localPendentes) : localPendentes,
       emAnalise: originScopedRequests.filter(
         (r) =>
           r.status === 'EM_ANALISE' ||
           r.status === 'AGUARDANDO_VAGA_DESTINO' ||
           r.status === 'VAGA_CONFIRMADA'
       ).length,
-      concluidos: originScopedRequests.filter((r) => r.status === 'CONCLUIDO').length,
+      concluidos: isMasterAdmin && serverCounts ? Math.max(serverCounts.concluidos, localConcluidos) : localConcluidos,
       efectividade: originScopedRequests.filter((r) => r.serviceType === 'DECLARACAO_EFECTIVIDADE').length,
       servico: originScopedRequests.filter((r) => r.serviceType === 'DECLARACAO_SERVICO').length,
       ferias: originScopedRequests.filter((r) => r.serviceType === 'GUIA_FERIAS').length,
@@ -319,7 +384,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       matriculas: originScopedRequests.filter((r) => r.serviceType === 'DECLARACAO_MATRICULA').length,
       transferencias: originScopedRequests.filter((r) => r.serviceType === 'GUIA_TRANSFERENCIA').length,
     };
-  }, [originScopedRequests]);
+  }, [originScopedRequests, isMasterAdmin, serverCounts]);
 
   // Compute turma vacancies when Vacancy Modal is open
   const destinationTurmaVacancies = useMemo<DestinationTurmaVacancyInfo[]>(() => {
@@ -1860,6 +1925,24 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               </div>
             );
           })}
+
+          {hasMoreArchive && (
+            <div className="pt-3 flex justify-center">
+              <button
+                type="button"
+                disabled={isLoadingMore}
+                onClick={() => loadArchivePage(statusFilter, true)}
+                className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-[#e8e8ea] text-xs font-bold text-[#002133] shadow-xs flex items-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingMore ? 'animate-spin' : ''}`} />
+                <span>
+                  {isLoadingMore
+                    ? 'A carregar mais solicitações...'
+                    : `Carregar mais solicitações (próximos ${PAGINATION_PAGE_SIZE})`}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
