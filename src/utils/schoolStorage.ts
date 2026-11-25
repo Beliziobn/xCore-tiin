@@ -24,6 +24,7 @@ import {
   deleteApplicationFromFirestore,
 } from './firestoreSync';
 import { purgeDeletedAccountCredentials, deduplicateApplicationsList, stripAppIdPrefix } from './authApprovalStorage';
+import { isExpressApiAvailable, checkExpressApiResponse } from './apiAvailability';
 import {
   CANONICAL_SCHOOLS,
   CANONICAL_DIRECTORS,
@@ -1269,12 +1270,20 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
       dirtyCollections.clear();
       dirtyStorageKeys.clear();
 
+      if (!isExpressApiAvailable()) {
+        return localSchools;
+      }
+
       res = await fetch('/api/network/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
     } else {
+      if (!isExpressApiAvailable()) {
+        hasCompletedInitialServerPull = true;
+        return localSchools;
+      }
       res = await fetch('/api/network/sync', {
         method: 'GET',
         headers: {
@@ -1285,11 +1294,12 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     }
 
     if (res.status === 304) {
+      checkExpressApiResponse(res);
       hasCompletedInitialServerPull = true;
       return localSchools;
     }
 
-    if (!res.ok) {
+    if (!checkExpressApiResponse(res)) {
       return localSchools;
     }
 

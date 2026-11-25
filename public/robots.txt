@@ -1,37 +1,68 @@
 # ==============================================================================
-# robots.txt - Central uCore (Plataforma Integrada de Gestão Educacional em Angola)
+# robots.txt - Sigre Angola (Proteção contra Crawlers Pesados / Vercel Hobby CDN)
 # ==============================================================================
-# Configuração oficial de rastreamento e indexação para motores de busca.
-# Protege dados confidenciais de alunos, docentes e áreas de gestão escolar.
+# Bloqueia explicitamente robôs de IA, scrapers e crawlers de SEO que consomem
+# CDN Requests na Vercel, permitindo apenas a indexação do Googlebot.
 
-User-agent: *
-# Páginas Públicas Institucionais Permitidas
+# --- Bloqueio explícito de crawlers pesados de IA e SEO ---
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+User-agent: DataForSeoBot
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+# --- Permitir exclusivamente Googlebot (protegendo API e áreas privadas) ---
+User-agent: Googlebot
 Allow: /
-Allow: /index.html
-Allow: /public/
 Allow: /assets/
-Allow: /?page=sobre
-Allow: /?page=cases
-Allow: /?page=faq
-Allow: /?page=mapas
-Allow: /?page=rotas
-Allow: /?page=reunioes
-Allow: /?page=termos
-Allow: /?page=privacidade
-Allow: /?page=seguranca
-Allow: /?page=obrigado
-Allow: /sobre
-Allow: /cases
-Allow: /faq
-Allow: /mapas
-Allow: /rotas
-Allow: /reunioes
-Allow: /termos
-Allow: /privacidade
-Allow: /seguranca
-Allow: /obrigado
-
-# Bloqueio de Áreas Restritas, Dados Pessoais e API
 Disallow: /api/
 Disallow: /admin
 Disallow: /diretor
@@ -39,37 +70,12 @@ Disallow: /professor
 Disallow: /aluno
 Disallow: /secretaria
 Disallow: /portal-privado
-Disallow: /*?view=admin*
-Disallow: /*?view=director*
-Disallow: /*?view=teacher*
-Disallow: /*?view=student*
-Disallow: /*?view=approvals*
-Disallow: /*?view=attendance*
-
-# Bloqueio de Ficheiros de Dados e Planilhas Brutas
+Disallow: /*?view=*
 Disallow: /*.xlsx$
 Disallow: /*.xls$
 Disallow: /*.csv$
 Disallow: /*.json$
 
-# Googlebot Diretrizes Específicas
-User-agent: Googlebot
-Allow: /
-Allow: /assets/
-Disallow: /api/
-Disallow: /*?view=*
-
-# Bingbot Diretrizes Específicas
-User-agent: Bingbot
-Allow: /
-Allow: /assets/
-Disallow: /api/
-Disallow: /*?view=*
-
-# Taxa de rastreio recomendada
-Crawl-delay: 5
-
-# Sitemaps Oficiais
-Sitemap: https://ais-pre-je74l3gqxasv5iudwsbmo6-172471451356.europe-west2.run.app/sitemap.xml
-Sitemap: https://ais-pre-vyv6vdg4jz5xil3qm7oms5-656011205627.europe-west1.run.app/sitemap.xml
-
+# --- Bloquear todos os restantes bots não autorizados ---
+User-agent: *
+Disallow: /

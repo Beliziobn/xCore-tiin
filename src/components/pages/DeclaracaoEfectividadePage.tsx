@@ -280,29 +280,19 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     const handler = () => reloadRecords();
     const quickHandler = () => reloadQuickRequests();
     window.addEventListener('sigre-efectividade-updated', handler);
+    window.addEventListener('sigre-data-synced', handler);
     window.addEventListener('sigre-database-restored', handler);
     window.addEventListener('sigre_quick_request_created', quickHandler);
     window.addEventListener('sigre_quick_request_updated', quickHandler);
     window.addEventListener('storage', handler);
 
-    const pollInterval = setInterval(() => {
-      syncEfectividadeFromServer()
-        .then((synced) => {
-          if (Array.isArray(synced)) {
-            setRecords(synced);
-          }
-        })
-        .catch(() => {});
-      reloadQuickRequests();
-    }, 4500);
-
     return () => {
       window.removeEventListener('sigre-efectividade-updated', handler);
+      window.removeEventListener('sigre-data-synced', handler);
       window.removeEventListener('sigre-database-restored', handler);
       window.removeEventListener('sigre_quick_request_created', quickHandler);
       window.removeEventListener('sigre_quick_request_updated', quickHandler);
       window.removeEventListener('storage', handler);
-      clearInterval(pollInterval);
     };
   }, []);
 

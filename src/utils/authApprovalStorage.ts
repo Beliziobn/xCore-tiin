@@ -23,6 +23,7 @@ import {
   isEntityTombstoned,
 } from './firestoreSync';
 import { encodePasswordVerifier, deleteUserCredentials } from './passwordService';
+import { isExpressApiAvailable, checkExpressApiResponse } from './apiAvailability';
 
 export const UCORE_MUNICIPALITIES = [
   'Quêssua (Malanje)',
@@ -411,12 +412,16 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
     try {
       const combined: PendingApplication[] = [];
 
-      // 1. Fetch Express server AND Cloud Firestore in parallel (Firestore is the shared source across ais-dev & ais-pre!)
+      // 1. Fetch Express server (only when Express API backend is active) AND Cloud Firestore in parallel
       const [serverResult, firestoreResult] = await Promise.allSettled([
-        Promise.race([
-          fetch('/api/network/applications', { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-        ]),
+        isExpressApiAvailable()
+          ? Promise.race([
+              fetch('/api/network/applications', { headers: { Accept: 'application/json' } }).then((r) =>
+                checkExpressApiResponse(r) ? r.json() : null
+              ),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+            ])
+          : Promise.resolve(null),
         Promise.race([
           fetchApplicationsFromFirestore(),
           new Promise<PendingApplication[]>((resolve) => setTimeout(() => resolve([]), 4500)),
@@ -480,7 +485,7 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
         if (ma.status === 'rejeitado' && srvMatch.status === 'pendente') return true;
         return false;
       });
-      if (missingOrUpgradedOnServer.length > 0) {
+      if (isExpressApiAvailable() && missingOrUpgradedOnServer.length > 0) {
         fetch('/api/network/applications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -551,8 +556,8 @@ export function initRealtimeApplicationsSync(
       const nextRaw = JSON.stringify(validApps);
       if (prevRaw !== nextRaw) {
         writeApplicationsWithoutDirtyEcho(validApps);
-        // Mirror Cloud Firestore updates to this container's Express backend so GET /api/network/sync stays fresh
-        if (liveFsApps.length > 0) {
+        // Mirror Cloud Firestore updates to this container's Express backend only when Express API is active
+        if (isExpressApiAvailable() && liveFsApps.length > 0) {
           fetch('/api/network/applications', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

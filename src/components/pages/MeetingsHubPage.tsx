@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type { MeetingRoomSummary } from '../../types/meeting';
+import { isExpressApiAvailable, checkExpressApiResponse } from '../../utils/apiAvailability';
 
 interface MeetingsHubPageProps {
   currentUser: {
@@ -42,10 +43,11 @@ export const MeetingsHubPage: React.FC<MeetingsHubPageProps> = ({
   });
 
   const fetchRooms = async () => {
+    if (!isExpressApiAvailable()) return;
     setIsLoadingRooms(true);
     try {
-      const res = await fetch('/api/meetings/rooms');
-      if (res.ok) {
+      const res = await fetch('/api/meetings/rooms', { headers: { Accept: 'application/json' } });
+      if (checkExpressApiResponse(res)) {
         const data = await res.json();
         if (data.rooms && Array.isArray(data.rooms)) {
           setRooms(data.rooms);
@@ -60,8 +62,6 @@ export const MeetingsHubPage: React.FC<MeetingsHubPageProps> = ({
 
   useEffect(() => {
     fetchRooms();
-    const interval = setInterval(fetchRooms, 8000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleStartInstantMeeting = () => {

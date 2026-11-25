@@ -146,12 +146,15 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
 
   useEffect(() => {
     loadApplications();
-    const handleSync = () => loadApplications();
+    const handleSync = () => {
+      const localApps = deduplicateApplicationsList(getPendingApplications()).filter((a) =>
+        isSchoolDirectorApproval(a)
+      );
+      setApplications(localApps);
+    };
     window.addEventListener('sigre-data-synced', handleSync);
-    const interval = setInterval(loadApplications, 4500);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
-      clearInterval(interval);
     };
   }, []);
 

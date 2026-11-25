@@ -116,11 +116,9 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
 
     window.addEventListener('sigre-data-synced', handleRealtimeSync);
     pollStatus();
-    const interval = setInterval(pollStatus, 3500);
     return () => {
       isMounted = false;
       window.removeEventListener('sigre-data-synced', handleRealtimeSync);
-      clearInterval(interval);
     };
   }, [currentUser, onApprovalConfirmed, showToast, approverRole]);
 

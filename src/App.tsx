@@ -462,14 +462,10 @@ export default function App() {
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
     window.addEventListener('ucore-students-updated', handleSync);
-    window.addEventListener('focus', triggerFullNetworkSync);
-    const pollInterval = setInterval(triggerFullNetworkSync, 15000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('ucore-teachers-updated', handleSync);
       window.removeEventListener('ucore-students-updated', handleSync);
-      window.removeEventListener('focus', triggerFullNetworkSync);
-      clearInterval(pollInterval);
       if (typeof unsubApps === 'function') unsubApps();
       if (typeof unsubQuick === 'function') unsubQuick();
       if (typeof unsubUnifiedDb === 'function') unsubUnifiedDb();

@@ -197,10 +197,8 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     loadApplications(true);
     const handleSync = () => refreshLocalApplications();
     window.addEventListener('sigre-data-synced', handleSync);
-    const interval = setInterval(() => loadApplications(false), 8000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
-      clearInterval(interval);
     };
   }, []);
 

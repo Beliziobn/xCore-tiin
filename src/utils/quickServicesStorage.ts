@@ -14,6 +14,7 @@ import {
   subscribeToQuickRequests,
 } from './firestoreSync';
 import { getStoredStudents } from './studentStorage';
+import { isExpressApiAvailable, checkExpressApiResponse } from './apiAvailability';
 import {
   getStudentsForTurma,
   normalizeClasseName,
@@ -465,29 +466,33 @@ export async function fetchQuickRequests(filters?: {
     console.warn('[QuickServices] Cloud fetch warning:', err);
   }
 
-  // 2. Fetch from backend API
-  try {
-    const params = new URLSearchParams();
-    if (filters?.schoolId) params.append('schoolId', filters.schoolId);
-    if (filters?.targetRole) params.append('targetRole', filters.targetRole);
-    if (filters?.protocol) params.append('protocol', filters.protocol);
-    if (filters?.phone) params.append('phone', filters.phone);
-    if (filters?.id) params.append('id', filters.id);
+  // 2. Fetch from backend API (only when Express API backend is active)
+  if (isExpressApiAvailable()) {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.schoolId) params.append('schoolId', filters.schoolId);
+      if (filters?.targetRole) params.append('targetRole', filters.targetRole);
+      if (filters?.protocol) params.append('protocol', filters.protocol);
+      if (filters?.phone) params.append('phone', filters.phone);
+      if (filters?.id) params.append('id', filters.id);
 
-    const res = await fetch(`/api/quick-requests?${params.toString()}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.requests)) {
-        data.requests.forEach((r: QuickServiceRequest) => {
-          if (r && r.id && !map.has(r.id)) {
-            map.set(r.id, r);
-            saveQuickRequestToFirestore(r).catch(() => {});
-          }
-        });
+      const res = await fetch(`/api/quick-requests?${params.toString()}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (checkExpressApiResponse(res)) {
+        const data = await res.json();
+        if (Array.isArray(data.requests)) {
+          data.requests.forEach((r: QuickServiceRequest) => {
+            if (r && r.id && !map.has(r.id)) {
+              map.set(r.id, r);
+              saveQuickRequestToFirestore(r).catch(() => {});
+            }
+          });
+        }
       }
+    } catch (err) {
+      console.warn('[QuickServices] Server API fetch failed, continuing with cloud/local:', err);
     }
-  } catch (err) {
-    console.warn('[QuickServices] Server API fetch failed, continuing with cloud/local:', err);
   }
 
   // 3. Fallback to local cache if map is still empty

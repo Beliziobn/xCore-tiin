@@ -1733,6 +1733,7 @@ async function startServer() {
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
+    res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60");
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
@@ -1749,6 +1750,7 @@ async function startServer() {
   // Ensures registered schools and their data appear for all users signing up
   // ============================================================================
   app.get("/api/network/state", (req, res) => {
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
     res.json({
       success: true,
       ...networkStore,
@@ -1756,6 +1758,7 @@ async function startServer() {
   });
 
   app.get("/api/network/schools", (req, res) => {
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
     res.json({
       success: true,
       schools: networkStore.schools,
@@ -3771,6 +3774,7 @@ async function startServer() {
   // RAG INTELIGENTE: ROTAS DE RECUPERAÇÃO E GERAÇÃO AUMENTADA (GEMINI + VETORES)
   // ============================================================================
   app.get("/api/rag/stats", (req, res) => {
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
     res.json({
       success: true,
       stats: getKnowledgeBaseStats(),
@@ -3778,6 +3782,7 @@ async function startServer() {
   });
 
   app.get("/api/rag/documents", (req, res) => {
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
     res.json({
       success: true,
       documents: getAllDocuments(),
@@ -3886,6 +3891,7 @@ async function startServer() {
     const pub = path.join(process.cwd(), "public", "robots.txt");
     const dist = path.join(process.cwd(), "dist", "robots.txt");
     const target = fs.existsSync(pub) ? pub : dist;
+    res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400");
     res.type("text/plain").sendFile(target);
   });
 
@@ -3893,6 +3899,7 @@ async function startServer() {
     const pub = path.join(process.cwd(), "public", "sitemap.xml");
     const dist = path.join(process.cwd(), "dist", "sitemap.xml");
     const target = fs.existsSync(pub) ? pub : dist;
+    res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400");
     res.type("application/xml").sendFile(target);
   });
 
@@ -3911,8 +3918,21 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(
+      express.static(distPath, {
+        maxAge: "1y",
+        immutable: true,
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith("index.html")) {
+            res.setHeader("Cache-Control", "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800");
+          } else {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          }
+        },
+      })
+    );
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

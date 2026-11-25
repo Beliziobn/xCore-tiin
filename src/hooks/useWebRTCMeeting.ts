@@ -795,8 +795,8 @@ export function useWebRTCMeeting({
       }
     });
 
-    // 3. HTTP Presence Sync Polling (Every 3.5s): Safety net guaranteeing no empty room anomalies
-    const syncInterval = setInterval(async () => {
+    // 3. One-shot initial HTTP presence check (live join/leave updates come via Socket.io events — no HTTP polling loop)
+    const syncInitialPresence = async () => {
       if (!active) return;
       try {
         const res = await fetch(`/api/meetings/rooms/${cleanRoomId}`);
@@ -833,14 +833,14 @@ export function useWebRTCMeeting({
             });
           }
         }
-      } catch (err) {
-        // Silently skip transient polling errors
+      } catch {
+        // Silently skip if running on static CDN without Express signaling
       }
-    }, 3500);
+    };
+    syncInitialPresence();
 
     return () => {
       active = false;
-      clearInterval(syncInterval);
 
       // Clean up peer connections & socket
       (Object.values(peerConnectionsRef.current) as RTCPeerConnection[]).forEach((pc) => pc.close());

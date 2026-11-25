@@ -230,13 +230,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     window.addEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
     window.addEventListener('sigre_quick_request_created', updateQuickRequests);
     window.addEventListener('sigre_quick_request_updated', updateQuickRequests);
-    const interval = setInterval(updateCounts, 10000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
       window.removeEventListener('sigre_quick_request_created', updateQuickRequests);
       window.removeEventListener('sigre_quick_request_updated', updateQuickRequests);
-      clearInterval(interval);
     };
   }, [activeRole, currentUser?.id, currentUser?.email, currentUser?.role, currentUser?.schoolName, currentUser?.schoolId]);
 

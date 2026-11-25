@@ -188,7 +188,6 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
 
   useEffect(() => {
     loadRequests();
-    const interval = setInterval(loadRequests, 6000);
 
     const handleCreated = (e: any) => {
       if (e?.detail) {
@@ -200,14 +199,24 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         setRequests((prev) => prev.map((r) => (r.id === e.detail.id ? e.detail : r)));
       }
     };
+    const handleDataSynced = () => {
+      try {
+        const raw = localStorage.getItem('sigre_quick_services_local_cache');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setRequests(parsed);
+        }
+      } catch {}
+    };
 
     window.addEventListener('sigre_quick_request_created', handleCreated);
     window.addEventListener('sigre_quick_request_updated', handleUpdated);
+    window.addEventListener('sigre-data-synced', handleDataSynced);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('sigre_quick_request_created', handleCreated);
       window.removeEventListener('sigre_quick_request_updated', handleUpdated);
+      window.removeEventListener('sigre-data-synced', handleDataSynced);
     };
   }, []);
 
