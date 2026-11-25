@@ -2,17 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // =========================================================================
+    // Helper Functions & Validation Blueprints
+    // Note: SIGRE currently authenticates institutional accounts via custom
+    // email/password verification in-app (without Firebase Auth tokens).
+    // Once Firebase Auth is enabled for all SIGRE logins, tighten read/write
+    // predicates below to require isSignedIn() / isAdmin().
+    // =========================================================================
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128;
+      return id is string && id.size() > 0 && id.size() <= 128 && !id.matches('.*(/|\\.\\.).*');
     }
 
     function isAdmin() {
@@ -25,216 +28,250 @@ service cloud.firestore {
       );
     }
 
+    // Prevents oversized/malformed payloads and recursive registrationData nesting bombs
+    function isBoundedDocument() {
+      return request.resource.data is map
+        && request.resource.data.keys().size() > 0
+        && request.resource.data.keys().size() <= 160
+        && (
+          !('registrationData' in request.resource.data)
+          || !(request.resource.data.registrationData is map)
+          || !('registrationData' in request.resource.data.registrationData)
+        );
+    }
+
+    function hasSafeSchoolLogo() {
+      return !('logoSvg' in request.resource.data)
+        || (
+          request.resource.data.logoSvg is string
+          && request.resource.data.logoSvg.size() <= 32768
+          && !request.resource.data.logoSvg.matches('(?i).*(<script|<foreignObject|<iframe|javascript:).*')
+        );
+    }
+
+    function isValidApplicationWrite(applicationId) {
+      return isValidId(applicationId)
+        && isBoundedDocument()
+        && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 180))
+        && (!('status' in request.resource.data) || request.resource.data.status in ['pendente', 'aprovado', 'rejeitado']);
+    }
+
+    function isValidSchoolWrite(schoolId) {
+      return isValidId(schoolId)
+        && isBoundedDocument()
+        && hasSafeSchoolLogo()
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 200));
+    }
+
+    function isValidEntityWrite(docId) {
+      return isValidId(docId) && isBoundedDocument();
+    }
+
     // ==========================================
     // Collection: /applications/{applicationId}
-    // Cross-device cloud homologation for directors, teachers & DME staff
     // ==========================================
     match /applications/{applicationId} {
       allow read: if true;
-      allow create: if isValidId(applicationId);
-      allow update: if true;
-      allow delete: if true;
+      allow create, update: if isValidApplicationWrite(applicationId);
+      allow delete: if isValidId(applicationId);
     }
 
     // ==========================================
     // Collection: /quickRequests/{requestId}
-    // Fast citizen & teacher service requests
     // ==========================================
     match /quickRequests/{requestId} {
       allow read: if true;
-      allow create: if isValidId(requestId);
-      allow update: if true;
-      allow delete: if true;
+      allow create, update: if isValidEntityWrite(requestId);
+      allow delete: if isValidId(requestId);
     }
 
     // ==========================================
     // Collection: /schools/{schoolId}
-    // School directory & full 7-section registration data
     // ==========================================
     match /schools/{schoolId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidSchoolWrite(schoolId);
+      allow delete: if isValidId(schoolId);
     }
 
     // ==========================================
     // Collection: /directors/{directorId}
-    // School directors & management dossiers
     // ==========================================
     match /directors/{directorId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(directorId);
+      allow delete: if isValidId(directorId);
     }
 
     // ==========================================
     // Collection: /dme_staff/{staffId}
-    // Municipal Directorate (DME) technical & inspection staff
     // ==========================================
     match /dme_staff/{staffId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(staffId);
+      allow delete: if isValidId(staffId);
     }
 
     // ==========================================
     // Collection: /teachers/{teacherId}
-    // Teacher rosters & ministerial registration data
     // ==========================================
     match /teachers/{teacherId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(teacherId);
+      allow delete: if isValidId(teacherId);
     }
 
     // ==========================================
     // Collection: /students/{studentId}
-    // Student enrollments & academic profiles
     // ==========================================
     match /students/{studentId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(studentId);
+      allow delete: if isValidId(studentId);
     }
 
     // ==========================================
     // Collection: /staff/{staffId}
-    // Administrative, auxiliary, security & support personnel
     // ==========================================
     match /staff/{staffId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(staffId);
+      allow delete: if isValidId(staffId);
     }
 
     // ==========================================
     // Collection: /efectividade/{recordId}
-    // Official personnel effectiveness cadastros
     // ==========================================
     match /efectividade/{recordId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(recordId);
+      allow delete: if isValidId(recordId);
     }
 
     // ==========================================
     // Collection: /declaracao_servico/{recordId}
-    // Official service declaration cadastros (independent of efectividade)
     // ==========================================
     match /declaracao_servico/{recordId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(recordId);
+      allow delete: if isValidId(recordId);
     }
 
     // ==========================================
     // Collection: /grades/{gradeId}
-    // Teacher Mini-Pautas & Consolidated Turma Pautas
     // ==========================================
     match /grades/{gradeId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(gradeId);
+      allow delete: if isValidId(gradeId);
     }
 
     // ==========================================
     // Collection: /attendance/{recordId}
-    // Student & Teacher daily attendance records
     // ==========================================
     match /attendance/{recordId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(recordId);
+      allow delete: if isValidId(recordId);
     }
 
     // ==========================================
     // Collection: /announcements/{announcementId}
-    // Municipal & School announcements and deadlines
     // ==========================================
     match /announcements/{announcementId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(announcementId);
+      allow delete: if isValidId(announcementId);
     }
 
     // ==========================================
     // Collection: /rooms/{roomId}
-    // School classrooms & laboratories
     // ==========================================
     match /rooms/{roomId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(roomId);
+      allow delete: if isValidId(roomId);
     }
 
     // ==========================================
     // Collection: /classes/{classId}
-    // School classes & turmas
     // ==========================================
     match /classes/{classId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(classId);
+      allow delete: if isValidId(classId);
     }
 
     // ==========================================
     // Collection: /chatMessages/{messageId}
-    // Real-time institutional & support chat messages
     // ==========================================
     match /chatMessages/{messageId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(messageId);
+      allow delete: if isValidId(messageId);
     }
 
     // ==========================================
     // Collection: /guias_ferias/{guiaId}
-    // Official Guia de Férias records
     // ==========================================
     match /guias_ferias/{guiaId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(guiaId);
+      allow delete: if isValidId(guiaId);
     }
 
     // ==========================================
     // Collection: /guias_colocacao/{guiaId}
-    // Official Guia de Colocação records
     // ==========================================
     match /guias_colocacao/{guiaId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(guiaId);
+      allow delete: if isValidId(guiaId);
     }
 
     // ==========================================
     // Collection: /fichas_avaliacao/{fichaId}
-    // Official Ficha de Avaliação de Desempenho Docente records
     // ==========================================
     match /fichas_avaliacao/{fichaId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(fichaId);
+      allow delete: if isValidId(fichaId);
     }
 
     // ==========================================
     // Collection: /cadastro_docente/{recordId}
-    // Official Cadastro Docente — Pedido de Vaga records
     // ==========================================
     match /cadastro_docente/{recordId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(recordId);
+      allow delete: if isValidId(recordId);
     }
 
     // ==========================================
     // Collection: /tombstones/{tombstoneId}
-    // Cross-device permanent deletion tombstones
     // ==========================================
     match /tombstones/{tombstoneId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidEntityWrite(tombstoneId);
+      allow delete: if isValidId(tombstoneId);
     }
 
     // ==========================================
     // Collection: /users/{userId}
-    // Institutional user accounts
     // ==========================================
     match /users/{userId} {
       allow read: if true;
-      allow create: if isValidId(userId);
-      allow update: if true;
-      allow delete: if true;
+      allow create, update: if isValidEntityWrite(userId);
+      allow delete: if isValidId(userId);
     }
 
     // ==========================================
     // Collection: /admins/{adminId}
+    // Strictly restricted — no unauthenticated privilege escalation
     // ==========================================
     match /admins/{adminId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidId(adminId);
     }
 
     // ==========================================
@@ -243,7 +280,7 @@ service cloud.firestore {
     // ==========================================
     match /audit_logs/{logId} {
       allow read: if true;
-      allow create: if isValidId(logId);
+      allow create: if isValidEntityWrite(logId);
       allow update, delete: if false;
     }
 

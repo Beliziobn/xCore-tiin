@@ -29,6 +29,7 @@ import type {
   ChatMessage,
 } from '../types';
 import { defaultDisciplinasList } from '../data/teacherData';
+import { extractFlatRegistrationData, stripNestedRegistrationData } from './svgSanitizer';
 
 const APPLICATIONS_COL = 'applications';
 const QUICK_REQUESTS_COL = 'quickRequests';
@@ -707,14 +708,15 @@ export async function saveTeacherToFirestore(
     if (teacher.id) removeEntityTombstone(TEACHERS_COL, teacher.id);
     if (rawName) removeEntityTombstone(TEACHERS_COL, rawName);
     if (rawBi) removeEntityTombstone(TEACHERS_COL, rawBi);
+    const cleanTeacher = stripNestedRegistrationData(teacher as any);
     const ref = doc(db, TEACHERS_COL, id);
     await setDoc(
       ref,
       cleanObject({
-        ...teacher,
+        ...cleanTeacher,
         id,
-        name: rawName || (teacher as any).name,
-        nomeCompleto: rawName || (teacher as any).nomeCompleto,
+        name: rawName || (cleanTeacher as any).name,
+        nomeCompleto: rawName || (cleanTeacher as any).nomeCompleto,
         updatedAt: new Date().toISOString(),
       }),
       { merge: true }
@@ -815,12 +817,15 @@ export async function saveStudentToFirestore(
       (student as any).registrationData?.classe ||
       '1ª Classe';
 
+    const cleanStudent = stripNestedRegistrationData(student as any);
+    const flatReg = extractFlatRegistrationData(cleanStudent) || {};
+    const { registrationData: _omitStReg, ...studentRoot } = cleanStudent;
     const ref = doc(db, STUDENTS_COL, id);
     await setDoc(
       ref,
       cleanObject({
-        ...((student as any).registrationData || {}),
-        ...student,
+        ...flatReg,
+        ...studentRoot,
         id,
         nomeCompleto,
         name: nomeCompleto,
@@ -906,14 +911,15 @@ export async function saveDirectorToFirestore(
     removeEntityTombstone(DIRECTORS_COL, id);
     if (director.id) removeEntityTombstone(DIRECTORS_COL, String(director.id));
     if (rawName) removeEntityTombstone(DIRECTORS_COL, String(rawName));
+    const cleanDirector = stripNestedRegistrationData(director as any);
     const ref = doc(db, DIRECTORS_COL, id);
     await setDoc(
       ref,
       cleanObject({
-        ...director,
+        ...cleanDirector,
         id,
-        name: rawName || (director as any).name,
-        nomeCompleto: rawName || (director as any).nomeCompleto,
+        name: rawName || (cleanDirector as any).name,
+        nomeCompleto: rawName || (cleanDirector as any).nomeCompleto,
         updatedAt: new Date().toISOString(),
       }),
       { merge: true }
@@ -1818,19 +1824,20 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
   };
 
   // 0. REAL-TIME TOMBSTONES & BANNED ENTITY PURGE ORCHESTRATION
-  // Firestore tombstones are authoritative — replacing local tombstones heals any previously poisoned browser cache
+  // Union-merge Firestore tombstones with local/server tombstones so neither side overwrites the other
   unsubs.push(
     subscribeToTombstones((cloudTombstoneKeys) => {
       try {
         if (!Array.isArray(cloudTombstoneKeys)) return;
-        const normalizedCloud = Array.from(
+        const existingLocal = getEntityTombstones();
+        const normalizedUnion = Array.from(
           new Set(
-            cloudTombstoneKeys
+            [...existingLocal, ...cloudTombstoneKeys]
               .filter((k) => typeof k === 'string' && k.trim() !== '' && !k.toLowerCase().includes('socienciadaeduca2018'))
               .map((k) => k.trim().toLowerCase())
           )
         );
-        if (safeWriteJsonIfChanged(DELETED_ENTITIES_KEY, normalizedCloud)) {
+        if (safeWriteJsonIfChanged(DELETED_ENTITIES_KEY, normalizedUnion)) {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
       } catch {}
@@ -1953,8 +1960,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           if (isBannedSchoolOrEntity(schoolName)) return;
 
           const key = norm(id || name);
-          const regData: TeacherRegistrationData | undefined =
-            item.nomeCompleto ? item : item.registrationData;
+          const regData = extractFlatRegistrationData(item) as TeacherRegistrationData | undefined;
 
           if (regData && regData.nomeCompleto) {
             regMap.set(key, { ...(regMap.get(key) || {}), ...regData });
@@ -2150,10 +2156,10 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           );
           const idade = Number(item.idade ?? item.age ?? item.registrationData?.idade ?? 9);
 
+          const flatStudentBase = extractFlatRegistrationData(item) || {};
           const regObj: StudentRegistrationData = {
             ...(regMap.get(key) || {}),
-            ...(item.registrationData || {}),
-            ...(item.nomeCompleto || item.escola ? item : {}),
+            ...flatStudentBase,
             id: studentId,
             name,
             nomeCompleto: name,
@@ -2176,6 +2182,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             telefone: item.telefone || item.registrationData?.telefone || '+244 923 000 000',
             endereco,
           };
+          delete (regObj as any).registrationData;
           regMap.set(key, regObj);
 
           const adminObj: AdminStudent = {
@@ -2357,8 +2364,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           if (isBannedSchoolOrEntity(schoolName)) return;
 
           const key = norm(id || name);
-          const regData: DirectorRegistrationData | undefined =
-            item.nomeCompleto ? item : item.registrationData;
+          const regData = extractFlatRegistrationData(item) as DirectorRegistrationData | undefined;
           if (regData && regData.nomeCompleto) {
             regMap.set(key, { ...(regMap.get(key) || {}), ...regData });
           }
@@ -2836,6 +2842,17 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
     subscribeToUsers((cloudUsers) => {
       try {
         const localUsers = safeReadJsonArray<UserAccount>('ucore_registered_users');
+        const localApps = safeReadJsonArray<PendingApplication>('ucore_pending_applications');
+        const approvedEmails = new Set<string>();
+        const approvedIds = new Set<string>();
+        localApps.forEach((a) => {
+          if (a && (a.status === 'aprovado' || Boolean(a.approvedAt))) {
+            if (a.email) approvedEmails.add(norm(a.email));
+            if (a.userId) approvedIds.add(norm(a.userId));
+            if (a.id) approvedIds.add(norm(a.id));
+          }
+        });
+
         const map = new Map<string, UserAccount>();
         localUsers.forEach((lu) => {
           if (!lu || !lu.email || isBannedSchoolOrEntity(lu)) return;
@@ -2848,9 +2865,11 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             return;
           }
           const k = norm(lu.email);
-          map.set(k, lu);
+          const isApproved = approvedEmails.has(k) || (lu.id ? approvedIds.has(norm(lu.id)) : false);
+          const normalizedLocal: UserAccount = isApproved && lu.status !== 'ativo' ? { ...lu, status: 'ativo' } : lu;
+          map.set(k, normalizedLocal);
           if (!cloudUsers.some((cu) => norm(cu.email) === k) && shouldPushMissing(USERS_COL, k)) {
-            saveUserToFirestore(lu).catch(() => {});
+            saveUserToFirestore(normalizedLocal).catch(() => {});
           }
         });
         cloudUsers.forEach((cu) => {
@@ -2868,7 +2887,22 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             return;
           }
           const k = norm(cu.email);
-          map.set(k, { ...(map.get(k) || {}), ...cu });
+          const prev = map.get(k);
+          const isApproved =
+            prev?.status === 'ativo' ||
+            cu.status === 'ativo' ||
+            approvedEmails.has(k) ||
+            (cu.id ? approvedIds.has(norm(cu.id)) : false);
+          const mergedUser: UserAccount = {
+            ...(prev || {}),
+            ...cu,
+            status: isApproved ? 'ativo' : cu.status || prev?.status || 'pendente',
+          };
+          map.set(k, mergedUser);
+          // Self-heal stale Firestore users doc if application was already approved
+          if (isApproved && cu.status === 'pendente' && shouldPushMissing(USERS_COL, `heal_active_${k}`)) {
+            saveUserToFirestore(mergedUser).catch(() => {});
+          }
         });
         safeWriteJsonIfChanged('ucore_registered_users', Array.from(map.values()));
       } catch {}
@@ -2910,7 +2944,9 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
     const dirStudents = safeReadJsonArray<any>('ucore_director_students').filter((s) => !isBannedSchoolOrEntity(s));
     const staff = safeReadJsonArray<any>('ucore_registered_staff_v1').filter((s) => !isBannedSchoolOrEntity(s));
     const applications = safeReadJsonArray<any>('ucore_pending_applications').filter((a) => !isBannedSchoolOrEntity(a));
-    const quickRequests = safeReadJsonArray<any>('ucore_quick_service_requests_v1').filter((q) => !isBannedSchoolOrEntity(q));
+    const quickRequestsPrimary = safeReadJsonArray<any>('sigre_quick_services_local_cache');
+    const quickRequestsLegacy = safeReadJsonArray<any>('ucore_quick_service_requests_v1');
+    const quickRequests = [...quickRequestsLegacy, ...quickRequestsPrimary].filter((q) => !isBannedSchoolOrEntity(q));
     const efectividade = safeReadJsonArray<any>('sigre_cadastramento_efectividade_v2').filter((e) => !isBannedSchoolOrEntity(e));
     const declaracaoServico = safeReadJsonArray<any>('sigre_declaracao_servico_v1').filter((d) => !isBannedSchoolOrEntity(d));
     const guiasFerias = safeReadJsonArray<any>('sigre_guias_ferias_records_v1').filter((g) => !isBannedSchoolOrEntity(g));

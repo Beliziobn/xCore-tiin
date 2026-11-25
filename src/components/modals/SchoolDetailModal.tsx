@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import type { AdminSchool, SchoolRegistrationData } from '../../types';
 import { getSchoolTeacherQuotaStatus } from '../../utils/teacherStorage';
+import { sanitizeSvgMarkup } from '../../utils/svgSanitizer';
 import {
   getSchoolRegistrationData,
   getOfferedLevelsBadges,
@@ -95,7 +96,7 @@ export const SchoolDetailModal: React.FC<SchoolDetailModalProps> = ({
             {school.logoSvg ? (
               <div
                 className="w-12 h-12 rounded-2xl p-1 bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner"
-                dangerouslySetInnerHTML={{ __html: school.logoSvg }}
+                dangerouslySetInnerHTML={{ __html: sanitizeSvgMarkup(school.logoSvg) }}
               />
             ) : (
               <div className="w-12 h-12 rounded-2xl bg-[#f75142]/20 border border-[#f75142]/40 text-[#f75142] flex items-center justify-center shadow-inner shrink-0">

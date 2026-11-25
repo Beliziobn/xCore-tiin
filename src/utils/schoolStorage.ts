@@ -39,6 +39,7 @@ import {
   CANONICAL_FICHAS_AVALIACAO,
 } from '../data/canonicalNetworkSeed';
 import { io, Socket } from 'socket.io-client';
+import { extractFlatRegistrationData, stripNestedRegistrationData } from './svgSanitizer';
 
 export const STORAGE_KEY_SCHOOLS = 'ucore_admin_schools';
 
@@ -935,6 +936,7 @@ let hasCompletedInitialServerPull = false;
 let interceptorInstalled = false;
 let realtimeSocket: Socket | null = null;
 let lastKnownServerUpdatedAt = '';
+let lastKnownServerEtag = '';
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let socketPullTimer: ReturnType<typeof setTimeout> | null = null;
 let syncInFlightPromise: Promise<AdminSchool[]> | null = null;
@@ -1275,12 +1277,25 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     } else {
       res = await fetch('/api/network/sync', {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          ...(lastKnownServerEtag && hasCompletedInitialServerPull ? { 'If-None-Match': lastKnownServerEtag } : {}),
+        },
       });
+    }
+
+    if (res.status === 304) {
+      hasCompletedInitialServerPull = true;
+      return localSchools;
     }
 
     if (!res.ok) {
       return localSchools;
+    }
+
+    const responseEtag = res.headers.get('etag');
+    if (responseEtag) {
+      lastKnownServerEtag = responseEtag;
     }
 
     const data = await res.json();
@@ -1292,20 +1307,20 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
     isApplyingServerState = true;
     try {
-      // 0. Sync server tombstones into the real DELETED_ENTITIES_KEY (sigre_deleted_entities_tombstones_v1)
-      // Only overwrite local tombstones if server actually returned a valid array; also clean obsolete key name
+      // 0. Union-merge server tombstones with existing Firestore/local tombstones (prevents 41-vs-57 overwrite tug-of-war)
       try {
         localStorage.removeItem('ucore_deleted_entity_tombstones_v1');
       } catch {}
       if (Array.isArray(data.tombstones) && data.tombstones.length > 0) {
-        const normalizedServerTombstones = Array.from(
+        const existingLocalTombstones = getEntityTombstones();
+        const combinedTombstones = Array.from(
           new Set(
-            data.tombstones
+            [...existingLocalTombstones, ...data.tombstones]
               .filter((tk: any) => typeof tk === 'string' && tk.trim() !== '' && !tk.toLowerCase().includes('socienciadaeduca2018'))
               .map((tk: string) => tk.trim().toLowerCase())
           )
         );
-        setLocalStorageFromServer('sigre_deleted_entities_tombstones_v1', JSON.stringify(normalizedServerTombstones));
+        setLocalStorageFromServer('sigre_deleted_entities_tombstones_v1', JSON.stringify(combinedTombstones));
       }
 
       // Non-destructive union-merge helper with authoritative tombstone filtering:
@@ -1417,17 +1432,46 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         }
       }
 
-      // 2. Merge Directors
+      // 2. Merge Directors (non-destructive union of local/Firestore + Express server; supports emailInstitucional/emailPessoal/biNif)
       if (Array.isArray(data.directors) && !dirtyCollections.has('directors')) {
         const dirMap = new Map<string, any>();
-        data.directors.forEach((d: any) => {
-          if (!d) return;
+        const ingestDir = (rawDir: any) => {
+          if (!rawDir || isBannedSchoolOrEntity(rawDir)) return;
+          const d = stripNestedRegistrationData(rawDir);
           const baseId = stripAppIdPrefix(d.id);
-          const k = norm(baseId || d.email || d.name || d.nomeCompleto);
-          if (k && !isEntityTombstoned('directors', d.id) && !isEntityTombstoned('directors', d.email || d.id)) {
-            dirMap.set(k, { ...(dirMap.get(k) || {}), ...d, id: baseId || d.id });
+          const dEmail = String(
+            d.email || d.emailInstitucional || d.emailPessoal || d.registrationData?.emailPessoal || d.registrationData?.emailInstitucional || ''
+          ).trim().toLowerCase();
+          const dBi = String(d.biNif || d.bi || d.registrationData?.biNif || '').trim().toLowerCase();
+          const dName = String(d.name || d.nomeCompleto || d.registrationData?.nomeCompleto || '').trim();
+          const k = norm(baseId || dBi || dEmail || dName);
+          if (!k) return;
+          if (
+            isEntityTombstoned('directors', d.id) ||
+            (baseId && isEntityTombstoned('directors', baseId)) ||
+            (dEmail && isEntityTombstoned('directors', dEmail))
+          ) {
+            return;
           }
-        });
+          const flatReg = extractFlatRegistrationData(d);
+          const existing = dirMap.get(k);
+          const mergedReg = flatReg
+            ? { ...(existing?.registrationData || {}), ...flatReg }
+            : existing?.registrationData;
+          dirMap.set(k, {
+            ...(existing || {}),
+            ...d,
+            id: baseId || existing?.id || d.id,
+            name: dName || existing?.name || '',
+            nomeCompleto: dName || existing?.nomeCompleto || '',
+            email: dEmail || existing?.email || '',
+            biNif: d.biNif || d.bi || existing?.biNif || flatReg?.biNif || '',
+            schoolName: d.schoolName || d.nomeEscola || existing?.schoolName || flatReg?.nomeEscola || '',
+            nomeEscola: d.nomeEscola || d.schoolName || existing?.nomeEscola || flatReg?.nomeEscola || '',
+            ...(mergedReg ? { registrationData: mergedReg } : {}),
+          });
+        };
+        [...localRegDirs, ...localDirs, ...data.directors].forEach(ingestDir);
         const mergedDirs = Array.from(dirMap.values());
         if (JSON.stringify(mergedDirs) !== JSON.stringify(localDirs)) {
           setLocalStorageFromServer('ucore_admin_directors', JSON.stringify(mergedDirs));
@@ -1436,46 +1480,50 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         }
       }
 
-      // 3. Merge Teachers
+      // 3. Merge Teachers (non-destructive union of local/Firestore + Express server; flat registrationData — zero recursion!)
       if (Array.isArray(data.teachers) && !dirtyCollections.has('teachers')) {
         const adminTMap = new Map<string, any>();
         const regTMap = new Map<string, any>();
         const dirTMap = new Map<string, any>();
 
-        data.teachers.forEach((item: any) => {
-          if (!item) return;
+        const ingestTeacher = (rawItem: any) => {
+          if (!rawItem || isBannedSchoolOrEntity(rawItem)) return;
+          const item = stripNestedRegistrationData(rawItem);
           const id = String(item.id || '').trim();
           const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
           if (!id && !name) return;
-          if (isEntityTombstoned('teachers', id)) return;
+          if (isEntityTombstoned('teachers', id) || (name && isEntityTombstoned('teachers', name))) return;
           const schoolName = String(item.nomeEscola || item.schoolName || item.registrationData?.nomeEscola || 'Escola Municipal de Quêssua').trim();
           if (isModeloCentralSchool(schoolName)) return;
 
           const k = norm(id || name);
-          const regData = item.nomeCompleto ? item : item.registrationData;
-          if (regData && regData.nomeCompleto) {
-            regTMap.set(k, { ...(regTMap.get(k) || {}), ...regData });
+          const flatReg = extractFlatRegistrationData(item);
+          if (flatReg && flatReg.nomeCompleto) {
+            regTMap.set(k, { ...(regTMap.get(k) || {}), ...flatReg });
           }
 
-          const mergedReg = regTMap.get(k) || regData;
+          const mergedReg = regTMap.get(k) || flatReg;
+          const { registrationData: _omitItemReg, ...cleanItem } = item;
+          const existingAdmin = adminTMap.get(k);
           const adminEntry = {
-            ...item,
-            id: id || `prof-${Date.now()}`,
+            ...(existingAdmin || {}),
+            ...cleanItem,
+            id: id || existingAdmin?.id || `prof-${Date.now()}`,
             name,
-            phone: item.phone || item.telefone || mergedReg?.telefone || '+244 923 000 000',
-            gradeClass: item.gradeClass || item.primaryGradeClass || mergedReg?.primaryGradeClass || 'Ensino Primário',
-            room: item.room || item.primaryRoom || mergedReg?.primaryRoom || 'Sala 01',
-            turma: item.turma || item.primaryTurma || mergedReg?.primaryTurma || 'Turma A',
-            category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || 'Docente / Professor',
-            location: item.location || 'Quêssua',
+            phone: item.phone || item.telefone || mergedReg?.telefone || existingAdmin?.phone || '+244 923 000 000',
+            gradeClass: item.gradeClass || item.primaryGradeClass || mergedReg?.primaryGradeClass || existingAdmin?.gradeClass || 'Ensino Primário',
+            room: item.room || item.primaryRoom || mergedReg?.primaryRoom || existingAdmin?.room || 'Sala 01',
+            turma: item.turma || item.primaryTurma || mergedReg?.primaryTurma || existingAdmin?.turma || 'Turma A',
+            category: item.category || item.funcaoCategoria || mergedReg?.funcaoCategoria || existingAdmin?.category || 'Docente / Professor',
+            location: item.location || existingAdmin?.location || 'Quêssua',
             schoolName,
-            schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId,
-            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : 100,
-            subject: item.subject || item.disciplinas || mergedReg?.disciplinas || 'Língua Portuguesa',
+            schoolId: item.schoolId || item.escolaId || mergedReg?.escolaId || existingAdmin?.schoolId,
+            presenceRate: typeof item.presenceRate === 'number' ? item.presenceRate : (existingAdmin?.presenceRate ?? 100),
+            subject: item.subject || item.disciplinas || mergedReg?.disciplinas || existingAdmin?.subject || 'Língua Portuguesa',
             gender: item.gender || (item.sexo === 'Feminino' || mergedReg?.sexo === 'Feminino' ? 'F' : 'M'),
-            qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico,
-            assignedTurmas: item.assignedTurmas || mergedReg?.assignedTurmas,
-            registrationData: mergedReg || item.registrationData,
+            qualification: item.qualification || item.nivelAcademico || mergedReg?.nivelAcademico || existingAdmin?.qualification,
+            assignedTurmas: item.assignedTurmas || mergedReg?.assignedTurmas || existingAdmin?.assignedTurmas,
+            registrationData: mergedReg,
           };
           adminTMap.set(k, adminEntry);
 
@@ -1494,13 +1542,15 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
             phone: adminEntry.phone,
             email: item.email || mergedReg?.email,
             assignedTurmas: adminEntry.assignedTurmas,
-            registrationData: adminEntry.registrationData,
+            registrationData: mergedReg,
             schedule: item.schedule || [
               { day: 'Segunda', period: '07h30 - 12h00', subject: adminEntry.subject, room: adminEntry.room },
             ],
           };
           dirTMap.set(k, dirEntry);
-        });
+        };
+
+        [...localRegTeachers, ...localTeachers, ...data.teachers].forEach(ingestTeacher);
 
         const nextAdminT = Array.from(adminTMap.values());
         const nextRegT = Array.from(regTMap.values());
@@ -1520,19 +1570,20 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         }
       }
 
-      // 4. Merge Students
+      // 4. Merge Students (non-destructive union of local/Firestore + Express server; flat registrationData — zero recursion!)
       if (Array.isArray(data.students) && !dirtyCollections.has('students')) {
         const adminSMap = new Map<string, any>();
         const regSMap = new Map<string, any>();
         const dirSMap = new Map<string, any>();
         const teachSMap = new Map<string, any>();
 
-        data.students.forEach((item: any) => {
-          if (!item) return;
+        const ingestStudent = (rawItem: any) => {
+          if (!rawItem || isBannedSchoolOrEntity(rawItem)) return;
+          const item = stripNestedRegistrationData(rawItem);
           const id = String(item.id || '').trim();
           const name = String(item.nomeCompleto || item.name || item.registrationData?.nomeCompleto || '').trim();
           if (!id && !name) return;
-          if (isEntityTombstoned('students', id)) return;
+          if (isEntityTombstoned('students', id) || (name && isEntityTombstoned('students', name))) return;
           const schoolName = String(item.escola || item.schoolName || item.registrationData?.escola || 'Escola Oficial').trim();
           if (isModeloCentralSchool(schoolName)) return;
 
@@ -1555,9 +1606,10 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
           const dataNascimento = String(item.dataNascimento || item.registrationData?.dataNascimento || '2016-05-10');
           const idade = Number(item.idade ?? item.age ?? item.registrationData?.idade ?? 9);
 
+          const flatBase = extractFlatRegistrationData(item) || {};
           const regObj = {
-            ...(item.registrationData || {}),
-            ...(item.nomeCompleto || item.escola ? item : {}),
+            ...(regSMap.get(k) || {}),
+            ...flatBase,
             id: studentId,
             name,
             nomeCompleto: name,
@@ -1580,10 +1632,13 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
             telefone: item.telefone || item.registrationData?.telefone || '+244 923 000 000',
             endereco,
           };
+          delete (regObj as any).registrationData;
           regSMap.set(k, regObj);
 
+          const { registrationData: _omitStReg, ...cleanStudentItem } = item;
           const adminObj = {
-            ...item,
+            ...(adminSMap.get(k) || {}),
+            ...cleanStudentItem,
             id: studentId,
             name,
             gender: genero,
@@ -1648,7 +1703,9 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
             telefone: regObj.telefone,
             endereco,
           });
-        });
+        };
+
+        [...localRegStudents, ...localStudents, ...data.students].forEach(ingestStudent);
 
         const nextAdminS = Array.from(adminSMap.values());
         const nextRegS = Array.from(regSMap.values());

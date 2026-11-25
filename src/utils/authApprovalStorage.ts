@@ -906,35 +906,105 @@ export function approveApplication(
     );
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updatedList));
 
-    // Also update user in ucore_registered_users to status: 'ativo'
+    // Build canonical activated candidate UserAccount (even when the candidate is NOT in the admin's localStorage)
+    const buildActivatedCandidateUser = (existingUser?: any): UserAccount => {
+      const nameParts = (target.fullName || '').trim().split(/\s+/).filter(Boolean);
+      const isDmeMember =
+        target.scope === 'administracao' ||
+        target.type === 'membro_dme' ||
+        Boolean(target.adminRole);
+      const isTeacher = target.type === 'professor' || target.schoolRole === 'professor';
+      const resolvedRole: 'admin' | 'diretor' | 'professor' = isDmeMember
+        ? 'admin'
+        : isTeacher
+        ? 'professor'
+        : 'diretor';
+      const resolvedScope: 'escola' | 'administracao' = isDmeMember ? 'administracao' : 'escola';
+      const firstName = existingUser?.firstName || nameParts[0] || 'Utilizador';
+      const lastName = existingUser?.lastName !== undefined ? existingUser.lastName : nameParts.slice(1).join(' ');
+      const titlePrefix =
+        existingUser?.titlePrefix ||
+        (isDmeMember ? 'Quadro DME' : isTeacher ? 'Prof.' : 'Director');
+
+      return {
+        ...(existingUser || {}),
+        id: existingUser?.id || target.userId || target.id,
+        firstName,
+        lastName,
+        email: (existingUser?.email || target.email || '').trim().toLowerCase(),
+        role: existingUser?.role || resolvedRole,
+        scope: existingUser?.scope || resolvedScope,
+        schoolRole:
+          resolvedScope === 'escola'
+            ? existingUser?.schoolRole || target.schoolRole || (isTeacher ? 'professor' : 'diretor_geral')
+            : undefined,
+        adminRole:
+          resolvedScope === 'administracao'
+            ? existingUser?.adminRole || target.adminRole || 'chefe_reparticao'
+            : undefined,
+        cargoTitle: existingUser?.cargoTitle || target.roleRequested || (isTeacher ? 'Professor(a) / Docente' : 'Director(a) Geral'),
+        schoolName: existingUser?.schoolName || target.schoolName || (isDmeMember ? 'Direcção Municipal da Educação de Quêssua' : 'Unidade Escolar'),
+        schoolId: existingUser?.schoolId || target.schoolId,
+        municipalityOrDepartment: existingUser?.municipalityOrDepartment || target.municipality || 'Quêssua',
+        titlePrefix,
+        greeting: existingUser?.greeting || `Olá ${titlePrefix} ${firstName}`,
+        biNumber: existingUser?.biNumber || target.biNumber,
+        phone: existingUser?.phone || target.phone,
+        subject: existingUser?.subject || target.subject,
+        gradeClass: existingUser?.gradeClass || target.gradeClass,
+        passwordVerifier: existingUser?.passwordVerifier || target.passwordVerifier,
+        status: 'ativo',
+        approvedAt: updatedApp.approvedAt,
+        approvedBy: approverName,
+        approverTargetRole: 'admin',
+        approverTargetEmail: OFFICIAL_DME_ADMIN_EMAIL,
+        ...(complementaryData ? {
+          nivelAcademico: complementaryData.nivelAcademico || existingUser?.nivelAcademico || target.nivelAcademico,
+          anosServico: typeof complementaryData.anosServico === 'number' ? complementaryData.anosServico : (existingUser?.anosServico ?? target.anosServico),
+          regimeTrabalho: complementaryData.regimeTrabalho || existingUser?.regimeTrabalho || target.regimeTrabalho,
+          classificacaoPedagogica: complementaryData.classificacaoPedagogica || existingUser?.classificacaoPedagogica || target.classificacaoPedagogica,
+          numeroMecanograficoOuNif: complementaryData.numeroMecanograficoOuNif || existingUser?.numeroMecanograficoOuNif || target.numeroMecanograficoOuNif,
+          documentosConferidosPresencialmente:
+            typeof complementaryData.documentosConferidosPresencialmente === 'boolean'
+              ? complementaryData.documentosConferidosPresencialmente
+              : existingUser?.documentosConferidosPresencialmente,
+        } : {}),
+      };
+    };
+
+    // Always upsert candidate in ucore_registered_users with status: 'ativo' and sync to Firestore users collection
+    let activatedCandidateUser: UserAccount = buildActivatedCandidateUser();
     try {
       const rawUsers = localStorage.getItem('ucore_registered_users');
-      if (rawUsers) {
-        const parsedUsers = JSON.parse(rawUsers);
-        if (Array.isArray(parsedUsers)) {
-          const nextUsers = parsedUsers.map((u: any) => {
-            if (
-              u &&
-              (u.id === target.userId ||
-                u.id === target.id ||
-                (u.biNumber && target.biNumber && u.biNumber.trim().toUpperCase() === target.biNumber.trim().toUpperCase()) ||
-                (u.email && target.email && !isGenericSchoolEmail(u.email) && u.email.trim().toLowerCase() === target.email.trim().toLowerCase()))
-            ) {
-              const activated = {
-                ...u,
-                status: 'ativo',
-                approvedAt: updatedApp.approvedAt,
-                approvedBy: approverName,
-              };
-              saveUserToFirestore(activated).catch(() => {});
-              return activated;
-            }
-            return u;
-          });
-          localStorage.setItem('ucore_registered_users', JSON.stringify(nextUsers));
+      const parsedUsers = rawUsers ? JSON.parse(rawUsers) : [];
+      const nextUsers: any[] = Array.isArray(parsedUsers) ? [...parsedUsers] : [];
+      let matchedUser = false;
+      for (let i = 0; i < nextUsers.length; i++) {
+        const u = nextUsers[i];
+        if (
+          u &&
+          (u.id === target.userId ||
+            u.id === target.id ||
+            (u.biNumber && target.biNumber && u.biNumber.trim().toUpperCase() === target.biNumber.trim().toUpperCase()) ||
+            (u.email && target.email && !isGenericSchoolEmail(u.email) && u.email.trim().toLowerCase() === target.email.trim().toLowerCase()))
+        ) {
+          activatedCandidateUser = buildActivatedCandidateUser(u);
+          nextUsers[i] = activatedCandidateUser;
+          matchedUser = true;
         }
       }
+      if (!matchedUser && activatedCandidateUser.email) {
+        nextUsers.push(activatedCandidateUser);
+      }
+      localStorage.setItem('ucore_registered_users', JSON.stringify(nextUsers));
     } catch {}
+
+    // Always push candidate's active UserAccount to Firestore so login from ANY device immediately sees status: 'ativo'
+    if (activatedCandidateUser.email || activatedCandidateUser.id) {
+      saveUserToFirestore(activatedCandidateUser).catch((e) => {
+        console.warn('[authApprovalStorage] Falha ao ativar utilizador no Firestore:', e);
+      });
+    }
 
     // If a School Director (Diretor Geral) is approved, update the school's directorName in storage
     if (target.type === 'diretor' && target.schoolName) {
@@ -1149,13 +1219,13 @@ export function approveApplication(
       }
     }
 
-    // Update active user in localStorage if matching
-    let activatedUser: UserAccount | undefined;
+    // Update active user in localStorage ONLY if the currently logged-in user IS the candidate
+    let activatedUser: UserAccount = activatedCandidateUser;
     const activeUserRaw = localStorage.getItem('ucore_active_user');
     if (activeUserRaw) {
       try {
         const activeUser: UserAccount = JSON.parse(activeUserRaw);
-        if (activeUser.id === target.userId || activeUser.email.toLowerCase() === target.email.toLowerCase()) {
+        if (activeUser.id === target.userId || (activeUser.email && target.email && activeUser.email.toLowerCase() === target.email.toLowerCase())) {
           activeUser.status = 'ativo';
           activeUser.approvedAt = updatedApp.approvedAt;
           activeUser.approvedBy = approverName;
@@ -1186,7 +1256,7 @@ export function approveApplication(
       fetch('/api/network/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application: updatedApp, ...(activatedUser ? { user: activatedUser } : {}) }),
+        body: JSON.stringify({ application: updatedApp, user: activatedUser }),
         keepalive: true,
       }).catch(() => {});
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
@@ -1201,8 +1271,8 @@ export function approveApplication(
 
 /**
  * Async version of approveApplication that AWAITS persistence to BOTH Cloud Firestore
- * (cross-device shared DB) and /api/network/applications BEFORE returning, eliminating
- * any race condition where an approval flickers back to 'pendente'.
+ * (applications AND users collections across ALL devices) and /api/network/applications
+ * BEFORE returning, eliminating any race condition where an approved user still lands on 'pendente'.
  */
 export async function approveApplicationAsync(
   applicationId: string,
@@ -1234,6 +1304,14 @@ export async function approveApplicationAsync(
       saveApplicationToFirestore(updatedApp),
       new Promise<void>((resolve) => setTimeout(resolve, 4500)),
     ]),
+    ...(activatedUser
+      ? [
+          Promise.race([
+            saveUserToFirestore(activatedUser),
+            new Promise<void>((resolve) => setTimeout(resolve, 4500)),
+          ]),
+        ]
+      : []),
     postToServer().catch(() => postToServer().catch(() => {})),
   ]);
 
@@ -1334,21 +1412,42 @@ export async function rejectApplicationAsync(
 }
 
 /**
- * Checks the real-time approval status of a given user ID or email
+ * Checks the real-time approval status of a given user ID, email, or BI number.
+ * Scans ALL matching application records and ALWAYS prioritizes 'aprovado' (or approvedAt)
+ * over any stale 'pendente' duplicate so a validated user never gets trapped in waiting screen.
  */
 export function checkUserApprovalStatus(
   userId: string,
-  userEmail?: string
+  userEmail?: string,
+  biNumber?: string
 ): { status: 'ativo' | 'pendente' | 'rejeitado'; app?: PendingApplication } {
   const applications = getPendingApplications();
-  const match = applications.find(
-    (a) => a.userId === userId || (userEmail && a.email.toLowerCase() === userEmail.toLowerCase())
-  );
+  const normUid = (userId || '').trim().toLowerCase();
+  const normEmail = (userEmail || '').trim().toLowerCase();
+  const normBi = (biNumber || '').trim().toUpperCase();
 
-  if (match) {
-    const userStatus: 'ativo' | 'pendente' | 'rejeitado' =
-      match.status === 'aprovado' ? 'ativo' : match.status;
-    return { status: userStatus, app: match };
+  const matches = applications.filter((a) => {
+    if (!a) return false;
+    const aId = (a.id || '').trim().toLowerCase();
+    const aUid = (a.userId || '').trim().toLowerCase();
+    const aEmail = (a.email || '').trim().toLowerCase();
+    const aBi = (a.biNumber || '').trim().toUpperCase();
+    if (normUid && (aUid === normUid || aId === normUid)) return true;
+    if (normEmail && !isGenericSchoolEmail(normEmail) && aEmail === normEmail) return true;
+    if (normBi && normBi.length >= 5 && aBi === normBi) return true;
+    return false;
+  });
+
+  if (matches.length > 0) {
+    const approvedMatch = matches.find((m) => m.status === 'aprovado' || Boolean(m.approvedAt));
+    if (approvedMatch) {
+      return { status: 'ativo', app: approvedMatch };
+    }
+    const rejectedMatch = matches.find((m) => m.status === 'rejeitado');
+    if (rejectedMatch) {
+      return { status: 'rejeitado', app: rejectedMatch };
+    }
+    return { status: 'pendente', app: matches[0] };
   }
   return { status: 'ativo' };
 }

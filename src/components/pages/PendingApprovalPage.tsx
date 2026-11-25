@@ -77,33 +77,52 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     matchedApp?.roleRequested ||
     (isTeacher ? 'Professor(a) / Docente' : isAdminScopeMember ? 'Membro da Direção Municipal' : 'Pessoal do Âmbito Escolar');
 
-  // Background polling to auto-detect approval by supervisor in real-time
+  // Background polling + instant real-time Firestore listener to auto-detect approval across devices
   React.useEffect(() => {
     let isMounted = true;
+    let promoted = false;
+
+    const promoteIfApproved = () => {
+      if (!isMounted || promoted) return false;
+      const res = checkUserApprovalStatus(currentUser.id, currentUser.email, currentUser.biNumber);
+      if (res.status === 'ativo') {
+        promoted = true;
+        showToast?.(`A sua conta foi homologada por ${res.app?.approvedBy || approverRole}! A carregar o seu ambiente de trabalho...`);
+        const updated: UserAccount = {
+          ...currentUser,
+          status: 'ativo',
+          approvedAt: res.app?.approvedAt || currentUser.approvedAt || new Date().toLocaleString('pt-AO'),
+          approvedBy: res.app?.approvedBy || currentUser.approvedBy || approverRole,
+        };
+        onApprovalConfirmed(updated);
+        return true;
+      }
+      return false;
+    };
+
     const pollStatus = async () => {
       try {
-        await syncApplicationsFromServer();
-        const res = checkUserApprovalStatus(currentUser.id, currentUser.email);
-        if (res.status === 'ativo' && isMounted) {
-          showToast?.(`A sua conta foi homologada por ${res.app?.approvedBy || approverRole}! A carregar o seu ambiente de trabalho...`);
-          const updated: UserAccount = {
-            ...currentUser,
-            status: 'ativo',
-          };
-          onApprovalConfirmed(updated);
-        }
+        if (promoteIfApproved()) return;
+        await syncApplicationsFromServer(true);
+        promoteIfApproved();
       } catch {
         // ignore
       }
     };
 
+    const handleRealtimeSync = () => {
+      promoteIfApproved();
+    };
+
+    window.addEventListener('sigre-data-synced', handleRealtimeSync);
     pollStatus();
-    const interval = setInterval(pollStatus, 4000);
+    const interval = setInterval(pollStatus, 3500);
     return () => {
       isMounted = false;
+      window.removeEventListener('sigre-data-synced', handleRealtimeSync);
       clearInterval(interval);
     };
-  }, [currentUser.id, currentUser.email, onApprovalConfirmed, showToast, approverRole]);
+  }, [currentUser, onApprovalConfirmed, showToast, approverRole]);
 
   const handleCheckStatus = async () => {
     if (checking) return;
@@ -111,7 +130,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     setIsClockAccelerated(true);
 
     try {
-      await syncApplicationsFromServer();
+      await syncApplicationsFromServer(true);
     } catch {
       // ignore
     }
@@ -122,12 +141,14 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       setChecking(false);
       setLastCheckedTime(new Date().toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' }));
       
-      const res = checkUserApprovalStatus(currentUser.id, currentUser.email);
+      const res = checkUserApprovalStatus(currentUser.id, currentUser.email, currentUser.biNumber);
       if (res.status === 'ativo') {
         showToast?.('Parabéns! A sua conta foi homologada pelo seu responsável. A carregar o painel...');
         const updated: UserAccount = {
           ...currentUser,
           status: 'ativo',
+          approvedAt: res.app?.approvedAt || currentUser.approvedAt || new Date().toLocaleString('pt-AO'),
+          approvedBy: res.app?.approvedBy || currentUser.approvedBy || approverRole,
         };
         onApprovalConfirmed(updated);
       } else if (res.status === 'rejeitado') {
@@ -137,7 +158,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
           `A sua candidatura continua na fila de homologação do Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}).`
         );
       }
-    }, 1200);
+    }, 800);
   };
 
   const handleSimulateInstantApproval = () => {

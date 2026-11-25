@@ -3,10 +3,10 @@ import { saveApplicationToFirestore, saveUserToFirestore } from './firestoreSync
 const PASSWORDS_STORAGE_KEY = 'ucore_user_passwords';
 const SECURITY_LOGS_KEY = 'ucore_security_logs';
 
-// Official Master Admin credential
-const DEFAULT_PASSWORDS: Record<string, string> = {
-  'dmedoquessua@gmail.com': 'quessua000',
-  'beliziodos20@gmail.com': 'quessua000',
+// Official Master Admin credential verifiers (no plaintext passwords in client bundle)
+const DEFAULT_PASSWORD_VERIFIERS: Record<string, string> = {
+  'dmedoquessua@gmail.com': 'v2_deb382943b35d247_44',
+  'beliziodos20@gmail.com': 'v2_eaae70b5fe249046_44',
 };
 
 export interface SecurityAuditLog {
@@ -105,7 +105,7 @@ export function hasRegisteredPassword(email: string): boolean {
   if (typeof stored[normalizedEmail] === 'string' && stored[normalizedEmail].length > 0) {
     return true;
   }
-  if (DEFAULT_PASSWORDS[normalizedEmail]) {
+  if (DEFAULT_PASSWORD_VERIFIERS[normalizedEmail]) {
     return true;
   }
   if (findApplicationPasswordVerifier(normalizedEmail)) {
@@ -121,8 +121,8 @@ export function getUserPassword(email: string): string {
   if (typeof stored[normalizedEmail] === 'string' && stored[normalizedEmail].length > 0) {
     return stored[normalizedEmail];
   }
-  if (DEFAULT_PASSWORDS[normalizedEmail]) {
-    return DEFAULT_PASSWORDS[normalizedEmail];
+  if (DEFAULT_PASSWORD_VERIFIERS[normalizedEmail]) {
+    return DEFAULT_PASSWORD_VERIFIERS[normalizedEmail];
   }
   return '';
 }
@@ -155,8 +155,8 @@ export function verifyPassword(
 
   // 2. Official Master Admin (dmedoquessua@gmail.com / beliziodos20@gmail.com)
   if (normalizedEmail === 'dmedoquessua@gmail.com' || normalizedEmail === 'beliziodos20@gmail.com') {
+    const expectedVerifier = encodePasswordVerifier(normalizedEmail, candidatePassword);
     if (remotePasswordVerifier) {
-      const expectedVerifier = encodePasswordVerifier(normalizedEmail, candidatePassword);
       if (remotePasswordVerifier.startsWith('v2_') && expectedVerifier === remotePasswordVerifier) {
         return true;
       }
@@ -164,7 +164,7 @@ export function verifyPassword(
         return true;
       }
     }
-    return candidatePassword === DEFAULT_PASSWORDS[normalizedEmail];
+    return expectedVerifier === DEFAULT_PASSWORD_VERIFIERS[normalizedEmail];
   }
 
   // 3. If a remote/cloud or local application passwordVerifier is present, verify against it
@@ -177,9 +177,9 @@ export function verifyPassword(
     return candidatePassword === verifierToUse;
   }
 
-  // 4. Check explicit default password map if any
-  if (DEFAULT_PASSWORDS[normalizedEmail]) {
-    return candidatePassword === DEFAULT_PASSWORDS[normalizedEmail];
+  // 4. Check explicit default password verifier map if any
+  if (DEFAULT_PASSWORD_VERIFIERS[normalizedEmail]) {
+    return encodePasswordVerifier(normalizedEmail, candidatePassword) === DEFAULT_PASSWORD_VERIFIERS[normalizedEmail];
   }
 
   return false;
@@ -225,8 +225,8 @@ export function updatePassword(
   if (normalizedOldEmail && normalizedOldEmail !== normalizedEmail) {
     delete stored[normalizedOldEmail];
   }
-  stored[normalizedEmail] = newPassword;
   const verifier = encodePasswordVerifier(normalizedEmail, newPassword);
+  stored[normalizedEmail] = verifier;
   const nowIso = new Date().toISOString();
 
   try {

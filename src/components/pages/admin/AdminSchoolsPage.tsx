@@ -20,6 +20,7 @@ import { filterSchoolsWithCriteria } from '../../../utils/schoolFilterHelper';
 import { getSchoolRegistrationData, deleteSchoolAndRelatedData } from '../../../utils/schoolStorage';
 import { getSchoolTeacherQuotaStatus } from '../../../utils/teacherStorage';
 import { getSchoolStudentQuotaStatus } from '../../../utils/studentStorage';
+import { sanitizeSvgMarkup } from '../../../utils/svgSanitizer';
 
 interface AdminSchoolsPageProps {
   onOpenGetStarted: () => void;
@@ -78,10 +79,11 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
     return list;
   }, [filterResult.filteredSchools, advancedFilters.zone, selectedMunicipality]);
 
-  // View mode and sorting controls for the schools catalog
+  // View mode, search, and sorting controls for the schools catalog
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'name' | 'performance' | 'students' | 'teachers'>('name');
   const [quickNatureFilter, setQuickNatureFilter] = useState<string>('all');
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState<string>('');
 
   // Sorted and filtered schools for the catalog display
   const processedSchools = useMemo(() => {
@@ -90,6 +92,14 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
       list = list.filter((s) => {
         const reg = getSchoolRegistrationData(s);
         return reg.natureza === quickNatureFilter;
+      });
+    }
+    const q = catalogSearchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((s) => {
+        const reg = getSchoolRegistrationData(s);
+        const haystack = `${s.name} ${reg.codigoSIGE || ''} ${s.directorName || ''} ${s.location || ''} ${reg.natureza || ''}`.toLowerCase();
+        return haystack.includes(q);
       });
     }
     list.sort((a, b) => {
@@ -104,7 +114,7 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
       return 0;
     });
     return list;
-  }, [schoolsToDisplay, quickNatureFilter, sortBy]);
+  }, [schoolsToDisplay, quickNatureFilter, catalogSearchQuery, sortBy]);
 
   // Active individual school if selected by click
   const activeSchool = useMemo(() => {
@@ -654,26 +664,32 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
         </div>
 
-        {/* 4. Schools List: Espaçamento aprimorado, menor densidade de cards, ordenação/filtros e alternância grelha/lista */}
-        <div id="admin-schools-explorer" className="mt-8 pt-6 border-t border-slate-200/60">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+        {/* 4. Rede de Escolas — Interface minimalista Apple HIG / Dieter Rams */}
+        <div id="admin-schools-explorer" className="mt-10 pt-8 border-t border-[#E5E5EA]">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 pb-5 mb-8 border-b border-[#E5E5EA]">
             <div>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <SchoolIcon className="w-5 h-5 text-[#f75142]" />
-                <span>Catálogo de Escolas</span>
-                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
-                  {processedSchools.length} {processedSchools.length === 1 ? 'escola' : 'escolas'}
-                </span>
+              <h3 className="text-[26px] sm:text-[28px] font-semibold text-[#1D1D1F] tracking-[-0.02em] leading-tight">
+                Rede de Escolas
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {selectedMunicipality === 'Todas as Escolas' ? 'Toda a Rede Central' : `Zona de ${selectedMunicipality}`} • Clique para inspecionar indicadores
+              <p className="text-[14px] text-[#6E6E73] mt-1">
+                SIGRE Angola · {processedSchools.length} {processedSchools.length === 1 ? 'instituição registada' : 'instituições registadas'}
+                {selectedMunicipality !== 'Todas as Escolas' ? ` · ${selectedMunicipality}` : ''}
               </p>
             </div>
 
-            {/* Controls Bar: Nature filter, Sort dropdown, and Grid/List toggle */}
+            {/* Minimalist Controls Bar: Search, Nature filter, Sort dropdown, and Grid/List toggle */}
             <div className="flex flex-wrap items-center gap-2.5">
+              <input
+                type="search"
+                value={catalogSearchQuery}
+                onChange={(e) => setCatalogSearchQuery(e.target.value)}
+                placeholder="Filtrar por escola, SIGE ou director..."
+                aria-label="Filtrar por escola, SIGE ou director"
+                className="w-full sm:w-[280px] px-3.5 py-2.5 text-[14px] text-[#1D1D1F] placeholder:text-[#86868B] bg-white border border-[#E5E5EA] rounded-[10px] outline-none focus:border-[#1D1D1F] transition-colors"
+              />
+
               {/* Quick Nature Filter */}
-              <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
+              <div className="flex items-center bg-[#F5F5F7] border border-[#E5E5EA] rounded-[10px] p-0.5">
                 {[
                   { key: 'all', label: 'Todas' },
                   { key: 'Pública', label: 'Pública' },
@@ -681,11 +697,12 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 ].map((item) => (
                   <button
                     key={item.key}
+                    type="button"
                     onClick={() => setQuickNatureFilter(item.key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-medium transition-colors cursor-pointer ${
                       quickNatureFilter === item.key
-                        ? 'bg-slate-900 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white text-[#1D1D1F] shadow-2xs'
+                        : 'text-[#6E6E73] hover:text-[#1D1D1F]'
                     }`}
                   >
                     {item.label}
@@ -698,39 +715,44 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="appearance-none bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#f75142] cursor-pointer shadow-2xs"
+                  aria-label="Ordenar escolas"
+                  className="appearance-none bg-white hover:border-[#C7C7CC] text-[#1D1D1F] text-[13px] font-medium py-2 pl-3 pr-8 rounded-[10px] border border-[#E5E5EA] focus:outline-none focus:border-[#1D1D1F] cursor-pointer transition-colors"
                 >
-                  <option value="name">Nome (A-Z)</option>
+                  <option value="name">Nome (A–Z)</option>
                   <option value="performance">Maior Desempenho</option>
                   <option value="students">Mais Alunos</option>
                   <option value="teachers">Mais Docentes</option>
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500 text-[10px]">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[#86868B] text-[10px]">
                   ▼
                 </div>
               </div>
 
               {/* View Mode Switcher: Grid vs List */}
-              <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
+              <div className="flex items-center bg-[#F5F5F7] border border-[#E5E5EA] rounded-[10px] p-0.5">
                 <button
+                  type="button"
                   onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`p-1.5 rounded-[8px] transition-colors cursor-pointer ${
                     viewMode === 'grid'
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-white text-[#1D1D1F] shadow-2xs'
+                      : 'text-[#6E6E73] hover:text-[#1D1D1F]'
                   }`}
                   title="Visualização em Grelha"
+                  aria-label="Visualização em Grelha"
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`p-1.5 rounded-[8px] transition-colors cursor-pointer ${
                     viewMode === 'list'
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-white text-[#1D1D1F] shadow-2xs'
+                      : 'text-[#6E6E73] hover:text-[#1D1D1F]'
                   }`}
                   title="Visualização em Lista"
+                  aria-label="Visualização em Lista"
                 >
                   <List className="w-4 h-4" />
                 </button>
@@ -738,8 +760,9 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
 
               {activeSchool && (
                 <button
+                  type="button"
                   onClick={() => setSelectedSchoolId(null)}
-                  className="text-xs font-bold text-[#f75142] hover:underline flex items-center gap-1 cursor-pointer pl-1"
+                  className="text-[13px] font-medium text-[#0071E3] hover:underline flex items-center gap-1 cursor-pointer pl-1"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Ver Média</span>
@@ -749,227 +772,200 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
           </div>
 
           {processedSchools.length === 0 ? (
-            <div className="bg-white rounded-2xl p-10 text-center border border-dashed border-slate-200 shadow-2xs">
-              <SchoolIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700">Nenhuma escola encontrada para os filtros atuais.</p>
-              <p className="text-xs text-slate-500 mt-1">Experimente ajustar os filtros ou selecionar outra zona.</p>
+            <div className="bg-white rounded-[14px] p-12 text-center border border-[#E5E5EA]">
+              <p className="text-[15px] font-semibold text-[#1D1D1F]">
+                Nenhuma escola encontrada para os filtros atuais.
+              </p>
+              <p className="text-[13px] text-[#6E6E73] mt-1">
+                Experimente ajustar a pesquisa ou selecionar outra zona.
+              </p>
               <button
+                type="button"
                 onClick={() => {
+                  setCatalogSearchQuery('');
                   setQuickNatureFilter('all');
                   handleClearAllFilters();
                 }}
-                className="mt-4 px-4 py-2 bg-[#f75142] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs hover:bg-[#c9372a] transition-colors"
+                className="mt-5 px-4 py-2 text-[#0071E3] hover:underline text-[13px] font-medium cursor-pointer"
               >
-                Limpar Todos os Filtros
+                Limpar todos os filtros
               </button>
             </div>
           ) : viewMode === 'grid' ? (
-            /* Grid View */
+            /* Minimalist Apple HIG / Dieter Rams Grid View */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {processedSchools.map((school) => {
                 const isSelected = school.id === selectedSchoolId;
                 const regData = getSchoolRegistrationData(school);
                 const isEspecial = regData.oferta?.ensinoEspecial?.activo;
                 const isComplexo = regData.situacao?.regimeComplexoEscolar;
-
-                const getNatureColor = (nat: string) => {
-                  switch (nat) {
-                    case 'Pública':
-                      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                    case 'Público-Privada':
-                      return 'bg-blue-50 text-blue-700 border-blue-200';
-                    case 'Privada':
-                      return 'bg-purple-50 text-purple-700 border-purple-200';
-                    default:
-                      return 'bg-slate-50 text-slate-700 border-slate-200';
-                  }
-                };
+                const regimeParts: string[] = [];
+                if (isEspecial) regimeParts.push('Especial');
+                if (isComplexo) regimeParts.push('Complexo');
+                const regimeText = regimeParts.join(' · ');
+                const q = getSchoolTeacherQuotaStatus(school);
+                const sq = getSchoolStudentQuotaStatus(school);
+                const perfHigh = (school.performanceRate || 0) >= 50;
 
                 return (
-                  <div
+                  <article
                     key={school.id}
                     onClick={() => {
                       setSelectedSchoolId(school.id);
                       document.getElementById('admin-overview-section')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                    className={`rounded-[14px] border p-6 flex flex-col justify-between transition-colors duration-200 cursor-pointer ${
                       isSelected
-                        ? 'bg-[#fef2f1]/80 border-[#f75142] ring-2 ring-[#f75142]/20 shadow-md'
-                        : 'bg-white hover:bg-slate-50/70 border-slate-200/90 hover:border-slate-300 shadow-2xs hover:shadow-xs'
+                        ? 'bg-[#FBFBFD] border-[#0071E3] ring-1 ring-[#0071E3]/25'
+                        : 'bg-white border-[#E5E5EA] hover:border-[#C7C7CC] hover:bg-[#FBFBFD]'
                     }`}
                   >
                     <div>
-                      <div className="flex items-start justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${getNatureColor(regData.natureza)}`}>
-                            {regData.natureza}
-                          </span>
-                          {isEspecial && (
-                            <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded-md">
-                              Especial
-                            </span>
-                          )}
-                          {isComplexo && (
-                            <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md">
-                              Complexo
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                      {/* Top unboxed metadata row */}
+                      <div className="flex items-center justify-between gap-3 text-[12px] text-[#86868B] tracking-[0.02em] mb-3">
+                        <span className="uppercase font-semibold text-[#6E6E73] truncate">
+                          {regData.natureza}
+                          {regimeText ? ` · ${regimeText}` : ''}
+                        </span>
+                        <span
+                          className={`font-semibold tabular-nums shrink-0 ${
+                            perfHigh ? 'text-[#248A3D]' : 'text-[#86868B]'
+                          }`}
+                        >
                           {school.performanceRate}% Desempenho
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 mt-3">
-                        {school.logoSvg ? (
-                          <div 
-                            className="w-10 h-10 shrink-0 rounded-xl p-0.5 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shadow-2xs"
-                            dangerouslySetInnerHTML={{ __html: school.logoSvg }}
+                      {/* School title + subtle optional logo */}
+                      <div className="flex items-start gap-3">
+                        {school.logoSvg && (
+                          <div
+                            className="w-9 h-9 shrink-0 rounded-[9px] p-0.5 bg-[#FBFBFD] border border-[#E5E5EA] flex items-center justify-center overflow-hidden mt-0.5"
+                            dangerouslySetInnerHTML={{ __html: sanitizeSvgMarkup(school.logoSvg) }}
                           />
-                        ) : (
-                          <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-                            <SchoolIcon className="w-5 h-5 text-slate-400" />
-                          </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <h4 className="text-sm font-bold text-slate-900 leading-snug truncate" title={school.name}>
+                          <h4
+                            className="text-[17px] font-semibold tracking-[-0.01em] text-[#1D1D1F] leading-snug mb-1 truncate"
+                            title={school.name}
+                          >
                             {school.name}
                           </h4>
-                          {regData.codigoSIGE && (
-                            <span className="text-[10px] font-mono text-slate-400 font-semibold">
-                              SIGE: {regData.codigoSIGE}
-                            </span>
-                          )}
+                          <div className="text-[12px] text-[#86868B] tabular-nums mb-4">
+                            {regData.codigoSIGE ? `SIGE ${regData.codigoSIGE}` : 'SIGE —'}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="mt-3 space-y-1 text-xs text-slate-600">
-                        <div className="flex items-center gap-1.5">
-                          <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">Director: <strong>{school.directorName}</strong></span>
+                      {/* Clean 2-line details */}
+                      <div className="text-[13px] text-[#6E6E73] mb-5 flex flex-col gap-1">
+                        <div className="truncate">
+                          Director: <strong className="font-medium text-[#1D1D1F]">{school.directorName}</strong>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">{school.location}</span>
+                        <div className="truncate" title={school.location}>
+                          {school.location}
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2.5">
-                      {(() => {
-                        const q = getSchoolTeacherQuotaStatus(school);
-                        const sq = getSchoolStudentQuotaStatus(school);
-                        return (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-slate-500 font-semibold text-[11px]">
-                              <span title="Docentes Cadastrados na Planilha / Quota Declarada">
-                                <strong className="text-slate-800">{q.registeredCount}</strong>/{q.declaredTotal} Docentes
-                              </span>
-                              <span>•</span>
-                              <span>{school.turmasCount} Turmas</span>
-                              <span>•</span>
-                              <span title="Alunos Cadastrados na Planilha / Quota Declarada">
-                                <strong className="text-slate-800">{sq.registeredCount}</strong>/{sq.declaredTotal} Alunos
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 bg-amber-50/70 border border-amber-200/80 rounded-lg px-2.5 py-1 text-[10px]">
-                              <span className="font-bold text-amber-900">
-                                Docentes SIGE: <strong>{q.registeredCount}</strong>/{q.declaredTotal}
-                              </span>
-                              <span
-                                className={`font-black px-1.5 py-0.5 rounded ${
-                                  q.pendingCount > 0
-                                    ? 'bg-amber-200/80 text-amber-950'
-                                    : 'bg-emerald-100 text-emerald-800'
-                                }`}
-                              >
-                                {q.pendingCount > 0 ? `${q.pendingCount} Pend.` : '0 Pend.'}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 bg-cyan-50/70 border border-cyan-200/80 rounded-lg px-2.5 py-1 text-[10px]">
-                              <span className="font-bold text-cyan-950">
-                                Alunos: <strong>{sq.registeredCount}</strong>/{sq.declaredTotal} (F: <strong className="text-rose-700">{sq.registeredFemaleCount}</strong> | M: <strong className="text-indigo-700">{sq.registeredMaleCount}</strong>)
-                              </span>
-                              <span
-                                className={`font-black px-1.5 py-0.5 rounded ${
-                                  sq.pendingCount > 0
-                                    ? 'bg-amber-200/80 text-amber-950'
-                                    : 'bg-emerald-100 text-emerald-800'
-                                }`}
-                              >
-                                {sq.pendingCount > 0 ? `${sq.pendingCount} Pend.` : '0 Pend.'}
-                              </span>
-                            </div>
+                    <div>
+                      {/* 3-Column hairline metrics strip */}
+                      <div className="grid grid-cols-3 gap-3 py-4 border-t border-b border-[#E5E5EA] mb-4">
+                        <div title="Docentes Cadastrados / Quota Declarada">
+                          <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                            Docentes
                           </div>
-                        );
-                      })()}
+                          <div className="text-[15px] font-semibold tabular-nums text-[#1D1D1F]">
+                            {q.registeredCount}/{q.declaredTotal}
+                          </div>
+                          <div className="text-[11px] text-[#86868B] mt-0.5 tabular-nums">
+                            {q.pendingCount} pend.
+                          </div>
+                        </div>
 
-                      {/* Action buttons on card */}
-                      <div className="flex items-center justify-between gap-2 pt-0.5">
+                        <div>
+                          <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                            Turmas
+                          </div>
+                          <div className="text-[15px] font-semibold tabular-nums text-[#1D1D1F]">
+                            {school.turmasCount}
+                          </div>
+                          <div className="text-[11px] text-[#86868B] mt-0.5">
+                            ativas
+                          </div>
+                        </div>
+
+                        <div title={`Alunos Cadastrados / Quota Declarada (F: ${sq.registeredFemaleCount} | M: ${sq.registeredMaleCount})`}>
+                          <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                            Alunos
+                          </div>
+                          <div className="text-[15px] font-semibold tabular-nums text-[#1D1D1F]">
+                            {sq.registeredCount}/{sq.declaredTotal}
+                          </div>
+                          <div className="text-[11px] text-[#86868B] mt-0.5 tabular-nums">
+                            {sq.pendingCount} pend.
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Minimalist text actions row */}
+                      <div className="flex items-center justify-between text-[13px]">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setDetailSchool(school);
                           }}
-                          className="flex-1 py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          className="text-[#0071E3] font-medium hover:underline cursor-pointer bg-transparent border-0 p-0"
                         >
-                          <FileText className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Ficha SIGE</span>
+                          Ficha SIGE →
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingSchool(school);
-                          }}
-                          className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-[#fef2f1] hover:text-[#f75142] text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          title="Editar Cadastro da Escola"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>Editar</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSchoolToDelete({ id: school.id, name: school.name });
-                          }}
-                          className="py-1.5 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                          title="Apagar escola e todos os dados relacionados"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Apagar</span>
-                        </button>
+                        <div className="flex items-center gap-4">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingSchool(school);
+                            }}
+                            className="bg-transparent border-0 p-0 text-[13px] text-[#6E6E73] hover:text-[#1D1D1F] transition-colors cursor-pointer"
+                            title="Editar Cadastro da Escola"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSchoolToDelete({ id: school.id, name: school.name });
+                            }}
+                            className="bg-transparent border-0 p-0 text-[13px] text-[#6E6E73] hover:text-[#D70015] transition-colors cursor-pointer"
+                            title="Apagar escola e todos os dados relacionados"
+                          >
+                            Apagar
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
           ) : (
-            /* List View (Table-like rows) */
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden divide-y divide-slate-100">
+            /* Minimalist List View (Consistent Apple HIG / Dieter Rams Aesthetic) */
+            <div className="bg-white rounded-[14px] border border-[#E5E5EA] overflow-hidden divide-y divide-[#E5E5EA]">
               {processedSchools.map((school) => {
                 const isSelected = school.id === selectedSchoolId;
                 const regData = getSchoolRegistrationData(school);
                 const isEspecial = regData.oferta?.ensinoEspecial?.activo;
                 const isComplexo = regData.situacao?.regimeComplexoEscolar;
-
-                const getNatureColor = (nat: string) => {
-                  switch (nat) {
-                    case 'Pública':
-                      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                    case 'Público-Privada':
-                      return 'bg-blue-50 text-blue-700 border-blue-200';
-                    case 'Privada':
-                      return 'bg-purple-50 text-purple-700 border-purple-200';
-                    default:
-                      return 'bg-slate-50 text-slate-700 border-slate-200';
-                  }
-                };
+                const regimeParts: string[] = [];
+                if (isEspecial) regimeParts.push('Especial');
+                if (isComplexo) regimeParts.push('Complexo');
+                const regimeText = regimeParts.join(' · ');
+                const q = getSchoolTeacherQuotaStatus(school);
+                const sq = getSchoolStudentQuotaStatus(school);
+                const perfHigh = (school.performanceRate || 0) >= 50;
 
                 return (
                   <div
@@ -978,133 +974,97 @@ export const AdminSchoolsPage: React.FC<AdminSchoolsPageProps> = ({
                       setSelectedSchoolId(school.id);
                       document.getElementById('admin-overview-section')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className={`p-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 transition-all cursor-pointer ${
+                    className={`px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors cursor-pointer ${
                       isSelected
-                        ? 'bg-[#fef2f1]/80 ring-1 ring-inset ring-[#f75142]'
-                        : 'hover:bg-slate-50/70'
+                        ? 'bg-[#FBFBFD] ring-1 ring-inset ring-[#0071E3]/40'
+                        : 'hover:bg-[#FBFBFD]'
                     }`}
                   >
                     {/* Left: Identity */}
                     <div className="flex items-center gap-3.5 min-w-0 md:w-5/12">
-                      {school.logoSvg ? (
-                        <div 
-                          className="w-10 h-10 shrink-0 rounded-xl p-0.5 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shadow-2xs"
-                          dangerouslySetInnerHTML={{ __html: school.logoSvg }}
+                      {school.logoSvg && (
+                        <div
+                          className="w-9 h-9 shrink-0 rounded-[9px] p-0.5 bg-[#FBFBFD] border border-[#E5E5EA] flex items-center justify-center overflow-hidden"
+                          dangerouslySetInnerHTML={{ __html: sanitizeSvgMarkup(school.logoSvg) }}
                         />
-                      ) : (
-                        <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-                          <SchoolIcon className="w-5 h-5 text-slate-400" />
-                        </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-sm font-bold text-slate-900 truncate" title={school.name}>
-                            {school.name}
-                          </h4>
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${getNatureColor(regData.natureza)}`}>
-                            {regData.natureza}
-                          </span>
-                          {isEspecial && (
-                            <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1 py-0.5 rounded">
-                              Especial
-                            </span>
-                          )}
-                          {isComplexo && (
-                            <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1 py-0.5 rounded">
-                              Complexo
-                            </span>
-                          )}
+                        <div className="text-[11px] uppercase font-semibold tracking-[0.02em] text-[#6E6E73] mb-0.5 truncate">
+                          {regData.natureza}
+                          {regimeText ? ` · ${regimeText}` : ''}
+                          {regData.codigoSIGE ? ` · SIGE ${regData.codigoSIGE}` : ''}
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium mt-0.5">
-                          <span>Director: <strong className="text-slate-700">{school.directorName}</strong></span>
-                          <span>•</span>
-                          <span className="truncate">{school.location}</span>
-                          {regData.codigoSIGE && (
-                            <>
-                              <span>•</span>
-                              <span className="font-mono text-slate-400">SIGE: {regData.codigoSIGE}</span>
-                            </>
-                          )}
+                        <h4 className="text-[15px] font-semibold text-[#1D1D1F] tracking-[-0.01em] truncate" title={school.name}>
+                          {school.name}
+                        </h4>
+                        <div className="text-[12px] text-[#6E6E73] mt-0.5 truncate">
+                          Director: <strong className="font-medium text-[#1D1D1F]">{school.directorName}</strong> · {school.location}
                         </div>
                       </div>
                     </div>
 
-                    {/* Middle: Metrics */}
-                    <div className="flex items-center gap-4 text-xs text-slate-600 font-semibold md:w-4/12 justify-between md:justify-center">
-                      {(() => {
-                        const q = getSchoolTeacherQuotaStatus(school);
-                        return (
-                          <div className="text-center">
-                            <span className="text-sm font-black text-slate-900 block leading-tight">
-                              {q.registeredCount}/{q.declaredTotal}
-                            </span>
-                            <span className="text-[10px] text-amber-700 font-bold">
-                              {q.pendingCount} Pend.
-                            </span>
-                          </div>
-                        );
-                      })()}
-                      <div className="text-center">
-                        <span className="text-sm font-black text-slate-900 block leading-tight">{school.turmasCount}</span>
-                        <span className="text-[10px] text-slate-400 font-normal">Turmas</span>
+                    {/* Middle: Tabular Metrics */}
+                    <div className="grid grid-cols-4 gap-4 md:w-4/12 text-left md:text-center">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.04em] text-[#86868B]">Docentes</div>
+                        <div className="text-[14px] font-semibold tabular-nums text-[#1D1D1F]">
+                          {q.registeredCount}/{q.declaredTotal}
+                        </div>
+                        <div className="text-[11px] text-[#86868B] tabular-nums">{q.pendingCount} pend.</div>
                       </div>
-                      {(() => {
-                        const sq = getSchoolStudentQuotaStatus(school);
-                        return (
-                          <div className="text-center">
-                            <span className="text-sm font-black text-slate-900 block leading-tight">
-                              {sq.registeredCount}/{sq.declaredTotal}
-                            </span>
-                            <span className="text-[10px] text-amber-700 font-bold">
-                              {sq.pendingCount} Al. Pend.
-                            </span>
-                          </div>
-                        );
-                      })()}
-                      <div className="text-center">
-                        <span className="text-sm font-black text-emerald-700 block leading-tight">{school.performanceRate}%</span>
-                        <span className="text-[10px] text-emerald-600/80 font-normal">Média</span>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.04em] text-[#86868B]">Turmas</div>
+                        <div className="text-[14px] font-semibold tabular-nums text-[#1D1D1F]">{school.turmasCount}</div>
+                        <div className="text-[11px] text-[#86868B]">ativas</div>
+                      </div>
+                      <div title={`F: ${sq.registeredFemaleCount} | M: ${sq.registeredMaleCount}`}>
+                        <div className="text-[10px] uppercase tracking-[0.04em] text-[#86868B]">Alunos</div>
+                        <div className="text-[14px] font-semibold tabular-nums text-[#1D1D1F]">
+                          {sq.registeredCount}/{sq.declaredTotal}
+                        </div>
+                        <div className="text-[11px] text-[#86868B] tabular-nums">{sq.pendingCount} pend.</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.04em] text-[#86868B]">Desempenho</div>
+                        <div className={`text-[14px] font-semibold tabular-nums ${perfHigh ? 'text-[#248A3D]' : 'text-[#86868B]'}`}>
+                          {school.performanceRate}%
+                        </div>
                       </div>
                     </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex items-center justify-end gap-2 md:w-3/12">
+                    {/* Right: Minimalist Actions */}
+                    <div className="flex items-center justify-end gap-4 md:w-3/12 text-[13px]">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDetailSchool(school);
                         }}
-                        className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="text-[#0071E3] font-medium hover:underline cursor-pointer bg-transparent border-0 p-0 whitespace-nowrap"
                       >
-                        <FileText className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Ficha SIGE</span>
+                        Ficha SIGE →
                       </button>
-
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingSchool(school);
                         }}
-                        className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-[#fef2f1] hover:text-[#f75142] text-slate-700 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        className="text-[#6E6E73] hover:text-[#1D1D1F] transition-colors cursor-pointer bg-transparent border-0 p-0"
                         title="Editar Cadastro da Escola"
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>Editar</span>
+                        Editar
                       </button>
-
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSchoolToDelete({ id: school.id, name: school.name });
                         }}
-                        className="py-1.5 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        className="text-[#6E6E73] hover:text-[#D70015] transition-colors cursor-pointer bg-transparent border-0 p-0"
                         title="Apagar escola e todos os dados relacionados"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Apagar</span>
+                        Apagar
                       </button>
                     </div>
                   </div>

@@ -432,24 +432,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       cleanEmail === 'beliziodos20@gmail.com' ||
       cleanEmail.includes('belizio');
 
-    // 1. Sync fresh applications from server / Firestore to ensure we check any existing application
-    let approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
-    if (!approvalCheck.app) {
-      try {
-        const freshApps = await syncApplicationsFromServer();
-        const matchedApp = freshApps.find(
-          (a) =>
-            (uid && a.userId === uid) ||
-            (cleanEmail && a.email?.trim().toLowerCase() === cleanEmail)
-        );
-        if (matchedApp) {
-          approvalCheck = {
-            status: matchedApp.status === 'aprovado' ? 'ativo' : matchedApp.status,
-            app: matchedApp,
-          };
-        }
-      } catch {}
-    }
+    // 1. ALWAYS force-sync fresh applications from Cloud Firestore + Server before checking status
+    //    so a validation done on another device immediately reflects (never trust stale local 'pendente' cache!)
+    try {
+      await syncApplicationsFromServer(true);
+    } catch {}
+    const approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
 
     // 2. Check registered accounts strictly by email
     const existingAccountLookup = findRegisteredAccountByEmail(cleanEmail);
@@ -729,8 +717,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
     createGoogleUserSession(cleanEmail, `${gFirst} ${gLast}`.trim(), uid, photoURL);
 
+    const isApprovedByApp = Boolean(
+      approvalCheck.app &&
+        (approvalCheck.status === 'ativo' ||
+          approvalCheck.app.status === 'aprovado' ||
+          Boolean(approvalCheck.app.approvedAt))
+    );
+    const resolvedAccountStatus: 'ativo' | 'pendente' =
+      isSuperAdmin || isDirectorMunicipal || isApprovedByApp
+        ? 'ativo'
+        : existingFirestoreUser?.status === 'pendente'
+        ? 'pendente'
+        : 'ativo';
+
     const googleAccount: UserAccount = {
-      id: uid || (isSuperAdmin ? 'usr_belizio_admin' : isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_google_' + Date.now()),
+      id: approvalCheck.app?.userId || existingFirestoreUser?.id || uid || (isSuperAdmin ? 'usr_belizio_admin' : isDirectorMunicipal ? 'usr_dme_quessua' : 'usr_google_' + Date.now()),
       firstName: gFirst,
       lastName: gLast,
       email: cleanEmail,
@@ -745,11 +746,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       titlePrefix: resolvedPrefix,
       greeting: `Olá ${resolvedPrefix} ${gFirst}`,
       avatar: photoURL || existingFirestoreUser?.avatar || undefined,
-      status:
-        existingFirestoreUser?.status === 'pendente'
-          ? 'pendente'
-          : 'ativo',
+      biNumber: approvalCheck.app?.biNumber || existingFirestoreUser?.biNumber,
+      phone: approvalCheck.app?.phone || existingFirestoreUser?.phone,
+      approvedAt: approvalCheck.app?.approvedAt || existingFirestoreUser?.approvedAt,
+      approvedBy: approvalCheck.app?.approvedBy || existingFirestoreUser?.approvedBy,
+      status: resolvedAccountStatus,
     };
+
+    // Self-heal stale Firestore user doc if application was approved while users doc stayed 'pendente'
+    if (resolvedAccountStatus === 'ativo' && existingFirestoreUser?.status === 'pendente') {
+      saveUserToFirestore(googleAccount).catch(() => {});
+    }
 
     setSuccessMsg(`Autenticado com sucesso via Google (${cleanEmail})! A aceder à plataforma...`);
     setTimeout(() => {
@@ -980,7 +987,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setInstitutionalScope('escola');
     setSchoolRole(roleId);
     setEmail(config.defaultEmail);
-    setPassword('Ucore@2026');
+    setPassword('');
     setFirstName(config.defaultFirst);
     setLastName(config.defaultLast);
     setSchoolOrUnitName('Unidade Escolar Municipal');
@@ -993,11 +1000,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setInstitutionalScope('administracao');
     setAdminRole(roleId);
     setEmail(config.defaultEmail);
-    if (roleId === 'diretor_municipal') {
-      setPassword('quessua000');
-    } else {
-      setPassword('Ucore@2026');
-    }
+    setPassword('');
     setFirstName(config.defaultFirst);
     setLastName(config.defaultLast);
     setSchoolOrUnitName('Direcção Municipal da Educação de Quessua');
@@ -1019,8 +1022,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       onAuthLoadingChange?.(true, 'login');
 
       try {
-        // 1. Sync applications and user records from cloud/server before authenticating
-        await syncApplicationsFromServer().catch(() => {});
+        // 1. Force-sync fresh applications and user records from Cloud Firestore + Server before authenticating
+        await syncApplicationsFromServer(true).catch(() => {});
 
         const accountLookup = findRegisteredAccountByEmail(cleanEmail);
 
@@ -1222,7 +1225,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           rememberMe,
         };
 
-        const approvalCheck = checkUserApprovalStatus(loggedUser.id, cleanEmail);
+        const approvalCheck = checkUserApprovalStatus(
+          loggedUser.id,
+          cleanEmail,
+          accountLookup.app?.biNumber || firestoreUser?.biNumber
+        );
         if (approvalCheck.app) {
           const app = approvalCheck.app;
           if (app.biNumber) loggedUser.biNumber = app.biNumber;
@@ -1232,6 +1239,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           if (app.nivelAcademico) loggedUser.nivelAcademico = app.nivelAcademico;
           if (typeof app.anosServico === 'number') loggedUser.anosServico = app.anosServico;
           if (app.regimeTrabalho) loggedUser.regimeTrabalho = app.regimeTrabalho;
+          if (app.approvedAt) loggedUser.approvedAt = app.approvedAt;
+          if (app.approvedBy) loggedUser.approvedBy = app.approvedBy;
           loggedUser.approverTargetRole = 'admin';
           loggedUser.approverTargetEmail = OFFICIAL_DME_ADMIN_EMAIL;
           loggedUser.approverTargetSchoolName = app.schoolName;
@@ -1286,6 +1295,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           return;
         } else {
           loggedUser.status = 'ativo';
+          if (firestoreUser?.status === 'pendente') {
+            saveUserToFirestore(loggedUser).catch(() => {});
+          }
           setSuccessMsg(
             `Bem-vindo(a), ${loggedUser.greeting}! A aceder ao painel de ${loggedUser.cargoTitle}...`
           );

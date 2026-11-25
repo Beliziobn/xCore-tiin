@@ -57,6 +57,7 @@ import {
   initRealtimeApplicationsSync,
   isAccountDeleted,
   findRegisteredAccountByEmail,
+  checkUserApprovalStatus,
 } from './utils/authApprovalStorage';
 import { initRealtimeQuickRequestsSync } from './utils/quickServicesStorage';
 import {
@@ -539,9 +540,9 @@ export default function App() {
     }
   });
 
-  // Immediately terminate active session if the account is deleted/revoked by the Administrator
+  // Immediately terminate active session if revoked OR auto-promote if approved on another device
   useEffect(() => {
-    const checkActiveAccountRevocation = () => {
+    const checkActiveAccountStatus = () => {
       if (!currentUser) return;
       const emailLow = (currentUser.email || '').trim().toLowerCase();
       if (emailLow === 'dmedoquessua@gmail.com' || emailLow === 'beliziodos20@gmail.com') {
@@ -563,14 +564,35 @@ export default function App() {
         showToast(
           'A sua conta foi apagada pela Administração do Sistema. As suas credenciais foram revogadas e a sessão foi encerrada.'
         );
+        return;
+      }
+
+      // If this session is still marked 'pendente' but the application is now 'aprovado', promote immediately!
+      if (currentUser.status === 'pendente') {
+        const approvalCheck = checkUserApprovalStatus(currentUser.id, currentUser.email, currentUser.biNumber);
+        if (approvalCheck.status === 'ativo') {
+          const promotedUser: UserAccount = {
+            ...currentUser,
+            status: 'ativo',
+            approvedAt: approvalCheck.app?.approvedAt || currentUser.approvedAt || new Date().toLocaleString('pt-AO'),
+            approvedBy: approvalCheck.app?.approvedBy || currentUser.approvedBy || 'Director Municipal da Educação (dmedoquessua@gmail.com)',
+          };
+          setCurrentUser(promotedUser);
+          try {
+            localStorage.setItem('ucore_active_user', JSON.stringify(promotedUser));
+          } catch {}
+          saveUserToFirestore(promotedUser).catch(() => {});
+          showToast(`Conta homologada com sucesso! Bem-vindo(a) à plataforma Sigre, ${promotedUser.firstName}.`);
+        }
       }
     };
 
-    window.addEventListener('sigre-account-revoked', checkActiveAccountRevocation);
-    window.addEventListener('sigre-data-synced', checkActiveAccountRevocation);
+    checkActiveAccountStatus();
+    window.addEventListener('sigre-account-revoked', checkActiveAccountStatus);
+    window.addEventListener('sigre-data-synced', checkActiveAccountStatus);
     return () => {
-      window.removeEventListener('sigre-account-revoked', checkActiveAccountRevocation);
-      window.removeEventListener('sigre-data-synced', checkActiveAccountRevocation);
+      window.removeEventListener('sigre-account-revoked', checkActiveAccountStatus);
+      window.removeEventListener('sigre-data-synced', checkActiveAccountStatus);
     };
   }, [currentUser]);
 
@@ -1052,19 +1074,29 @@ export default function App() {
   const handleLoginSuccess = (user: UserAccount) => {
     setIsAuthLoading(false);
     setAuthLoadingAction(null);
+    const approvalCheck = checkUserApprovalStatus(user.id, user.email, user.biNumber);
+    const normalizedUser: UserAccount =
+      user.status === 'pendente' && approvalCheck.status === 'ativo'
+        ? {
+            ...user,
+            status: 'ativo',
+            approvedAt: approvalCheck.app?.approvedAt || user.approvedAt,
+            approvedBy: approvalCheck.app?.approvedBy || user.approvedBy,
+          }
+        : user;
     try {
       sessionStorage.setItem('ucore_session_active', 'true');
-      localStorage.setItem('ucore_active_user', JSON.stringify(user));
+      localStorage.setItem('ucore_active_user', JSON.stringify(normalizedUser));
     } catch {
       // ignore
     }
-    setCurrentUser(user);
-    saveUserToFirestore(user).catch(() => {});
-    if (user.role === 'admin' || user.role === 'diretor' || user.role === 'professor') {
-      setActiveRole(user.role);
+    setCurrentUser(normalizedUser);
+    saveUserToFirestore(normalizedUser).catch(() => {});
+    if (normalizedUser.role === 'admin' || normalizedUser.role === 'diretor' || normalizedUser.role === 'professor') {
+      setActiveRole(normalizedUser.role);
     }
     // Immediately synchronize all network collections upon login so any device sees the latest shared data
-    syncApplicationsFromServer().catch(() => {});
+    syncApplicationsFromServer(true).catch(() => {});
     syncSchoolsFromServer()
       .then((syncedSchools) => {
         if (Array.isArray(syncedSchools) && syncedSchools.length > 0) {
@@ -1649,11 +1681,28 @@ export default function App() {
           currentUser={currentUser}
           onLogout={handleLogout}
           onApprovalConfirmed={(updatedUser) => {
-            setCurrentUser(updatedUser);
+            const activated: UserAccount = { ...updatedUser, status: 'ativo' };
+            setCurrentUser(activated);
             try {
-              localStorage.setItem('ucore_active_user', JSON.stringify(updatedUser));
+              localStorage.setItem('ucore_active_user', JSON.stringify(activated));
+              const rawUsers = localStorage.getItem('ucore_registered_users');
+              const parsed = rawUsers ? JSON.parse(rawUsers) : [];
+              if (Array.isArray(parsed)) {
+                const emailLow = (activated.email || '').trim().toLowerCase();
+                let updatedExisting = false;
+                const next = parsed.map((u: any) => {
+                  if (u && (u.id === activated.id || (emailLow && String(u.email || '').trim().toLowerCase() === emailLow))) {
+                    updatedExisting = true;
+                    return { ...u, ...activated, status: 'ativo' };
+                  }
+                  return u;
+                });
+                if (!updatedExisting && emailLow) next.push(activated);
+                localStorage.setItem('ucore_registered_users', JSON.stringify(next));
+              }
             } catch {}
-            showToast(`Conta ativada com sucesso! Bem-vindo(a) à plataforma Sigre, ${updatedUser.firstName}.`);
+            saveUserToFirestore(activated).catch(() => {});
+            showToast(`Conta ativada com sucesso! Bem-vindo(a) à plataforma Sigre, ${activated.firstName}.`);
           }}
           showToast={showToast}
           onOpenSupport={() => setInfoModalType('support')}

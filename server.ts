@@ -269,14 +269,39 @@ async function startServer() {
     return false;
   }
 
+  function stripNestedRegistrationDataServer(item: any): any {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+    let next = item;
+    if (next.registrationData && typeof next.registrationData === "object" && !Array.isArray(next.registrationData)) {
+      if ("registrationData" in next.registrationData) {
+        const { registrationData: _nested, ...cleanReg } = next.registrationData;
+        next = { ...next, registrationData: cleanReg };
+      }
+    }
+    if (typeof next.logoSvg === "string" && next.logoSvg.trim() !== "") {
+      const cleanedSvg = next.logoSvg
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
+        .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+        .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+        .replace(/javascript:/gi, "");
+      if (cleanedSvg !== next.logoSvg) {
+        next = { ...next, logoSvg: cleanedSvg };
+      }
+    }
+    return next;
+  }
+
   function sanitizeCollectionList(col: string, arr: any[], tombstonesSet: Set<string>): any[] {
     if (!Array.isArray(arr)) return [];
-    return arr.filter((item) => {
-      if (!item || typeof item !== "object") return false;
-      if (isEliminatedSchoolOrRecord(item)) return false;
-      if (isItemTombstoned(col, item, tombstonesSet)) return false;
-      return true;
-    });
+    const out: any[] = [];
+    for (const item of arr) {
+      if (!item || typeof item !== "object") continue;
+      if (isEliminatedSchoolOrRecord(item)) continue;
+      if (isItemTombstoned(col, item, tombstonesSet)) continue;
+      out.push(stripNestedRegistrationDataServer(item));
+    }
+    return out;
   }
 
   function normalizeStoreObject(parsed: any): NetworkRegistryStore {
@@ -1121,17 +1146,22 @@ async function startServer() {
     networkStore.users = dedupUsers;
 
     const dedupDirectors: any[] = [];
-    (networkStore.directors || []).forEach((d) => {
+    (networkStore.directors || []).forEach((rawD) => {
+      const d = stripNestedRegistrationDataServer(rawD);
       if (!d || isEliminatedSchoolOrRecord(d) || isItemTombstoned("directors", d, tombstonesSet)) return;
       const dBi = String(d.biNif || d.bi || d.registrationData?.biNif || "").trim().replace(/\s+/g, "").toLowerCase();
-      const dEmail = String(d.email || d.registrationData?.emailPessoal || "").trim().toLowerCase();
+      const dEmail = String(
+        d.email || d.emailInstitucional || d.emailPessoal || d.registrationData?.emailPessoal || d.registrationData?.emailInstitucional || ""
+      ).trim().toLowerCase();
       const dBaseId = stripEntityIdPrefix(d.id);
       const dName = normalizeAscii(d.name || d.nomeCompleto || d.registrationData?.nomeCompleto || "");
 
       const idx = dedupDirectors.findIndex((ed) => {
         const eBi = String(ed.biNif || ed.bi || ed.registrationData?.biNif || "").trim().replace(/\s+/g, "").toLowerCase();
         if (dBi.length >= 5 && eBi.length >= 5 && dBi === eBi) return true;
-        const eEmail = String(ed.email || ed.registrationData?.emailPessoal || "").trim().toLowerCase();
+        const eEmail = String(
+          ed.email || ed.emailInstitucional || ed.emailPessoal || ed.registrationData?.emailPessoal || ed.registrationData?.emailInstitucional || ""
+        ).trim().toLowerCase();
         if (!isGenericPlaceholderEmail(dEmail) && !isGenericPlaceholderEmail(eEmail) && dEmail === eEmail) return true;
         const eBaseId = stripEntityIdPrefix(ed.id);
         if (dBaseId && eBaseId && dBaseId === eBaseId) return true;
@@ -1144,16 +1174,27 @@ async function startServer() {
         dedupDirectors.push({
           ...d,
           id: canonicalId,
+          email: dEmail || d.email || "",
           schoolName: cleanSchoolNameSpaces(d.schoolName || d.nomeEscola),
           nomeEscola: cleanSchoolNameSpaces(d.nomeEscola || d.schoolName),
         });
       } else {
         const prev = dedupDirectors[idx];
-        const bestEmail = !isGenericPlaceholderEmail(prev.email)
-          ? prev.email
-          : !isGenericPlaceholderEmail(d.email)
-          ? d.email
-          : prev.registrationData?.emailPessoal || d.registrationData?.emailPessoal || prev.email || d.email;
+        const prevEmail = String(
+          prev.email || prev.emailInstitucional || prev.emailPessoal || prev.registrationData?.emailPessoal || ""
+        ).trim().toLowerCase();
+        const bestEmail = !isGenericPlaceholderEmail(prevEmail)
+          ? prevEmail
+          : !isGenericPlaceholderEmail(dEmail)
+          ? dEmail
+          : prev.email || d.email || "";
+        const mergedReg =
+          prev.registrationData && d.registrationData
+            ? { ...prev.registrationData, ...d.registrationData, id: stripEntityIdPrefix(prev.id || d.id) }
+            : prev.registrationData || d.registrationData;
+        if (mergedReg && "registrationData" in mergedReg) {
+          delete mergedReg.registrationData;
+        }
         dedupDirectors[idx] = {
           ...prev,
           ...d,
@@ -1164,9 +1205,7 @@ async function startServer() {
           biNif: prev.biNif || d.biNif || prev.registrationData?.biNif || d.registrationData?.biNif,
           schoolName: cleanSchoolNameSpaces(prev.schoolName || d.schoolName || prev.nomeEscola || d.nomeEscola),
           nomeEscola: cleanSchoolNameSpaces(prev.nomeEscola || d.nomeEscola || prev.schoolName || d.schoolName),
-          registrationData: prev.registrationData && d.registrationData
-            ? { ...prev.registrationData, ...d.registrationData, id: stripEntityIdPrefix(prev.id || d.id) }
-            : prev.registrationData || d.registrationData,
+          registrationData: mergedReg,
         };
       }
     });
@@ -1228,14 +1267,23 @@ async function startServer() {
         });
 
         if (idx === -1) {
-          result.push({
-            ...t,
-            schoolName: cleanSchoolNameSpaces(t.schoolName || t.nomeEscola),
-            nomeEscola: cleanSchoolNameSpaces(t.nomeEscola || t.schoolName),
-          });
+          result.push(
+            stripNestedRegistrationDataServer({
+              ...t,
+              schoolName: cleanSchoolNameSpaces(t.schoolName || t.nomeEscola),
+              nomeEscola: cleanSchoolNameSpaces(t.nomeEscola || t.schoolName),
+            })
+          );
         } else {
           const prev = result[idx];
-          result[idx] = {
+          const mergedReg =
+            prev.registrationData && t.registrationData
+              ? { ...prev.registrationData, ...t.registrationData }
+              : prev.registrationData || t.registrationData;
+          if (mergedReg && "registrationData" in mergedReg) {
+            delete mergedReg.registrationData;
+          }
+          result[idx] = stripNestedRegistrationDataServer({
             ...prev,
             ...t,
             id: prev.id || t.id,
@@ -1244,10 +1292,8 @@ async function startServer() {
             email: !isGenericPlaceholderEmail(prev.email) ? prev.email : t.email || prev.email,
             schoolName: cleanSchoolNameSpaces(prev.schoolName || t.schoolName || prev.nomeEscola || t.nomeEscola),
             nomeEscola: cleanSchoolNameSpaces(prev.nomeEscola || t.nomeEscola || prev.schoolName || t.schoolName),
-            registrationData: prev.registrationData && t.registrationData
-              ? { ...prev.registrationData, ...t.registrationData }
-              : prev.registrationData || t.registrationData,
-          };
+            registrationData: mergedReg,
+          });
         }
       });
       return result;
@@ -1879,14 +1925,115 @@ async function startServer() {
       if (afterAppsSnap !== beforeAppsSnap) {
         didMutate = true;
       }
+
+      // Automatically promote matching users in networkStore.users to 'ativo' whenever their application is 'aprovado'
+      const approvedApps = networkStore.applications.filter(
+        (a: any) => a && (a.status === "aprovado" || Boolean(a.approvedAt))
+      );
+      if (approvedApps.length > 0) {
+        const usersList = Array.isArray(networkStore.users) ? [...networkStore.users] : [];
+        let usersPromoted = false;
+        for (const appItem of approvedApps) {
+          const aUid = String(appItem.userId || "").trim().toLowerCase();
+          const aId = String(appItem.id || "").trim().toLowerCase();
+          const aEmail = String(appItem.email || "").trim().toLowerCase();
+          const aBi = String(appItem.biNumber || "").trim().toUpperCase();
+          const isGeneric = !aEmail || aEmail.startsWith("escola.") || aEmail.endsWith("@med.gov.ao");
+          let foundIdx = -1;
+          for (let i = 0; i < usersList.length; i++) {
+            const u = usersList[i];
+            if (!u) continue;
+            const uId = String(u.id || u.userId || "").trim().toLowerCase();
+            const uEmail = String(u.email || "").trim().toLowerCase();
+            const uBi = String(u.biNumber || "").trim().toUpperCase();
+            if (
+              (aUid && uId === aUid) ||
+              (aId && uId === aId) ||
+              (!isGeneric && aEmail && uEmail === aEmail) ||
+              (aBi && aBi.length >= 5 && uBi === aBi)
+            ) {
+              foundIdx = i;
+              if (u.status !== "ativo") {
+                usersList[i] = {
+                  ...u,
+                  status: "ativo",
+                  approvedAt: u.approvedAt || appItem.approvedAt,
+                  approvedBy: u.approvedBy || appItem.approvedBy,
+                  _updatedAt: Date.now(),
+                };
+                usersPromoted = true;
+              }
+            }
+          }
+          if (foundIdx === -1 && aEmail && !isGeneric) {
+            const parts = String(appItem.fullName || "").trim().split(/\s+/).filter(Boolean);
+            const isDme = appItem.scope === "administracao" || appItem.type === "membro_dme" || Boolean(appItem.adminRole);
+            const isProf = appItem.type === "professor" || appItem.schoolRole === "professor";
+            usersList.push({
+              id: appItem.userId || appItem.id,
+              firstName: parts[0] || "Utilizador",
+              lastName: parts.slice(1).join(" "),
+              email: aEmail,
+              role: isDme ? "admin" : isProf ? "professor" : "diretor",
+              scope: isDme ? "administracao" : "escola",
+              schoolRole: isDme ? undefined : appItem.schoolRole || (isProf ? "professor" : "diretor_geral"),
+              adminRole: isDme ? appItem.adminRole || "chefe_reparticao" : undefined,
+              cargoTitle: appItem.roleRequested || "Utilizador Institucional",
+              schoolName: appItem.schoolName || (isDme ? "Direcção Municipal da Educação de Quêssua" : "Unidade Escolar"),
+              schoolId: appItem.schoolId,
+              biNumber: appItem.biNumber,
+              phone: appItem.phone,
+              passwordVerifier: appItem.passwordVerifier,
+              status: "ativo",
+              approvedAt: appItem.approvedAt,
+              approvedBy: appItem.approvedBy,
+              approverTargetRole: "admin",
+              approverTargetEmail: "dmedoquessua@gmail.com",
+              _updatedAt: Date.now(),
+            });
+            usersPromoted = true;
+          }
+        }
+        if (usersPromoted) {
+          networkStore.users = usersList;
+          didMutate = true;
+        }
+      }
     }
 
     if (user && typeof user === "object" && !isEliminatedSchoolOrRecord(user)) {
       removeServerTombstone("users", user.id, user.email, user.biNumber);
+      const uEmail = String(user.email || "").trim().toLowerCase();
+      const uId = String(user.id || "").trim().toLowerCase();
+      const hasApprovedApp = (networkStore.applications || []).some((a: any) => {
+        if (!a || (a.status !== "aprovado" && !a.approvedAt)) return false;
+        const aUid = String(a.userId || "").trim().toLowerCase();
+        const aEmail = String(a.email || "").trim().toLowerCase();
+        return (uId && aUid === uId) || (uEmail && aEmail === uEmail);
+      });
+      const existingSrvUser = (networkStore.users || []).find(
+        (u: any) =>
+          u &&
+          ((uId && String(u.id || "").trim().toLowerCase() === uId) ||
+            (uEmail && String(u.email || "").trim().toLowerCase() === uEmail))
+      );
+      const safeStatus =
+        hasApprovedApp || existingSrvUser?.status === "ativo" || user.status === "ativo"
+          ? "ativo"
+          : user.status || "pendente";
+
       networkStore.users = upsertByKey(
         networkStore.users || [],
-        [{ ...user, approverTargetRole: "admin", approverTargetEmail: "dmedoquessua@gmail.com", _updatedAt: Date.now() }],
-        (u) => String(u.id || u.email || "").trim().toLowerCase()
+        [
+          {
+            ...user,
+            status: safeStatus,
+            approverTargetRole: "admin",
+            approverTargetEmail: "dmedoquessua@gmail.com",
+            _updatedAt: Date.now(),
+          },
+        ],
+        (u) => String(u.email || u.id || "").trim().toLowerCase()
       );
       const afterUsersSnap = JSON.stringify((networkStore.users || []).map(({ _updatedAt, ...rest }) => rest));
       if (afterUsersSnap !== beforeUsersSnap) {
@@ -2236,7 +2383,13 @@ async function startServer() {
   app.delete("/api/network/homologados", clearHomologadosHandler);
   app.post("/api/network/clear-homologated", clearHomologadosHandler);
 
-  app.get("/api/network/sync", (_req, res) => {
+  app.get("/api/network/sync", (req, res) => {
+    const etag = `W/"${networkStore.updatedAt || "0"}-${(networkStore.applications || []).length}-${(networkStore.schools || []).length}-${(networkStore.directors || []).length}-${(networkStore.teachers || []).length}-${(networkStore.tombstones || []).length}"`;
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "no-cache");
+    if (req.headers["if-none-match"] === etag) {
+      return res.status(304).end();
+    }
     res.json({
       success: true,
       ...networkStore,
