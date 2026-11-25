@@ -13,8 +13,25 @@
 
 const SESSION_FLAG_KEY = 'sigre_static_cdn_api_disabled';
 
+function isLikelyStaticVercelHost(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false;
+  const host = (window.location.hostname || '').toLowerCase();
+  // On Vercel static SPA deployments (.vercel.app or custom domain without Express),
+  // AI Studio & Cloud Run preview domains use .run.app or localhost.
+  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.run.app')) {
+    return false;
+  }
+  if (host.endsWith('.vercel.app')) {
+    return true;
+  }
+  return false;
+}
+
 let expressApiState: 'unknown' | 'available' | 'static-only' = (() => {
   try {
+    if (isLikelyStaticVercelHost()) {
+      return 'static-only';
+    }
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(SESSION_FLAG_KEY) === '1') {
       return 'static-only';
     }
@@ -95,7 +112,10 @@ export function installStaticCdnApiGuard(): void {
 
       const isSameOriginApi =
         rawUrl.startsWith('/api/') ||
-        (typeof window !== 'undefined' && rawUrl.startsWith(`${window.location.origin}/api/`));
+        rawUrl.startsWith('/socket.io/') ||
+        (typeof window !== 'undefined' &&
+          (rawUrl.startsWith(`${window.location.origin}/api/`) ||
+            rawUrl.startsWith(`${window.location.origin}/socket.io/`)));
 
       if (!isSameOriginApi) {
         return nativeFetch(input, init);

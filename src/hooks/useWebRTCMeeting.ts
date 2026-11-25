@@ -13,6 +13,7 @@ import {
   playHandRaisedSound,
   playMessageSound,
 } from '../utils/meetingAudioUtils';
+import { isExpressApiAvailable } from '../utils/apiAvailability';
 
 interface UseWebRTCMeetingOptions {
   roomId: string;
@@ -648,14 +649,17 @@ export function useWebRTCMeeting({
     if (!enabled || !cleanRoomId) return;
 
     let active = true;
+    if (!isExpressApiAvailable()) {
+      return;
+    }
     console.log('[Socket.io] Connecting to signaling server for room:', cleanRoomId);
 
     const socket: Socket = ioClient(window.location.origin, {
       path: '/socket.io',
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 15,
-      reconnectionDelay: 1000,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 2000,
       timeout: 20000,
     });
     socketRef.current = socket;

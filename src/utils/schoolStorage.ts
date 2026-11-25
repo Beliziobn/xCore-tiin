@@ -1148,14 +1148,21 @@ export function initUniversalRealtimeSyncEngine(): void {
     };
   }
 
-  if (!realtimeSocket) {
+  if (!realtimeSocket && isExpressApiAvailable()) {
     try {
       realtimeSocket = io({
         path: '/socket.io',
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: Infinity,
+        reconnectionDelay: 2000,
+        reconnectionAttempts: 3,
+      });
+
+      realtimeSocket.on('connect_error', () => {
+        if (!isExpressApiAvailable() && realtimeSocket) {
+          realtimeSocket.io.opts.reconnection = false;
+          realtimeSocket.disconnect();
+        }
       });
 
       realtimeSocket.on('network:state-updated', (payload?: { updatedAt?: string }) => {

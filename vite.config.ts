@@ -12,9 +12,7 @@ export default defineConfig(() => {
       },
     },
     build: {
-      modulePreload: {
-        polyfill: false,
-      },
+      modulePreload: false,
     },
     server: {
       host: '0.0.0.0',
