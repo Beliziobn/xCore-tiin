@@ -160,10 +160,24 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     }
   };
 
-  const loadApplications = async () => {
+  const refreshLocalApplications = () => {
+    const all = getPendingApplications();
+    const unified = deduplicateApplicationsList(all);
+    setApplications(unified);
+    if (!hasInitializedStatusRef.current && unified.length > 0) {
+      hasInitializedStatusRef.current = true;
+      const pendCount = unified.filter((a) => a.status === 'pendente').length;
+      const appCount = unified.filter((a) => a.status === 'aprovado').length;
+      if (pendCount === 0 && appCount > 0) {
+        setStatusFilter('todos');
+      }
+    }
+  };
+
+  const loadApplications = async (force: boolean = false) => {
     let unified: PendingApplication[] = [];
     try {
-      const all = await syncApplicationsFromServer();
+      const all = await syncApplicationsFromServer(force);
       unified = deduplicateApplicationsList(all);
     } catch {
       const all = getPendingApplications();
@@ -181,10 +195,10 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   };
 
   useEffect(() => {
-    loadApplications();
-    const handleSync = () => loadApplications();
+    loadApplications(true);
+    const handleSync = () => refreshLocalApplications();
     window.addEventListener('sigre-data-synced', handleSync);
-    const interval = setInterval(loadApplications, 3500);
+    const interval = setInterval(() => loadApplications(false), 8000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       clearInterval(interval);
@@ -558,7 +572,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   type="button"
                   onClick={async () => {
                     setIsSyncing(true);
-                    await loadApplications();
+                    await loadApplications(true);
                     setTimeout(() => setIsSyncing(false), 500);
                   }}
                   className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"

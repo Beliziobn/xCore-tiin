@@ -1354,6 +1354,8 @@ async function startServer() {
     }
   }
 
+  let lastBackupWriteTs = 0;
+
   function persistNetworkStore() {
     try {
       applyStoreSanitization();
@@ -1361,15 +1363,20 @@ async function startServer() {
         fs.mkdirSync(networkDataDir, { recursive: true });
       }
       networkStore.updatedAt = new Date().toISOString();
-      const serialized = JSON.stringify(networkStore, null, 2);
-      // Atomic write via temporary file then rename, plus redundant .bak mirror
+      const serialized = JSON.stringify(networkStore);
+      // Atomic write via temporary file then rename
       fs.writeFileSync(networkStoreTmpFile, serialized, "utf-8");
       fs.renameSync(networkStoreTmpFile, networkStoreFile);
-      fs.writeFileSync(networkStoreBackupFile, serialized, "utf-8");
+      // Async throttled redundant .bak mirror (non-blocking, max once every 15s)
+      const now = Date.now();
+      if (now - lastBackupWriteTs > 15000) {
+        lastBackupWriteTs = now;
+        fs.promises.writeFile(networkStoreBackupFile, serialized, "utf-8").catch(() => {});
+      }
     } catch (err) {
       console.warn("[NetworkStore] Failed atomic write, attempting direct write:", err);
       try {
-        fs.writeFileSync(networkStoreFile, JSON.stringify(networkStore, null, 2), "utf-8");
+        fs.writeFileSync(networkStoreFile, JSON.stringify(networkStore), "utf-8");
       } catch {}
     }
 
@@ -1768,19 +1775,7 @@ async function startServer() {
     });
   });
 
-  app.get("/api/network/applications", (req, res) => {
-    try {
-      if (fs.existsSync(networkStoreFile)) {
-        const raw = fs.readFileSync(networkStoreFile, "utf-8");
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.applications)) {
-          networkStore.applications = parsed.applications;
-        }
-      }
-    } catch (e) {
-      console.warn("[NetworkStore] Error reading applications:", e);
-    }
-    applyStoreSanitization();
+  app.get("/api/network/applications", (_req, res) => {
     res.json({
       success: true,
       applications: networkStore.applications || [],
@@ -1790,43 +1785,43 @@ async function startServer() {
   });
 
   app.post("/api/network/applications", (req, res) => {
-    const { application, applications } = req.body || {};
-    const incoming: any[] = [];
-    if (application && typeof application === "object") incoming.push(application);
-    if (Array.isArray(applications)) incoming.push(...applications);
+    const { application, applications, user } = req.body || {};
+    const tombstonesSet = new Set(networkStore.tombstones || []);
+    const validIncoming: any[] = [];
 
-    const validIncoming = incoming.filter((item) => item && !isEliminatedSchoolOrRecord(item));
+    // Explicit single submission (registration or approval action) may clear tombstones if re-registering
+    if (application && typeof application === "object" && !isEliminatedSchoolOrRecord(application)) {
+      removeServerTombstone("applications", application.id, application.userId, application.email, application.biNumber);
+      removeServerTombstone("users", application.id, application.userId, application.email, application.biNumber);
+      if (application.type === "diretor") {
+        removeServerTombstone("directors", application.id, application.userId, application.email, application.biNumber);
+      } else if (application.type === "professor") {
+        removeServerTombstone("teachers", application.id, application.userId, application.email, application.biNumber);
+      } else if (application.type === "membro_dme") {
+        removeServerTombstone("dme_staff", application.id, application.userId, application.email, application.biNumber);
+      } else if (application.type === "funcionario") {
+        removeServerTombstone("staff", application.id, application.userId, application.email, application.biNumber);
+      }
+      validIncoming.push(application);
+    }
+
+    // Bulk sync arrays must respect server tombstones so stale tabs never resurrect deleted records
+    if (Array.isArray(applications) && applications.length > 0) {
+      const sanitizedBulk = sanitizeCollectionList("applications", applications, tombstonesSet);
+      validIncoming.push(...sanitizedBulk);
+    }
+
+    const beforeAppsSnap = JSON.stringify((networkStore.applications || []).map(({ _updatedAt, ...rest }) => rest));
+    const beforeUsersSnap = JSON.stringify((networkStore.users || []).map(({ _updatedAt, ...rest }) => rest));
+    let didMutate = false;
 
     if (validIncoming.length > 0) {
-      try {
-        if (fs.existsSync(networkStoreFile)) {
-          const raw = fs.readFileSync(networkStoreFile, "utf-8");
-          const parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.applications)) {
-            networkStore.applications = parsed.applications;
-          }
-        }
-      } catch {}
-
-      validIncoming.forEach((appItem) => {
-        removeServerTombstone("applications", appItem.id, appItem.userId, appItem.email);
-        removeServerTombstone("users", appItem.id, appItem.userId, appItem.email);
-        if (appItem.type === "diretor") {
-          removeServerTombstone("directors", appItem.id, appItem.userId, appItem.email);
-        } else if (appItem.type === "professor") {
-          removeServerTombstone("teachers", appItem.id, appItem.userId, appItem.email);
-        } else if (appItem.type === "membro_dme") {
-          removeServerTombstone("dme_staff", appItem.id, appItem.userId, appItem.email);
-        } else if (appItem.type === "funcionario") {
-          removeServerTombstone("staff", appItem.id, appItem.userId, appItem.email);
-        }
-      });
-
       const normalizedIncoming = validIncoming.map((appItem) => ({
         ...appItem,
         targetApproverRole: "admin",
         targetApproverEmail: "dmedoquessua@gmail.com",
         approverDirectorName: "Director Municipal da Educação (dmedoquessua@gmail.com)",
+        _updatedAt: Number(appItem._updatedAt || Date.now()),
       }));
 
       networkStore.applications = upsertByKey(
@@ -1834,7 +1829,26 @@ async function startServer() {
         normalizedIncoming,
         (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
       );
+      const afterAppsSnap = JSON.stringify((networkStore.applications || []).map(({ _updatedAt, ...rest }) => rest));
+      if (afterAppsSnap !== beforeAppsSnap) {
+        didMutate = true;
+      }
+    }
 
+    if (user && typeof user === "object" && !isEliminatedSchoolOrRecord(user)) {
+      removeServerTombstone("users", user.id, user.email, user.biNumber);
+      networkStore.users = upsertByKey(
+        networkStore.users || [],
+        [{ ...user, approverTargetRole: "admin", approverTargetEmail: "dmedoquessua@gmail.com", _updatedAt: Date.now() }],
+        (u) => String(u.id || u.email || "").trim().toLowerCase()
+      );
+      const afterUsersSnap = JSON.stringify((networkStore.users || []).map(({ _updatedAt, ...rest }) => rest));
+      if (afterUsersSnap !== beforeUsersSnap) {
+        didMutate = true;
+      }
+    }
+
+    if (didMutate) {
       persistNetworkStore();
     }
 
@@ -2177,7 +2191,6 @@ async function startServer() {
   app.post("/api/network/clear-homologated", clearHomologadosHandler);
 
   app.get("/api/network/sync", (_req, res) => {
-    applyStoreSanitization();
     res.json({
       success: true,
       ...networkStore,
@@ -2185,6 +2198,34 @@ async function startServer() {
   });
 
   app.post("/api/network/sync", (req, res) => {
+    const beforeSnapshot = JSON.stringify({
+      schools: networkStore.schools,
+      directors: networkStore.directors,
+      teachers: networkStore.teachers,
+      students: networkStore.students,
+      staff: networkStore.staff,
+      dmeStaff: networkStore.dmeStaff,
+      applications: networkStore.applications,
+      efectividade: networkStore.efectividade,
+      declaracaoServico: networkStore.declaracaoServico,
+      guiasFerias: networkStore.guiasFerias,
+      guiasColocacao: networkStore.guiasColocacao,
+      fichasAvaliacao: networkStore.fichasAvaliacao,
+      cadastroDocente: networkStore.cadastroDocente,
+      miniPautas: networkStore.miniPautas,
+      rooms: networkStore.rooms,
+      classes: networkStore.classes,
+      users: networkStore.users,
+      quickRequests: networkStore.quickRequests,
+      announcements: networkStore.announcements,
+      studentAttendance: networkStore.studentAttendance,
+      teacherAttendance: networkStore.teacherAttendance,
+      attendanceNotes: networkStore.attendanceNotes,
+      chatChannels: networkStore.chatChannels,
+      chatMessages: networkStore.chatMessages,
+      kvStore: networkStore.kvStore,
+      tombstones: networkStore.tombstones,
+    });
     const {
       schools,
       directors,
@@ -2215,13 +2256,9 @@ async function startServer() {
     } = req.body || {};
     let changed = false;
 
-    if (Array.isArray(tombstones) && tombstones.length > 0) {
-      const beforeT = (networkStore.tombstones || []).length;
-      addServerTombstone(...tombstones);
-      if ((networkStore.tombstones || []).length !== beforeT) {
-        changed = true;
-      }
-    }
+    // Note: Explicit deletions are registered exclusively via DELETE /api/network/entity/:col/:id,
+    // /api/network/schools/:id, and /api/network/applications/:id — never let stale client localStorage tombstones poison the server.
+    void tombstones;
 
     const tombstonesSet = new Set(networkStore.tombstones || []);
 
@@ -2592,9 +2629,37 @@ async function startServer() {
     }
 
     if (changed) {
-      persistNetworkStore();
-    } else {
-      applyStoreSanitization();
+      const afterSnapshot = JSON.stringify({
+        schools: networkStore.schools,
+        directors: networkStore.directors,
+        teachers: networkStore.teachers,
+        students: networkStore.students,
+        staff: networkStore.staff,
+        dmeStaff: networkStore.dmeStaff,
+        applications: networkStore.applications,
+        efectividade: networkStore.efectividade,
+        declaracaoServico: networkStore.declaracaoServico,
+        guiasFerias: networkStore.guiasFerias,
+        guiasColocacao: networkStore.guiasColocacao,
+        fichasAvaliacao: networkStore.fichasAvaliacao,
+        cadastroDocente: networkStore.cadastroDocente,
+        miniPautas: networkStore.miniPautas,
+        rooms: networkStore.rooms,
+        classes: networkStore.classes,
+        users: networkStore.users,
+        quickRequests: networkStore.quickRequests,
+        announcements: networkStore.announcements,
+        studentAttendance: networkStore.studentAttendance,
+        teacherAttendance: networkStore.teacherAttendance,
+        attendanceNotes: networkStore.attendanceNotes,
+        chatChannels: networkStore.chatChannels,
+        chatMessages: networkStore.chatMessages,
+        kvStore: networkStore.kvStore,
+        tombstones: networkStore.tombstones,
+      });
+      if (afterSnapshot !== beforeSnapshot) {
+        persistNetworkStore();
+      }
     }
 
     res.json({

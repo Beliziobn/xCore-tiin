@@ -462,7 +462,7 @@ export default function App() {
     window.addEventListener('ucore-teachers-updated', handleSync);
     window.addEventListener('ucore-students-updated', handleSync);
     window.addEventListener('focus', triggerFullNetworkSync);
-    const pollInterval = setInterval(triggerFullNetworkSync, 3000);
+    const pollInterval = setInterval(triggerFullNetworkSync, 15000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('ucore-teachers-updated', handleSync);

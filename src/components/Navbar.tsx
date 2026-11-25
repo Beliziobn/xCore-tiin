@@ -204,30 +204,33 @@ export const Navbar: React.FC<NavbarProps> = ({
       } catch {}
     };
 
-    const updateCounts = () => {
+    const refreshCountsFromLocal = () => {
       updateQuickRequests();
       updateVagasWorkflow();
+      try {
+        const all = getPendingApplications();
+        const admPending = all.filter((a) => a.status === 'pendente').length;
+        setPendingAppsCount({ director: 0, admin: admPending });
+      } catch {}
+    };
+
+    const updateCounts = () => {
+      refreshCountsFromLocal();
       syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
       syncApplicationsFromServer().then((all) => {
         // All homologations now route exclusively to the central Admin account (dmedoquessua@gmail.com)
         const admPending = all.filter((a) => a.status === 'pendente').length;
         setPendingAppsCount({ director: 0, admin: admPending });
-      }).catch(() => {
-        try {
-          const all = getPendingApplications();
-          const admPending = all.filter((a) => a.status === 'pendente').length;
-          setPendingAppsCount({ director: 0, admin: admPending });
-        } catch {}
-      });
+      }).catch(() => {});
     };
 
     updateCounts();
-    const handleSync = () => updateCounts();
+    const handleSync = () => refreshCountsFromLocal();
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
     window.addEventListener('sigre_quick_request_created', updateQuickRequests);
     window.addEventListener('sigre_quick_request_updated', updateQuickRequests);
-    const interval = setInterval(updateCounts, 3000);
+    const interval = setInterval(updateCounts, 10000);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);

@@ -1397,43 +1397,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const targetDirectorName = `Director Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL})`;
         const targetDirectorEmail = OFFICIAL_DME_ADMIN_EMAIL;
 
-        // Create pending application record targeted directly to dmedoquessua@gmail.com
-        if (isPending) {
-          const appId = `app-${appType}-${Date.now()}`;
-          await savePendingApplicationAsync({
-            id: appId,
-            userId: newUserId,
-            type: appType,
-            scope: institutionalScope,
-            schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
-            adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
-            roleRequested: cargoTitle,
-            fullName: `${userFirst} ${lastName.trim() || 'Sigre'}`.trim(),
-            email: email.trim(),
-            phone: phone.trim() || '+244 923 000 000',
-            biNumber: biNumber.trim(),
-            schoolName: resolvedSchoolName,
-            schoolId: resolvedSchoolId,
-            municipality: selectedMunicipality,
-            targetApproverRole,
-            targetApproverEmail: targetDirectorEmail,
-            approverDirectorName: targetDirectorName,
-            subject: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedSubject : undefined,
-            gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
-            status: 'pendente',
-            isPreRegistered: institutionalScope === 'escola' ? Boolean(preRegResult?.found) : false,
-            preRegisteredDetails: institutionalScope === 'escola' ? preRegResult?.details : undefined,
-            createdAt: new Date().toLocaleString('pt-AO'),
-            passwordVerifier,
-            notes:
-              institutionalScope === 'administracao'
-                ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
-                : preRegResult?.found
-                ? `Registro pré-existente localizado para "${resolvedSchoolName}". Enviado diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
-                : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`,
-          });
-        }
-
         const newUser: UserAccount = {
           id: newUserId,
           firstName: userFirst,
@@ -1464,9 +1427,52 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           passwordVerifier,
         };
 
-        // Persist user account directly to Firebase Firestore Cloud Database
+        // Create pending application record + user atomically targeted directly to dmedoquessua@gmail.com
+        if (isPending) {
+          const appId = `app-${appType}-${Date.now()}`;
+          await savePendingApplicationAsync(
+            {
+              id: appId,
+              userId: newUserId,
+              type: appType,
+              scope: institutionalScope,
+              schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
+              adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
+              roleRequested: cargoTitle,
+              fullName: `${userFirst} ${lastName.trim() || 'Sigre'}`.trim(),
+              email: email.trim(),
+              phone: phone.trim() || '+244 923 000 000',
+              biNumber: biNumber.trim(),
+              schoolName: resolvedSchoolName,
+              schoolId: resolvedSchoolId,
+              municipality: selectedMunicipality,
+              targetApproverRole,
+              targetApproverEmail: targetDirectorEmail,
+              approverDirectorName: targetDirectorName,
+              subject: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedSubject : undefined,
+              gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
+              status: 'pendente',
+              isPreRegistered: institutionalScope === 'escola' ? Boolean(preRegResult?.found) : false,
+              preRegisteredDetails: institutionalScope === 'escola' ? preRegResult?.details : undefined,
+              createdAt: new Date().toLocaleString('pt-AO'),
+              passwordVerifier,
+              notes:
+                institutionalScope === 'administracao'
+                  ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
+                  : preRegResult?.found
+                  ? `Registro pré-existente localizado para "${resolvedSchoolName}". Enviado diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
+                  : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`,
+            },
+            newUser
+          );
+        }
+
+        // Persist user account to Firestore with strict timeout so quota/latency never freezes signup
         try {
-          await saveUserToFirestore(newUser);
+          await Promise.race([
+            saveUserToFirestore(newUser),
+            new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+          ]);
         } catch (err) {
           console.warn('[AuthPage] Erro ao sincronizar usuário no Firestore:', err);
         }

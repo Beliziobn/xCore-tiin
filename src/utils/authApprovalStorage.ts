@@ -369,66 +369,102 @@ export function getPendingApplications(type?: string): PendingApplication[] {
   return type ? list.filter((a) => a.type === type) : list;
 }
 
-/**
- * Synchronizes pending applications from the Firestore cloud database and the server's persistent disk store
- * so applications created in any session, browser, or mobile device are instantly visible to their supervisor.
- */
-export async function syncApplicationsFromServer(): Promise<PendingApplication[]> {
+let applicationsSyncInFlight: Promise<PendingApplication[]> | null = null;
+let lastApplicationsSyncAt = 0;
+
+function writeApplicationsWithoutDirtyEcho(apps: PendingApplication[]): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  const prevWinFlag = Boolean((window as any).__SIGRE_APPLYING_SERVER_STATE);
+  (window as any).__SIGRE_APPLYING_SERVER_STATE = true;
   try {
-    const combined: PendingApplication[] = [];
+    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(apps));
+  } catch (err) {
+    console.warn('[authApprovalStorage] Falha ao gravar candidaturas no localStorage:', err);
+  } finally {
+    (window as any).__SIGRE_APPLYING_SERVER_STATE = prevWinFlag;
+  }
+}
 
-    // 1. Fetch authoritative server applications (already reconciled with active rosters)
-    let serverApps: PendingApplication[] = [];
+/**
+ * Synchronizes pending applications from the backend server (primary, instant) and Firestore cloud
+ * so applications created on any device appear immediately in dmedoquessua@gmail.com.
+ * Uses an in-flight singleton mutex so simultaneous callers share a single fast request.
+ */
+export async function syncApplicationsFromServer(force: boolean = false): Promise<PendingApplication[]> {
+  if (applicationsSyncInFlight) {
+    return applicationsSyncInFlight;
+  }
+  const now = Date.now();
+  if (!force && now - lastApplicationsSyncAt < 1000) {
+    return getPendingApplications();
+  }
+
+  applicationsSyncInFlight = (async (): Promise<PendingApplication[]> => {
     try {
-      const res = await fetch('/api/network/applications');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.applications)) {
-          serverApps = data.applications;
-          combined.push(...serverApps);
+      const combined: PendingApplication[] = [];
+
+      // 1. Fetch authoritative server applications first (instant from memory)
+      let serverApps: PendingApplication[] = [];
+      try {
+        const res = await Promise.race([
+          fetch('/api/network/applications', { headers: { Accept: 'application/json' } }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 6000)),
+        ]);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.applications)) {
+            serverApps = data.applications;
+            combined.push(...serverApps);
+          }
         }
-      }
-    } catch {}
+      } catch {}
 
-    // 2. Fetch cloud data from Firebase Firestore
-    try {
-      const firestoreApps = await fetchApplicationsFromFirestore();
-      if (Array.isArray(firestoreApps) && firestoreApps.length > 0) {
-        combined.push(...firestoreApps);
-      }
-    } catch (err) {
-      console.warn('[authApprovalStorage] Falha ao carregar do Firestore:', err);
-    }
+      // 2. Opportunistic Firestore pull with strict 1500ms timeout (never blocks if quota exhausted)
+      try {
+        const firestoreApps = await Promise.race([
+          fetchApplicationsFromFirestore(),
+          new Promise<PendingApplication[]>((resolve) => setTimeout(() => resolve([]), 1500)),
+        ]);
+        if (Array.isArray(firestoreApps) && firestoreApps.length > 0) {
+          combined.push(...firestoreApps);
+        }
+      } catch {}
 
-    // 3. Include local applications
-    const localApps = getPendingApplications();
-    combined.push(...localApps);
+      // 3. Include local applications
+      const localApps = getPendingApplications();
+      combined.push(...localApps);
 
-    // 4. Canonically deduplicate & unify so no candidate is duplicated and 'aprovado' never downgrades to 'pendente'
-    const merged = deduplicateApplicationsList(combined);
-    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(merged));
+      // 4. Canonically deduplicate & unify so no candidate is duplicated and 'aprovado' never downgrades to 'pendente'
+      const merged = deduplicateApplicationsList(combined);
+      writeApplicationsWithoutDirtyEcho(merged);
+      lastApplicationsSyncAt = Date.now();
 
-    // If any merged record is approved or missing on server, sync back silently
-    if (serverApps.length > 0) {
-      merged.forEach((ma) => {
-        const srvMatch = serverApps.find((sa) => sa.id === ma.id || sa.userId === ma.userId);
-        if (!srvMatch || (ma.status === 'aprovado' && srvMatch.status !== 'aprovado')) {
+      // 5. If any genuinely new local application is missing on server, push them in ONE batched request
+      if (serverApps.length > 0) {
+        const missingOrUpgraded = merged.filter((ma) => {
+          const srvMatch = serverApps.find((sa) => sa.id === ma.id || sa.userId === ma.userId);
+          return !srvMatch || (ma.status === 'aprovado' && srvMatch.status !== 'aprovado');
+        });
+        if (missingOrUpgraded.length > 0) {
           fetch('/api/network/applications', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ application: ma }),
+            body: JSON.stringify({ applications: missingOrUpgraded }),
             keepalive: true,
           }).catch(() => {});
-          saveApplicationToFirestore(ma).catch(() => {});
         }
-      });
-    }
+      }
 
-    return merged;
-  } catch (err) {
-    console.warn('[authApprovalStorage] Falha ao sincronizar candidaturas:', err);
-    return getPendingApplications();
-  }
+      return merged;
+    } catch (err) {
+      console.warn('[authApprovalStorage] Falha ao sincronizar candidaturas:', err);
+      return getPendingApplications();
+    }
+  })().finally(() => {
+    applicationsSyncInFlight = null;
+  });
+
+  return applicationsSyncInFlight;
 }
 
 /**
@@ -447,9 +483,13 @@ export function initRealtimeApplicationsSync(
     try {
       const localApps = getPendingApplications();
       const validApps = deduplicateApplicationsList([...localApps, ...(firestoreApps || [])]);
-      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(validApps));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+      const prevRaw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
+      const nextRaw = JSON.stringify(validApps);
+      if (prevRaw !== nextRaw) {
+        writeApplicationsWithoutDirtyEcho(validApps);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
       }
       onUpdate?.(validApps);
     } catch (e) {
@@ -557,7 +597,7 @@ export function savePendingApplication(app: PendingApplication): PendingApplicat
             m.type === rawAdjusted.type)
       ) || rawAdjusted;
 
-    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(mergedList));
+    writeApplicationsWithoutDirtyEcho(mergedList);
 
     // Save directly to Firestore cloud database in background
     saveApplicationToFirestore(canonicalApp).catch((e) => {
@@ -581,46 +621,71 @@ export function savePendingApplication(app: PendingApplication): PendingApplicat
 }
 
 /**
- * Async version that ensures the application is physically persisted on the Firebase Firestore cloud
- * and backend server so it appears immediately on the responsible supervisor's device.
+ * Async version that guarantees the application (and optional user account) is persisted on the central
+ * backend server (/api/network/applications) so it appears immediately in dmedoquessua@gmail.com across all devices.
  */
-export async function savePendingApplicationAsync(app: PendingApplication): Promise<PendingApplication> {
+export async function savePendingApplicationAsync(
+  app: PendingApplication,
+  userAccount?: UserAccount
+): Promise<PendingApplication> {
   // Clear any deletion tombstone
   removeDeletedApplicationId(app.id, app.userId, app.email);
 
-  const canonicalApp = savePendingApplication(app);
+  const existing = getPendingApplications();
+  const rawAdjusted = buildNormalizedPendingApplication(app);
+  const mergedList = deduplicateApplicationsList([rawAdjusted, ...existing]);
+  const canonicalApp =
+    mergedList.find(
+      (m) =>
+        m.id === rawAdjusted.id ||
+        m.userId === rawAdjusted.userId ||
+        (rawAdjusted.biNumber &&
+          m.biNumber &&
+          rawAdjusted.biNumber.trim().toUpperCase() === m.biNumber.trim().toUpperCase()) ||
+        (!isGenericSchoolEmail(rawAdjusted.email) &&
+          m.email &&
+          rawAdjusted.email.trim().toLowerCase() === m.email.trim().toLowerCase()) ||
+        (normalizeSchoolText(m.fullName) === normalizeSchoolText(rawAdjusted.fullName) &&
+          m.type === rawAdjusted.type)
+    ) || rawAdjusted;
 
-  // Guarantee parallel persistence to both Cloud Firestore and Node.js network store
+  writeApplicationsWithoutDirtyEcho(mergedList);
+
+  const postToServer = async (): Promise<boolean> => {
+    const res = await Promise.race([
+      fetch('/api/network/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application: canonicalApp, ...(userAccount ? { user: userAccount } : {}) }),
+        keepalive: true,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Server API timeout')), 8000)),
+    ]);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.applications)) {
+        writeApplicationsWithoutDirtyEcho(deduplicateApplicationsList(data.applications));
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // Reliable server persistence (with 1 automatic retry) + non-blocking Firestore mirror (1.5s cap)
+  const serverPromise = postToServer().catch(async () => {
+    await new Promise((r) => setTimeout(r, 400));
+    return postToServer().catch((err) => {
+      console.warn('[authApprovalStorage] Falha ao comunicar com o servidor ao salvar candidatura:', err);
+      return false;
+    });
+  });
+
   const firestorePromise = Promise.race([
     saveApplicationToFirestore(canonicalApp),
-    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 3500)),
-  ]).catch((err) => {
-    console.warn('[authApprovalStorage] Aviso ao gravar no Firestore:', err);
-  });
+    new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+  ]).catch(() => {});
 
-  const serverPromise = Promise.race([
-    fetch('/api/network/applications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ application: canonicalApp }),
-      keepalive: true,
-    }).then(async (res) => {
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.applications)) {
-          localStorage.setItem(
-            STORAGE_KEY_APPLICATIONS,
-            JSON.stringify(deduplicateApplicationsList(data.applications))
-          );
-        }
-      }
-    }),
-    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Server API timeout')), 3500)),
-  ]).catch((err) => {
-    console.warn('[authApprovalStorage] Falha ao comunicar com o servidor ao salvar candidatura:', err);
-  });
-
-  await Promise.allSettled([firestorePromise, serverPromise]);
+  await Promise.allSettled([serverPromise, firestorePromise]);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('sigre-data-synced'));

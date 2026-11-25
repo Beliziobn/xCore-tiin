@@ -286,7 +286,10 @@ export async function fetchApplicationsFromFirestore(): Promise<PendingApplicati
   if (firestoreQuotaExhausted) return [];
   try {
     const ref = collection(db, APPLICATIONS_COL);
-    const snapshot = await getDocs(ref);
+    const snapshot = await Promise.race([
+      getDocs(ref),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 2000)),
+    ]);
     const list: PendingApplication[] = [];
     snapshot.forEach((d) => {
       list.push(d.data() as PendingApplication);
@@ -1735,6 +1738,8 @@ function safeReadJsonArray<T = any>(key: string): T[] {
 
 function safeWriteJsonIfChanged(key: string, data: any): boolean {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false;
+  const prevWinFlag = Boolean((window as any).__SIGRE_APPLYING_SERVER_STATE);
+  (window as any).__SIGRE_APPLYING_SERVER_STATE = true;
   try {
     const nextStr = JSON.stringify(data);
     const prevStr = localStorage.getItem(key);
@@ -1745,6 +1750,8 @@ function safeWriteJsonIfChanged(key: string, data: any): boolean {
     return false;
   } catch {
     return false;
+  } finally {
+    (window as any).__SIGRE_APPLYING_SERVER_STATE = prevWinFlag;
   }
 }
 

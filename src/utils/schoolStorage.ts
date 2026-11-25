@@ -923,6 +923,9 @@ let interceptorInstalled = false;
 let realtimeSocket: Socket | null = null;
 let lastKnownServerUpdatedAt = '';
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let socketPullTimer: ReturnType<typeof setTimeout> | null = null;
+let syncInFlightPromise: Promise<AdminSchool[]> | null = null;
+let resyncRequestedWhileInFlight = false;
 
 const dirtyCollections = new Set<string>();
 const dirtyStorageKeys = new Map<string, string>(); // payloadKey -> last modified storage key
@@ -956,14 +959,20 @@ function getItemIdentityKey(item: any): string {
   return '';
 }
 
-function setLocalStorageFromServer(key: string, value: string): void {
+export function setLocalStorageFromServer(key: string, value: string): void {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   const prevFlag = isApplyingServerState;
+  const prevWinFlag = Boolean((window as any).__SIGRE_APPLYING_SERVER_STATE);
   isApplyingServerState = true;
+  (window as any).__SIGRE_APPLYING_SERVER_STATE = true;
   try {
     localStorage.setItem(key, value);
+  } catch (err) {
+    // Never let QuotaExceededError on one heavy mirror key abort syncing critical collections (applications, users, schools)
+    console.warn(`[schoolStorage] Falha ao gravar ${key} no localStorage (quota/storage):`, err);
   } finally {
     isApplyingServerState = prevFlag;
+    (window as any).__SIGRE_APPLYING_SERVER_STATE = prevWinFlag;
   }
 }
 
@@ -972,7 +981,7 @@ function scheduleDirtyFlush(): void {
   flushTimer = setTimeout(() => {
     flushTimer = null;
     syncSchoolsFromServer().catch(() => {});
-  }, 25);
+  }, 250);
 }
 
 export function initUniversalRealtimeSyncEngine(): void {
@@ -984,7 +993,7 @@ export function initUniversalRealtimeSyncEngine(): void {
     const rawGetItem = Storage.prototype.getItem;
 
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (this !== window.localStorage || isApplyingServerState) {
+      if (this !== window.localStorage || isApplyingServerState || (window as any).__SIGRE_APPLYING_SERVER_STATE) {
         return rawSetItem.call(this, key, value);
       }
 
@@ -995,8 +1004,8 @@ export function initUniversalRealtimeSyncEngine(): void {
 
       const colConfig = KEY_TO_COLLECTION_CONFIG[key];
       if (colConfig) {
-        // Ignore initial default seeding before first server pull when key did not exist yet
-        if (prevRaw === null && !hasCompletedInitialServerPull) {
+        // Ignore initial default seeding / hydration before first server pull completes
+        if (!hasCompletedInitialServerPull) {
           return rawSetItem.call(this, key, value);
         }
 
@@ -1006,52 +1015,43 @@ export function initUniversalRealtimeSyncEngine(): void {
 
           if (Array.isArray(nextArr)) {
             const nowTs = Date.now();
-            const prevById = new Map<string, { item: any; raw: string }>();
+            const prevById = new Map<string, { item: any; cleanStr: string }>();
             if (Array.isArray(prevArr)) {
               prevArr.forEach((p) => {
                 const k = getItemIdentityKey(p);
-                if (k) prevById.set(k, { item: p, raw: JSON.stringify(p) });
+                if (k && p && typeof p === 'object') {
+                  const { _updatedAt: _oldTs, ...prevClean } = p;
+                  prevById.set(k, { item: p, cleanStr: JSON.stringify(prevClean) });
+                }
               });
             }
 
-            const nextIds = new Set<string>();
+            let anyRealChange = !Array.isArray(prevArr) || prevArr.length !== nextArr.length;
             const stampedNext = nextArr.map((n) => {
               if (!n || typeof n !== 'object') return n;
               const k = getItemIdentityKey(n);
-              if (k) nextIds.add(k);
               const prevEntry = k ? prevById.get(k) : undefined;
               if (!prevEntry) {
+                anyRealChange = true;
                 return { ...n, _updatedAt: nowTs };
               }
-              const { _updatedAt: _oldTs, ...prevClean } = prevEntry.item || {};
               const { _updatedAt: _newTs, ...nextClean } = n;
-              if (JSON.stringify(prevClean) !== JSON.stringify(nextClean)) {
+              if (prevEntry.cleanStr !== JSON.stringify(nextClean)) {
+                anyRealChange = true;
                 return { ...n, _updatedAt: nowTs };
               }
               return n;
             });
 
-            // Detect deleted items and register permanent tombstones immediately
-            if (colConfig.detectDeletions && Array.isArray(prevArr) && prevArr.length > nextArr.length) {
-              prevArr.forEach((p) => {
-                const k = getItemIdentityKey(p);
-                if (k && !nextIds.has(k)) {
-                  const rawId = String(p.id || p.userId || k).trim();
-                  if (rawId) {
-                    addEntityTombstone(colConfig.tombstoneCol, rawId);
-                  }
-                  if (colConfig.tombstoneCol === 'schools' && (p.name || p.nomeOficial)) {
-                    addEntityTombstone('schools', String(p.name || p.nomeOficial));
-                  }
-                }
-              });
-            }
-
+            // IMPORTANT: Do NOT auto-tombstone missing items here! Stale React state or filtered views
+            // can legitimately write shorter arrays; explicit deletions call deleteSchool/deleteApplication/addEntityTombstone.
             const stampedJson = JSON.stringify(stampedNext);
             rawSetItem.call(this, key, stampedJson);
-            dirtyCollections.add(colConfig.payloadKey);
-            dirtyStorageKeys.set(colConfig.payloadKey, key);
-            scheduleDirtyFlush();
+            if (anyRealChange) {
+              dirtyCollections.add(colConfig.payloadKey);
+              dirtyStorageKeys.set(colConfig.payloadKey, key);
+              scheduleDirtyFlush();
+            }
             return;
           }
         } catch {
@@ -1059,7 +1059,7 @@ export function initUniversalRealtimeSyncEngine(): void {
         }
       } else if (isSyncedKvKey(key)) {
         rawSetItem.call(this, key, value);
-        if (prevRaw !== null || hasCompletedInitialServerPull) {
+        if (hasCompletedInitialServerPull) {
           dirtyKvStore[key] = { value, updatedAt: Date.now() };
           scheduleDirtyFlush();
         }
@@ -1076,7 +1076,7 @@ export function initUniversalRealtimeSyncEngine(): void {
         path: '/socket.io',
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionDelay: 500,
+        reconnectionDelay: 1000,
         reconnectionAttempts: Infinity,
       });
 
@@ -1084,7 +1084,11 @@ export function initUniversalRealtimeSyncEngine(): void {
         if (payload?.updatedAt && payload.updatedAt === lastKnownServerUpdatedAt && dirtyCollections.size === 0) {
           return;
         }
-        syncSchoolsFromServer().catch(() => {});
+        if (socketPullTimer) clearTimeout(socketPullTimer);
+        socketPullTimer = setTimeout(() => {
+          socketPullTimer = null;
+          syncSchoolsFromServer().catch(() => {});
+        }, 150);
       });
 
       realtimeSocket.on('connect', () => {
@@ -1103,8 +1107,7 @@ if (typeof window !== 'undefined') {
 /**
  * Synchronizes all collections and profile/settings key-values
  * between browser localStorage and the shared backend (/api/network/sync) in real time.
- * Passive tabs pull via GET /api/network/sync so they never overwrite fresh edits from other devices;
- * active tabs push only their dirty mutated collections via POST /api/network/sync.
+ * Uses an in-flight mutex so overlapping sync calls never flood the browser or server.
  */
 export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
@@ -1112,6 +1115,13 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
   }
 
   initUniversalRealtimeSyncEngine();
+
+  if (syncInFlightPromise) {
+    resyncRequestedWhileInFlight = true;
+    return syncInFlightPromise;
+  }
+
+  const runSync = async (): Promise<AdminSchool[]> => {
 
   const norm = (str?: string) =>
     (str || '')
@@ -1273,20 +1283,16 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
     isApplyingServerState = true;
     try {
-      // 0. Merge Tombstones from Server first (supporting both "::" and ":" formats) so deleted entities never resurrect
-      if (Array.isArray(data.tombstones) && data.tombstones.length > 0) {
-        data.tombstones.forEach((tk: string) => {
-          if (typeof tk !== 'string' || !tk) return;
-          if (tk.includes('::')) {
-            const [col, id] = tk.split('::');
-            if (col && id) addEntityTombstone(col, id, true);
-          } else if (tk.includes(':')) {
-            const idx = tk.indexOf(':');
-            const col = tk.slice(0, idx);
-            const id = tk.slice(idx + 1);
-            if (col && id) addEntityTombstone(col, id, true);
-          }
-        });
+      // 0. Server tombstones are authoritative — replace local tombstone cache so stale client tombstones never persist
+      if (Array.isArray(data.tombstones)) {
+        const normalizedServerTombstones = Array.from(
+          new Set(
+            data.tombstones
+              .filter((tk: any) => typeof tk === 'string' && tk.trim() !== '')
+              .map((tk: string) => tk.trim().toLowerCase())
+          )
+        );
+        setLocalStorageFromServer('ucore_deleted_entity_tombstones_v1', JSON.stringify(normalizedServerTombstones));
       }
 
       const nowMs = Date.now();
@@ -1325,6 +1331,46 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
         return Array.from(map.values());
       };
+
+      // 0B. HIGHEST PRIORITY: Sync Applications, Users & QuickRequests FIRST so localStorage quota never blocks homologations!
+      if (Array.isArray(data.applications) && !dirtyCollections.has('applications')) {
+        const mergedApps = deduplicateApplicationsList(data.applications);
+        if (JSON.stringify(mergedApps) !== JSON.stringify(localApps)) {
+          setLocalStorageFromServer('ucore_pending_applications', JSON.stringify(mergedApps));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.users) && data.users.length > 0 && !dirtyCollections.has('users')) {
+        const userMap = new Map<string, any>();
+        data.users.forEach((u: any) => {
+          const k = norm(u?.biNumber || u?.email || u?.id);
+          if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) {
+            const prev = userMap.get(k);
+            const isApproved = prev?.status === 'ativo' || u?.status === 'ativo' || Boolean(prev?.approvedAt) || Boolean(u?.approvedAt);
+            userMap.set(k, { ...(prev || {}), ...u, status: isApproved ? 'ativo' : u.status });
+          }
+        });
+        const mergedUsers = Array.from(userMap.values());
+        if (JSON.stringify(mergedUsers) !== JSON.stringify(localUsers)) {
+          setLocalStorageFromServer('ucore_registered_users', JSON.stringify(mergedUsers));
+          changed = true;
+        }
+      }
+
+      if (Array.isArray(data.quickRequests) && !dirtyCollections.has('quickRequests')) {
+        const mergedQr = reconcileList(
+          localQuickRequests,
+          data.quickRequests,
+          'quickRequests',
+          (q) => String(q?.id || '').trim().toLowerCase()
+        );
+        if (JSON.stringify(mergedQr) !== JSON.stringify(localQuickRequests)) {
+          setLocalStorageFromServer('sigre_quick_services_local_cache', JSON.stringify(mergedQr));
+          window.dispatchEvent(new CustomEvent('sigre_quick_request_updated'));
+          changed = true;
+        }
+      }
 
       // 1. Merge Schools (Server authoritative)
       if (Array.isArray(data.schools) && !dirtyCollections.has('schools')) {
@@ -1716,44 +1762,7 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         }
       }
 
-      if (Array.isArray(data.applications) && !dirtyCollections.has('applications')) {
-        const mergedApps = deduplicateApplicationsList(data.applications);
-        if (JSON.stringify(mergedApps) !== JSON.stringify(localApps)) {
-          setLocalStorageFromServer('ucore_pending_applications', JSON.stringify(mergedApps));
-          changed = true;
-        }
-      }
-
-      if (Array.isArray(data.users) && data.users.length > 0 && !dirtyCollections.has('users')) {
-        const userMap = new Map<string, any>();
-        data.users.forEach((u: any) => {
-          const k = norm(u?.biNumber || u?.email || u?.id);
-          if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) {
-            const prev = userMap.get(k);
-            const isApproved = prev?.status === 'ativo' || u?.status === 'ativo' || Boolean(prev?.approvedAt) || Boolean(u?.approvedAt);
-            userMap.set(k, { ...(prev || {}), ...u, status: isApproved ? 'ativo' : u.status });
-          }
-        });
-        const mergedUsers = Array.from(userMap.values());
-        if (JSON.stringify(mergedUsers) !== JSON.stringify(localUsers)) {
-          setLocalStorageFromServer('ucore_registered_users', JSON.stringify(mergedUsers));
-          changed = true;
-        }
-      }
-
-      if (Array.isArray(data.quickRequests) && !dirtyCollections.has('quickRequests')) {
-        const mergedQr = reconcileList(
-          localQuickRequests,
-          data.quickRequests,
-          'quickRequests',
-          (q) => String(q?.id || '').trim().toLowerCase()
-        );
-        if (JSON.stringify(mergedQr) !== JSON.stringify(localQuickRequests)) {
-          setLocalStorageFromServer('sigre_quick_services_local_cache', JSON.stringify(mergedQr));
-          window.dispatchEvent(new CustomEvent('sigre_quick_request_updated'));
-          changed = true;
-        }
-      }
+      // (applications, users, and quickRequests are already synced at highest priority in step 0B above)
 
       if (Array.isArray(data.dmeStaff) && !dirtyCollections.has('dmeStaff')) {
         const mergedDs = reconcileList(
@@ -1905,6 +1914,17 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     const fallbackRaw = localStorage.getItem(STORAGE_KEY_SCHOOLS);
     return fallbackRaw ? JSON.parse(fallbackRaw) : [];
   }
+  };
+
+  syncInFlightPromise = runSync().finally(() => {
+    syncInFlightPromise = null;
+    if (resyncRequestedWhileInFlight || dirtyCollections.size > 0 || Object.keys(dirtyKvStore).length > 0) {
+      resyncRequestedWhileInFlight = false;
+      scheduleDirtyFlush();
+    }
+  });
+
+  return syncInFlightPromise;
 }
 
 /**
