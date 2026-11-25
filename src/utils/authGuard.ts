@@ -86,8 +86,6 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'cadastro-docente',
     'pedido-vaga',
     'pedidos-vaga',
-    'servicos-sigre',
-    'sigre-servicos',
     'reunioes',
     'reunioes-salas',
     'sobre',
@@ -119,18 +117,11 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'perfil-professor',
     'aluno-perfil', // Professor can access pedagogical file of class students
     'perfil-aluno',
-    'admin-servicos-rapidos',
     'servicos-rapidos',
-    'diretor-servicos-rapidos',
     'pedidos-rapidos',
-    'declaracao-efectividade',
-    'servicos-sigre',
-    'sigre-servicos',
     'cadastro-docente',
     'pedido-vaga',
     'pedidos-vaga',
-    'efectividade',
-    'mapa-efectividade',
     'reunioes',
     'reunioes-salas',
     'sobre',
@@ -149,12 +140,8 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
     'home',
     'aluno-perfil',
     'perfil-aluno',
-    'admin-servicos-rapidos',
     'servicos-rapidos',
-    'diretor-servicos-rapidos',
     'pedidos-rapidos',
-    'declaracao-efectividade',
-    'efectividade',
     'reunioes',
     'reunioes-salas',
     'sobre',
@@ -258,20 +245,30 @@ export function getViewTitle(view: string): string {
 export function canUserAccessView(user: UserAccount | null, view: string): ViewAccessCheck {
   const isHrServiceView =
     view === 'declaracao-efectividade' ||
+    view === 'servicos-sigre' ||
+    view === 'sigre-servicos' ||
     view === 'declaracao-servico' ||
     view === 'declaracao-de-servico' ||
     view === 'efectividade' ||
+    view === 'efectividade-branco' ||
     view === 'servico' ||
     view === 'mapa-efectividade' ||
     view === 'guia-ferias' ||
     view === 'guia-de-ferias' ||
-    view === 'guia-colocacao';
+    view === 'guia-colocacao' ||
+    view === 'ficha-avaliacao' ||
+    view === 'admin-servicos-rapidos';
 
-  if (user && (user.role || '').toLowerCase() === 'diretor' && isHrServiceView) {
+  const isMasterAdminUser =
+    Boolean(user) &&
+    ((user?.role || '').toLowerCase() === 'admin' ||
+      user?.email?.trim().toLowerCase() === 'dmedoquessua@gmail.com');
+
+  if (isHrServiceView && !isMasterAdminUser) {
     return {
       allowed: false,
       reason:
-        'Acesso restrito: Na conta de Director de Escola o único serviço SIGRE disponível é Serviços Rápidos (Boletins de Notas, Matrículas & Frequências e Transferências).',
+        'Acesso restrito: Os Serviços SIGRE são exclusivos da Direção Municipal da Educação. Para diretores, subdiretores, professores e restantes órgãos do ambiente escolar estão disponíveis apenas os Serviços Rápidos.',
       targetViewTitle: getViewTitle(view),
       userOwnProfileView: getOwnProfileViewForUser(user),
     };
@@ -306,8 +303,7 @@ export function canUserAccessView(user: UserAccount | null, view: string): ViewA
     view === 'servicos-sem-login' ||
     view === 'servicos-cidadao' ||
     view === 'balcao-rapido' ||
-    view === 'pedidos-rapidos' ||
-    isHrServiceView
+    view === 'pedidos-rapidos'
   ) {
     return { allowed: true, userOwnProfileView: getOwnProfileViewForUser(user) };
   }

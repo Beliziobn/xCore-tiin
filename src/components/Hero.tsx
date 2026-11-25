@@ -196,8 +196,8 @@ export const Hero: React.FC<HeroProps> = ({
             className="relative w-full transition-transform duration-100 ease-out"
             style={{ transform: `translateY(${floatSlow * 0.25}px)` }}
           >
-            {/* ---- Central photo with prominent white contour / border ---- */}
-            <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-[24px] sm:rounded-[36px] overflow-hidden border-4 sm:border-8 border-white shadow-[0_30px_70px_-20px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/5 bg-slate-100">
+            {/* ---- Central photo with clean Dieter Rams 1px border and 14px radius ---- */}
+            <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-[14px] overflow-hidden border border-[#E5E5EA] bg-[#F5F5F7]">
               <img
                 src={heroImg}
                 alt="Biblioteca escolar e centro de documentação pedagógica"
@@ -207,47 +207,47 @@ export const Hero: React.FC<HeroProps> = ({
               />
             </div>
 
-            {/* ---- Attached Stat Cards with Centered Content ---- */}
+            {/* ---- Attached Stat Cards with Dieter Rams (.rams-card) Styling ---- */}
 
-            {/* Dark Navy Stat Card — Top-Left */}
+            {/* Dark Anchor Stat Card — Top-Left */}
             <div
-              className="absolute z-20 -top-4 sm:-top-7 -left-2 sm:-left-6 bg-[#002133] text-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-[0_20px_45px_-12px_rgba(0,33,51,0.6)] flex flex-col items-center justify-center text-center min-w-[100px] sm:min-w-[140px] border border-white/10"
+              className="absolute z-20 -top-4 sm:-top-6 -left-2 sm:-left-6 bg-[#1D1D1F] text-white rounded-[14px] p-3.5 sm:p-5 flex flex-col items-center justify-center text-center min-w-[100px] sm:min-w-[136px] border border-[#1D1D1F]"
             >
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/10 flex items-center justify-center mb-2 mx-auto">
-                <Box className="w-4 h-4 sm:w-5 sm:h-5 text-white" strokeWidth={2.5} />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] bg-white/10 flex items-center justify-center mb-2 mx-auto">
+                <Box className="w-4 h-4 text-white" strokeWidth={2} />
               </div>
-              <div className="text-xl sm:text-3xl font-black text-white leading-none tracking-tight text-center">
+              <div className="text-xl sm:text-2xl font-bold text-white leading-none tracking-tight text-center tabular-nums">
                 +2.5k
               </div>
-              <div className="mt-1 text-[10px] sm:text-xs font-medium text-white/60 text-center">
+              <div className="mt-1 text-[10px] sm:text-xs font-medium text-white/70 text-center">
                 Alunos ativos
               </div>
             </div>
 
-            {/* White Stat Card — Bottom-Left */}
+            {/* White Stat Card — Bottom-Left (.rams-card) */}
             <div
-              className="absolute z-20 -bottom-4 sm:-bottom-7 -left-2 sm:-left-6 bg-white text-[#002133] rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-[0_20px_40px_-15px_rgba(15,23,42,0.22)] border border-slate-100 flex flex-col items-center justify-center text-center min-w-[100px] sm:min-w-[130px]"
+              className="rams-card absolute z-20 -bottom-4 sm:-bottom-6 -left-2 sm:-left-6 flex flex-col items-center justify-center text-center min-w-[100px] sm:min-w-[130px]"
             >
-              <GraduationCap className="w-5 h-5 sm:w-7 sm:h-7 text-[#f75142] mb-1.5 mx-auto" strokeWidth={2.25} />
-              <div className="text-xl sm:text-3xl font-black text-[#002133] leading-none tracking-tight text-center">
+              <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 text-[#1D1D1F] mb-1.5 mx-auto" strokeWidth={2} />
+              <div className="text-xl sm:text-2xl font-bold text-[#1D1D1F] leading-none tracking-tight text-center tabular-nums">
                 98%
               </div>
-              <div className="mt-1 text-[10px] sm:text-xs font-medium text-slate-500 text-center">
+              <div className="mt-1 text-[10px] sm:text-xs font-medium text-[#6E6E73] text-center">
                 Satisfação
               </div>
             </div>
 
-            {/* Service Tags Card — Bottom-Right */}
+            {/* Service Tags Card — Bottom-Right (.rams-card + .rams-badge-clean) */}
             <div
-              className="absolute z-20 -bottom-5 sm:-bottom-8 -right-2 sm:-right-6 bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-[0_20px_40px_-15px_rgba(15,23,42,0.22)] p-3 sm:p-5 flex flex-col items-center justify-center text-center max-w-[210px] sm:max-w-xs"
+              className="rams-card absolute z-20 -bottom-5 sm:-bottom-6 -right-2 sm:-right-6 flex flex-col items-center justify-center text-center max-w-[210px] sm:max-w-xs"
             >
-              <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+              <div className="flex flex-col items-center gap-1.5 w-full">
                 {SERVICE_TAGS.map((row, i) => (
-                  <div key={i} className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+                  <div key={i} className="flex flex-wrap items-center justify-center gap-3">
                     {row.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
+                        className="rams-badge-clean"
                       >
                         {tag}
                       </span>
@@ -264,7 +264,7 @@ export const Hero: React.FC<HeroProps> = ({
           <button
             id="hero-comecar-btn"
             onClick={onOpenGetStarted}
-            className="mt-10 sm:mt-14 bg-[#f75142] hover:bg-[#e04436] text-[#002133] font-black text-base sm:text-lg px-10 sm:px-14 py-3.5 sm:py-4 rounded-2xl transition-all duration-300 cursor-pointer shadow-[0_16px_36px_-12px_rgba(247,81,66,0.6)] hover:shadow-[0_20px_44px_-12px_rgba(247,81,66,0.8)] active:scale-[0.98]"
+            className="mt-10 sm:mt-14 bg-[#1D1D1F] hover:bg-black text-white font-semibold text-base px-10 sm:px-12 py-3.5 rounded-[14px] border border-[#1D1D1F] transition-colors duration-200 cursor-pointer active:scale-[0.98]"
           >
             Começar
           </button>

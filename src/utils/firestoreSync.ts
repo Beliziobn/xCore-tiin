@@ -30,6 +30,7 @@ import type {
 } from '../types';
 import { defaultDisciplinasList } from '../data/teacherData';
 import { extractFlatRegistrationData, stripNestedRegistrationData } from './svgSanitizer';
+import { isExpressApiAvailable } from './apiAvailability';
 
 const APPLICATIONS_COL = 'applications';
 const QUICK_REQUESTS_COL = 'quickRequests';
@@ -72,16 +73,26 @@ const BANNED_ENTITY_IDS = new Set([
   'efec-1792963605316-86',
 ]);
 
-let firestoreQuotaExhausted = false;
+let firestoreQuotaCooldownUntil = 0;
 
 export function isFirestoreQuotaExhausted(): boolean {
-  return firestoreQuotaExhausted;
+  if (firestoreQuotaCooldownUntil === 0) return false;
+  if (Date.now() >= firestoreQuotaCooldownUntil) {
+    firestoreQuotaCooldownUntil = 0;
+    return false;
+  }
+  return true;
 }
 
 export function markFirestoreQuotaIfExhausted(err: any): void {
-  const msg = String(err?.message || err?.code || err || '').toLowerCase();
-  if (msg.includes('resource-exhausted') || msg.includes('quota') || msg.includes('exceeded')) {
-    firestoreQuotaExhausted = true;
+  const code = String(err?.code || '').toLowerCase();
+  const msg = String(err?.message || err || '').toLowerCase();
+  if (
+    code === 'resource-exhausted' ||
+    msg.includes('resource-exhausted') ||
+    (msg.includes('quota') && !msg.includes('deadline'))
+  ) {
+    firestoreQuotaCooldownUntil = Date.now() + 30_000;
   }
 }
 
@@ -199,7 +210,7 @@ export function addEntityTombstone(col: string, id: string, skipRemotePropagatio
     localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
 
     if (!skipRemotePropagation) {
-      if (!firestoreQuotaExhausted) {
+      if (!isFirestoreQuotaExhausted()) {
         const tombDocId = sanitizeDocId(tombKey);
         if (tombDocId) {
           setDoc(
@@ -209,9 +220,11 @@ export function addEntityTombstone(col: string, id: string, skipRemotePropagatio
           ).catch((e) => markFirestoreQuotaIfExhausted(e));
         }
       }
-      fetch(`/api/network/entity/${encodeURIComponent(col)}/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      }).catch(() => {});
+      if (isExpressApiAvailable()) {
+        fetch(`/api/network/entity/${encodeURIComponent(col)}/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
     }
   } catch {}
 }
@@ -239,12 +252,14 @@ export function removeEntityTombstone(col: string, id: string): void {
     });
     if (removed) {
       localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
-      if (!firestoreQuotaExhausted) {
-        const tombDocId = sanitizeDocId(`${col}::${cleanId}`);
-        if (tombDocId) {
-          deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch((e) => markFirestoreQuotaIfExhausted(e));
-        }
-      }
+    }
+    if (!isFirestoreQuotaExhausted()) {
+      const candidateDocIds = new Set(
+        [sanitizeDocId(`${col}::${cleanId}`), sanitizeDocId(`${col}:${rawClean}`)].filter(Boolean)
+      );
+      candidateDocIds.forEach((tombDocId) => {
+        deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch((e) => markFirestoreQuotaIfExhausted(e));
+      });
     }
   } catch {}
 }
@@ -270,67 +285,111 @@ export function isEntityTombstoned(col: string, id: string): boolean {
 // 1. APPLICATIONS (HOMOLOGAÇÕES) - FIRESTORE CLOUD STORE
 // ============================================================================
 
-export async function saveApplicationToFirestore(app: PendingApplication): Promise<void> {
-  if (firestoreQuotaExhausted) return;
+export async function saveApplicationToFirestore(app: PendingApplication): Promise<boolean> {
+  if (isFirestoreQuotaExhausted()) return false;
   try {
     const docId = sanitizeDocId(app.id || app.userId);
-    if (!docId) return;
-    removeEntityTombstone(APPLICATIONS_COL, docId);
-    const normalizedApp = {
+    if (!docId) return false;
+
+    const normBi = typeof app.biNumber === 'string' ? app.biNumber.trim().replace(/\s+/g, '').toUpperCase() : '';
+    const cleanEmail = typeof app.email === 'string' ? app.email.trim().slice(0, 180) : '';
+
+    // Clear any tombstones across applications, users, and target role collection
+    const roleCol =
+      app.type === 'diretor' || app.schoolRole === 'diretor_geral'
+        ? DIRECTORS_COL
+        : app.type === 'membro_dme' || app.scope === 'administracao'
+        ? DME_STAFF_COL
+        : app.type === 'funcionario'
+        ? STAFF_COL
+        : TEACHERS_COL;
+    [app.id, app.userId, cleanEmail, normBi, docId].forEach((ident) => {
+      if (ident) {
+        removeEntityTombstone(APPLICATIONS_COL, ident);
+        removeEntityTombstone(USERS_COL, ident);
+        removeEntityTombstone(roleCol, ident);
+      }
+    });
+
+    const isApproved = app.status === 'aprovado' || Boolean(app.approvedAt);
+    const safeStatus: 'pendente' | 'aprovado' | 'rejeitado' = isApproved
+      ? 'aprovado'
+      : app.status === 'rejeitado'
+      ? 'rejeitado'
+      : 'pendente';
+
+    const rawPayload: Record<string, any> = {
       ...app,
+      id: app.id || docId,
+      ...(normBi ? { biNumber: normBi } : {}),
       targetApproverRole: 'admin',
       targetApproverEmail: 'dmedoquessua@gmail.com',
       approverDirectorName: 'Director Municipal da Educação (dmedoquessua@gmail.com)',
+      status: safeStatus,
       _updatedAt: Date.now(),
     };
+    if (cleanEmail) {
+      rawPayload.email = cleanEmail;
+    } else {
+      delete rawPayload.email;
+    }
+    // Strip top-level null values so Firestore rules (e.g. email is string) never reject null fields
+    Object.keys(rawPayload).forEach((k) => {
+      if (rawPayload[k] === null || rawPayload[k] === undefined) {
+        delete rawPayload[k];
+      }
+    });
+
     const ref = doc(db, APPLICATIONS_COL, docId);
-    await setDoc(ref, cleanObject(normalizedApp), { merge: true });
+    await setDoc(ref, cleanObject(rawPayload), { merge: true });
 
-    // If approving or rejecting, also update/eliminate any duplicate Firestore docs for the same person
-    // (matched by userId, BI, or personal email) so no ghost 'pendente' copy remains on other devices
-    if (app.status === 'aprovado' || app.status === 'rejeitado' || Boolean(app.approvedAt)) {
-      try {
-        const snap = await Promise.race([
-          getDocs(collection(db, APPLICATIONS_COL)),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
-        ]);
-        const targetUid = String(app.userId || '').trim().toLowerCase();
-        const targetEmail = String(app.email || '').trim().toLowerCase();
-        const targetBi = String(app.biNumber || '').trim().toUpperCase();
-        const isGeneric = !targetEmail || targetEmail.startsWith('escola.') || targetEmail.endsWith('@med.gov.ao');
-        const batch = writeBatch(db);
-        let duplicateCount = 0;
+    // Clean any duplicate Firestore docs for the same person (never delete a higher-ranked 'aprovado' doc)
+    try {
+      const snap = await Promise.race([
+        getDocs(collection(db, APPLICATIONS_COL)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
+      ]);
+      const targetUid = String(app.userId || '').trim().toLowerCase();
+      const targetEmail = cleanEmail.toLowerCase();
+      const isGeneric = !targetEmail || targetEmail.startsWith('escola.') || targetEmail.endsWith('@med.gov.ao');
+      const batch = writeBatch(db);
+      let duplicateCount = 0;
 
-        snap.forEach((d) => {
-          if (d.id === docId) return;
-          const data = d.data() as PendingApplication;
-          if (!data) return;
-          const dUid = String(data.userId || '').trim().toLowerCase();
-          const dEmail = String(data.email || '').trim().toLowerCase();
-          const dBi = String(data.biNumber || '').trim().toUpperCase();
-          const isSamePerson =
-            (targetUid && dUid && targetUid === dUid) ||
-            (targetBi && targetBi.length >= 5 && dBi === targetBi) ||
-            (!isGeneric && dEmail && dEmail === targetEmail);
-          if (isSamePerson) {
-            // Delete duplicate ghost doc so only the canonical approved/rejected doc exists in Firestore
+      snap.forEach((d) => {
+        if (d.id === docId) return;
+        const data = d.data() as PendingApplication;
+        if (!data) return;
+        const dUid = String(data.userId || '').trim().toLowerCase();
+        const dEmail = String(data.email || '').trim().toLowerCase();
+        const dBi = String(data.biNumber || '').trim().replace(/\s+/g, '').toUpperCase();
+        const isSamePerson =
+          (targetUid && dUid && targetUid === dUid) ||
+          (normBi.length >= 5 && dBi === normBi) ||
+          (!isGeneric && dEmail && dEmail === targetEmail);
+        if (isSamePerson) {
+          const otherApproved = data.status === 'aprovado' || Boolean(data.approvedAt);
+          if (safeStatus === 'aprovado' || safeStatus === 'rejeitado' || !otherApproved) {
             batch.delete(d.ref);
             duplicateCount++;
           }
-        });
-
-        if (duplicateCount > 0) {
-          await batch.commit();
         }
-      } catch {}
-    }
+      });
+
+      if (duplicateCount > 0) {
+        await batch.commit();
+      }
+    } catch {}
+
+    return true;
   } catch (error) {
     markFirestoreQuotaIfExhausted(error);
+    console.warn('[Firestore] Erro ao gravar candidatura no Firestore:', error);
+    return false;
   }
 }
 
 export async function fetchApplicationsFromFirestore(): Promise<PendingApplication[]> {
-  if (firestoreQuotaExhausted) return [];
+  if (isFirestoreQuotaExhausted()) return [];
   try {
     const ref = collection(db, APPLICATIONS_COL);
     const snapshot = await Promise.race([
@@ -352,7 +411,7 @@ export async function updateApplicationInFirestore(
   appId: string,
   updates: Partial<PendingApplication>
 ): Promise<void> {
-  if (firestoreQuotaExhausted) return;
+  if (isFirestoreQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(appId);
     if (!docId) return;
@@ -368,7 +427,7 @@ export async function deleteApplicationFromFirestore(appId: string): Promise<voi
     const docId = sanitizeDocId(appId);
     if (!docId) return;
     addEntityTombstone(APPLICATIONS_COL, docId);
-    if (firestoreQuotaExhausted) return;
+    if (isFirestoreQuotaExhausted()) return;
     const ref = doc(db, APPLICATIONS_COL, docId);
     await deleteDoc(ref);
   } catch (error) {
@@ -377,7 +436,7 @@ export async function deleteApplicationFromFirestore(appId: string): Promise<voi
 }
 
 export async function clearApprovedApplicationsFromFirestore(): Promise<number> {
-  if (firestoreQuotaExhausted) return 0;
+  if (isFirestoreQuotaExhausted()) return 0;
   try {
     const ref = collection(db, APPLICATIONS_COL);
     const snapshot = await getDocs(ref);
@@ -406,7 +465,7 @@ export async function clearApprovedApplicationsFromFirestore(): Promise<number> 
 export function subscribeToApplications(
   onUpdate: (apps: PendingApplication[]) => void
 ): Unsubscribe {
-  if (firestoreQuotaExhausted) return () => {};
+  if (isFirestoreQuotaExhausted()) return () => {};
   try {
     const ref = collection(db, APPLICATIONS_COL);
     return onSnapshot(
@@ -433,7 +492,7 @@ export function subscribeToApplications(
 // ============================================================================
 
 export async function saveQuickRequestToFirestore(request: QuickServiceRequest): Promise<void> {
-  if (firestoreQuotaExhausted) return;
+  if (isFirestoreQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(request.id);
     if (!docId) return;
@@ -446,7 +505,7 @@ export async function saveQuickRequestToFirestore(request: QuickServiceRequest):
 }
 
 export async function fetchQuickRequestsFromFirestore(): Promise<QuickServiceRequest[]> {
-  if (firestoreQuotaExhausted) return [];
+  if (isFirestoreQuotaExhausted()) return [];
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     const snapshot = await getDocs(ref);
@@ -465,7 +524,7 @@ export async function updateQuickRequestInFirestore(
   id: string,
   updates: Partial<QuickServiceRequest>
 ): Promise<void> {
-  if (firestoreQuotaExhausted) return;
+  if (isFirestoreQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(id);
     if (!docId) return;
@@ -481,7 +540,7 @@ export async function deleteQuickRequestFromFirestore(id: string): Promise<void>
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(QUICK_REQUESTS_COL, docId);
-    if (firestoreQuotaExhausted) return;
+    if (isFirestoreQuotaExhausted()) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     await deleteDoc(ref);
   } catch (error) {
@@ -490,7 +549,7 @@ export async function deleteQuickRequestFromFirestore(id: string): Promise<void>
 }
 
 export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
-  if (firestoreQuotaExhausted) return 0;
+  if (isFirestoreQuotaExhausted()) return 0;
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     const snapshot = await getDocs(ref);
@@ -516,7 +575,7 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
 export function subscribeToQuickRequests(
   onUpdate: (requests: QuickServiceRequest[]) => void
 ): Unsubscribe {
-  if (firestoreQuotaExhausted) return () => {};
+  if (isFirestoreQuotaExhausted()) return () => {};
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     return onSnapshot(
@@ -543,16 +602,42 @@ export function subscribeToQuickRequests(
 // ============================================================================
 
 export async function saveUserToFirestore(user: UserAccount): Promise<void> {
-  if (firestoreQuotaExhausted) return;
+  if (isFirestoreQuotaExhausted()) return;
   try {
-    const docId = sanitizeDocId((user.email || user.id || '').trim().toLowerCase());
+    const cleanEmail = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+    const docId = sanitizeDocId(cleanEmail || user.id || '');
     if (!docId) return;
-    removeEntityTombstone(USERS_COL, docId);
-    if (user.id) {
-      removeEntityTombstone(USERS_COL, sanitizeDocId(user.id));
+    const normBi = typeof user.biNumber === 'string' ? user.biNumber.trim().replace(/\s+/g, '').toUpperCase() : '';
+    [docId, user.id, cleanEmail, normBi].forEach((ident) => {
+      if (ident) {
+        removeEntityTombstone(USERS_COL, ident);
+        removeEntityTombstone(APPLICATIONS_COL, ident);
+      }
+    });
+    const safeStatus: 'ativo' | 'pendente' | 'rejeitado' =
+      user.status === 'ativo' || Boolean(user.approvedAt)
+        ? 'ativo'
+        : user.status === 'rejeitado'
+        ? 'rejeitado'
+        : 'pendente';
+    const rawUser: Record<string, any> = {
+      ...user,
+      userId: user.id || docId,
+      status: safeStatus,
+      ...(normBi ? { biNumber: normBi } : {}),
+    };
+    if (cleanEmail) {
+      rawUser.email = cleanEmail;
+    } else {
+      delete rawUser.email;
     }
+    Object.keys(rawUser).forEach((k) => {
+      if (rawUser[k] === null || rawUser[k] === undefined) {
+        delete rawUser[k];
+      }
+    });
     const ref = doc(db, USERS_COL, docId);
-    await setDoc(ref, cleanObject({ ...user, userId: user.id || docId }), { merge: true });
+    await setDoc(ref, cleanObject(rawUser), { merge: true });
   } catch (error) {
     markFirestoreQuotaIfExhausted(error);
   }
@@ -2925,7 +3010,10 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
             saveUserToFirestore(mergedUser).catch(() => {});
           }
         });
-        safeWriteJsonIfChanged('ucore_registered_users', Array.from(map.values()));
+        if (safeWriteJsonIfChanged('ucore_registered_users', Array.from(map.values()))) {
+          window.dispatchEvent(new CustomEvent('sigre-users-updated'));
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        }
       } catch {}
     })
   );

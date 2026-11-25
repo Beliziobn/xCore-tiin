@@ -53,7 +53,7 @@ import {
   formatAngolanDateExtenso,
   syncEfectividadeFromServer,
 } from '../../utils/efectividadeStorage';
-import { fetchQuickRequests, submitQuickServiceRequest } from '../../utils/quickServicesStorage';
+import { fetchQuickRequests, getCachedQuickRequests, submitQuickServiceRequest } from '../../utils/quickServicesStorage';
 import {
   isFemaleFirstName,
   resolveIsFeminino,
@@ -191,20 +191,24 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
   onNavigateHome,
   initialTab = 'form',
 }) => {
+  const isAdmin = Boolean(
+    isLoggedIn && currentUser && currentUser.role === 'admin'
+  );
   const isDirector = Boolean(
     isLoggedIn && currentUser && currentUser.role === 'diretor'
   );
-  const [activeTab, setActiveTab] = useState<ActiveTab>(
-    isDirector ? 'pedidos' : initialTab
+  const resolveAllowedTab = (requestedTab?: ActiveTab | string): ActiveTab => {
+    if (isAdmin) return (requestedTab as ActiveTab) || 'form';
+    if (requestedTab === 'cadastro-docente') return 'cadastro-docente';
+    return 'pedidos';
+  };
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
+    resolveAllowedTab(initialTab)
   );
 
   useEffect(() => {
-    if (isDirector) {
-      setActiveTab('pedidos');
-    } else if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab, isDirector]);
+    setActiveTab(resolveAllowedTab(initialTab));
+  }, [initialTab, isAdmin, isDirector]);
 
   const [quickRequestsCount, setQuickRequestsCount] = useState<number>(0);
   const [records, setRecords] = useState<CadastramentoEfectividadeRecord[]>(() =>
@@ -242,33 +246,35 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     setRecords(getStoredEfectividadeRecords());
   };
 
-  const reloadQuickRequests = () => {
-    fetchQuickRequests()
-      .then((reqs) => {
-        if (Array.isArray(reqs)) {
-          const allowedForDirector = ['BOLETIM_NOTAS', 'DECLARACAO_MATRICULA', 'GUIA_TRANSFERENCIA'];
-          const dirSchool = (currentUser?.schoolName || '').trim().toLowerCase();
-          setQuickRequestsCount(
-            reqs.filter((r) => {
-              if (r.status !== 'PENDENTE' && r.status !== 'EM_ANALISE') return false;
-              if (isDirector) {
-                if (!allowedForDirector.includes(r.serviceType)) return false;
-                if (dirSchool && r.targetSchoolName) {
-                  const target = r.targetSchoolName.trim().toLowerCase();
-                  return target.includes(dirSchool) || dirSchool.includes(target);
-                }
-              }
-              return true;
-            }).length
-          );
+  const computeQuickRequestsCount = (reqs: any[]) => {
+    if (!Array.isArray(reqs)) return;
+    const allowedForDirector = ['BOLETIM_NOTAS', 'DECLARACAO_MATRICULA', 'GUIA_TRANSFERENCIA'];
+    const dirSchool = (currentUser?.schoolName || '').trim().toLowerCase();
+    setQuickRequestsCount(
+      reqs.filter((r) => {
+        if (r.status !== 'PENDENTE' && r.status !== 'EM_ANALISE') return false;
+        if (isDirector) {
+          if (!allowedForDirector.includes(r.serviceType)) return false;
+          if (dirSchool && r.targetSchoolName) {
+            const target = r.targetSchoolName.trim().toLowerCase();
+            return target.includes(dirSchool) || dirSchool.includes(target);
+          }
         }
-      })
-      .catch(() => {});
+        return true;
+      }).length
+    );
+  };
+
+  const reloadQuickRequestsFromCache = () => {
+    computeQuickRequestsCount(getCachedQuickRequests());
   };
 
   useEffect(() => {
     reloadRecords();
-    reloadQuickRequests();
+    reloadQuickRequestsFromCache();
+    fetchQuickRequests()
+      .then((reqs) => computeQuickRequestsCount(reqs))
+      .catch(() => {});
     syncEfectividadeFromServer()
       .then((synced) => {
         if (Array.isArray(synced)) {
@@ -277,8 +283,11 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       })
       .catch(() => {});
 
-    const handler = () => reloadRecords();
-    const quickHandler = () => reloadQuickRequests();
+    const handler = () => {
+      reloadRecords();
+      reloadQuickRequestsFromCache();
+    };
+    const quickHandler = () => reloadQuickRequestsFromCache();
     window.addEventListener('sigre-efectividade-updated', handler);
     window.addEventListener('sigre-data-synced', handler);
     window.addEventListener('sigre-database-restored', handler);
@@ -1405,108 +1414,76 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
       {/* ================================================================= */}
       <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row items-start gap-7">
-          {/* LEFT SIDEBAR SELECTOR (EXACT EXEMPLAR DESIGN) */}
-          <aside
-            id="service-left-sidebar"
-            aria-label="Seleção de tipos de serviço e operações"
-            className="no-print w-full lg:w-[272px] shrink-0 lg:sticky lg:top-24 bg-white rounded-[24px] border border-slate-200/90 p-4 shadow-xs space-y-5"
-          >
-            {/* Group 1: Tipos de Serviço */}
-            <div>
-              <p className="text-xs font-medium text-slate-500 px-3 mb-1.5">
-                {isDirector ? 'Serviço SIGRE da Direção' : 'Tipos de serviço'}
-              </p>
-              <div className="space-y-1">
-                {!isDirector && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('form')}
-                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                        activeTab === 'form' || activeTab === 'view-ficha'
-                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <Building2 className="w-4 h-4 text-slate-700 shrink-0" />
-                      <span className="truncate">Declaração de Efectividade</span>
-                    </button>
-
-                    <button
-                      id="tab-declaracao-servico"
-                      type="button"
-                      onClick={() => setActiveTab('declaracao-servico')}
-                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                        activeTab === 'declaracao-servico'
-                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <Landmark className="w-4 h-4 text-slate-700 shrink-0" />
-                      <span className="truncate">Declaração de Serviço</span>
-                    </button>
-
-                    <button
-                      id="tab-guia-ferias"
-                      type="button"
-                      onClick={() => setActiveTab('guia-ferias')}
-                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                        activeTab === 'guia-ferias'
-                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <CalendarRange className="w-4 h-4 text-slate-700 shrink-0" />
-                      <span className="truncate">Guia de Férias</span>
-                    </button>
-
-                    <button
-                      id="tab-guia-colocacao"
-                      type="button"
-                      onClick={() => setActiveTab('guia-colocacao')}
-                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                        activeTab === 'guia-colocacao'
-                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <MapPin className="w-4 h-4 text-slate-700 shrink-0" />
-                      <span className="truncate">Guia de Colocação</span>
-                    </button>
-
-                    <button
-                      id="tab-ficha-avaliacao"
-                      type="button"
-                      onClick={() => setActiveTab('ficha-avaliacao')}
-                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                        activeTab === 'ficha-avaliacao'
-                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <ClipboardCheck className="w-4 h-4 text-slate-700 shrink-0" />
-                      <span className="truncate">Ficha de Avaliação</span>
-                    </button>
-
-                    <button
-                      id="tab-cadastro-docente"
-                      type="button"
-                      onClick={() => setActiveTab('cadastro-docente')}
-                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
-                        activeTab === 'cadastro-docente'
-                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <UserPlus className="w-4 h-4 text-slate-700 shrink-0" />
-                      <span className="truncate">Cadastro Docente</span>
-                    </button>
-                  </>
-                )}
-
-                {isDirector && (
+          {/* LEFT SIDEBAR SELECTOR — EXCLUSIVO PARA ADMINISTRAÇÃO MUNICIPAL (SERVIÇOS SIGRE) */}
+          {isAdmin && (
+            <aside
+              id="service-left-sidebar"
+              aria-label="Seleção de tipos de serviço e operações"
+              className="no-print w-full lg:w-[272px] shrink-0 lg:sticky lg:top-24 bg-white rounded-[24px] border border-slate-200/90 p-4 shadow-xs space-y-5"
+            >
+              {/* Group 1: Tipos de Serviço */}
+              <div>
+                <p className="text-xs font-medium text-slate-500 px-3 mb-1.5">
+                  Tipos de serviço
+                </p>
+                <div className="space-y-1">
                   <button
-                    id="tab-ficha-avaliacao-director"
+                    type="button"
+                    onClick={() => setActiveTab('form')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'form' || activeTab === 'view-ficha'
+                        ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4 text-slate-700 shrink-0" />
+                    <span className="truncate">Declaração de Efectividade</span>
+                  </button>
+
+                  <button
+                    id="tab-declaracao-servico"
+                    type="button"
+                    onClick={() => setActiveTab('declaracao-servico')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'declaracao-servico'
+                        ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <Landmark className="w-4 h-4 text-slate-700 shrink-0" />
+                    <span className="truncate">Declaração de Serviço</span>
+                  </button>
+
+                  <button
+                    id="tab-guia-ferias"
+                    type="button"
+                    onClick={() => setActiveTab('guia-ferias')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'guia-ferias'
+                        ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <CalendarRange className="w-4 h-4 text-slate-700 shrink-0" />
+                    <span className="truncate">Guia de Férias</span>
+                  </button>
+
+                  <button
+                    id="tab-guia-colocacao"
+                    type="button"
+                    onClick={() => setActiveTab('guia-colocacao')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'guia-colocacao'
+                        ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4 text-slate-700 shrink-0" />
+                    <span className="truncate">Guia de Colocação</span>
+                  </button>
+
+                  <button
+                    id="tab-ficha-avaliacao"
                     type="button"
                     onClick={() => setActiveTab('ficha-avaliacao')}
                     className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
@@ -1518,49 +1495,61 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                     <ClipboardCheck className="w-4 h-4 text-slate-700 shrink-0" />
                     <span className="truncate">Ficha de Avaliação</span>
                   </button>
-                )}
 
-                <div className={isDirector ? '' : 'pt-2 mt-2 border-t border-slate-100'}>
-                  {!isDirector && (
-                    <p className="text-[11px] font-medium text-slate-400 px-3 mb-1">
-                      Solicitações de Usuários
-                    </p>
-                  )}
                   <button
-                    id="tab-servicos-rapidos-pedidos"
+                    id="tab-cadastro-docente"
                     type="button"
-                    onClick={() => setActiveTab('pedidos')}
-                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
-                      activeTab === 'pedidos'
+                    onClick={() => setActiveTab('cadastro-docente')}
+                    className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center gap-3 text-left text-sm transition-colors cursor-pointer ${
+                      activeTab === 'cadastro-docente'
                         ? 'bg-[#f2f4f7] text-slate-950 font-bold'
                         : 'text-slate-700 hover:bg-slate-50 font-medium'
                     }`}
                   >
-                    <span className="flex items-center gap-3 min-w-0">
-                      <Zap className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
-                      <span className="truncate">Serviços Rápidos</span>
-                    </span>
-                    {quickRequestsCount > 0 ? (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black shrink-0 animate-pulse">
-                        {quickRequestsCount}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
-                        {isDirector ? 'Ativo' : 'Pedidos'}
-                      </span>
-                    )}
+                    <UserPlus className="w-4 h-4 text-slate-700 shrink-0" />
+                    <span className="truncate">Cadastro Docente</span>
                   </button>
+
+                  <div className="pt-2 mt-2 border-t border-slate-100">
+                    <p className="text-[11px] font-medium text-slate-400 px-3 mb-1">
+                      Solicitações de Usuários
+                    </p>
+                    <button
+                      id="tab-servicos-rapidos-pedidos"
+                      type="button"
+                      onClick={() => setActiveTab('pedidos')}
+                      className={`w-full rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left text-sm transition-colors cursor-pointer ${
+                        activeTab === 'pedidos'
+                          ? 'bg-[#f2f4f7] text-slate-950 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span className="flex items-center gap-3 min-w-0">
+                        <Zap className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                        <span className="truncate">Serviços Rápidos</span>
+                      </span>
+                      {quickRequestsCount > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black shrink-0 animate-pulse">
+                          {quickRequestsCount}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
+                          Pedidos
+                        </span>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </aside>
+            </aside>
+          )}
 
           {/* RIGHT MAIN PANEL */}
           <div className="flex-1 min-w-0 w-full">
             {/* ============================================================== */}
             {/* SERVICE 1: DECLARAÇÃO DE EFECTIVIDADE                          */}
             {/* ============================================================== */}
-            {activeTab === 'form' && (
+            {isAdmin && activeTab === 'form' && (
               <div className="space-y-6 animate-in fade-in duration-150">
                 {/* Exemplar Top Title Bar */}
                 <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
@@ -2572,7 +2561,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {/* SERVICE 2: DECLARAÇÃO DE SERVIÇO (CONTA & SALÁRIO)             */}
             {/* ============================================================== */}
-            {activeTab === 'declaracao-servico' && (
+            {isAdmin && activeTab === 'declaracao-servico' && (
               <DeclaracaoServicoSection
                 isLoggedIn={isLoggedIn}
                 currentUser={currentUser}
@@ -2582,7 +2571,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {/* SERVICE 3: GUIA DE FÉRIAS (CADASTRO DE PESSOAL)                */}
             {/* ============================================================== */}
-            {activeTab === 'guia-ferias' && (
+            {isAdmin && activeTab === 'guia-ferias' && (
               <GuiaFeriasSection
                 isLoggedIn={isLoggedIn}
                 currentUser={currentUser}
@@ -2592,7 +2581,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {/* SERVICE 4: GUIA DE COLOCAÇÃO (CADASTRO DE PESSOAL)             */}
             {/* ============================================================== */}
-            {activeTab === 'guia-colocacao' && (
+            {isAdmin && activeTab === 'guia-colocacao' && (
               <GuiaColocacaoSection
                 isLoggedIn={isLoggedIn}
                 currentUser={currentUser}
@@ -2602,7 +2591,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {/* SERVICE 5: FICHA DE AVALIAÇÃO DE DESEMPENHO DOCENTE            */}
             {/* ============================================================== */}
-            {activeTab === 'ficha-avaliacao' && (
+            {isAdmin && activeTab === 'ficha-avaliacao' && (
               <FichaAvaliacaoSection
                 isLoggedIn={isLoggedIn}
                 currentUser={currentUser}
@@ -2622,7 +2611,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {/* TAB: BASE DE DADOS COMPLETA (GESTÃO & BACKUPS)                 */}
             {/* ============================================================== */}
-            {activeTab === 'database' && (
+            {isAdmin && activeTab === 'database' && (
               <div className="space-y-6 animate-in fade-in duration-150">
                 <div className="bg-white rounded-[24px] border border-slate-200 shadow-xs p-6 sm:p-8 space-y-5">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2840,7 +2829,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
                   }
                   schoolName={currentUser?.schoolName || ''}
                   onNavigateToDeclaracaoEfectividade={
-                    isDirector ? undefined : () => setActiveTab('form')
+                    isAdmin ? () => setActiveTab('form') : undefined
                   }
                   showToast={showToast}
                 />
@@ -2850,7 +2839,7 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {/* TAB: FICHA DE CADASTRO OFICIAL / DECLARAÇÃO (FOLHA A4 PDF)     */}
             {/* ============================================================== */}
-            {activeTab === 'view-ficha' && selectedRecordForView && (
+            {isAdmin && activeTab === 'view-ficha' && selectedRecordForView && (
               <div className="space-y-6 animate-in fade-in duration-150">
                 <div className="no-print bg-white rounded-[24px] p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">

@@ -7,6 +7,7 @@ import {
   FileText,
   MessageSquare,
   Edit3,
+  Ban,
 } from 'lucide-react';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import directorSignatureImg from '../../assets/images/assinatura_director_black.png';
@@ -51,6 +52,7 @@ interface OfficialDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
   request: QuickServiceRequest | null;
+  initialViewMode?: 'requerimento' | 'emissao';
   onMarkAsConcluidoAndNotify?: (request: QuickServiceRequest) => void;
   onOpenNotifyModal?: (request: QuickServiceRequest) => void;
 }
@@ -167,14 +169,20 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
   isOpen,
   onClose,
   request,
+  initialViewMode = 'emissao',
   onMarkAsConcluidoAndNotify,
   onOpenNotifyModal,
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
   const [genderOverride, setGenderOverride] = useState<'M' | 'F' | null>(null);
   const [showQuickEdit, setShowQuickEdit] = useState(false);
+  const [viewMode, setViewMode] = useState<'requerimento' | 'emissao'>(initialViewMode);
   const [editableEfectividade, setEditableEfectividade] =
     useState<CadastramentoEfectividadeRecord | null>(null);
+
+  useEffect(() => {
+    setViewMode(initialViewMode);
+  }, [isOpen, request?.id, initialViewMode]);
 
   useEffect(() => {
     if (request && request.serviceType === 'DECLARACAO_EFECTIVIDADE') {
@@ -282,6 +290,18 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
 
   const efectividadeRecord =
     editableEfectividade || buildEfectividadeRecordFromQuickRequest(request, genderOverride);
+
+  const isCancelledRequest = request.status === 'CANCELADO';
+  const isUnenrolledStudentBlock = !isSigreAdminService && !enrollmentCheck.isEnrolled;
+  const isTransferMissingVacancyBlock =
+    request.serviceType === 'GUIA_TRANSFERENCIA' &&
+    request.status !== 'VAGA_CONFIRMADA' &&
+    request.status !== 'CONCLUIDO' &&
+    !details.reservedTurma;
+  const isEmissionBlockedInModal =
+    isCancelledRequest || isUnenrolledStudentBlock || isTransferMissingVacancyBlock;
+  const canPrintOrDownloadCurrentView =
+    viewMode === 'requerimento' || !isEmissionBlockedInModal;
 
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-xs overflow-y-auto print:block print:p-0 print:bg-white print:static print:inset-auto">
@@ -509,7 +529,9 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                   {request.protocol}
                 </span>
                 <span className="text-sm font-bold text-slate-200">
-                  Pré-visualização Oficial SIGRE (A4)
+                  {viewMode === 'requerimento'
+                    ? 'Documento Formal Recebido (Requerimento A4)'
+                    : 'Documento Oficial a Emitir SIGRE (A4)'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -519,6 +541,36 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* View Mode Switcher: Documento Recebido vs Documento Emitido */}
+            <div
+              role="group"
+              aria-label="Modo de visualização do documento"
+              className="inline-flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700"
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode('requerimento')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'requerimento'
+                    ? 'bg-amber-400 text-slate-950'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Pedido Recebido (Requerimento)
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('emissao')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'emissao'
+                    ? 'bg-emerald-500 text-white'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Documento a Emitir
+              </button>
+            </div>
+
             {/* Gender Selector */}
             <div
               role="group"
@@ -555,7 +607,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
               </button>
             </div>
 
-            {request.serviceType === 'DECLARACAO_EFECTIVIDADE' && (
+            {viewMode === 'emissao' && request.serviceType === 'DECLARACAO_EFECTIVIDADE' && !isCancelledRequest && (
               <button
                 type="button"
                 onClick={() => setShowQuickEdit((prev) => !prev)}
@@ -572,8 +624,9 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
 
             <button
               type="button"
+              disabled={!canPrintOrDownloadCurrentView}
               onClick={handleDownloadPdf}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-45 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
               title="Baixar diretamente o Documento em PDF (1 página A4, fiel à Pré-visualização SIGRE)"
             >
               <FileDown className="w-4 h-4" />
@@ -582,14 +635,15 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
 
             <button
               type="button"
+              disabled={!canPrintOrDownloadCurrentView}
               onClick={handlePrint}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-45 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
             >
               <Printer className="w-4 h-4" />
               <span>Imprimir (1 Página A4)</span>
             </button>
 
-            {onOpenNotifyModal && (
+            {onOpenNotifyModal && !isCancelledRequest && (
               <button
                 type="button"
                 onClick={() => {
@@ -730,13 +784,319 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
           <div
             id="official-modal-print-sheet"
             ref={printRef}
-            className="bg-white mx-auto w-full max-w-[210mm] p-6 sm:p-10 md:px-[20mm] md:py-[15mm] border border-slate-200/90 print:border-0 outline-none shadow-xs print:p-0 print:shadow-none text-black leading-relaxed"
+            className="bg-white mx-auto w-full max-w-[210mm] min-h-[297mm] p-6 sm:p-10 md:px-[20mm] md:py-[15mm] border border-slate-200/90 print:border-0 outline-none shadow-xs print:p-0 print:shadow-none text-black leading-relaxed"
             style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
           >
             {/* ================================================================= */}
+            {/* MODO 0A: DOCUMENTO FORMAL DO PEDIDO RECEBIDO (REQUERIMENTO A4)    */}
+            {/* ================================================================= */}
+            {viewMode === 'requerimento' && (() => {
+              const createdDate = request.createdAt ? new Date(request.createdAt) : new Date();
+              const createdIso = createdDate.toISOString().slice(0, 10);
+              const createdTimePt = createdDate.toLocaleTimeString('pt-PT', {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+              const recipientEntity =
+                request.targetRole === 'ADMIN'
+                  ? 'Direcção Municipal da Educação do Quêssua'
+                  : request.targetSchoolName || 'Direcção da Instituição Escolar';
+
+              const fmtPt = (iso?: string) => {
+                if (!iso) return '';
+                const p = iso.split('-');
+                return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+              };
+
+              const reqRows: Array<{ label: string; value: string; tone?: 'blue' | 'red' | 'bold' }> = [
+                { label: 'Protocolo Oficial', value: request.protocol, tone: 'blue' },
+                { label: 'Assunto / Serviço Solicitado', value: request.title, tone: 'bold' },
+                { label: 'Entidade Destinatária', value: recipientEntity },
+                { label: 'Data / Hora de Submissão', value: `${createdDate.toLocaleDateString('pt-PT')} às ${createdTimePt}` },
+                {
+                  label: 'Requerente',
+                  value: `${details.tratamento ? `${details.tratamento} ` : ''}${request.requesterName}`,
+                  tone: 'red',
+                },
+                { label: 'Contacto Telefónico / E-mail', value: [request.requesterPhone, request.requesterEmail].filter(Boolean).join(' · ') || '—' },
+              ];
+
+              if (isSigreAdminService) {
+                if (details.pai || details.mae) {
+                  reqRows.push({
+                    label: 'Filiação',
+                    value: [details.pai ? `Pai: ${details.pai}` : '', details.mae ? `Mãe: ${details.mae}` : ''].filter(Boolean).join(' · '),
+                  });
+                }
+                if (details.nascimento || details.naturalidade) {
+                  reqRows.push({
+                    label: 'Nascimento / Naturalidade',
+                    value: [details.nascimento ? fmtPt(details.nascimento) : '', details.naturalidade, details.provNat].filter(Boolean).join(' · '),
+                  });
+                }
+                if (details.employeeBi) {
+                  reqRows.push({
+                    label: 'Bilhete de Identidade',
+                    value: details.biEmissao ? `${details.employeeBi} (Emitido a ${fmtPt(details.biEmissao)})` : details.employeeBi,
+                  });
+                }
+                if (details.employeeAgente) {
+                  reqRows.push({ label: 'Número de Agente', value: details.employeeAgente, tone: 'bold' });
+                }
+                if (details.funcao || details.employeeCategory || details.grau) {
+                  reqRows.push({
+                    label: 'Função / Categoria / Grau',
+                    value: [details.funcao, details.employeeCategory, details.grau].filter(Boolean).join(' · '),
+                  });
+                }
+                if (details.employeeSchoolOrDepartment || request.targetSchoolName) {
+                  reqRows.push({
+                    label: 'Escola / Local de Serviço',
+                    value: details.employeeSchoolOrDepartment || request.targetSchoolName || '—',
+                  });
+                }
+                if (details.sigreServico) {
+                  reqRows.push({
+                    label: 'Banco / Conta / Salário',
+                    value: [details.sigreServico.bancoFinal || details.sigreServico.banco, details.sigreServico.conta ? `Conta ${details.sigreServico.conta}` : '', details.sigreServico.salario ? `${fmtKz(Number(details.sigreServico.salario) || 0)} Kz` : ''].filter(Boolean).join(' · '),
+                  });
+                }
+                if (details.sigreGuiaFerias) {
+                  reqRows.push({
+                    label: 'Licença / Período',
+                    value: [details.sigreGuiaFerias.tipolic, details.sigreGuiaFerias.dias ? `${details.sigreGuiaFerias.dias} dias` : '', details.sigreGuiaFerias.ini ? `${fmtPt(details.sigreGuiaFerias.ini)} a ${fmtPt(details.sigreGuiaFerias.fim)}` : ''].filter(Boolean).join(' · '),
+                  });
+                }
+              } else {
+                if (details.studentName) {
+                  reqRows.push({ label: 'Nome Completo do Aluno', value: details.studentName, tone: 'red' });
+                }
+                reqRows.push({
+                  label: 'N.º de Matrícula / B.I.',
+                  value: enrollmentCheck.isEnrolled
+                    ? enrollmentCheck.codigoMatricula || details.studentBiOrProcesso || 'Confirmado'
+                    : details.studentBiOrProcesso || 'Não informado',
+                  tone: 'bold',
+                });
+                reqRows.push({
+                  label: 'Classe / Turma / Turno',
+                  value: [
+                    enrollmentCheck.classe || details.studentClasse,
+                    enrollmentCheck.turma || details.studentTurma,
+                    enrollmentCheck.turno || details.studentPeriodo,
+                  ].filter(Boolean).join(' · ') || '—',
+                });
+                if (details.trimestre || details.academicYear) {
+                  reqRows.push({
+                    label: 'Período / Ano Lectivo',
+                    value: [details.trimestre, details.academicYear].filter(Boolean).join(' · '),
+                  });
+                }
+                if (request.destinationSchoolName || details.destinationSchool) {
+                  reqRows.push({
+                    label: 'Escola de Destino Pretendida',
+                    value: request.destinationSchoolName || details.destinationSchool || '—',
+                  });
+                }
+                reqRows.push({
+                  label: 'Conferência de Matrícula na Escola',
+                  value: enrollmentCheck.isEnrolled
+                    ? `MATRÍCULA CONFIRMADA (${enrollmentCheck.matchedName} · ${enrollmentCheck.classe} ${enrollmentCheck.turma})`
+                    : `SEM REGISTO DE MATRÍCULA NESTA ESCOLA (${enrollmentCheck.reason || 'Não matriculado'})`,
+                  tone: enrollmentCheck.isEnrolled ? 'bold' : 'red',
+                });
+              }
+
+              if (details.purpose) {
+                reqRows.push({ label: 'Finalidade Declarada', value: details.purpose });
+              }
+              if (details.notes) {
+                reqRows.push({ label: 'Observações do Requerente', value: details.notes });
+              }
+
+              return (
+                <div className="flex flex-col justify-between min-h-[260mm]">
+                  <div>
+                    <div className="a4-header-block">
+                      <div className="flex justify-center">
+                        <img
+                          src={emblemAngolaImg}
+                          alt="Insígnia da República de Angola"
+                          className="a4-emblem-img"
+                        />
+                      </div>
+                      <p className="a4-republic-title" style={{ fontSize: '12pt' }}>REPÚBLICA DE ANGOLA</p>
+                      <p className="a4-inst-line">GOVERNO PROVINCIAL DE MALANJE</p>
+                      <p className="a4-inst-line">ADMINISTRAÇÃO MUNICIPAL DO QUÊSSUA</p>
+                      <p className="a4-inst-line">DIRECÇÃO MUNICIPAL DA EDUCAÇÃO</p>
+                    </div>
+
+                    <div className="a4-title-wrap" style={{ paddingTop: '8pt', paddingBottom: '6pt' }}>
+                      <h1 style={{ fontSize: '12pt' }}>REQUERIMENTO OFICIAL DE SERVIÇO SIGRE</h1>
+                      <p style={{ fontSize: '10pt', fontWeight: 700, marginTop: '4pt' }}>
+                        PROTOCOLO N.º{' '}
+                        <span style={{ color: '#0044cc', fontWeight: 700 }}>{request.protocol}</span>
+                        {request.status === 'CANCELADO' && (
+                          <span style={{ color: '#c00000', marginLeft: '8pt' }}>
+                            (PEDIDO CANCELADO PELO REQUERENTE)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="a4-body-copy" style={{ marginTop: '8pt' }}>
+                      <p style={{ fontSize: '10pt', lineHeight: 1.45, marginBottom: '8pt' }}>
+                        Excelentíssimo(a) Senhor(a) Responsável da <strong>{recipientEntity}</strong>,
+                        o(a) cidadão(ã){' '}
+                        <strong style={{ color: '#c00000' }}>
+                          {details.tratamento ? `${details.tratamento} ` : ''}
+                          {request.requesterName}
+                        </strong>
+                        {details.studentName ? (
+                          <>
+                            , na qualidade de encarregado(a) / representante do(a) estudante{' '}
+                            <strong style={{ color: '#c00000' }}>{details.studentName}</strong>
+                          </>
+                        ) : null}
+                        , vem mui respeitosamente requerer a V. Ex.ª se digne autorizar a tramitação e emissão do expediente referente a{' '}
+                        <strong>{request.title}</strong>, nos termos e com os dados oficiais abaixo discriminados para conferência nos arquivos institucionais.
+                      </p>
+                    </div>
+
+                    <h2
+                      style={{
+                        fontSize: '12pt',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        borderBottom: '1px solid #000000',
+                        paddingBottom: '2pt',
+                        margin: '10pt 0 6pt 0',
+                      }}
+                    >
+                      I. Elementos Oficiais do Pedido Submetido
+                    </h2>
+
+                    <table
+                      style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: '10pt',
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      <tbody>
+                        {reqRows.map((row) => (
+                          <tr key={row.label}>
+                            <th
+                              scope="row"
+                              style={{
+                                width: '34%',
+                                border: '1px solid #333333',
+                                padding: '4pt 7pt',
+                                fontWeight: 700,
+                                backgroundColor: '#f6f7f6',
+                                textAlign: 'left',
+                                verticalAlign: 'top',
+                                fontSize: '10pt',
+                              }}
+                            >
+                              {row.label}
+                            </th>
+                            <td
+                              style={{
+                                width: '66%',
+                                border: '1px solid #333333',
+                                padding: '4pt 7pt',
+                                textAlign: 'left',
+                                verticalAlign: 'top',
+                                fontSize: '10pt',
+                                fontWeight: row.tone ? 700 : 400,
+                                color:
+                                  row.tone === 'red'
+                                    ? '#c00000'
+                                    : row.tone === 'blue'
+                                    ? '#0044cc'
+                                    : '#000000',
+                              }}
+                            >
+                              {row.value}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {details.responseMessage && (
+                      <div style={{ marginTop: '10pt', padding: '6pt 8pt', border: '1px solid #333333', fontSize: '10pt' }}>
+                        <strong>Despacho / Registo Administrativo:</strong> {details.responseMessage}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: '18pt', textAlign: 'center', fontSize: '10pt' }}>
+                    <p style={{ fontWeight: 700, textTransform: 'uppercase', marginBottom: '16pt' }}>
+                      {recipientEntity.toUpperCase()}, AOS {formatAngolanDateExtenso(createdIso).toUpperCase()}.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24pt', marginTop: '10pt' }}>
+                      <div>
+                        <p style={{ fontWeight: 700, marginBottom: '22pt' }}>O(A) Requerente</p>
+                        <div style={{ borderBottom: '1px solid #000000', width: '90%', margin: '0 auto 4pt auto' }}></div>
+                        <p style={{ color: '#c00000', fontWeight: 700 }}>{request.requesterName}</p>
+                      </div>
+                      <div>
+                        <p style={{ fontWeight: 700, marginBottom: '22pt' }}>Despacho da Direcção / Secretaria</p>
+                        <div style={{ borderBottom: '1px solid #000000', width: '90%', margin: '0 auto 4pt auto' }}></div>
+                        <p>{request.details?.resolvedBy || 'Carimbo e Assinatura Oficial'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ================================================================= */}
+            {/* MODO 0B: BLOQUEIO ESTRITO DE EMISSÃO QUANDO INVÁLIDO / CANCELADO  */}
+            {/* ================================================================= */}
+            {viewMode === 'emissao' && isEmissionBlockedInModal && (
+              <div className="py-12 px-6 text-center space-y-4">
+                <div className="flex justify-center">
+                  <img
+                    src={emblemAngolaImg}
+                    alt="Insígnia da República de Angola"
+                    className="w-16 h-auto object-contain mx-auto"
+                  />
+                </div>
+                <p className="text-sm font-bold uppercase">REPÚBLICA DE ANGOLA · DIRECÇÃO MUNICIPAL DA EDUCAÇÃO DO QUÊSSUA</p>
+                <div className="max-w-xl mx-auto p-6 rounded-2xl border-2 border-red-300 bg-red-50 space-y-2 text-left">
+                  <div className="flex items-center gap-2 text-red-900 font-bold text-base">
+                    <Ban className="w-5 h-5 text-red-700 shrink-0" />
+                    <span>Emissão de Documento Oficial Bloqueada</span>
+                  </div>
+                  <p className="text-sm text-red-900 leading-relaxed">
+                    {isCancelledRequest
+                      ? `Este pedido (${request.protocol}) foi cancelado pelo próprio requerente (${request.requesterName}) e já não pode ser emitido.`
+                      : isUnenrolledStudentBlock
+                      ? enrollmentCheck.reason ||
+                        `Não é possível emitir Declaração de Matrícula, Boletim de Notas ou Guia de Transferência porque o(a) aluno(a) "${details.studentName || request.requesterName}" não consta matriculado(a) na instituição "${request.targetSchoolName}".`
+                      : `A Guia de Transferência (${request.protocol}) só pode ser emitida após a Escola de Destino confirmar a disponibilidade de vaga e reservar uma turma.`}
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('requerimento')}
+                      className="px-4 py-2 bg-[#002133] text-white text-xs font-bold rounded-xl cursor-pointer print:hidden"
+                    >
+                      Ver Documento Formal do Pedido (Requerimento)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ================================================================= */}
             {/* 1. DECLARAÇÃO DE EFECTIVIDADE — 100% IDÊNTICA AO SERVIÇO SIGRE    */}
             {/* ================================================================= */}
-            {request.serviceType === 'DECLARACAO_EFECTIVIDADE' && (() => {
+            {viewMode === 'emissao' && !isEmissionBlockedInModal && request.serviceType === 'DECLARACAO_EFECTIVIDADE' && (() => {
               const rec = efectividadeRecord;
               const isFem = resolveIsFeminino(rec.nome, rec.tratamento, true);
 
@@ -896,7 +1256,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {/* ================================================================= */}
             {/* 2. DECLARAÇÃO DE SERVIÇO — 100% IDÊNTICA AO SERVIÇO SIGRE         */}
             {/* ================================================================= */}
-            {request.serviceType === 'DECLARACAO_SERVICO' && (() => {
+            {viewMode === 'emissao' && !isEmissionBlockedInModal && request.serviceType === 'DECLARACAO_SERVICO' && (() => {
               const sigre = (details.sigreServico || {}) as Record<string, any>;
               const storedList = getStoredDeclaracaoServicoRecords();
               const matched = storedList.find(
@@ -1026,7 +1386,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {/* ================================================================= */}
             {/* 3. GUIA DE FÉRIAS — 100% IDÊNTICA AO SERVIÇO SIGRE                */}
             {/* ================================================================= */}
-            {request.serviceType === 'GUIA_FERIAS' && (() => {
+            {viewMode === 'emissao' && !isEmissionBlockedInModal && request.serviceType === 'GUIA_FERIAS' && (() => {
               const sigre = (details.sigreGuiaFerias || {}) as Record<string, any>;
               const storedList = getStoredGuiaFeriasRecords();
               const matched = storedList.find(
@@ -1136,7 +1496,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {/* ================================================================= */}
             {/* 4. GUIA DE COLOCAÇÃO — 100% IDÊNTICA AO SERVIÇO SIGRE             */}
             {/* ================================================================= */}
-            {request.serviceType === 'GUIA_COLOCACAO' && (() => {
+            {viewMode === 'emissao' && !isEmissionBlockedInModal && request.serviceType === 'GUIA_COLOCACAO' && (() => {
               const sigre = (details.sigreGuiaColocacao || {}) as Record<string, any>;
               const storedList = getStoredGuiaColocacaoRecords();
               const matched = storedList.find(
@@ -1235,7 +1595,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
             {/* ================================================================= */}
             {/* 5. SERVIÇOS ESCOLARES (BOLETIM, MATRÍCULA, TRANSFERÊNCIA)         */}
             {/* ================================================================= */}
-            {!isSigreAdminService && (
+            {viewMode === 'emissao' && !isEmissionBlockedInModal && !isSigreAdminService && (
               <>
                 <div className="text-center space-y-0.5 mb-3 pb-1">
                   <div className="flex justify-center mb-1.5">
@@ -1481,35 +1841,39 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
 
             <button
               type="button"
+              disabled={!canPrintOrDownloadCurrentView}
               onClick={handleDownloadPdf}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <FileDown className="w-4 h-4" />
-              <span>Baixar Declaração (PDF)</span>
+              <span>{viewMode === 'requerimento' ? 'Baixar Requerimento (PDF)' : 'Baixar Declaração (PDF)'}</span>
             </button>
 
             <button
               type="button"
+              disabled={!canPrintOrDownloadCurrentView}
               onClick={handlePrint}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Printer className="w-4 h-4" />
               <span>Imprimir (1 Página)</span>
             </button>
 
-            {onMarkAsConcluidoAndNotify && request.status !== 'CONCLUIDO' && (
-              <button
-                type="button"
-                onClick={() => {
-                  onMarkAsConcluidoAndNotify(request);
-                  onClose();
-                }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Marcar Emitido & Concluir</span>
-              </button>
-            )}
+            {onMarkAsConcluidoAndNotify &&
+              request.status !== 'CONCLUIDO' &&
+              !isEmissionBlockedInModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onMarkAsConcluidoAndNotify(request);
+                    onClose();
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Marcar Emitido & Concluir</span>
+                </button>
+              )}
           </div>
         </div>
       </div>

@@ -34,23 +34,23 @@ export const InfoModal: React.FC<InfoModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white text-slate-900 rounded-3xl max-w-lg w-full shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden relative max-h-[90vh] flex flex-col">
+      <div className="rams-modal max-w-lg w-full overflow-hidden relative max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="bg-slate-50 p-6 relative shrink-0 border-b border-slate-200">
+        <div className="pb-5 relative shrink-0 border-b border-[#E5E5EA]">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-200/50 transition-colors cursor-pointer"
+            className="absolute top-0 right-0 p-2 text-[#6E6E73] hover:text-[#1D1D1F] rounded-[10px] hover:bg-[#F5F5F7] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[9px] uppercase font-black tracking-[0.25em] text-[#f75142]">
+            <span className="rams-badge-clean">
               Sigre
             </span>
           </div>
 
-          <h3 className="text-2xl font-black uppercase tracking-tight text-[#002133]">
+          <h3 className="text-2xl font-bold tracking-tight text-[#1D1D1F]">
             {type === 'about' && 'Sobre o Sigre'}
             {type === 'terms' && 'Termos e Políticas de Privacidade'}
             {type === 'support' && 'Suporte & Contato'}
@@ -59,33 +59,35 @@ export const InfoModal: React.FC<InfoModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-4 text-slate-600 text-xs sm:text-sm leading-relaxed">
+        <div className="pt-5 overflow-y-auto space-y-4 text-[#6E6E73] text-xs sm:text-sm leading-relaxed">
           {type === 'about' && (
             <>
               <p>
-                O <strong className="text-[#002133]">Sigre (Sistema Integrado de Gestão Escolar)</strong> nasceu com o propósito de transformar a gestão educacional em redes públicas e privadas de ensino em todo o país.
+                O <strong className="text-[#1D1D1F]">Sigre (Sistema Integrado de Gestão Escolar)</strong> nasceu com o propósito de transformar a gestão educacional em redes públicas e privadas de ensino em todo o país.
               </p>
-              <div className="bg-[#fef2f1] border border-[#f75142]/20 rounded-2xl p-4 text-xs text-slate-700">
-                <p className="font-black mb-1 text-[#f75142] uppercase tracking-wider text-[11px]">
-                  "Priorizamos a melhor organização da Educação"
+              <div className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-[14px] p-4 text-xs text-[#1D1D1F]">
+                <p className="rams-badge-clean mb-1 block">
+                  &ldquo;Menos, mas melhor — Organização da Educação&rdquo;
                 </p>
                 Acreditamos que professores que gastam menos tempo com burocracias manuais têm mais tempo para inspirar e educar seus alunos.
               </div>
-              <h4 className="font-black text-[#002133] text-xs uppercase tracking-[0.15em]">Nossos Pilares:</h4>
-              <ul className="space-y-2 text-xs">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#f75142] shrink-0" />
-                  <span><strong className="text-[#002133]">Simplicidade Operacional:</strong> Interfaces limpas e objetivas.</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#f75142] shrink-0" />
-                  <span><strong className="text-[#002133]">Transparência Pedagógica:</strong> Acesso direto para pais e alunos.</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#f75142] shrink-0" />
-                  <span><strong className="text-[#002133]">Segurança de Dados:</strong> Em conformidade com a LGPD e padrões do MEC.</span>
-                </li>
-              </ul>
+              <details className="rams-details" open>
+                <summary>Ver detalhes</summary>
+                <ul className="mt-3 space-y-2 text-xs">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-[#1D1D1F] shrink-0" />
+                    <span><strong className="text-[#1D1D1F]">Simplicidade Operacional:</strong> Interfaces limpas e objetivas.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-[#1D1D1F] shrink-0" />
+                    <span><strong className="text-[#1D1D1F]">Transparência Pedagógica:</strong> Acesso direto para pais e alunos.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-[#1D1D1F] shrink-0" />
+                    <span><strong className="text-[#1D1D1F]">Segurança de Dados:</strong> Em conformidade com a Lei 22/11 da APD.</span>
+                  </li>
+                </ul>
+              </details>
             </>
           )}
 
@@ -95,24 +97,29 @@ export const InfoModal: React.FC<InfoModalProps> = ({
                 O Sigre preza pela total transparência e proteção rigorosa de dados de estudantes, docentes e equipes gestoras.
               </p>
               <div className="space-y-3 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">1. Privacidade dos Estudantes</h5>
-                  <p className="text-slate-600 mt-1">
-                    Dados pessoais de menores são tratados exclusivamente para finalidades pedagógicas e de escrituração escolar legal, sem compartilhamento comercial de qualquer natureza.
+                <div className="p-3 bg-[#F5F5F7] rounded-[10px] border border-[#E5E5EA]">
+                  <h5 className="font-bold text-[#1D1D1F] text-xs uppercase tracking-wider">1. Privacidade dos Estudantes</h5>
+                  <p className="text-[#6E6E73] mt-1">
+                    Dados pessoais de menores são tratados exclusivamente para finalidades pedagógicas e de escrituração escolar legal.
                   </p>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">2. Proteção e Segurança de Dados</h5>
-                  <p className="text-slate-600 mt-1">
-                    Criptografia de ponta a ponta para diários de classe, históricos escolares e relatórios socioeducacionais.
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <h5 className="font-black text-[#002133] text-xs uppercase tracking-wider">3. Responsabilidade das Instituições</h5>
-                  <p className="text-slate-600 mt-1">
-                    Cada instituição escolar conectada ao Sigre mantém autonomia de controle de acesso de suas respectivas turmas e matrículas.
-                  </p>
-                </div>
+                <details className="rams-details">
+                  <summary>Ver detalhes</summary>
+                  <div className="mt-2 space-y-2">
+                    <div className="p-3 bg-[#F5F5F7] rounded-[10px] border border-[#E5E5EA]">
+                      <h5 className="font-bold text-[#1D1D1F] text-xs uppercase tracking-wider">2. Proteção e Segurança de Dados</h5>
+                      <p className="text-[#6E6E73] mt-1">
+                        Criptografia de ponta a ponta para diários de classe, históricos escolares e relatórios socioeducacionais.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-[#F5F5F7] rounded-[10px] border border-[#E5E5EA]">
+                      <h5 className="font-bold text-[#1D1D1F] text-xs uppercase tracking-wider">3. Responsabilidade das Instituições</h5>
+                      <p className="text-[#6E6E73] mt-1">
+                        Cada instituição escolar conectada ao Sigre mantém autonomia de controle de acesso de suas respectivas turmas e matrículas.
+                      </p>
+                    </div>
+                  </div>
+                </details>
               </div>
             </>
           )}

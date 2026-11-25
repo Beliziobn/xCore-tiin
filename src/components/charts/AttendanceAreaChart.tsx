@@ -95,17 +95,6 @@ export const AttendanceAreaChart: React.FC<AttendanceAreaChartProps> = ({
   const selectedItem = currentData[selectedIndex] || currentData[currentData.length - 1];
   const statusLabel = calculatedRate >= 97 ? 'Excelente' : calculatedRate >= 85 ? 'Bom' : 'Atenção';
 
-  // Simulação / Auto-cycle animado
-  useEffect(() => {
-    let timer: any;
-    if (isPlaying) {
-      timer = setInterval(() => {
-        setSelectedIndex((prev) => (prev + 1) % currentData.length);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [isPlaying, currentData.length]);
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}

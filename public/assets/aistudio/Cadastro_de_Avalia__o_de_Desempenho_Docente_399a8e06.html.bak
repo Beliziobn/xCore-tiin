@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cadastro de Avaliação de Desempenho Docente</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<style>
+:root{--bg:#f4f6f7;--surface:#fff;--ink:#14202b;--muted:#566472;--line:#cfd7dd;--red:#b3202a;--gold:#c79a1f;--hero:#14202b;--hero-ink:#fff;--field:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f161c;--surface:#18222b;--ink:#e8edf1;--muted:#9aa8b4;--line:#2d3b47;--red:#ec6b73;--gold:#e0b84a;--hero:#0a1015;--hero-ink:#f2f5f7;--field:#111a21}}
+:root[data-theme="dark"]{--bg:#0f161c;--surface:#18222b;--ink:#e8edf1;--muted:#9aa8b4;--line:#2d3b47;--red:#ec6b73;--gold:#e0b84a;--hero:#0a1015;--hero-ink:#f2f5f7;--field:#111a21}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Public Sans",system-ui,sans-serif}
+.hero{background:var(--hero);color:var(--hero-ink);border-bottom:6px solid var(--red);position:relative}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:6px;background:linear-gradient(90deg,var(--red) 0 45%,var(--gold) 45% 60%,var(--hero) 60%)}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px}
+.hero .wrap{padding-top:56px;padding-bottom:56px}
+.org{margin:0 0 18px;font-size:.95rem;opacity:.8}
+h1{font:700 clamp(1.9rem,5vw,3rem)/1.12 "Source Serif 4",Georgia,serif;margin:0 0 16px;max-width:19ch}
+.hero p.lead{max-width:56ch;margin:0 0 26px;opacity:.88}
+.btn{display:inline-block;font:600 1rem "Public Sans",sans-serif;padding:12px 22px;border-radius:6px;border:2px solid var(--red);background:var(--red);color:#fff;cursor:pointer;text-decoration:none}
+.btn.alt{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.steps{display:flex;flex-wrap:wrap;gap:10px 28px;margin:30px 0 0;padding:0;list-style:none;font-size:.92rem;opacity:.85}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:26px 24px;margin:26px 0}
+h2{font:700 1.4rem/1.2 "Source Serif 4",Georgia,serif;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px;font-size:.93rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.span2{grid-column:1/-1}
+label{display:block;font-weight:500;font-size:.9rem;margin-bottom:5px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+textarea{min-height:84px;resize:vertical}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left}
+th{font-size:.85rem;color:var(--muted);font-weight:600}
+td input{max-width:92px;text-align:center}
+td.n,th.n{text-align:center}
+td.calc{font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+tr.sum td{background:color-mix(in srgb,var(--gold) 14%,transparent);font-weight:600}
+.note{font-size:.85rem;color:var(--muted);margin-top:12px}
+.radios{display:flex;gap:28px;flex-wrap:wrap}
+.radios label{display:flex;gap:8px;align-items:center;font-size:1rem}
+.radios input{width:auto}
+.sig{border-top:1px solid var(--ink);padding-top:6px;margin-top:34px;font-size:.88rem;color:var(--muted)}
+.final{display:flex;gap:30px;flex-wrap:wrap;align-items:baseline}
+.final strong{font:700 2.4rem "Source Serif 4",serif;color:var(--red)}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 40px}
+#msg{margin:0 0 14px;font-weight:600}
+.rec{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:10px 0;flex-wrap:wrap}
+.rec span{color:var(--muted);font-size:.9rem}
+footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media print{.hero,.actions,#lista,footer{display:none}body{background:#fff;color:#000}section.card{border-color:#999}}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap">
+<p class="org">República de Angola · Ministério da Educação</p>
+<h1>Cadastro da ficha de avaliação de desempenho anual</h1>
+<p class="lead">Para educadores de infância e professores do ensino primário e secundário. Registe a identificação, as notas trimestrais, os comentários e as assinaturas num único formulário.</p>
+<a class="btn" href="#ficha">Começar o cadastro</a>
+<ul class="steps"><li>1. Identificação</li><li>2. Notas por trimestre</li><li>3. Comentários</li><li>4. Assinaturas</li></ul>
+</div></header>
+
+<main class="wrap" id="ficha">
+<form id="f" novalidate>
+
+<section class="card">
+<h2>Identificação do avaliado</h2>
+<p class="sub">Campos do cabeçalho da ficha (Anexo III).</p>
+<div class="grid">
+<div><label for="a">a) Província</label><input id="a" name="a"></div>
+<div><label for="b">b) Município</label><input id="b" name="b"></div>
+<div><label for="c">c) Escola / instituição</label><input id="c" name="c"></div>
+<div class="span2"><label for="nome">Nome completo *</label><input id="nome" name="nome" required autocomplete="name"></div>
+<div><label for="cat">Categoria *</label><input id="cat" name="categoria" required></div>
+<div><label for="ag">Agente nº *</label><input id="ag" name="agente" required inputmode="numeric"></div>
+<div><label for="dav">Data de avaliação *</label><input id="dav" name="dataAval" type="date" required></div>
+</div>
+</section>
+
+<section class="card">
+<h2>Período a que respeita a avaliação</h2>
+<p class="sub">Indique o intervalo avaliado.</p>
+<div class="grid">
+<div><label for="de">De</label><input id="de" name="de" type="date"></div>
+<div><label for="ate">A</label><input id="ate" name="ate" type="date"></div>
+</div>
+</section>
+
+<section class="card">
+<h2>Classificação dos indicadores</h2>
+<p class="sub">Introduza a nota de cada indicador por trimestre. Os totais e as médias são calculados automaticamente.</p>
+<div class="tw"><table id="tb">
+<thead><tr><th class="n">Nº</th><th>Indicadores</th><th class="n">I Trim</th><th class="n">II Trim</th><th class="n">III Trim</th><th class="n">Média</th></tr></thead>
+<tbody></tbody>
+<tfoot>
+<tr class="sum"><td></td><td>Classificação quantitativa</td><td class="calc" id="q0">–</td><td class="calc" id="q1">–</td><td class="calc" id="q2">–</td><td class="calc" id="q3">–</td></tr>
+<tr><td></td><td>Classificação qualitativa</td>
+<td><input name="ql0" aria-label="Qualitativa I trimestre"></td><td><input name="ql1" aria-label="Qualitativa II trimestre"></td><td><input name="ql2" aria-label="Qualitativa III trimestre"></td><td><input name="ql3" aria-label="Qualitativa final"></td></tr>
+</tfoot></table></div>
+<p class="note">1. A pontuação trimestral é a soma de todos os indicadores. 2. A média é a soma dos trimestres dividida pelos trimestres lectivos (os preenchidos). 3. A classificação qualitativa é a faixa correspondente à nota.</p>
+</section>
+
+<section class="card">
+<h2>Classificação anual dos indicadores</h2>
+<p class="sub">Média final por indicador e classificação final.</p>
+<div class="tw"><table><thead><tr><th class="n">Nº</th><th>Indicadores</th><th class="n">Média final</th></tr></thead><tbody id="anual"></tbody></table></div>
+<div class="final" style="margin-top:20px">
+<div><label>Final quantitativa</label><strong id="fq">–</strong></div>
+<div style="flex:1;min-width:200px"><label for="fql">Final qualitativa</label><input id="fql" name="finalQual"></div>
+</div>
+</section>
+
+<section class="card">
+<h2>Apreciação geral</h2>
+<p class="sub">Comentários dos avaliadores. Os comentários são feitos por trimestre.</p>
+<div class="grid">
+<div class="span2"><label for="c1">Comentário 1</label><textarea id="c1" name="c1"></textarea></div>
+<div class="span2"><label for="c2">Comentário 2</label><textarea id="c2" name="c2"></textarea></div>
+<div class="span2"><label for="c3">Comentário 3</label><textarea id="c3" name="c3"></textarea></div>
+<div class="span2"><label for="cf">Comentário final</label><textarea id="cf" name="cf"></textarea></div>
+</div>
+</section>
+
+<section class="card">
+<h2>Avaliador</h2>
+<div class="grid">
+<div><label for="avn">Nome</label><input id="avn" name="avNome"></div>
+<div><label for="avf">Função</label><input id="avf" name="avFuncao"></div>
+<div><label for="avd">Data</label><input id="avd" name="avData" type="date"></div>
+</div>
+<div class="sig">Assinatura do avaliador</div>
+</section>
+
+<section class="card">
+<h2>Concordância com a avaliação</h2>
+<div class="radios" role="radiogroup" aria-label="Concordância">
+<label><input type="radio" name="conc" value="Concordo"> Concordo</label>
+<label><input type="radio" name="conc" value="Não concordo"> Não concordo</label>
+</div>
+<div class="grid" style="margin-top:18px"><div><label for="avdd">Data do avaliado</label><input id="avdd" name="avdData" type="date"></div></div>
+<div class="sig">Assinatura do avaliado</div>
+<div class="sig">Assinatura do homologante</div>
+</section>
+
+<p id="msg" role="status"></p>
+<div class="actions">
+<button class="btn" type="submit">Guardar cadastro</button>
+<button class="btn alt" type="button" id="pr">Imprimir ficha</button>
+<button class="btn alt" type="reset" id="rs">Limpar</button>
+</div>
+
+<section class="card" id="lista"><h2>Cadastros guardados</h2><p class="sub">Guardados neste navegador.</p><div id="recs"><p class="note">Ainda não há cadastros.</p></div></section>
+</form>
+</main>
+<footer>Modelo: Diário da República, I Série — N.º 18, de 27 de Janeiro de 2022, Anexo III.</footer>
+
+<script>
+var IND=["Qualidade do processo de ensino e aprendizagem","Progresso do aluno ou desenvolvimento do aluno","Responsabilidade","Aperfeiçoamento profissional e inovação pedagógica","Relações humanas"];
+var ANUAL=[0,1,3,2,4];
+var tb=document.querySelector("#tb tbody"),an=document.getElementById("anual"),f=document.getElementById("f");
+IND.forEach(function(t,i){
+ tb.insertAdjacentHTML("beforeend",'<tr><td class="n">'+(i+1)+'</td><td>'+t+'</td>'+[0,1,2].map(function(k){return '<td><input type="number" min="0" step="0.1" data-i="'+i+'" data-t="'+k+'" name="n'+i+'_'+k+'" aria-label="'+t+', trimestre '+(k+1)+'"></td>'}).join('')+'<td class="calc" id="m'+i+'">–</td></tr>');
+});
+ANUAL.forEach(function(ix,j){an.insertAdjacentHTML("beforeend",'<tr><td class="n">'+(j+1)+'</td><td>'+IND[ix]+'</td><td class="calc" id="a'+ix+'">–</td></tr>')});
+function fmt(v){return v===null?"–":(Math.round(v*100)/100).toString().replace(".",",")}
+function calc(){
+ var inp=tb.querySelectorAll("input"),v={},tot=[0,0,0],cnt=[0,0,0],any=[false,false,false];
+ inp.forEach(function(e){var i=e.dataset.i,t=e.dataset.t;if(e.value!==""){var n=parseFloat(e.value);(v[i]=v[i]||{})[t]=n;tot[t]+=n;any[t]=true}});
+ var fin=0,has=false;
+ IND.forEach(function(_,i){
+  var o=v[i]||{},ks=Object.keys(o),m=null;
+  if(ks.length){m=ks.reduce(function(s,k){return s+o[k]},0)/ks.length;fin+=m;has=true}
+  document.getElementById("m"+i).textContent=fmt(m);document.getElementById("a"+i).textContent=fmt(m);
+ });
+ var live=any.filter(Boolean).length,sum=0;
+ [0,1,2].forEach(function(t){document.getElementById("q"+t).textContent=any[t]?fmt(tot[t]):"–";sum+=tot[t]});
+ document.getElementById("q3").textContent=live?fmt(sum/live):"–";
+ document.getElementById("fq").textContent=has?fmt(fin):"–";
+ return has?fin:null;
+}
+f.addEventListener("input",calc);
+f.addEventListener("reset",function(){setTimeout(calc,0);document.getElementById("msg").textContent=""});
+document.getElementById("pr").onclick=function(){window.print()};
+function load(){try{return JSON.parse(localStorage.getItem("cadastros")||"[]")}catch(e){return[]}}
+function save(a){try{localStorage.setItem("cadastros",JSON.stringify(a))}catch(e){}}
+var mem=load();
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function render(){
+ var r=document.getElementById("recs");
+ if(!mem.length){r.innerHTML='<p class="note">Ainda não há cadastros.</p>';return}
+ r.innerHTML=mem.map(function(x){return '<div class="rec"><div><strong>'+esc(x.nome)+'</strong><br><span>'+esc(x.categoria)+' · Agente nº '+esc(x.agente)+'</span></div><span>Final: '+(x.final===null?'–':fmt(x.final))+'</span></div>'}).join('');
+}
+render();
+f.addEventListener("submit",function(e){
+ e.preventDefault();var msg=document.getElementById("msg");
+ var miss=["nome","cat","ag","dav"].filter(function(id){return !document.getElementById(id).value.trim()});
+ if(miss.length){msg.style.color="var(--red)";msg.textContent="Preencha nome completo, categoria, agente nº e data de avaliação.";document.getElementById(miss[0]).focus();return}
+ var d={};new FormData(f).forEach(function(v,k){d[k]=v});d.final=calc();d.criado=new Date().toISOString();
+ mem.unshift(d);save(mem);render();
+ msg.style.color="var(--ink)";msg.textContent="Cadastro guardado: "+d.nome+".";
+});
+</script>
+</body>
+</html>

@@ -87,14 +87,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
 
 
-          {/* Primary Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 w-full max-w-md sm:max-w-none">
+          {/* Primary Action Buttons — Política Visual Dieter Rams / Apple HIG */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 w-full max-w-md sm:max-w-none">
             {/* Começa agora */}
             <button
               id="landing-btn-solicitar-demo"
               type="button"
               onClick={onAcessarPlataforma}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-[#f75142] hover:bg-[#e04335] text-white font-bold text-sm sm:text-base px-8 py-4 rounded-xl shadow-[0_12px_28px_-6px_rgba(247,81,66,0.45)] hover:shadow-[0_16px_34px_-6px_rgba(247,81,66,0.6)] active:scale-98 transition-all duration-200 cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-[#1D1D1F] hover:bg-black text-white font-semibold text-sm sm:text-base px-8 py-4 rounded-[14px] border border-[#1D1D1F] active:scale-98 transition-colors duration-200 cursor-pointer"
             >
               <span>Começa agora</span>
               <ArrowRight className="w-4 h-4 shrink-0" strokeWidth={2} />
@@ -105,11 +105,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               id="landing-btn-acessar-plataforma"
               type="button"
               onClick={onOpenQuickServices || onAcessarPlataforma}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 text-[#002133] border-2 border-slate-300 hover:border-slate-800 font-bold text-sm sm:text-base px-8 py-4 rounded-xl shadow-xs hover:shadow-md active:scale-98 transition-all duration-200 cursor-pointer group"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-white hover:bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA] hover:border-[#1D1D1F]/30 font-semibold text-sm sm:text-base px-8 py-4 rounded-[14px] active:scale-98 transition-colors duration-200 cursor-pointer group"
             >
-              <Zap className="w-4 h-4 text-amber-500 fill-amber-500 group-hover:scale-110 transition-transform" />
+              <Zap className="w-4 h-4 text-[#1D1D1F] transition-transform" />
               <span>Serviços Rápidos</span>
-              <span className="text-[10px] uppercase font-black tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+              <span className="rams-badge-clean">
                 Sem login
               </span>
             </button>

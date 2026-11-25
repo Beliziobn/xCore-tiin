@@ -1295,5 +1295,118 @@ html.lenis.lenis-stopped {
   }
 }
 
+/* ============================================================================
+ * Política Visual Dieter Rams / Apple HIG ("Menos, mas melhor")
+ * ============================================================================ */
+:root {
+  --rams-bg: #FFFFFF;
+  --rams-border: #E5E5EA;
+  --rams-text: #1D1D1F;
+  --rams-muted: #6E6E73;
+  --rams-accent: #0071E3;
+  --rams-radius: 14px;
+}
 
+.rams-card,
+.rams-modal {
+  background: var(--rams-bg) !important;
+  border: 1px solid var(--rams-border) !important;
+  border-radius: var(--rams-radius) !important;
+  box-shadow: none !important;
+  color: var(--rams-text) !important;
+  padding: 24px !important;
+}
+
+.rams-badge-clean {
+  background: transparent !important;
+  border: none !important;
+  color: var(--rams-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 !important;
+}
+
+.rams-details summary {
+  cursor: pointer;
+  color: var(--rams-accent);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 8px;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rams-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.rams-details summary::after {
+  content: "→";
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+
+.rams-details[open] summary::after {
+  transform: rotate(90deg);
+}
+
+/* Padronização global de cartões e contentores segundo Dieter Rams / Apple HIG */
+.stat-card,
+.ui-modern-card,
+.kpi:not(.kpi--featured),
+.student-card,
+.enrollment-card,
+.metric-card,
+.profile-modal {
+  background: var(--rams-bg) !important;
+  border: 1px solid var(--rams-border) !important;
+  border-radius: var(--rams-radius) !important;
+  box-shadow: none !important;
+  color: var(--rams-text) !important;
+}
+
+.kpi--featured {
+  border-radius: var(--rams-radius) !important;
+  box-shadow: none !important;
+}
+
+/* Eliminação global de sombras ruidosas (shadow-lg / shadow-xl / shadow-2xl) */
+html:not(.dark) .shadow-lg,
+html:not(.dark) .shadow-xl,
+html:not(.dark) .shadow-2xl {
+  box-shadow: none !important;
+}
+
+/* Neutralização de classes de fundo e bordas coloridas ruidosas (Política Rams) */
+html:not(.dark) [class*="bg-yellow-"],
+html:not(.dark) [class*="bg-amber-"],
+html:not(.dark) [class*="bg-orange-"],
+html:not(.dark) [class*="bg-pink-"],
+html:not(.dark) [class*="bg-purple-"],
+html:not(.dark) [class*="bg-indigo-"],
+html:not(.dark) [class*="bg-cyan-"],
+html:not(.dark) [class*="bg-teal-"],
+html:not(.dark) [class*="bg-lime-"],
+html:not(.dark) [class*="bg-emerald-50"],
+html:not(.dark) [class*="bg-emerald-100"] {
+  background-color: #F5F5F7 !important;
+  color: var(--rams-text) !important;
+}
+
+html:not(.dark) [class*="border-yellow-"],
+html:not(.dark) [class*="border-amber-"],
+html:not(.dark) [class*="border-orange-"],
+html:not(.dark) [class*="border-pink-"],
+html:not(.dark) [class*="border-purple-"],
+html:not(.dark) [class*="border-indigo-"],
+html:not(.dark) [class*="border-cyan-"],
+html:not(.dark) [class*="border-teal-"],
+html:not(.dark) [class*="border-lime-"],
+html:not(.dark) [class*="border-emerald-"] {
+  border-color: var(--rams-border) !important;
+}
 

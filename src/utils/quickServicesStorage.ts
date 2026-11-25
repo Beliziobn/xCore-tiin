@@ -12,11 +12,11 @@ import {
   deleteQuickRequestFromFirestore,
   clearAllQuickRequestsFromFirestore,
   subscribeToQuickRequests,
+  fetchStudentsFromFirestore,
 } from './firestoreSync';
 import { getStoredStudents } from './studentStorage';
 import { isExpressApiAvailable, checkExpressApiResponse } from './apiAvailability';
 import {
-  getStudentsForTurma,
   normalizeClasseName,
   normalizeTurmaName,
 } from './turmaStudentsService';
@@ -40,17 +40,71 @@ function normalizeText(val?: string | null): string {
     .trim();
 }
 
-function schoolsMatch(schoolA?: string | null, schoolB?: string | null): boolean {
+const GENERIC_SCHOOL_NAMES = new Set([
+  'escola oficial',
+  'escola municipal',
+  'direccao escolar',
+  'direcao escolar',
+  'unidade escolar municipal',
+  'unidade escolar municipal de quessua',
+]);
+
+export function schoolsMatch(schoolA?: string | null, schoolB?: string | null): boolean {
   const a = normalizeText(schoolA);
   const b = normalizeText(schoolB);
   if (!a || !b) return false;
+  if (GENERIC_SCHOOL_NAMES.has(a) || GENERIC_SCHOOL_NAMES.has(b)) return false;
   if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
+
   // Compare core school numbers if present (e.g. "166", "314", "269")
-  const numA = a.match(/\b\d{3,5}\b/)?.[0];
-  const numB = b.match(/\b\d{3,5}\b/)?.[0];
-  if (numA && numB && numA === numB) return true;
+  const numA = a.match(/\b\d{2,5}\b/)?.[0];
+  const numB = b.match(/\b\d{2,5}\b/)?.[0];
+  if (numA && numB) {
+    return numA === numB;
+  }
+  if ((numA && !numB) || (!numA && numB)) {
+    return false;
+  }
+
+  if (a.length >= 12 && b.length >= 12 && (a.includes(b) || b.includes(a))) {
+    return true;
+  }
   return false;
+}
+
+function collectAllRealSchoolStudentRecords(): any[] {
+  const collected: any[] = [];
+  const seenKeys = new Set<string>();
+
+  const pushUnique = (item: any) => {
+    if (!item || typeof item !== 'object') return;
+    const reg = item.registrationData && typeof item.registrationData === 'object' ? item.registrationData : null;
+    const rawName = String(item.nomeCompleto || item.name || reg?.nomeCompleto || reg?.name || '').trim();
+    if (!rawName) return;
+    const rawSchool = String(item.escola || item.nomeEscola || item.schoolName || reg?.escola || '').trim();
+    const key = `${normalizeText(rawName)}::${normalizeText(rawSchool)}::${normalizeText(
+      item.codigoMatricula || item.numeroDocumento || reg?.codigoMatricula || ''
+    )}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+    collected.push(item);
+  };
+
+  getStoredStudents().forEach(pushUnique);
+
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    for (const storageKey of ['ucore_admin_students', 'ucore_director_students', 'ucore_teacher_students']) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) arr.forEach(pushUnique);
+        }
+      } catch {}
+    }
+  }
+
+  return collected;
 }
 
 export interface StudentEnrollmentVerificationResult {
@@ -58,12 +112,86 @@ export interface StudentEnrollmentVerificationResult {
   studentId?: string;
   matchedName?: string;
   matchedBiOrProcesso?: string;
+  matchedSchoolName?: string;
   codigoMatricula?: string;
   classe?: string;
   turma?: string;
   turno?: string;
   sala?: string;
   reason?: string;
+}
+
+export function findStudentEnrolledSchoolAnywhere(params: {
+  studentName?: string;
+  studentBiOrProcesso?: string;
+}): { schoolName: string; studentName: string; classe?: string; turma?: string } | null {
+  const targetName = normalizeText(params.studentName);
+  const targetBi = normalizeText(params.studentBiOrProcesso);
+  if (!targetName && !targetBi) return null;
+
+  const allStudents = collectAllRealSchoolStudentRecords();
+  for (const st of allStudents) {
+    const reg = st.registrationData && typeof st.registrationData === 'object' ? st.registrationData : null;
+    const stNameRaw = String(st.nomeCompleto || st.name || reg?.nomeCompleto || reg?.name || '').trim();
+    const stName = normalizeText(stNameRaw);
+    const stBi = normalizeText(st.numeroDocumento || reg?.numeroDocumento || '');
+    const stCod = normalizeText(st.codigoMatricula || reg?.codigoMatricula || '');
+    const stSchool = String(st.escola || st.nomeEscola || st.schoolName || reg?.escola || '').trim();
+    if (!stSchool || GENERIC_SCHOOL_NAMES.has(normalizeText(stSchool))) continue;
+
+    const nameMatches =
+      targetName &&
+      stName &&
+      (stName === targetName ||
+        (targetName.length >= 6 && stName.includes(targetName)) ||
+        (stName.length >= 6 && targetName.includes(stName)));
+    const biMatches =
+      targetBi &&
+      targetBi !== 'registo escolar' &&
+      targetBi !== 'nao informado' &&
+      ((stBi && (stBi === targetBi || stBi.includes(targetBi))) ||
+        (stCod && (stCod === targetBi || stCod.includes(targetBi))));
+
+    if (nameMatches || biMatches) {
+      return {
+        schoolName: stSchool,
+        studentName: stNameRaw,
+        classe: normalizeClasseName(st.classeEtapaModulo || st.classe || st.gradeClass || reg?.classe || ''),
+        turma: normalizeTurmaName(st.turma || reg?.turma || 'Turma A'),
+      };
+    }
+  }
+
+  const miniPautas = getStoredMiniPautas();
+  for (const mp of miniPautas) {
+    const mpSchool = String(mp.schoolName || '').trim();
+    if (!mpSchool || GENERIC_SCHOOL_NAMES.has(normalizeText(mpSchool))) continue;
+    for (const row of mp.rows || []) {
+      const rowName = normalizeText(row.nomeCompleto);
+      const rowCode = normalizeText(row.codigo || row.studentId);
+      const nameMatches =
+        targetName &&
+        rowName &&
+        (rowName === targetName ||
+          (targetName.length >= 6 && rowName.includes(targetName)) ||
+          (rowName.length >= 6 && targetName.includes(rowName)));
+      const codeMatches =
+        targetBi &&
+        targetBi !== 'registo escolar' &&
+        rowCode &&
+        (rowCode === targetBi || rowCode.includes(targetBi));
+      if (nameMatches || codeMatches) {
+        return {
+          schoolName: mpSchool,
+          studentName: row.nomeCompleto,
+          classe: normalizeClasseName(mp.classe),
+          turma: normalizeTurmaName(mp.turma),
+        };
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -78,7 +206,7 @@ export function verifyStudentEnrollmentInSchool(params: {
 }): StudentEnrollmentVerificationResult {
   const targetName = normalizeText(params.studentName);
   const targetBi = normalizeText(params.studentBiOrProcesso);
-  const targetSchool = params.schoolName || '';
+  const targetSchool = (params.schoolName || '').trim();
   const normClasse = params.studentClasse ? normalizeClasseName(params.studentClasse) : '';
   const normTurma = params.studentTurma ? normalizeTurmaName(params.studentTurma) : '';
 
@@ -89,15 +217,25 @@ export function verifyStudentEnrollmentInSchool(params: {
     };
   }
 
-  // 1. Procurar nos estudantes registados em studentStorage
-  const storedStudents = getStoredStudents();
-  for (const st of storedStudents) {
-    const stName = normalizeText(st.nomeCompleto || st.name);
-    const stBi = normalizeText(st.numeroDocumento || st.codigoMatricula || st.id);
-    const stSchool = st.escola || st.nomeEscola || '';
+  if (!targetSchool) {
+    return {
+      isEnrolled: false,
+      reason: 'A instituição escolar do pedido não foi especificada.',
+    };
+  }
 
-    const schoolOk = !targetSchool || !stSchool || schoolsMatch(stSchool, targetSchool);
-    if (!schoolOk) continue;
+  // 1. Procurar estritamente nos estudantes registados da escola indicada
+  const allRealStudents = collectAllRealSchoolStudentRecords();
+  for (const st of allRealStudents) {
+    const reg = st.registrationData && typeof st.registrationData === 'object' ? st.registrationData : null;
+    const stNameRaw = String(st.nomeCompleto || st.name || reg?.nomeCompleto || reg?.name || '').trim();
+    const stName = normalizeText(stNameRaw);
+    const stBi = normalizeText(st.numeroDocumento || reg?.numeroDocumento || '');
+    const stCod = normalizeText(st.codigoMatricula || reg?.codigoMatricula || '');
+    const stIdNorm = normalizeText(st.id || '');
+    const stSchool = String(st.escola || st.nomeEscola || st.schoolName || reg?.escola || '').trim();
+
+    if (!stSchool || !schoolsMatch(stSchool, targetSchool)) continue;
 
     const nameMatches =
       targetName &&
@@ -109,31 +247,38 @@ export function verifyStudentEnrollmentInSchool(params: {
       targetBi &&
       targetBi !== 'registo escolar' &&
       targetBi !== 'nao informado' &&
-      stBi &&
-      (stBi === targetBi || stBi.includes(targetBi));
+      ((stBi && (stBi === targetBi || stBi.includes(targetBi))) ||
+        (stCod && (stCod === targetBi || stCod.includes(targetBi))) ||
+        (stIdNorm && stIdNorm === targetBi));
 
     if (nameMatches || biMatches) {
-      const resolvedClasse = normalizeClasseName(st.classe || normClasse || '7ª Classe');
-      const resolvedTurma = normalizeTurmaName(st.turma || normTurma || 'Turma A');
+      const rawCls = st.classeEtapaModulo || st.classe || st.gradeClass || reg?.classe || normClasse || '7ª Classe';
+      const rawTur = st.turma || reg?.turma || normTurma || 'Turma A';
+      const resolvedClasse = normalizeClasseName(rawCls);
+      const resolvedTurma = normalizeTurmaName(rawTur);
       return {
         isEnrolled: true,
         studentId: st.id || `st_${stName}`,
-        matchedName: st.nomeCompleto || st.name,
-        matchedBiOrProcesso: st.numeroDocumento || st.codigoMatricula || params.studentBiOrProcesso || 'Confirmado',
-        codigoMatricula: st.codigoMatricula || `MAT-2026/${String(st.id || '001').slice(-3).toUpperCase()}`,
+        matchedName: stNameRaw,
+        matchedBiOrProcesso:
+          st.numeroDocumento || st.codigoMatricula || reg?.codigoMatricula || params.studentBiOrProcesso || 'Confirmado',
+        matchedSchoolName: stSchool,
+        codigoMatricula:
+          st.codigoMatricula ||
+          reg?.codigoMatricula ||
+          `MAT-2026/${String(st.id || '001').slice(-3).toUpperCase()}`,
         classe: resolvedClasse,
         turma: resolvedTurma,
-        turno: st.turno || st.periodo || (resolvedTurma.includes('B') ? 'Tarde' : 'Manhã'),
-        sala: st.sala || (resolvedTurma.includes('B') ? 'Sala 04' : 'Sala 03'),
+        turno: st.turno || st.periodo || reg?.turno || (resolvedTurma.includes('B') ? 'Tarde' : 'Manhã'),
+        sala: st.sala || st.room || reg?.sala || (resolvedTurma.includes('B') ? 'Sala 04' : 'Sala 03'),
       };
     }
   }
 
-  // 2. Procurar nas Mini-Pautas submetidas pelos professores da escola
+  // 2. Procurar nas Mini-Pautas submetidas especificamente pelos professores desta escola
   const miniPautas = getStoredMiniPautas();
   for (const mp of miniPautas) {
-    const schoolOk = !targetSchool || !mp.schoolName || schoolsMatch(mp.schoolName, targetSchool);
-    if (!schoolOk) continue;
+    if (!mp.schoolName || !schoolsMatch(mp.schoolName, targetSchool)) continue;
 
     for (const row of mp.rows || []) {
       const rowName = normalizeText(row.nomeCompleto);
@@ -157,6 +302,7 @@ export function verifyStudentEnrollmentInSchool(params: {
           studentId: row.studentId,
           matchedName: row.nomeCompleto,
           matchedBiOrProcesso: row.codigo || params.studentBiOrProcesso || 'Confirmado',
+          matchedSchoolName: mp.schoolName,
           codigoMatricula: row.codigo || `MAT-2026/${String(row.numero).padStart(3, '0')}`,
           classe: normalizeClasseName(mp.classe),
           turma: normalizeTurmaName(mp.turma),
@@ -167,56 +313,70 @@ export function verifyStudentEnrollmentInSchool(params: {
     }
   }
 
-  // 3. Procurar nas listas de turmas oficiais da escola (turmaStudentsService)
-  const classesToCheck = normClasse
-    ? [normClasse]
-    : ['Iniciação', '1ª Classe', '2ª Classe', '3ª Classe', '4ª Classe', '5ª Classe', '6ª Classe', '7ª Classe', '8ª Classe', '9ª Classe'];
-  const turmasToCheck = normTurma ? [normTurma] : ['Turma A', 'Turma B', 'Turma C', 'Turma D'];
+  // Verificar se o aluno existe matriculado numa OUTRA escola para dar mensagem precisa
+  const otherSchoolMatch = findStudentEnrolledSchoolAnywhere({
+    studentName: params.studentName,
+    studentBiOrProcesso: params.studentBiOrProcesso,
+  });
 
-  for (const cl of classesToCheck) {
-    for (const tm of turmasToCheck) {
-      const roster = getStudentsForTurma({
-        schoolName: targetSchool || undefined,
-        gradeClass: cl,
-        turma: tm,
-      });
-      for (const st of roster.students) {
-        const stName = normalizeText(st.nomeCompleto);
-        const stDoc = normalizeText(st.numeroDocumento);
-        const stCod = normalizeText(st.codigoMatricula);
-
-        const nameMatches =
-          targetName &&
-          stName &&
-          (stName === targetName ||
-            (targetName.length >= 6 && stName.includes(targetName)) ||
-            (stName.length >= 6 && targetName.includes(stName)));
-        const biMatches =
-          targetBi &&
-          targetBi !== 'registo escolar' &&
-          ((stDoc && stDoc === targetBi) || (stCod && stCod === targetBi));
-
-        if (nameMatches || biMatches) {
-          return {
-            isEnrolled: true,
-            studentId: st.id,
-            matchedName: st.nomeCompleto,
-            matchedBiOrProcesso: st.numeroDocumento || st.codigoMatricula,
-            codigoMatricula: st.codigoMatricula,
-            classe: roster.metadata.classe,
-            turma: roster.metadata.turma,
-            turno: roster.metadata.turno.split(' ')[0] || 'Manhã',
-            sala: roster.metadata.sala,
-          };
-        }
-      }
-    }
+  if (otherSchoolMatch && !schoolsMatch(otherSchoolMatch.schoolName, targetSchool)) {
+    return {
+      isEnrolled: false,
+      reason: `O aluno "${otherSchoolMatch.studentName}" está matriculado na instituição "${otherSchoolMatch.schoolName}", e NÃO pertence à instituição "${targetSchool}".`,
+    };
   }
 
   return {
     isEnrolled: false,
-    reason: `O aluno "${params.studentName || 'Não identificado'}" não consta matriculado em nenhuma turma registada na instituição ${targetSchool || 'escolar'}.`,
+    reason: `O aluno "${params.studentName || 'Não identificado'}" não consta matriculado em nenhuma turma registada na instituição "${targetSchool}".`,
   };
+}
+
+let lastCloudStudentsSyncAt = 0;
+
+export async function verifyStudentEnrollmentInSchoolAsync(params: {
+  schoolName?: string;
+  studentName?: string;
+  studentBiOrProcesso?: string;
+  studentClasse?: string;
+  studentTurma?: string;
+}): Promise<StudentEnrollmentVerificationResult> {
+  const localResult = verifyStudentEnrollmentInSchool(params);
+  if (localResult.isEnrolled) return localResult;
+
+  // Se ainda não sincronizamos alunos da nuvem recentemente, garante leitura fresca do Firestore antes de bloquear
+  const now = Date.now();
+  if (now - lastCloudStudentsSyncAt > 30000) {
+    lastCloudStudentsSyncAt = now;
+    try {
+      const cloudStudents = await fetchStudentsFromFirestore();
+      if (Array.isArray(cloudStudents) && cloudStudents.length > 0 && typeof localStorage !== 'undefined') {
+        const prevFlag = Boolean((window as any).__SIGRE_APPLYING_SERVER_STATE);
+        (window as any).__SIGRE_APPLYING_SERVER_STATE = true;
+        try {
+          const existing = getStoredStudents();
+          const map = new Map<string, any>();
+          existing.forEach((s: any) => {
+            if (s && (s.id || s.nomeCompleto)) {
+              map.set(String(s.id || `${s.nomeCompleto}::${s.escola || ''}`), s);
+            }
+          });
+          cloudStudents.forEach((s: any) => {
+            if (s && (s.id || s.nomeCompleto || s.name)) {
+              map.set(String(s.id || `${s.nomeCompleto || s.name}::${s.escola || s.schoolName || ''}`), s);
+            }
+          });
+          localStorage.setItem('ucore_registered_students_v2', JSON.stringify(Array.from(map.values())));
+        } finally {
+          (window as any).__SIGRE_APPLYING_SERVER_STATE = prevFlag;
+        }
+      }
+    } catch {
+      // ignore cloud sync error
+    }
+  }
+
+  return verifyStudentEnrollmentInSchool(params);
 }
 
 export interface ExtractedStudentGradesResult {
@@ -452,84 +612,147 @@ export async function fetchQuickRequests(filters?: {
   phone?: string;
   id?: string;
 }): Promise<QuickServiceRequest[]> {
-  const map = new Map<string, QuickServiceRequest>();
+  const hasFilters = Boolean(
+    filters?.schoolId || filters?.targetRole || filters?.protocol || filters?.phone || filters?.id
+  );
 
-  // 1. Fetch from Firestore Cloud Database (Multi-device source of truth)
-  try {
-    const cloudRequests = await fetchQuickRequestsFromFirestore();
-    if (Array.isArray(cloudRequests) && cloudRequests.length > 0) {
-      cloudRequests.forEach((r) => {
-        if (r && r.id) map.set(r.id, r);
-      });
-    }
-  } catch (err) {
-    console.warn('[QuickServices] Cloud fetch warning:', err);
-  }
-
-  // 2. Fetch from backend API (only when Express API backend is active)
-  if (isExpressApiAvailable()) {
-    try {
-      const params = new URLSearchParams();
-      if (filters?.schoolId) params.append('schoolId', filters.schoolId);
-      if (filters?.targetRole) params.append('targetRole', filters.targetRole);
-      if (filters?.protocol) params.append('protocol', filters.protocol);
-      if (filters?.phone) params.append('phone', filters.phone);
-      if (filters?.id) params.append('id', filters.id);
-
-      const res = await fetch(`/api/quick-requests?${params.toString()}`, {
-        headers: { Accept: 'application/json' },
-      });
-      if (checkExpressApiResponse(res)) {
-        const data = await res.json();
-        if (Array.isArray(data.requests)) {
-          data.requests.forEach((r: QuickServiceRequest) => {
-            if (r && r.id && !map.has(r.id)) {
-              map.set(r.id, r);
-              saveQuickRequestToFirestore(r).catch(() => {});
-            }
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('[QuickServices] Server API fetch failed, continuing with cloud/local:', err);
+  // Return cached results if we just fetched within the last 15 seconds (prevents multi-component mount / event storms)
+  const now = Date.now();
+  if (!hasFilters && now - lastQuickRequestsFetchAt < 15000) {
+    const cachedList = getCachedQuickRequests();
+    if (cachedList.length > 0) {
+      return cachedList;
     }
   }
 
-  // 3. Fallback to local cache if map is still empty
-  if (map.size === 0) {
+  if (!hasFilters && quickRequestsInFlight) {
+    return quickRequestsInFlight;
+  }
+
+  const runFetch = async (): Promise<QuickServiceRequest[]> => {
+    const map = new Map<string, QuickServiceRequest>();
+
+    // 1. Fetch from Firestore Cloud Database (Multi-device source of truth)
     try {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      if (cached) {
-        const list: QuickServiceRequest[] = JSON.parse(cached);
-        list.forEach((r) => {
+      const cloudRequests = await fetchQuickRequestsFromFirestore();
+      if (Array.isArray(cloudRequests) && cloudRequests.length > 0) {
+        cloudRequests.forEach((r) => {
           if (r && r.id) map.set(r.id, r);
         });
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[QuickServices] Cloud fetch warning:', err);
+    }
+
+    // 2. Fetch from backend API (only when Express API backend is active)
+    if (isExpressApiAvailable()) {
+      try {
+        const params = new URLSearchParams();
+        if (filters?.schoolId) params.append('schoolId', filters.schoolId);
+        if (filters?.targetRole) params.append('targetRole', filters.targetRole);
+        if (filters?.protocol) params.append('protocol', filters.protocol);
+        if (filters?.phone) params.append('phone', filters.phone);
+        if (filters?.id) params.append('id', filters.id);
+
+        const res = await fetch(`/api/quick-requests?${params.toString()}`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (checkExpressApiResponse(res)) {
+          const data = await res.json();
+          if (Array.isArray(data.requests)) {
+            data.requests.forEach((r: QuickServiceRequest) => {
+              if (r && r.id && !map.has(r.id)) {
+                map.set(r.id, r);
+                saveQuickRequestToFirestore(r).catch(() => {});
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[QuickServices] Server API fetch failed, continuing with cloud/local:', err);
+      }
+    }
+
+    // 3. Fallback to local cache if map is still empty
+    if (map.size === 0) {
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          const list: QuickServiceRequest[] = JSON.parse(cached);
+          list.forEach((r) => {
+            if (r && r.id) map.set(r.id, r);
+          });
+        }
+      } catch {}
+    }
+
+    let list = Array.from(map.values());
+
+    // Cache in localStorage WITHOUT triggering Storage.prototype.setItem dirty sync loop
+    writeQuickCacheQuietly(list);
+    if (!hasFilters) {
+      lastQuickRequestsFetchAt = Date.now();
+    }
+
+    // Apply filters
+    if (filters?.protocol) {
+      list = list.filter((r) => r.protocol?.toUpperCase() === filters.protocol?.toUpperCase());
+    }
+    if (filters?.schoolId) {
+      list = list.filter((r) => r.targetSchoolId === filters.schoolId);
+    }
+    if (filters?.targetRole) {
+      list = list.filter((r) => r.targetRole === filters.targetRole);
+    }
+    if (filters?.phone) {
+      list = list.filter((r) => r.requesterPhone?.includes(filters.phone || ''));
+    }
+
+    return list;
+  };
+
+  if (!hasFilters) {
+    quickRequestsInFlight = runFetch().finally(() => {
+      quickRequestsInFlight = null;
+    });
+    return quickRequestsInFlight;
   }
 
-  let list = Array.from(map.values());
+  return runFetch();
+}
 
-  // Cache in localStorage
+let lastQuickRequestsFetchAt = 0;
+let quickRequestsInFlight: Promise<QuickServiceRequest[]> | null = null;
+
+export function getCachedQuickRequests(): QuickServiceRequest[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch {}
+    const cached = localStorage.getItem(STORAGE_KEY);
+    if (!cached) return [];
+    const parsed = JSON.parse(cached);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
-  // Apply filters
-  if (filters?.protocol) {
-    list = list.filter((r) => r.protocol?.toUpperCase() === filters.protocol?.toUpperCase());
+function writeQuickCacheQuietly(list: QuickServiceRequest[]): boolean {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false;
+  const prevFlag = Boolean((window as any).__SIGRE_APPLYING_SERVER_STATE);
+  (window as any).__SIGRE_APPLYING_SERVER_STATE = true;
+  try {
+    const nextJson = JSON.stringify(list);
+    const prevJson = localStorage.getItem(STORAGE_KEY);
+    if (prevJson !== nextJson) {
+      localStorage.setItem(STORAGE_KEY, nextJson);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  } finally {
+    (window as any).__SIGRE_APPLYING_SERVER_STATE = prevFlag;
   }
-  if (filters?.schoolId) {
-    list = list.filter((r) => r.targetSchoolId === filters.schoolId);
-  }
-  if (filters?.targetRole) {
-    list = list.filter((r) => r.targetRole === filters.targetRole);
-  }
-  if (filters?.phone) {
-    list = list.filter((r) => r.requesterPhone?.includes(filters.phone || ''));
-  }
-
-  return list;
 }
 
 export async function submitQuickServiceRequest(payload: {
@@ -549,27 +772,31 @@ export async function submitQuickServiceRequest(payload: {
   details: QuickServiceRequest['details'];
 }): Promise<{ success: boolean; request?: QuickServiceRequest; protocol?: string; message?: string; error?: string }> {
   try {
-    const res = await fetch('/api/quick-requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
     let createdRequest: QuickServiceRequest | undefined;
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.request) {
-        createdRequest = {
-          ...data.request,
-          destinationSchoolId: payload.destinationSchoolId || payload.details?.destinationSchoolId,
-          destinationSchoolName: payload.destinationSchoolName || payload.details?.destinationSchool,
-          details: {
-            ...payload.details,
-            ...(data.request.details || {}),
-          },
-        };
-      }
+    if (isExpressApiAvailable()) {
+      try {
+        const res = await fetch('/api/quick-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (checkExpressApiResponse(res)) {
+          const data = await res.json();
+          if (data.success && data.request) {
+            createdRequest = {
+              ...data.request,
+              destinationSchoolId: payload.destinationSchoolId || payload.details?.destinationSchoolId,
+              destinationSchoolName: payload.destinationSchoolName || payload.details?.destinationSchool,
+              details: {
+                ...payload.details,
+                ...(data.request.details || {}),
+              },
+            };
+          }
+        }
+      } catch {}
     }
 
     if (!createdRequest) {
@@ -602,12 +829,10 @@ export async function submitQuickServiceRequest(payload: {
     await saveQuickRequestToFirestore(createdRequest);
 
     // Update local cache
-    try {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      const list: QuickServiceRequest[] = cached ? JSON.parse(cached) : [];
-      list.unshift(createdRequest);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    } catch {}
+    const list = getCachedQuickRequests();
+    list.unshift(createdRequest);
+    writeQuickCacheQuietly(list);
+    lastQuickRequestsFetchAt = Date.now();
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('sigre_quick_request_created', { detail: createdRequest }));
@@ -639,15 +864,8 @@ export async function updateQuickRequestStatus(
 ): Promise<{ success: boolean; request?: QuickServiceRequest; error?: string }> {
   try {
     const nowIso = new Date().toISOString();
-    let existingItem: QuickServiceRequest | undefined;
-
-    try {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      if (cached) {
-        const list: QuickServiceRequest[] = JSON.parse(cached);
-        existingItem = list.find((r) => r.id === id);
-      }
-    } catch {}
+    const list = getCachedQuickRequests();
+    const existingItem = list.find((r) => r.id === id);
 
     const mergedDetails: QuickServiceRequest['details'] = {
       ...(existingItem?.details || {}),
@@ -669,39 +887,36 @@ export async function updateQuickRequestStatus(
     // 1. Update in Firestore Cloud
     await updateQuickRequestInFirestore(id, firestorePayload);
 
-    // 2. Update via server endpoint
-    try {
-      await fetch(`/api/quick-requests/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...updates,
-          details: mergedDetails,
-        }),
-      });
-    } catch {}
+    // 2. Update via server endpoint (only if Express API is available)
+    if (isExpressApiAvailable()) {
+      try {
+        await fetch(`/api/quick-requests/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...updates,
+            details: mergedDetails,
+          }),
+        });
+      } catch {}
+    }
 
     // 3. Update local cache
     let updatedObj: QuickServiceRequest | undefined;
-    try {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      if (cached) {
-        const list: QuickServiceRequest[] = JSON.parse(cached);
-        const idx = list.findIndex((r) => r.id === id);
-        if (idx !== -1) {
-          list[idx] = {
-            ...list[idx],
-            ...firestorePayload,
-            details: {
-              ...(list[idx].details || {}),
-              ...mergedDetails,
-            },
-          };
-          updatedObj = list[idx];
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-        }
-      }
-    } catch {}
+    const idx = list.findIndex((r) => r.id === id);
+    if (idx !== -1) {
+      list[idx] = {
+        ...list[idx],
+        ...firestorePayload,
+        details: {
+          ...(list[idx].details || {}),
+          ...mergedDetails,
+        },
+      };
+      updatedObj = list[idx];
+      writeQuickCacheQuietly(list);
+      lastQuickRequestsFetchAt = Date.now();
+    }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
@@ -716,27 +931,139 @@ export async function updateQuickRequestStatus(
   }
 }
 
+export async function updateSubmittedQuickServiceRequest(
+  id: string,
+  payload: {
+    title?: string;
+    requesterName?: string;
+    requesterPhone?: string;
+    requesterEmail?: string;
+    requesterRoleTitle?: string;
+    targetRole?: 'DIRECTOR' | 'ADMIN';
+    targetSchoolId?: string;
+    targetSchoolName?: string;
+    destinationSchoolId?: string;
+    destinationSchoolName?: string;
+    status?: QuickServiceStatus;
+    details: QuickServiceRequest['details'];
+  }
+): Promise<{ success: boolean; request?: QuickServiceRequest; error?: string }> {
+  try {
+    const nowIso = new Date().toISOString();
+    const list = getCachedQuickRequests();
+    const existingItem = list.find((r) => r.id === id);
+
+    const nextStatus: QuickServiceStatus =
+      payload.status ||
+      (existingItem?.status === 'REJEITADO' || existingItem?.status === 'SEM_VAGA_DESTINO'
+        ? 'PENDENTE'
+        : existingItem?.status || 'PENDENTE');
+
+    const mergedDetails: QuickServiceRequest['details'] = {
+      ...(existingItem?.details || {}),
+      ...(payload.details || {}),
+      lastEditedByRequesterAt: nowIso,
+    };
+
+    const firestorePayload: Partial<QuickServiceRequest> = {
+      ...(payload.title !== undefined ? { title: payload.title } : {}),
+      ...(payload.requesterName !== undefined ? { requesterName: payload.requesterName } : {}),
+      ...(payload.requesterPhone !== undefined ? { requesterPhone: payload.requesterPhone } : {}),
+      ...(payload.requesterEmail !== undefined ? { requesterEmail: payload.requesterEmail } : {}),
+      ...(payload.requesterRoleTitle !== undefined ? { requesterRoleTitle: payload.requesterRoleTitle } : {}),
+      ...(payload.targetRole !== undefined ? { targetRole: payload.targetRole } : {}),
+      ...(payload.targetSchoolId !== undefined ? { targetSchoolId: payload.targetSchoolId } : {}),
+      ...(payload.targetSchoolName !== undefined ? { targetSchoolName: payload.targetSchoolName } : {}),
+      ...(payload.destinationSchoolId !== undefined
+        ? { destinationSchoolId: payload.destinationSchoolId }
+        : {}),
+      ...(payload.destinationSchoolName !== undefined
+        ? { destinationSchoolName: payload.destinationSchoolName }
+        : {}),
+      status: nextStatus,
+      details: mergedDetails,
+      updatedAt: nowIso,
+    };
+
+    await updateQuickRequestInFirestore(id, firestorePayload);
+
+    if (isExpressApiAvailable()) {
+      try {
+        await fetch(`/api/quick-requests/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(firestorePayload),
+        });
+      } catch {}
+    }
+
+    let updatedObj: QuickServiceRequest | undefined;
+    const idx = list.findIndex((r) => r.id === id);
+    if (idx !== -1) {
+      list[idx] = {
+        ...list[idx],
+        ...firestorePayload,
+        details: mergedDetails,
+      };
+      updatedObj = list[idx];
+      writeQuickCacheQuietly(list);
+      lastQuickRequestsFetchAt = Date.now();
+    } else if (existingItem) {
+      updatedObj = {
+        ...existingItem,
+        ...firestorePayload,
+        details: mergedDetails,
+      };
+    }
+
+    if (typeof window !== 'undefined' && updatedObj) {
+      window.dispatchEvent(new CustomEvent('sigre_quick_request_updated', { detail: updatedObj }));
+      window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+    }
+
+    return { success: true, request: updatedObj };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao alterar pedido submetido.' };
+  }
+}
+
+export async function cancelQuickServiceRequest(
+  id: string,
+  reason?: string
+): Promise<{ success: boolean; request?: QuickServiceRequest; error?: string }> {
+  const nowIso = new Date().toISOString();
+  const cleanReason =
+    (reason || '').trim() || 'Pedido cancelado pelo requerente antes da emissão final.';
+  return updateQuickRequestStatus(id, {
+    status: 'CANCELADO',
+    responseMessage: cleanReason,
+    details: {
+      cancelledAt: nowIso,
+      cancelledByRequester: true,
+      cancelReason: cleanReason,
+    },
+  });
+}
+
 export async function deleteQuickRequest(id: string): Promise<boolean> {
   try {
     // Delete from Firestore Cloud
     await deleteQuickRequestFromFirestore(id);
 
-    // Call server DELETE
-    try {
-      await fetch(`/api/quick-requests/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-    } catch {}
+    // Call server DELETE (only if Express API is available)
+    if (isExpressApiAvailable()) {
+      try {
+        await fetch(`/api/quick-requests/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+      } catch {}
+    }
 
     // Update local cache
-    try {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      if (cached) {
-        const list: QuickServiceRequest[] = JSON.parse(cached);
-        const filtered = list.filter((r) => r.id !== id);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-      }
-    } catch {}
+    const list = getCachedQuickRequests();
+    const filtered = list.filter((r) => r.id !== id);
+    writeQuickCacheQuietly(filtered);
+    lastQuickRequestsFetchAt = Date.now();
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('sigre_quick_request_deleted', { detail: { id } }));
@@ -755,15 +1082,16 @@ export async function clearAllQuickRequests(): Promise<{ success: boolean; count
   try {
     const cloudCount = await clearAllQuickRequestsFromFirestore();
 
-    // Clear server store
-    try {
-      await fetch('/api/quick-requests/clear-all', { method: 'POST' });
-    } catch {}
+    // Clear server store (only if Express API is available)
+    if (isExpressApiAvailable()) {
+      try {
+        await fetch('/api/quick-requests/clear-all', { method: 'POST' });
+      } catch {}
+    }
 
     // Clear local storage
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-    } catch {}
+    writeQuickCacheQuietly([]);
+    lastQuickRequestsFetchAt = Date.now();
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('sigre_quick_requests_cleared'));
@@ -790,8 +1118,9 @@ export function initRealtimeQuickRequestsSync(
 
   quickRequestsUnsubscribe = subscribeToQuickRequests((list) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-      if (typeof window !== 'undefined') {
+      const changed = writeQuickCacheQuietly(list);
+      lastQuickRequestsFetchAt = Date.now();
+      if (changed && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sigre-data-synced'));
       }
       onUpdate?.(list);

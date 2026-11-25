@@ -35,7 +35,9 @@ import {
   ArrowRightLeft,
   Users,
   BookOpen,
+  Eye,
 } from 'lucide-react';
+import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import type { QuickServiceRequest, QuickServiceStatus, QuickServiceType, UserAccount } from '../../types';
 import {
   fetchQuickRequests,
@@ -46,9 +48,11 @@ import {
   verifyStudentEnrollmentInSchool,
   extractStudentGradesFromPautas,
   getDestinationSchoolTurmaVacancies,
+  schoolsMatch,
   type DestinationTurmaVacancyInfo,
 } from '../../utils/quickServicesStorage';
 import { getRegisteredSchoolsFromStorage, getStoredStudents } from '../../utils/studentStorage';
+import { formatAngolanDateExtenso } from '../../utils/efectividadeStorage';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import { isFemaleFirstName } from '../../utils/genderGrammar';
 
@@ -90,6 +94,8 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
 
   // Modals state
   const [documentModalRequest, setDocumentModalRequest] = useState<QuickServiceRequest | null>(null);
+  const [docModalInitialMode, setDocModalInitialMode] = useState<'requerimento' | 'emissao'>('requerimento');
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [notifyModalRequest, setNotifyModalRequest] = useState<QuickServiceRequest | null>(null);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [targetStatus, setTargetStatus] = useState<QuickServiceStatus>('CONCLUIDO');
@@ -120,9 +126,8 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
 
   const isMasterAdmin =
     currentUser?.email?.trim().toLowerCase() === 'dmedoquessua@gmail.com' ||
-    currentUser?.role === 'admin' ||
-    activeRole === 'admin';
-  const isDirectorOnly = !isMasterAdmin && (activeRole === 'diretor' || currentUser?.role === 'diretor');
+    (currentUser?.role === 'admin' && activeRole === 'admin');
+  const isDirectorOnly = !isMasterAdmin;
 
   const activeDirectorSchoolName = useMemo(() => {
     return (
@@ -139,10 +144,9 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   const schoolEnrolledStudents = useMemo(() => {
     const all = getStoredStudents();
     if (isMasterAdmin && !schoolName) return all;
-    const normSchool = activeDirectorSchoolName.toLowerCase();
     return all.filter((s) => {
-      const sSchool = (s.escola || (s as any).nomeEscola || '').trim().toLowerCase();
-      return !sSchool || sSchool.includes(normSchool) || normSchool.includes(sSchool);
+      const sSchool = (s.escola || (s as any).nomeEscola || '').trim();
+      return sSchool ? schoolsMatch(sSchool, activeDirectorSchoolName) : false;
     });
   }, [activeDirectorSchoolName, isMasterAdmin, schoolName]);
 
@@ -171,9 +175,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   };
 
   const handleClearAll = async () => {
-    if (!window.confirm('Tem certeza de que deseja zerar e eliminar todos os pedidos de Serviços Rápidos & Efectividade? Esta acção eliminará todos os pedidos da nuvem e do sistema.')) {
-      return;
-    }
+    setConfirmClearAll(false);
     setIsLoading(true);
     try {
       await clearAllQuickRequests();
@@ -226,28 +228,18 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       return requests;
     }
 
-    if (activeRole === 'diretor' || currentUser?.role === 'diretor') {
-      const dirSchool = activeDirectorSchoolName.toLowerCase();
-      return requests.filter((r) => {
-        if (!DIRECTOR_ALLOWED_SERVICES.includes(r.serviceType)) {
-          return false;
-        }
-        if (!dirSchool) return true;
-        const targetSchool = (r.targetSchoolName || '').trim().toLowerCase();
-        return (
-          targetSchool.includes(dirSchool) ||
-          dirSchool.includes(targetSchool) ||
-          !r.targetSchoolName
-        );
-      });
-    }
-
-    return requests;
-  }, [requests, isMasterAdmin, activeRole, activeDirectorSchoolName, currentUser]);
+    return requests.filter((r) => {
+      if (!DIRECTOR_ALLOWED_SERVICES.includes(r.serviceType)) {
+        return false;
+      }
+      if (!activeDirectorSchoolName) return true;
+      const targetSchool = (r.targetSchoolName || '').trim();
+      return targetSchool ? schoolsMatch(targetSchool, activeDirectorSchoolName) : true;
+    });
+  }, [requests, isMasterAdmin, activeDirectorSchoolName]);
 
   // Transfer Vacancy Consultation requests directed TO this school as the Destination School
   const destinationVacancyRequests = useMemo(() => {
-    const dirSchool = activeDirectorSchoolName.toLowerCase();
     return requests.filter((r) => {
       if (r.serviceType !== 'GUIA_TRANSFERENCIA') return false;
       if (isMasterAdmin) return true;
@@ -256,11 +248,9 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         r.details?.destinationSchool ||
         r.details?.purpose ||
         ''
-      )
-        .trim()
-        .toLowerCase();
-      if (!destSchool || !dirSchool) return false;
-      return destSchool.includes(dirSchool) || dirSchool.includes(destSchool);
+      ).trim();
+      if (!destSchool || !activeDirectorSchoolName) return false;
+      return schoolsMatch(destSchool, activeDirectorSchoolName);
     });
   }, [requests, isMasterAdmin, activeDirectorSchoolName]);
 
@@ -538,11 +528,23 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
     }
   };
 
+  const handleOpenIncomingFormalDocument = (req: QuickServiceRequest) => {
+    setDocModalInitialMode('requerimento');
+    setDocumentModalRequest(req);
+  };
+
   // Open Official Document Modal with enriched enrollment & Mini-Pauta grades snapshot
   const handleOpenOfficialDocumentWithVerification = async (
     req: QuickServiceRequest,
     enrollmentInfo?: ReturnType<typeof verifyStudentEnrollmentInSchool>
   ) => {
+    if (req.status === 'CANCELADO') {
+      showToast?.('Emissão bloqueada: este pedido foi cancelado pelo requerente.');
+      setDocModalInitialMode('requerimento');
+      setDocumentModalRequest(req);
+      return;
+    }
+
     const details = req.details || {};
     if (STUDENT_ACADEMIC_SERVICES.includes(req.serviceType)) {
       const check =
@@ -612,6 +614,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         details: updatedDetails,
       };
 
+      setDocModalInitialMode('emissao');
       setDocumentModalRequest(enrichedRequest);
 
       // Persist verified details in background
@@ -623,6 +626,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       return;
     }
 
+    setDocModalInitialMode('emissao');
     setDocumentModalRequest(req);
   };
 
@@ -889,6 +893,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         };
         setRequests((prev) => [updatedReq, ...prev.filter((r) => r.id !== updatedReq.id)]);
         setIsDirectEmitModalOpen(false);
+        setDocModalInitialMode('emissao');
         setDocumentModalRequest(updatedReq);
         showToast?.(`${title} gerado com sucesso!`);
       }
@@ -971,16 +976,36 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
           )}
 
           {isMasterAdmin && (
-            <button
-              type="button"
-              onClick={handleClearAll}
-              disabled={isLoading}
-              className="px-3.5 py-2 bg-[#fde8ed] hover:opacity-90 text-[#c8002f] font-semibold text-xs rounded-[10px] flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Zerar e eliminar permanentemente todos os pedidos"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Zerar Pedidos</span>
-            </button>
+            confirmClearAll ? (
+              <div className="inline-flex items-center gap-1.5 bg-[#fde8ed] border border-[#f5c2cf] px-2.5 py-1.5 rounded-[10px]">
+                <span className="text-xs font-bold text-[#c8002f]">Zerar tudo?</span>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="px-2 py-0.5 rounded bg-[#c8002f] text-white text-xs font-bold cursor-pointer"
+                >
+                  Sim
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearAll(false)}
+                  className="px-2 py-0.5 rounded bg-white text-[#002133] text-xs font-bold cursor-pointer"
+                >
+                  Não
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmClearAll(true)}
+                disabled={isLoading}
+                className="px-3.5 py-2 bg-[#fde8ed] hover:opacity-90 text-[#c8002f] font-semibold text-xs rounded-[10px] flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Zerar e eliminar permanentemente todos os pedidos"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Zerar Pedidos</span>
+              </button>
+            )
           )}
         </div>
       </div>
@@ -1188,6 +1213,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               'SEM_VAGA_DESTINO',
               'CONCLUIDO',
               'REJEITADO',
+              'CANCELADO',
             ] as const
           ).map((st) => (
             <button
@@ -1203,6 +1229,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               {st === 'SEM_VAGA_DESTINO' && 'Sem Vaga'}
               {st === 'CONCLUIDO' && 'Concluídos'}
               {st === 'REJEITADO' && 'Indeferidos'}
+              {st === 'CANCELADO' && 'Cancelados'}
             </button>
           ))}
         </div>
@@ -1284,10 +1311,11 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               req.serviceType === 'GUIA_TRANSFERENCIA' &&
               (isMasterAdmin ||
                 managementTab === 'CONSULTAS_VAGA_DESTINO' ||
-                (destSchoolName &&
-                  activeDirectorSchoolName &&
-                  (destSchoolName.toLowerCase().includes(activeDirectorSchoolName.toLowerCase()) ||
-                    activeDirectorSchoolName.toLowerCase().includes(destSchoolName.toLowerCase()))));
+                Boolean(
+                  destSchoolName &&
+                    activeDirectorSchoolName &&
+                    schoolsMatch(destSchoolName, activeDirectorSchoolName)
+                ));
 
             const isTransferAwaitingVacancy =
               req.serviceType === 'GUIA_TRANSFERENCIA' &&
@@ -1295,14 +1323,19 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
               req.status !== 'CONCLUIDO' &&
               !details.reservedTurma;
 
+            const isCancelled = req.status === 'CANCELADO';
+
             const isEmissionBlocked =
+              isCancelled ||
               (isStudentService && enrollmentCheck && !enrollmentCheck.isEnrolled) ||
               isTransferAwaitingVacancy;
 
             return (
               <div
                 key={req.id}
-                className="bg-white rounded-[14px] p-5 border border-[#e8e8ea] hover:border-[#d1d1d6] transition-colors space-y-4"
+                className={`bg-white rounded-[14px] p-5 border transition-colors space-y-4 ${
+                  isCancelled ? 'border-red-200 bg-red-50/15' : 'border-[#e8e8ea] hover:border-[#d1d1d6]'
+                }`}
               >
                 {/* Zona 1: Header — Protocolo, Título e Badge Semântico */}
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#e8e8ea]">
@@ -1355,6 +1388,11 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                           Indeferido / Rejeitado
                         </span>
                       )}
+                      {req.status === 'CANCELADO' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-900 border border-red-300">
+                          Cancelado pelo Requerente
+                        </span>
+                      )}
                     </div>
 
                     <div className="text-xs text-[#52606d] mt-1.5 flex flex-wrap items-center gap-3">
@@ -1380,8 +1418,19 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
 
                   {/* Zona de Ações Contextuais */}
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Botão Sempre Disponível: Visualizar Documento Formal Recebido com Insígnia */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenIncomingFormalDocument(req)}
+                      className="px-3.5 py-2 bg-[#002133] hover:bg-[#00314a] text-white font-semibold text-xs rounded-[10px] flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Visualizar Documento Formal (Insígnia)</span>
+                    </button>
+
                     {/* Botão de Consulta de Vaga (Diretor da Escola de Origem) */}
-                    {req.serviceType === 'GUIA_TRANSFERENCIA' &&
+                    {!isCancelled &&
+                      req.serviceType === 'GUIA_TRANSFERENCIA' &&
                       enrollmentCheck?.isEnrolled &&
                       (req.status === 'PENDENTE' || req.status === 'EM_ANALISE') && (
                         <button
@@ -1395,7 +1444,8 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                       )}
 
                     {/* Botão de Validar Vagas por Turma (Diretor da Escola de Destino ou Admin) */}
-                    {req.serviceType === 'GUIA_TRANSFERENCIA' &&
+                    {!isCancelled &&
+                      req.serviceType === 'GUIA_TRANSFERENCIA' &&
                       isDestinationDirectorForThisRequest &&
                       req.status !== 'CONCLUIDO' && (
                         <button
@@ -1408,7 +1458,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                         </button>
                       )}
 
-                    {/* Botão de Emissão Oficial (Bloqueado se não matriculado ou se transferência sem vaga confirmada) */}
+                    {/* Botão de Emissão Oficial (Bloqueado se cancelado, não matriculado ou se transferência sem vaga confirmada) */}
                     <button
                       type="button"
                       disabled={Boolean(isEmissionBlocked)}
@@ -1416,7 +1466,9 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                         handleOpenOfficialDocumentWithVerification(req, enrollmentCheck || undefined)
                       }
                       title={
-                        !enrollmentCheck?.isEnrolled && isStudentService
+                        isCancelled
+                          ? 'Pedido cancelado pelo requerente'
+                          : !enrollmentCheck?.isEnrolled && isStudentService
                           ? 'Emissão bloqueada: Aluno não matriculado nesta escola'
                           : isTransferAwaitingVacancy
                           ? 'Aguarde a confirmação de vaga e reserva de turma pela Escola de Destino antes de emitir a Guia de Transferência'
@@ -1436,25 +1488,39 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                       </span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleOpenNotifyModal(
-                          req,
-                          req.serviceType === 'GUIA_TRANSFERENCIA' && req.status === 'VAGA_CONFIRMADA'
-                            ? 'TRANSFERENCIA_ACEITE'
-                            : req.serviceType === 'GUIA_TRANSFERENCIA' && req.status === 'SEM_VAGA_DESTINO'
-                            ? 'TRANSFERENCIA_NEGADA'
-                            : 'LEVANTAMENTO'
-                        )
-                      }
-                      className="btn--secondary text-xs flex items-center gap-1.5"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 text-[#52606d]" />
-                      <span>Responder ao Encarregado</span>
-                    </button>
+                    {!isCancelled && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleOpenNotifyModal(
+                            req,
+                            req.serviceType === 'GUIA_TRANSFERENCIA' && req.status === 'VAGA_CONFIRMADA'
+                              ? 'TRANSFERENCIA_ACEITE'
+                              : req.serviceType === 'GUIA_TRANSFERENCIA' && req.status === 'SEM_VAGA_DESTINO'
+                              ? 'TRANSFERENCIA_NEGADA'
+                              : 'LEVANTAMENTO'
+                          )
+                        }
+                        className="btn--secondary text-xs flex items-center gap-1.5"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-[#52606d]" />
+                        <span>Responder ao Encarregado</span>
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {isCancelled && (
+                  <div className="rounded-[10px] p-3.5 border border-red-200 bg-red-50/70 text-xs text-red-900 flex items-start gap-2.5">
+                    <Ban className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold">Pedido Cancelado pelo Requerente</div>
+                      <p className="text-[11px] mt-0.5">
+                        {details.cancelReason || details.responseMessage || 'O requerente cancelou este pedido antes da emissão final.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Banner de Verificação Automática de Matrícula / Vínculo Escolar */}
                 {isStudentService && enrollmentCheck && (
@@ -1587,195 +1653,210 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
                   </div>
                 )}
 
-                {/* Zona 2 & 3: Dados do Pedinte e Especificações em Superfície Plana */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2 text-xs">
-                  {/* Coluna 1: Identificação do Pedinte */}
-                  <div className="space-y-1.5 lg:border-r lg:border-[#e8e8ea] lg:pr-5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[#52606d] uppercase tracking-wider text-[10px]">
-                        Identificação do Pedinte
-                      </span>
-                      <span className="text-[11px] font-medium text-[#52606d]">
-                        {req.requesterRoleTitle || 'Encarregado / Cidadão'}
-                      </span>
-                    </div>
+                {/* Documento Formal Recebido (Com Insígnia da República de Angola e Quadro Oficial) */}
+                {(() => {
+                  const createdIso = (req.createdAt || new Date().toISOString()).slice(0, 10);
+                  const recipientLabel =
+                    req.targetRole === 'ADMIN'
+                      ? 'Direcção Municipal da Educação do Quêssua'
+                      : req.targetSchoolName || activeDirectorSchoolName;
+                  const formalDocRows: Array<{ label: string; value: string; tone?: 'red' | 'blue' | 'bold' }> = [
+                    { label: 'Protocolo Oficial', value: req.protocol, tone: 'blue' },
+                    {
+                      label: 'Requerente',
+                      value: `${details.tratamento ? `${details.tratamento} ` : ''}${req.requesterName}`,
+                      tone: 'red',
+                    },
+                    {
+                      label: 'Contacto',
+                      value: [req.requesterPhone, req.requesterEmail].filter(Boolean).join(' · ') || '—',
+                    },
+                  ];
 
-                    <div className="font-semibold text-sm text-[#002133]">{req.requesterName}</div>
+                  if (isStudentService) {
+                    formalDocRows.push({
+                      label: 'Aluno(a)',
+                      value: details.studentName || req.requesterName,
+                      tone: 'red',
+                    });
+                    formalDocRows.push({
+                      label: 'Classe / Turma / Matrícula',
+                      value: [
+                        enrollmentCheck?.classe || details.studentClasse,
+                        enrollmentCheck?.turma || details.studentTurma,
+                        enrollmentCheck?.codigoMatricula || details.studentBiOrProcesso,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '—',
+                    });
+                    if (req.serviceType === 'BOLETIM_NOTAS' && details.trimestre) {
+                      formalDocRows.push({ label: 'Trimestre Solicitado', value: details.trimestre });
+                    }
+                    if (req.serviceType === 'GUIA_TRANSFERENCIA') {
+                      formalDocRows.push({
+                        label: 'Escola de Destino / Vaga',
+                        value: `${destSchoolName || 'Instituição pretendida'}${
+                          details.reservedTurma
+                            ? ` (Vaga: ${details.reservedTurma} · ${details.reservedTurno || 'Manhã'})`
+                            : ''
+                        }`,
+                      });
+                    }
+                  } else {
+                    if (details.employeeBi || details.employeeAgente) {
+                      formalDocRows.push({
+                        label: 'N.º Agente / B.I.',
+                        value: [
+                          details.employeeAgente ? `Ag. ${details.employeeAgente}` : '',
+                          details.employeeBi ? `B.I. ${details.employeeBi}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · '),
+                      });
+                    }
+                    if (details.funcao || details.employeeCategory || details.grau) {
+                      formalDocRows.push({
+                        label: 'Função / Categoria / Grau',
+                        value: [
+                          details.funcao || details.sigreServico?.profissao || details.sigreGuiaFerias?.funcao,
+                          details.employeeCategory,
+                          details.grau,
+                        ]
+                          .filter(Boolean)
+                          .join(' · '),
+                      });
+                    }
+                    if (details.employeeSchoolOrDepartment || req.targetSchoolName) {
+                      formalDocRows.push({
+                        label: 'Escola / Local de Serviço',
+                        value: details.employeeSchoolOrDepartment || req.targetSchoolName || 'Direcção Municipal',
+                      });
+                    }
+                    if (req.serviceType === 'DECLARACAO_SERVICO' && details.sigreServico) {
+                      formalDocRows.push({
+                        label: 'Banco / Conta / Salário',
+                        value: [
+                          details.sigreServico.bancoFinal || details.sigreServico.banco,
+                          details.sigreServico.conta,
+                          details.sigreServico.salarioFormatado
+                            ? `${details.sigreServico.salarioFormatado} Kz`
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · '),
+                      });
+                    }
+                    if (req.serviceType === 'GUIA_FERIAS' && details.sigreGuiaFerias) {
+                      formalDocRows.push({
+                        label: 'Licença / Período',
+                        value: `${details.sigreGuiaFerias.tipolic} (${details.sigreGuiaFerias.dias} dias · ${details.sigreGuiaFerias.ini} a ${details.sigreGuiaFerias.fim})`,
+                      });
+                    }
+                  }
 
-                    <div className="flex flex-wrap items-center gap-3 pt-1 text-[#52606d]">
-                      <a
-                        href={`https://wa.me/${fullPhone}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-[#002133] underline underline-offset-2 font-medium numeric"
-                      >
-                        WhatsApp: {req.requesterPhone}
-                      </a>
-                      <a
-                        href={`tel:${cleanPhone}`}
-                        className="hover:text-[#002133] font-medium"
-                        title="Ligar"
-                      >
-                        Ligar
-                      </a>
-                      {req.requesterEmail && (
-                        <a
-                          href={`mailto:${req.requesterEmail}`}
-                          className="hover:text-[#002133] truncate"
+                  if (details.purpose && req.serviceType !== 'GUIA_TRANSFERENCIA') {
+                    formalDocRows.push({ label: 'Finalidade Declarada', value: details.purpose });
+                  }
+                  if (details.notes) {
+                    formalDocRows.push({ label: 'Observações', value: details.notes });
+                  }
+
+                  return (
+                    <div
+                      className="rounded-xl border border-[#cfd6d2] bg-[#fcfdfc] p-4 sm:p-6 shadow-xs space-y-3"
+                      style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
+                    >
+                      <div className="text-center border-b border-black/15 pb-3 space-y-0.5 text-black">
+                        <img
+                          src={emblemAngolaImg}
+                          alt="Insígnia da República de Angola"
+                          className="w-10 h-10 object-contain mx-auto mb-1"
+                        />
+                        <p className="text-[11px] font-bold uppercase tracking-wide m-0">
+                          REPÚBLICA DE ANGOLA · GOVERNO PROVINCIAL DE MALANJE
+                        </p>
+                        <p className="text-[11px] font-bold uppercase m-0">
+                          ADMINISTRAÇÃO MUNICIPAL DO QUÊSSUA · DIRECÇÃO MUNICIPAL DA EDUCAÇÃO
+                        </p>
+                        <p className="text-xs font-bold uppercase underline underline-offset-4 pt-1.5 m-0">
+                          REQUERIMENTO OFICIAL DE SERVIÇO — {req.title.toUpperCase()}
+                        </p>
+                      </div>
+
+                      <p className="text-xs leading-relaxed text-justify text-black m-0">
+                        Excelentíssimo(a) Senhor(a) Responsável da <strong>{recipientLabel}</strong>, o(a) cidadão(ã){' '}
+                        <strong style={{ color: '#c00000' }}>
+                          {details.tratamento ? `${details.tratamento} ` : ''}
+                          {req.requesterName}
+                        </strong>
+                        {details.studentName ? (
+                          <>
+                            , em representação do(a) aluno(a){' '}
+                            <strong style={{ color: '#c00000' }}>{details.studentName}</strong>
+                          </>
+                        ) : null}
+                        , submeteu formalmente este pedido sob o protocolo{' '}
+                        <strong style={{ color: '#0044cc' }}>{req.protocol}</strong> em{' '}
+                        <strong>{formatAngolanDateExtenso(createdIso)}</strong>, requerendo o expediente acima
+                        identificado conforme os dados oficiais discriminados:
+                      </p>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-xs text-black">
+                          <tbody>
+                            {formalDocRows.map((row) => (
+                              <tr key={row.label}>
+                                <th
+                                  scope="row"
+                                  className="w-1/3 border border-slate-300 bg-slate-100/80 px-2.5 py-1.5 text-left font-bold align-top"
+                                >
+                                  {row.label}
+                                </th>
+                                <td
+                                  className="w-2/3 border border-slate-300 px-2.5 py-1.5 text-left align-top"
+                                  style={{
+                                    color:
+                                      row.tone === 'red'
+                                        ? '#c00000'
+                                        : row.tone === 'blue'
+                                        ? '#0044cc'
+                                        : '#000000',
+                                    fontWeight: row.tone ? 700 : 400,
+                                  }}
+                                >
+                                  {row.value}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-600">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <a
+                            href={`https://wa.me/${fullPhone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-[#002133] underline font-semibold"
+                          >
+                            WhatsApp: {req.requesterPhone}
+                          </a>
+                          {req.requesterEmail && <span>{req.requesterEmail}</span>}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenIncomingFormalDocument(req)}
+                          className="text-xs font-bold text-[#0044cc] hover:underline inline-flex items-center gap-1 cursor-pointer"
                         >
-                          {req.requesterEmail}
-                        </a>
-                      )}
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Abrir Folha A4 Completa (PDF / Impressão)</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Colunas 2-3: Especificações Submetidas */}
-                  <div className="space-y-2 lg:col-span-2">
-                    <span className="font-semibold text-[#52606d] uppercase tracking-wider text-[10px] block">
-                      Especificações & Dados Académicos
-                    </span>
-
-                    {(req.serviceType === 'DECLARACAO_EFECTIVIDADE' ||
-                      req.serviceType === 'DECLARACAO_SERVICO' ||
-                      req.serviceType === 'GUIA_FERIAS' ||
-                      req.serviceType === 'GUIA_COLOCACAO') && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Funcionário(a)</span>
-                          <span className="font-semibold text-[#002133] text-xs">
-                            {details.employeeName || req.requesterName}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">B.I. / Agente</span>
-                          <span className="font-mono font-medium text-[#002133] text-xs numeric">
-                            {details.employeeBi || 'Registo Geral'}
-                            {details.employeeAgente ? ` (${details.employeeAgente})` : ''}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Categoria</span>
-                          <span className="font-medium text-[#002133] text-xs">
-                            {details.employeeCategory || 'Docente'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Mês / Ano de Ref.</span>
-                          <span className="font-medium text-[#002133] text-xs numeric">
-                            {details.referenceMonthYear || '2026'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {req.serviceType === 'BOLETIM_NOTAS' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Estudante</span>
-                          <span className="font-semibold text-[#002133] text-xs">
-                            {details.studentName || 'Nome do Aluno'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Classe / Turma</span>
-                          <span className="font-medium text-[#002133] text-xs">
-                            {enrollmentCheck?.classe || details.studentClasse || '7ª Classe'} -{' '}
-                            {enrollmentCheck?.turma || details.studentTurma || 'Turma A'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Trimestre</span>
-                          <span className="font-medium text-[#002133] text-xs">
-                            {details.trimestre || '1º Trimestre'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">B.I. / Processo</span>
-                          <span className="font-mono font-medium text-[#002133] text-xs numeric">
-                            {enrollmentCheck?.codigoMatricula ||
-                              details.studentBiOrProcesso ||
-                              'Não informado'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {req.serviceType === 'DECLARACAO_MATRICULA' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Aluno(a)</span>
-                          <span className="font-semibold text-[#002133] text-xs">{details.studentName}</span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Classe / Turma</span>
-                          <span className="font-medium text-[#002133] text-xs numeric">
-                            {enrollmentCheck?.classe || details.studentClasse} •{' '}
-                            {enrollmentCheck?.turma || details.studentTurma || 'Turma A'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Turno / Sala</span>
-                          <span className="font-medium text-[#002133] text-xs">
-                            {enrollmentCheck?.turno || details.studentPeriodo || 'Manhã'} •{' '}
-                            {enrollmentCheck?.sala || 'Sala 01'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Nº Matrícula / B.I.</span>
-                          <span className="font-mono font-medium text-[#002133] text-xs numeric">
-                            {enrollmentCheck?.codigoMatricula || details.studentBiOrProcesso || 'Geral'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {req.serviceType === 'GUIA_TRANSFERENCIA' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Aluno(a)</span>
-                          <span className="font-semibold text-[#002133] text-xs">{details.studentName}</span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Classe / Turma Origem</span>
-                          <span className="font-medium text-[#002133] text-xs">
-                            {enrollmentCheck?.classe || details.studentClasse} (
-                            {enrollmentCheck?.turma || details.studentTurma || 'Turma A'})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Escola de Destino</span>
-                          <span className="font-semibold text-indigo-950 text-xs">
-                            {destSchoolName || 'Instituição pretendida'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[#52606d] block text-[11px]">Vaga / Turma Destino</span>
-                          <span className="font-semibold text-emerald-800 text-xs">
-                            {details.reservedTurma
-                              ? `${details.reservedTurma} (${details.reservedTurno || 'Manhã'})`
-                              : req.status === 'SEM_VAGA_DESTINO'
-                              ? 'Sem Vaga'
-                              : 'Aguardando Consulta'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {details.purpose && req.serviceType !== 'GUIA_TRANSFERENCIA' && (
-                      <div className="text-[#52606d] text-xs pt-2 border-t border-[#e8e8ea]">
-                        <span className="font-medium text-[#002133]">Finalidade Declarada:</span>{' '}
-                        {details.purpose}
-                      </div>
-                    )}
-
-                    {details.notes && (
-                      <div className="text-[#52606d] text-xs pt-1">
-                        <span className="font-medium text-[#002133]">Motivo / Observações do Encarregado:</span>{' '}
-                        <span>{details.notes}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             );
           })}
@@ -1949,6 +2030,7 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
         isOpen={Boolean(documentModalRequest)}
         onClose={() => setDocumentModalRequest(null)}
         request={documentModalRequest}
+        initialViewMode={docModalInitialMode}
         onOpenNotifyModal={(req) =>
           handleOpenNotifyModal(
             req,

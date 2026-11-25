@@ -1055,11 +1055,12 @@ export function setLocalStorageFromServer(key: string, value: string): void {
 }
 
 function scheduleDirtyFlush(): void {
+  if (!isExpressApiAvailable()) return;
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = setTimeout(() => {
     flushTimer = null;
     syncSchoolsFromServer().catch(() => {});
-  }, 250);
+  }, 400);
 }
 
 export function initUniversalRealtimeSyncEngine(): void {
@@ -1071,7 +1072,14 @@ export function initUniversalRealtimeSyncEngine(): void {
     const rawGetItem = Storage.prototype.getItem;
 
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (this !== window.localStorage || isApplyingServerState || (window as any).__SIGRE_APPLYING_SERVER_STATE) {
+      if (
+        this !== window.localStorage ||
+        isApplyingServerState ||
+        (window as any).__SIGRE_APPLYING_SERVER_STATE ||
+        !isExpressApiAvailable()
+      ) {
+        const currentVal = rawGetItem.call(this, key);
+        if (currentVal === value) return;
         return rawSetItem.call(this, key, value);
       }
 
@@ -1095,9 +1103,9 @@ export function initUniversalRealtimeSyncEngine(): void {
             const nowTs = Date.now();
             const prevById = new Map<string, { item: any; cleanStr: string }>();
             if (Array.isArray(prevArr)) {
-              prevArr.forEach((p) => {
-                const k = getItemIdentityKey(p);
-                if (k && p && typeof p === 'object') {
+              prevArr.forEach((p, idx) => {
+                const k = getItemIdentityKey(p) || `__idx_${idx}`;
+                if (p && typeof p === 'object') {
                   const { _updatedAt: _oldTs, ...prevClean } = p;
                   prevById.set(k, { item: p, cleanStr: JSON.stringify(prevClean) });
                 }
@@ -1105,10 +1113,10 @@ export function initUniversalRealtimeSyncEngine(): void {
             }
 
             let anyRealChange = !Array.isArray(prevArr) || prevArr.length !== nextArr.length;
-            const stampedNext = nextArr.map((n) => {
+            const stampedNext = nextArr.map((n, idx) => {
               if (!n || typeof n !== 'object') return n;
-              const k = getItemIdentityKey(n);
-              const prevEntry = k ? prevById.get(k) : undefined;
+              const k = getItemIdentityKey(n) || `__idx_${idx}`;
+              const prevEntry = prevById.get(k);
               if (!prevEntry) {
                 anyRealChange = true;
                 return { ...n, _updatedAt: nowTs };
@@ -1118,18 +1126,18 @@ export function initUniversalRealtimeSyncEngine(): void {
                 anyRealChange = true;
                 return { ...n, _updatedAt: nowTs };
               }
-              return n;
+              return prevEntry.item;
             });
 
-            // IMPORTANT: Do NOT auto-tombstone missing items here! Stale React state or filtered views
-            // can legitimately write shorter arrays; explicit deletions call deleteSchool/deleteApplication/addEntityTombstone.
+            if (!anyRealChange) {
+              return;
+            }
+
             const stampedJson = JSON.stringify(stampedNext);
             rawSetItem.call(this, key, stampedJson);
-            if (anyRealChange) {
-              dirtyCollections.add(colConfig.payloadKey);
-              dirtyStorageKeys.set(colConfig.payloadKey, key);
-              scheduleDirtyFlush();
-            }
+            dirtyCollections.add(colConfig.payloadKey);
+            dirtyStorageKeys.set(colConfig.payloadKey, key);
+            scheduleDirtyFlush();
             return;
           }
         } catch {

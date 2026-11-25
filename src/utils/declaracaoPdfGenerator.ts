@@ -18,7 +18,11 @@ import {
   formatAvaliacaoNumber,
 } from './fichaAvaliacaoStorage';
 import type { QuickServiceRequest } from '../types';
-import { formatAngolanDateExtenso } from './efectividadeStorage';
+import { formatAngolanDateExtenso, getStoredEfectividadeRecords } from './efectividadeStorage';
+import {
+  extractStudentGradesFromPautas,
+  verifyStudentEnrollmentInSchool,
+} from './quickServicesStorage';
 import {
   isFemaleFirstName,
   resolveIsFeminino,
@@ -160,6 +164,11 @@ async function captureSinglePageA4DomToPdf(
       clone.style.justifyContent = 'space-between';
     } else if (elementId === 'declaracao-servico-a4-sheet') {
       clone.style.padding = '18mm 20mm';
+      clone.style.display = 'flex';
+      clone.style.flexDirection = 'column';
+      clone.style.justifyContent = 'space-between';
+    } else if (elementId === 'quick-service-official-receipt') {
+      clone.style.padding = '15mm 20mm';
       clone.style.display = 'flex';
       clone.style.flexDirection = 'column';
       clone.style.justifyContent = 'space-between';
@@ -818,7 +827,9 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
       background: #ffffff !important;
       overflow: ${isFichaStyleA4 ? 'visible' : 'hidden'} !important;
       ${
-        elementId === 'cadastro-docente-a4-sheet' || elementId === 'declaracao-servico-a4-sheet'
+        elementId === 'cadastro-docente-a4-sheet' ||
+        elementId === 'declaracao-servico-a4-sheet' ||
+        elementId === 'quick-service-official-receipt'
           ? 'display: flex !important; flex-direction: column !important; justify-content: space-between !important;'
           : ''
       }
@@ -936,6 +947,75 @@ export function printSinglePageA4Clean(elementId: string = 'oficial-a4-sheet'): 
     .doc-text-12 strong {
       font-size: 12pt !important;
       font-weight: 700 !important;
+    }
+    .a4-protocol-sub {
+      margin-top: 5pt !important;
+      font-size: 10pt !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.04em !important;
+      text-transform: uppercase !important;
+      color: #111111 !important;
+      text-align: center !important;
+    }
+    .receipt-sec-heading {
+      font-size: 12pt !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.03em !important;
+      border-bottom: 1px solid #000000 !important;
+      padding-bottom: 2.5pt !important;
+      margin: 12pt 0 6pt 0 !important;
+      color: #000000 !important;
+    }
+    table.receipt-formal-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 10pt !important;
+      line-height: 1.35 !important;
+      color: #000000 !important;
+    }
+    table.receipt-formal-table th,
+    table.receipt-formal-table td {
+      border: 1px solid #333333 !important;
+      padding: 4.5pt 7pt !important;
+      font-size: 10pt !important;
+      vertical-align: top !important;
+      text-align: left !important;
+    }
+    table.receipt-formal-table th {
+      width: 34% !important;
+      font-weight: 700 !important;
+      background-color: #f6f7f6 !important;
+      color: #000000 !important;
+    }
+    table.receipt-formal-table td {
+      width: 66% !important;
+      font-weight: 400 !important;
+      color: #000000 !important;
+    }
+    .receipt-val-red {
+      color: #c00000 !important;
+      font-weight: 700 !important;
+    }
+    .receipt-val-blue {
+      color: #0044cc !important;
+      font-weight: 700 !important;
+    }
+    ${
+      elementId === 'quick-service-official-receipt'
+        ? `#quick-service-official-receipt .a4-republic-title,
+    #quick-service-official-receipt .a4-inst-line,
+    #quick-service-official-receipt .a4-title-wrap h1,
+    #quick-service-official-receipt .receipt-sec-heading {
+      font-size: 12pt !important;
+    }
+    #quick-service-official-receipt .a4-body-copy,
+    #quick-service-official-receipt .a4-body-copy p,
+    #quick-service-official-receipt .a4-body-copy strong,
+    #quick-service-official-receipt footer p {
+      font-size: 10pt !important;
+    }`
+        : ''
     }
     .a4-footer-block {
       margin-top: ${elementId === 'declaracao-servico-a4-sheet' ? '38pt' : '14pt'} !important;
@@ -1186,7 +1266,6 @@ export async function downloadQuickServiceDocumentPdf(
   if (capturedModal) return;
 
   if (request.serviceType === 'DECLARACAO_EFECTIVIDADE') {
-    const { getStoredEfectividadeRecords } = await import('./efectividadeStorage');
     const sigre = (details.sigreEfectividade || {}) as Partial<CadastramentoEfectividadeRecord>;
     const rawName = (sigre.nome || details.employeeName || request.requesterName || '').trim();
     const rawBi = (sigre.bi || details.employeeBi || '').trim().toUpperCase();
@@ -1260,9 +1339,6 @@ export async function downloadQuickServiceDocumentPdf(
     return;
   }
 
-  const { extractStudentGradesFromPautas, verifyStudentEnrollmentInSchool } = await import(
-    './quickServicesStorage'
-  );
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -3168,6 +3244,214 @@ export async function downloadFichaAvaliacaoPdf(
       align: 'right',
     });
   }
+
+  doc.save(filename);
+}
+
+/**
+ * Gera e transfere em PDF (formato A4 oficial) o Comprovativo Oficial de Registo de Pedido
+ * dos Serviços Rápidos do SIGRE-Quêssua, capturando directamente o documento formal A4 no DOM
+ * (com fallback vectorial completo em jsPDF idêntico aos documentos dos Serviços SIGRE).
+ */
+export async function downloadQuickServiceReceiptPdf(
+  request: QuickServiceRequest
+): Promise<void> {
+  const safeProtocol = (request.protocol || 'PROTOCOLO')
+    .replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeRequester = (request.requesterName || 'Requerente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40) || 'Requerente';
+  const filename = `Comprovativo_Pedido_${safeProtocol}_${safeRequester}.pdf`;
+
+  const captured = await captureSinglePageA4DomToPdf(
+    'quick-service-official-receipt',
+    filename,
+    request.protocol
+  );
+  if (captured) return;
+
+  // Fallback vectorial formal A4 em Times New Roman
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 20;
+  const usableWidth = pageWidth - marginX * 2;
+  const centerX = pageWidth / 2;
+  let y = 16;
+
+  const emblem = await loadEmblemPngDataUrl(emblemAngolaImg);
+  if (emblem?.dataUrl) {
+    const imgH = 16;
+    const imgW = imgH * (emblem.ratio || 1);
+    doc.addImage(emblem.dataUrl, 'PNG', centerX - imgW / 2, y, imgW, imgH, undefined, 'FAST');
+    y += imgH + 4;
+  }
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  doc.text('REPÚBLICA DE ANGOLA', centerX, y, { align: 'center' });
+  y += 5.4;
+
+  doc.setFontSize(12);
+  doc.text('GOVERNO PROVINCIAL DE MALANJE', centerX, y, { align: 'center' });
+  y += 5.2;
+  doc.text('ADMINISTRAÇÃO MUNICIPAL DO QUÊSSUA', centerX, y, { align: 'center' });
+  y += 5.2;
+  doc.text('DIRECÇÃO MUNICIPAL DA EDUCAÇÃO', centerX, y, { align: 'center' });
+  y += 10;
+
+  // Título sublinhado
+  const titleText = 'COMPROVATIVO OFICIAL DE REGISTO DE PEDIDO';
+  doc.setFontSize(12);
+  doc.text(titleText, centerX, y, { align: 'center' });
+  const titleWidth = doc.getTextWidth(titleText);
+  doc.setLineWidth(0.45);
+  doc.line(centerX - titleWidth / 2, y + 1.4, centerX + titleWidth / 2, y + 1.4);
+  y += 6.5;
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 68, 204);
+  doc.text(`PROTOCOLO N.º ${request.protocol} — SERVIÇOS RÁPIDOS SIGRE`, centerX, y, {
+    align: 'center',
+  });
+  doc.setTextColor(0, 0, 0);
+  y += 9;
+
+  const createdDate = request.createdAt ? new Date(request.createdAt) : new Date();
+  const createdIso = createdDate.toISOString().slice(0, 10);
+  const createdTime = createdDate.toLocaleTimeString('pt-PT', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const destinationLabel =
+    request.targetRole === 'ADMIN'
+      ? 'Direcção Municipal da Educação do Quêssua'
+      : request.targetSchoolName || 'Secretaria da Instituição Escolar';
+
+  // Parágrafo introdutório formal
+  doc.setFont('times', 'normal');
+  doc.setFontSize(10);
+  const introText = `A Direcção Municipal da Educação do Município do Quêssua certifica, para os devidos efeitos administrativos e de acompanhamento, que foi devidamente registado no Sistema Integrado de Gestão Escolar (SIGRE), sob o Protocolo n.º ${request.protocol}, em ${formatAngolanDateExtenso(createdIso)}, pelas ${createdTime}, o pedido oficial referente a ${request.title}, requerido por ${request.requesterName}, encaminhado para tramitação junto da ${destinationLabel}.`;
+  const introLines = doc.splitTextToSize(introText, usableWidth);
+  doc.text(introLines, marginX, y, { align: 'justify', maxWidth: usableWidth });
+  y += introLines.length * 4.8 + 6;
+
+  // Secção I — Quadro resumo formal
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  doc.text('I. IDENTIFICAÇÃO DO REQUERENTE E DADOS DO PEDIDO', marginX, y);
+  y += 2.5;
+  doc.setLineWidth(0.35);
+  doc.line(marginX, y, pageWidth - marginX, y);
+  y += 4;
+
+  const d = request.details || {};
+  const rows: Array<[string, string, 'protocol' | 'person' | undefined]> = [
+    ['Protocolo Oficial', request.protocol, 'protocol'],
+    ['Serviço Solicitado', request.title, undefined],
+    ['Entidade de Destino', destinationLabel, undefined],
+    ['Data e Hora de Registo', `${createdDate.toLocaleDateString('pt-PT')} às ${createdTime}`, undefined],
+    ['Requerente', `${d.tratamento ? `${d.tratamento} ` : ''}${request.requesterName}`, 'person'],
+    ['Contacto Telefónico', request.requesterPhone || '—', undefined],
+  ];
+  if (request.requesterEmail) rows.push(['Correio Electrónico', request.requesterEmail, undefined]);
+  if (d.employeeBi) rows.push(['Bilhete de Identidade', d.employeeBi, undefined]);
+  if (d.employeeAgente) rows.push(['N.º de Agente', d.employeeAgente, undefined]);
+  if (d.employeeCategory || d.funcao) {
+    rows.push(['Função / Categoria', [d.funcao, d.employeeCategory, d.grau].filter(Boolean).join(' · '), undefined]);
+  }
+  if (d.employeeSchoolOrDepartment || request.targetSchoolName) {
+    rows.push([
+      'Escola / Local de Serviço',
+      d.employeeSchoolOrDepartment || request.targetSchoolName || '—',
+      undefined,
+    ]);
+  }
+  if (d.studentName) rows.push(['Nome do Aluno', d.studentName, 'person']);
+  if (d.studentClasse || d.studentTurma) {
+    rows.push([
+      'Classe / Turma / Turno',
+      [d.studentClasse, d.studentTurma, d.studentPeriodo].filter(Boolean).join(' · '),
+      undefined,
+    ]);
+  }
+  if (d.destinationSchool) rows.push(['Escola de Destino', d.destinationSchool, undefined]);
+  if (d.purpose) rows.push(['Finalidade Declarada', d.purpose, undefined]);
+
+  const labelColW = 54;
+  const valColW = usableWidth - labelColW;
+
+  for (const [label, value, highlight] of rows) {
+    if (y > pageHeight - 42) break;
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10);
+    const valLines = doc.splitTextToSize(String(value || '—'), valColW - 4);
+    const rowH = Math.max(7.2, valLines.length * 4.6 + 2.6);
+
+    doc.setDrawColor(160, 160, 160);
+    doc.setLineWidth(0.2);
+    doc.rect(marginX, y, labelColW, rowH);
+    doc.rect(marginX + labelColW, y, valColW, rowH);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('times', 'bold');
+    doc.text(label, marginX + 2.5, y + 4.8);
+    if (highlight === 'person') {
+      doc.setFont('times', 'bold');
+      doc.setTextColor(192, 0, 0);
+    } else if (highlight === 'protocol') {
+      doc.setFont('times', 'bold');
+      doc.setTextColor(0, 68, 204);
+    } else {
+      doc.setFont('times', 'normal');
+      doc.setTextColor(0, 0, 0);
+    }
+    doc.text(valLines, marginX + labelColW + 2.5, y + 4.8);
+    doc.setTextColor(0, 0, 0);
+    y += rowH;
+  }
+
+  y += 8;
+
+  // Secção II — Instruções
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  doc.text('II. INSTRUÇÕES DE ACOMPANHAMENTO E LEVANTAMENTO', marginX, y);
+  y += 2.5;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.35);
+  doc.line(marginX, y, pageWidth - marginX, y);
+  y += 5.5;
+
+  doc.setFont('times', 'normal');
+  doc.setFontSize(10);
+  const closingText =
+    'O presente comprovativo serve de prova oficial de submissão junto dos serviços administrativos do Município do Quêssua. O requerente poderá consultar o estado do pedido a qualquer momento no portal, na secção «Meus pedidos», mediante o código de protocolo acima indicado, devendo apresentar este comprovativo (impresso ou em formato digital) no acto de levantamento do documento final.';
+  const closingLines = doc.splitTextToSize(closingText, usableWidth);
+  doc.text(closingLines, marginX, y, { align: 'justify', maxWidth: usableWidth });
+
+  // Rodapé formal com data por extenso
+  const footerY = pageHeight - 26;
+  doc.setFont('times', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text(
+    `DIRECÇÃO MUNICIPAL DA EDUCAÇÃO DO QUÊSSUA, AOS ${formatAngolanDateExtenso(createdIso).toUpperCase()}.`,
+    centerX,
+    footerY,
+    { align: 'center' }
+  );
 
   doc.save(filename);
 }

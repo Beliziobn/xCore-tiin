@@ -1,9 +1,9 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html><html><head><meta charset="utf8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Cadastro Docente Quêssua</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
 <style>
   /* Layout: faixa de abertura azul tinta, depois formulário em colunas com o resumo do pedido fixo ao lado (como a frase do parecer oficial). */
   :root {
@@ -217,23 +217,23 @@
 
 <main class="wrap main" id="top">
   <div>
-    <div class="notice" id="mode-notice" hidden>
+    <div class="notice" id="mode-notice" hidden="">
       <span>Modo de teste: o envio fica activo quando a página for partilhada com permissão de contribuidor. Pode preencher a ficha e ver o resumo.</span>
     </div>
 
-    <section id="done" class="done" hidden aria-live="polite">
+    <section id="done" class="done" hidden="" aria-live="polite">
       <h2>Pedido registado</h2>
       <p>A ficha de <strong id="done-name"></strong> foi guardada. Guarde este código para acompanhar o processo.</p>
       <div class="code" id="done-code"></div>
       <div class="actions">
         <button class="btn" type="button" id="btn-new">Registar outro docente</button>
-        <button class="btn ghost" type="button" id="btn-csv-one" hidden>Descarregar ficha (CSV)</button>
+        <button class="btn ghost" type="button" id="btn-csv-one" hidden="">Descarregar ficha (CSV)</button>
       </div>
     </section>
 
-    <form id="form" novalidate>
+    <form id="form" novalidate="">
       <fieldset class="card" id="sec-ident">
-        <div class="card-head"><h2>Identificação do docente</h2><span class="sub">Como consta no processo</span></div>
+        <div class="card-head rams-card"><h2>Identificação do docente</h2><span class="sub">Como consta no processo</span></div>
         <div class="fields">
           <div class="field span-2">
             <span class="lab" id="lab-trat">Tratamento<span class="req">*</span></span>
@@ -271,7 +271,7 @@
             </select>
             <div class="err" id="err-categoria"></div>
           </div>
-          <div class="field span-2" id="wrap-outra" hidden>
+          <div class="field span-2" id="wrap-outra" hidden="">
             <label for="f-categoria-outra">Indique a categoria<span class="req">*</span></label>
             <input type="text" id="f-categoria-outra" name="categoriaOutra">
             <div class="err" id="err-categoria-outra"></div>
@@ -280,7 +280,7 @@
       </fieldset>
 
       <fieldset class="card" id="sec-colocacao">
-        <div class="card-head"><h2>Colocação actual</h2><span class="sub">Onde o docente exerce funções hoje</span></div>
+        <div class="card-head rams-card"><h2>Colocação actual</h2><span class="sub">Onde o docente exerce funções hoje</span></div>
         <div class="fields">
           <div class="field span-2">
             <label for="f-colocacao">Instituição de colocação<span class="req">*</span></label>
@@ -297,7 +297,7 @@
       </fieldset>
 
       <fieldset class="card" id="sec-vaga">
-        <div class="card-head"><h2>Vaga pretendida</h2><span class="sub">Escola de destino com vaga disponível</span></div>
+        <div class="card-head rams-card"><h2>Vaga pretendida</h2><span class="sub">Escola de destino com vaga disponível</span></div>
         <div class="fields">
           <div class="field">
             <label for="f-destino">Município de destino<span class="req">*</span></label>
@@ -318,7 +318,7 @@
       </fieldset>
 
       <fieldset class="card" id="sec-motivo">
-        <div class="card-head"><h2>Motivo do pedido</h2><span class="sub">Motivos invocados pelo requerente</span></div>
+        <div class="card-head rams-card"><h2>Motivo do pedido</h2><span class="sub">Motivos invocados pelo requerente</span></div>
         <div class="fields">
           <div class="field span-2">
             <span class="lab" id="lab-motivo">Natureza do motivo<span class="req">*</span></span>
@@ -339,8 +339,8 @@
         </div>
       </fieldset>
 
-      <fieldset class="card service" id="sec-parecer" hidden>
-        <div class="card-head"><h2>Parecer da Direcção</h2><span class="tag">Reservado ao serviço</span></div>
+      <fieldset class="card service" id="sec-parecer" hidden="">
+        <div class="card-head rams-card"><h2>Parecer da Direcção</h2><span class="tag">Reservado ao serviço</span></div>
         <div class="fields">
           <div class="field">
             <label for="f-parecer">Parecer</label>
@@ -385,8 +385,8 @@
   </aside>
 </main>
 
-<section class="records wrap" id="records" hidden>
-  <div class="card">
+<section class="records wrap" id="records" hidden="">
+  <div class="card rams-card">
     <div class="toolbar">
       <div><h2>Registos recebidos</h2><p class="sub" id="rec-count">A carregar</p></div>
       <button class="btn ghost small" type="button" id="btn-csv-all">Exportar tudo (CSV)</button>
@@ -397,7 +397,7 @@
         <tbody id="rec-body"></tbody>
       </table>
     </div>
-    <div class="empty-state" id="rec-empty" hidden>Ainda não há fichas registadas. Quando alguém enviar um pedido, aparece aqui.</div>
+    <div class="empty-state" id="rec-empty" hidden="">Ainda não há fichas registadas. Quando alguém enviar um pedido, aparece aqui.</div>
   </div>
 </section>
 

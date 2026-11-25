@@ -1067,7 +1067,8 @@ export type QuickServiceStatus =
   | 'VAGA_CONFIRMADA'
   | 'SEM_VAGA_DESTINO'
   | 'CONCLUIDO'
-  | 'REJEITADO';
+  | 'REJEITADO'
+  | 'CANCELADO';
 
 export interface QuickServiceGradeItem {
   subject: string;
@@ -1181,6 +1182,10 @@ export interface QuickServiceRequest {
 
     // General & notes
     notes?: string;
+    cancelledAt?: string;
+    cancelledByRequester?: boolean;
+    cancelReason?: string;
+    lastEditedByRequesterAt?: string;
     responseMessage?: string;
     resolvedAt?: string;
     resolvedBy?: string;

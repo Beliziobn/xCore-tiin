@@ -72,7 +72,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
         }
       }}
       aria-label={`${card.title}: ${card.value}${isClickable ? '. Clique para ver mais' : '. Indicador informativo'}`}
-      className={`kpi ${featured ? 'kpi--featured' : ''} group select-none w-full cursor-pointer ${
+      className={`kpi ${featured ? 'kpi--featured' : 'rams-card'} group select-none w-full cursor-pointer ${
         isSmall ? 'min-h-[168px]' : isLarge ? 'min-h-[210px]' : 'min-h-[188px]'
       } ${className}`}
     >
@@ -80,7 +80,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
       <div className="flex items-start justify-between gap-3">
         <span
           className={`kpi__label text-xs sm:text-[13px] font-medium leading-snug ${
-            featured ? 'text-[#9fb3c8]' : 'text-[#52606d]'
+            featured ? 'text-[#9fb3c8]' : 'text-[#6E6E73]'
           }`}
         >
           {card.title}
@@ -91,7 +91,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
       <div className="my-2">
         <span
           className={`kpi__value numeric font-bold tracking-[-0.03em] leading-[1.1] block ${
-            featured ? 'text-white' : 'text-[#002133]'
+            featured ? 'text-white' : 'text-[#1D1D1F]'
           } ${getValueFontSize(card.value)}`}
         >
           {card.value}
@@ -101,12 +101,12 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
       {/* Linha 3: Meta & Acção Secundária (Sem botão escuro repetido em cada card) */}
       <div
         className={`pt-3 border-t flex items-center justify-between gap-2 ${
-          featured ? 'border-white/15' : 'border-[#e8e8ea]'
+          featured ? 'border-white/15' : 'border-[#E5E5EA]'
         }`}
       >
         <span
           className={`kpi__meta text-xs truncate ${
-            featured ? 'text-[#9fb3c8]' : 'text-[#52606d]'
+            featured ? 'text-[#9fb3c8]' : 'text-[#6E6E73]'
           }`}
         >
           {card.subtitle || (isClickable ? 'Módulo interativo' : 'Indicador consolidado')}
@@ -122,7 +122,7 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
             className={`shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-[10px] border transition-colors cursor-pointer ${
               featured
                 ? 'bg-white/10 hover:bg-white/20 text-white border-white/20'
-                : 'bg-white hover:bg-[#f4f4f6] text-[#002133] border-[#d1d1d6]'
+                : 'bg-white hover:bg-[#F5F5F7] text-[#1D1D1F] border-[#E5E5EA]'
             }`}
           >
             <span>{card.actionText || 'Ver mais'}</span>
@@ -130,10 +130,10 @@ export const StatCardItem: React.FC<StatCardItemProps> = ({
           </button>
         ) : (
           <span
-            className={`shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-md ${
+            className={`shrink-0 ${
               featured
-                ? 'bg-white/10 text-[#9fb3c8]'
-                : 'bg-[#f4f4f6] text-[#52606d]'
+                ? 'text-[11px] font-medium px-2.5 py-1 rounded-md bg-white/10 text-[#9fb3c8]'
+                : 'rams-badge-clean'
             }`}
           >
             Consolidado

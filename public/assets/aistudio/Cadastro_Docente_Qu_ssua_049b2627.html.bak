@@ -1,0 +1,764 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Cadastro Docente Quêssua</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  /* Layout: faixa de abertura azul tinta, depois formulário em colunas com o resumo do pedido fixo ao lado (como a frase do parecer oficial). */
+  :root {
+    --bg: #f2f4f8;
+    --surface: #ffffff;
+    --surface-2: #eaeef5;
+    --ink: #0e1a2b;
+    --muted: #55627a;
+    --line: #d3dae6;
+    --accent: #1b3fbf;
+    --accent-ink: #ffffff;
+    --mark: #ffc933;
+    --mark-ink: #1b1400;
+    --hero-bg: #0d1c4d;
+    --hero-ink: #f4f6ff;
+    --hero-muted: #b5c0e6;
+    --danger: #b3261e;
+    --danger-bg: #fdecea;
+    --ok: #1c7a45;
+    --ok-bg: #e6f5ec;
+    --warn: #8a5a00;
+    --warn-bg: #fff3d6;
+    --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a1120; --surface: #121b2d; --surface-2: #1a2540; --ink: #e8edf7; --muted: #9aa7bf;
+      --line: #263248; --accent: #86a2ff; --accent-ink: #0a1120; --mark: #ffd65a; --mark-ink: #1b1400;
+      --hero-bg: #0d1a44; --hero-ink: #f4f6ff; --hero-muted: #a9b6df;
+      --danger: #ff8f86; --danger-bg: #3a1a19; --ok: #72d79c; --ok-bg: #14301f; --warn: #ffd37a; --warn-bg: #3a2c0a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a1120; --surface: #121b2d; --surface-2: #1a2540; --ink: #e8edf7; --muted: #9aa7bf;
+    --line: #263248; --accent: #86a2ff; --accent-ink: #0a1120; --mark: #ffd65a; --mark-ink: #1b1400;
+    --hero-bg: #0d1a44; --hero-ink: #f4f6ff; --hero-muted: #a9b6df;
+    --danger: #ff8f86; --danger-bg: #3a1a19; --ok: #72d79c; --ok-bg: #14301f; --warn: #ffd37a; --warn-bg: #3a2c0a;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  }
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.1; }
+  p { margin: 0; }
+  .wrap {
+    width: 100%; max-width: 1180px; margin-inline: auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  /* ---------- Abertura ---------- */
+  .hero {
+    background: var(--hero-bg); color: var(--hero-ink);
+    margin-top: calc(-1 * env(safe-area-inset-top, 0px));
+    padding-top: calc(env(safe-area-inset-top, 0px) + 28px);
+    padding-bottom: 40px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 1rem; letter-spacing: .01em; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 6px; background: var(--mark); color: var(--mark-ink); display: grid; place-items: center; font-weight: 800; font-size: .85rem; }
+  .hero-grid { display: grid; gap: 28px; margin-top: 44px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: end; }
+  .eyebrow { font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--hero-muted); font-weight: 600; margin-bottom: 14px; }
+  .hero h1 { font-size: clamp(2.2rem, 5.2vw, 3.9rem); font-weight: 700; letter-spacing: -.02em; }
+  .hero h1 mark { background: var(--mark); color: var(--mark-ink); padding: 0 .14em; border-radius: 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .hero .lede { margin-top: 18px; max-width: 52ch; color: var(--hero-muted); font-size: 1.06rem; }
+  .flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-left: 2px solid color-mix(in srgb, var(--hero-ink) 22%, transparent); }
+  .flow li { padding: 2px 0 18px 18px; position: relative; }
+  .flow li:last-child { padding-bottom: 0; }
+  .flow li::before { content: ""; position: absolute; left: -7px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--hero-bg); border: 2px solid var(--mark); }
+  .flow b { display: block; font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; }
+  .flow span { color: var(--hero-muted); font-size: .94rem; }
+
+  /* ---------- Corpo ---------- */
+  .main { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr) 360px; padding-block: 36px 56px; align-items: start; }
+  .notice { display: flex; gap: 10px; padding: 12px 14px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: .94rem; margin-bottom: 18px; }
+  .notice[hidden] { display: none !important; }
+
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 18px; min-width: 0; }
+  .card > legend, .card-head { display: block; width: 100%; padding: 0; margin-bottom: 18px; }
+  .card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .card h2 { font-size: 1.3rem; font-weight: 650; letter-spacing: -.01em; }
+  .card .sub { color: var(--muted); font-size: .92rem; }
+  .fields { display: grid; gap: 18px 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .span-2 { grid-column: 1 / -1; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field > label, .field > .lab { font-weight: 600; font-size: .92rem; }
+  .req { color: var(--danger); margin-left: 2px; }
+  .hint { color: var(--muted); font-size: .84rem; }
+  input[type="text"], input[type="date"], select, textarea {
+    width: 100%; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface);
+    border: 1.5px solid var(--line); border-radius: 8px; padding: 11px 12px; min-height: 46px;
+  }
+  textarea { resize: vertical; min-height: 96px; }
+  input.mono { font-family: var(--font-mono); letter-spacing: .06em; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .seg input:focus-visible + span, .pick input:focus-visible + span, .check > input:focus-visible + span {
+    outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; border-color: var(--accent);
+  }
+  .invalid { border-color: var(--danger) !important; }
+  .err { color: var(--danger); font-size: .86rem; min-height: 0; }
+  .err:empty { display: none; }
+
+  .seg { display: inline-grid; grid-auto-flow: column; gap: 0; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; width: fit-content; max-width: 100%; }
+  .seg label { position: relative; cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; inset: 0; }
+  .seg span { display: block; padding: 11px 22px; min-height: 46px; font-weight: 500; }
+  .seg label + label span { border-left: 1.5px solid var(--line); }
+  .seg input:checked + span { background: var(--accent); color: var(--accent-ink); }
+
+  .picks { display: grid; gap: 10px; }
+  .pick { position: relative; cursor: pointer; display: block; }
+  .pick input { position: absolute; opacity: 0; inset: 0; }
+  .pick span { display: block; border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 14px 12px 44px; position: relative; background: var(--surface); }
+  .pick span::before { content: ""; position: absolute; left: 14px; top: 15px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--muted); }
+  .pick input:checked + span { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+  .pick input:checked + span::before { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 45%, transparent 50%); }
+  .pick b { display: block; font-weight: 600; }
+  .pick small { color: var(--muted); font-size: .86rem; }
+
+  .check { position: relative; display: block; cursor: pointer; }
+  .check input { position: absolute; opacity: 0; inset: 0; }
+  .check > input + span { display: block; padding-left: 36px; position: relative; }
+  .check > input + span::before { content: ""; position: absolute; left: 0; top: 2px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--muted); background: var(--surface); }
+  .check > input:checked + span::before { background: var(--accent); border-color: var(--accent); }
+  .check > input:checked + span::after { content: ""; position: absolute; left: 7px; top: 6px; width: 7px; height: 12px; border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+
+  .service { border-style: dashed; background: var(--surface-2); }
+  .tag { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: var(--mark); color: var(--mark-ink); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn { font: inherit; font-weight: 600; border-radius: 8px; padding: 12px 22px; min-height: 48px; cursor: pointer; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .btn.small { min-height: 36px; padding: 6px 12px; font-size: .88rem; }
+  .btn[disabled] { opacity: .6; cursor: progress; }
+  .form-msg { font-size: .94rem; }
+  .form-msg.bad { color: var(--danger); }
+
+  /* ---------- Resumo ---------- */
+  aside { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); min-width: 0; }
+  .letter { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 22px 22px 20px; box-shadow: 0 1px 0 var(--line), 0 10px 24px -18px color-mix(in srgb, var(--ink) 55%, transparent); }
+  .letter .kicker { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  .letter h3 { font-size: 1.15rem; margin-bottom: 14px; }
+  .letter p { font-size: .98rem; line-height: 1.7; }
+  .letter p + p { margin-top: 12px; }
+  .slot { font-weight: 600; }
+  .slot.empty { color: var(--muted); font-weight: 400; background: color-mix(in srgb, var(--mark) 30%, transparent); border-radius: 3px; padding: 0 4px; }
+  .progress { margin-top: 16px; height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+  .progress-label { margin-top: 8px; font-size: .84rem; color: var(--muted); }
+
+  /* ---------- Confirmação ---------- */
+  .done { background: var(--ok-bg); border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); border-radius: 12px; padding: 28px; }
+  .done h2 { font-size: 1.6rem; color: var(--ok); margin-bottom: 8px; }
+  .code { font-family: var(--font-mono); font-size: 1.5rem; letter-spacing: .08em; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: inline-block; padding: 8px 16px; margin: 14px 0 18px; color: var(--ink); }
+
+  /* ---------- Registos ---------- */
+  .records { padding-bottom: 64px; }
+  .records .card { padding: 24px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: .92rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td .mono { font-family: var(--font-mono); font-size: .86rem; }
+  td select { min-height: 36px; padding: 4px 8px; font-size: .9rem; width: auto; }
+  .empty-state { padding: 28px; text-align: center; color: var(--muted); }
+  .pill { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 99px; }
+  .pill.Pendente { background: var(--warn-bg); color: var(--warn); }
+  .pill.Favorável { background: var(--ok-bg); color: var(--ok); }
+  .pill.Desfavorável { background: var(--danger-bg); color: var(--danger); }
+
+  footer { border-top: 1px solid var(--line); padding-block: 22px 40px; color: var(--muted); font-size: .88rem; }
+
+  @media (max-width: 960px) {
+    .hero-grid { grid-template-columns: 1fr; margin-top: 32px; }
+    .main { grid-template-columns: 1fr; }
+    aside { position: static; order: 2; }
+  }
+  @media (max-width: 600px) {
+    .fields { grid-template-columns: 1fr; }
+    .card { padding: 18px; }
+    .seg span { padding: 11px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="brand"><span class="brand-mark">C</span><span>Cadastro Docente</span></div>
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Município do Quêssua · Ensino</p>
+        <h1>Cadastre o pedido de <mark>vaga</mark> do docente</h1>
+        <p class="lede">Registe os dados do professor, o local onde está colocado e a escola onde pretende exercer funções. Cada ficha segue para apreciação e parecer.</p>
+      </div>
+      <ol class="flow" aria-label="Etapas do processo">
+        <li><b>Preencha a ficha</b><span>Identificação, colocação actual e vaga pretendida.</span></li>
+        <li><b>A Direcção aprecia o processo</b><span>Verifica a vaga disponível na escola indicada.</span></li>
+        <li><b>Parecer emitido</b><span>Favorável ou desfavorável, com data e assinatura do Director Municipal.</span></li>
+      </ol>
+    </div>
+  </div>
+</header>
+
+<main class="wrap main" id="top">
+  <div>
+    <div class="notice" id="mode-notice" hidden>
+      <span>Modo de teste: o envio fica activo quando a página for partilhada com permissão de contribuidor. Pode preencher a ficha e ver o resumo.</span>
+    </div>
+
+    <section id="done" class="done" hidden aria-live="polite">
+      <h2>Pedido registado</h2>
+      <p>A ficha de <strong id="done-name"></strong> foi guardada. Guarde este código para acompanhar o processo.</p>
+      <div class="code" id="done-code"></div>
+      <div class="actions">
+        <button class="btn" type="button" id="btn-new">Registar outro docente</button>
+        <button class="btn ghost" type="button" id="btn-csv-one" hidden>Descarregar ficha (CSV)</button>
+      </div>
+    </section>
+
+    <form id="form" novalidate>
+      <fieldset class="card" id="sec-ident">
+        <div class="card-head"><h2>Identificação do docente</h2><span class="sub">Como consta no processo</span></div>
+        <div class="fields">
+          <div class="field span-2">
+            <span class="lab" id="lab-trat">Tratamento<span class="req">*</span></span>
+            <div class="seg" role="radiogroup" aria-labelledby="lab-trat">
+              <label><input type="radio" name="trat" value="Senhor"><span>Senhor</span></label>
+              <label><input type="radio" name="trat" value="Senhora"><span>Senhora</span></label>
+            </div>
+            <div class="err" id="err-trat"></div>
+          </div>
+          <div class="field span-2">
+            <label for="f-nome">Nome completo<span class="req">*</span></label>
+            <input type="text" id="f-nome" name="nome" autocomplete="name" placeholder="Ex.: Raimundo Alves Joveta Vunge">
+            <div class="err" id="err-nome"></div>
+          </div>
+          <div class="field">
+            <label for="f-agente">N.º de Agente<span class="req">*</span></label>
+            <input type="text" id="f-agente" name="agente" class="mono" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="88206815">
+            <div class="hint">Apenas algarismos, entre 6 e 10.</div>
+            <div class="err" id="err-agente"></div>
+          </div>
+          <div class="field">
+            <label for="f-grau">Grau ou classe<span class="req">*</span></label>
+            <select id="f-grau" name="grau">
+              <option value="">Seleccione</option>
+            </select>
+            <div class="err" id="err-grau"></div>
+          </div>
+          <div class="field span-2">
+            <label for="f-categoria">Categoria<span class="req">*</span></label>
+            <select id="f-categoria" name="categoria">
+              <option value="">Seleccione</option>
+              <option>Professor do Ensino Primário e Secundário</option>
+              <option>Professor Técnico Médio</option>
+              <option value="__outra">Outra categoria</option>
+            </select>
+            <div class="err" id="err-categoria"></div>
+          </div>
+          <div class="field span-2" id="wrap-outra" hidden>
+            <label for="f-categoria-outra">Indique a categoria<span class="req">*</span></label>
+            <input type="text" id="f-categoria-outra" name="categoriaOutra">
+            <div class="err" id="err-categoria-outra"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="card" id="sec-colocacao">
+        <div class="card-head"><h2>Colocação actual</h2><span class="sub">Onde o docente exerce funções hoje</span></div>
+        <div class="fields">
+          <div class="field span-2">
+            <label for="f-colocacao">Instituição de colocação<span class="req">*</span></label>
+            <input type="text" id="f-colocacao" name="colocacao" placeholder="Escola, colégio, liceu, magistério, direcção ou gabinete">
+            <div class="hint">Ex.: Escola Magistério Católico São José de Cluny, Direcção Municipal da Educação de Cacuso.</div>
+            <div class="err" id="err-colocacao"></div>
+          </div>
+          <div class="field">
+            <label for="f-origem">Município actual<span class="req">*</span></label>
+            <input type="text" id="f-origem" name="origem" list="dl-municipios" autocomplete="off" placeholder="Ex.: Malanje">
+            <div class="err" id="err-origem"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="card" id="sec-vaga">
+        <div class="card-head"><h2>Vaga pretendida</h2><span class="sub">Escola de destino com vaga disponível</span></div>
+        <div class="fields">
+          <div class="field">
+            <label for="f-destino">Município de destino<span class="req">*</span></label>
+            <input type="text" id="f-destino" name="destino" list="dl-municipios" autocomplete="off" value="Quêssua">
+            <div class="err" id="err-destino"></div>
+          </div>
+          <div class="field span-2">
+            <label for="f-escola">Escola ou complexo escolar<span class="req">*</span></label>
+            <input type="text" id="f-escola" name="escola" list="dl-escolas" autocomplete="off" placeholder="Comece a escrever o número ou o nome">
+            <div class="hint">Seleccione da lista ou escreva outra escola do Município.</div>
+            <div class="err" id="err-escola"></div>
+          </div>
+          <div class="field span-2">
+            <label class="check"><input type="checkbox" id="f-interesse" name="interesse"><span>Manifesto o interesse em exercer as minhas funções neste Município.<span class="req">*</span></span></label>
+            <div class="err" id="err-interesse"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="card" id="sec-motivo">
+        <div class="card-head"><h2>Motivo do pedido</h2><span class="sub">Motivos invocados pelo requerente</span></div>
+        <div class="fields">
+          <div class="field span-2">
+            <span class="lab" id="lab-motivo">Natureza do motivo<span class="req">*</span></span>
+            <div class="picks" role="radiogroup" aria-labelledby="lab-motivo">
+              <label class="pick"><input type="radio" name="motivo" value="Motivos de ordem pessoal"><span><b>Motivos de ordem pessoal</b><small>Razões do próprio docente.</small></span></label>
+              <label class="pick"><input type="radio" name="motivo" value="Motivos de ordem pessoal e familiar"><span><b>Motivos de ordem pessoal e familiar</b><small>Razões que envolvem a família do docente.</small></span></label>
+              <label class="pick"><input type="radio" name="motivo" value="Outros motivos invocados"><span><b>Outros motivos invocados</b><small>Descreva no campo abaixo.</small></span></label>
+            </div>
+            <div class="err" id="err-motivo"></div>
+          </div>
+          <div class="field span-2">
+            <label class="check"><input type="checkbox" id="f-proximidade" name="proximidade"><span>Pretendo exercer funções em estabelecimento de ensino próximo da minha residência.</span></label>
+          </div>
+          <div class="field span-2">
+            <label for="f-detalhe">Descrição do motivo</label>
+            <textarea id="f-detalhe" name="detalhe" placeholder="Escreva aqui informação adicional que sustente o pedido (opcional)."></textarea>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="card service" id="sec-parecer" hidden>
+        <div class="card-head"><h2>Parecer da Direcção</h2><span class="tag">Reservado ao serviço</span></div>
+        <div class="fields">
+          <div class="field">
+            <label for="f-parecer">Parecer</label>
+            <select id="f-parecer" name="parecer">
+              <option>Pendente</option>
+              <option>Favorável</option>
+              <option>Desfavorável</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-data">Data do parecer</label>
+            <input type="date" id="f-data" name="dataParecer">
+          </div>
+          <div class="field">
+            <label for="f-local">Local</label>
+            <input type="text" id="f-local" name="local" value="Quêssua">
+          </div>
+          <div class="field">
+            <label for="f-director">Director Municipal</label>
+            <input type="text" id="f-director" name="director" value="Belízio Miguel dos Santos António">
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="actions">
+        <button class="btn" type="submit" id="btn-submit">Registar pedido</button>
+        <button class="btn ghost" type="button" id="btn-reset">Limpar ficha</button>
+        <span class="form-msg" id="form-msg" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+
+  <aside aria-label="Resumo do pedido">
+    <div class="letter">
+      <p class="kicker">Resumo do pedido</p>
+      <h3>Assim ficará redigido o parecer</h3>
+      <p id="sum-1"></p>
+      <p id="sum-2"></p>
+      <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+      <p class="progress-label" id="bar-label"></p>
+    </div>
+  </aside>
+</main>
+
+<section class="records wrap" id="records" hidden>
+  <div class="card">
+    <div class="toolbar">
+      <div><h2>Registos recebidos</h2><p class="sub" id="rec-count">A carregar</p></div>
+      <button class="btn ghost small" type="button" id="btn-csv-all">Exportar tudo (CSV)</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Código</th><th>Docente</th><th>Categoria e grau</th><th>Colocação actual</th><th>Escola pretendida</th><th>Motivo</th><th>Parecer</th><th>Registo</th><th></th></tr></thead>
+        <tbody id="rec-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rec-empty" hidden>Ainda não há fichas registadas. Quando alguém enviar um pedido, aparece aqui.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">Os dados recolhidos servem apenas para a apreciação do pedido de vaga. Consulte a Direcção Municipal da Educação para rectificar ou eliminar uma ficha.</div>
+</footer>
+
+<datalist id="dl-municipios"></datalist>
+<datalist id="dl-escolas"></datalist>
+
+<script>
+(function () {
+  "use strict";
+  var MUNICIPIOS = ["Quêssua","Malanje","Cacuso","Calandula","Cambundi Catembo","Cangandala","Caombo","Capunda","Cunda dia Baze","Luquembo","Marimba","Massango","Mucari","Quela","Quirima","Quitapa"];
+  var ESCOLAS = [
+    "Escola Primária n.º 125 Cazeta",
+    "Complexo Escolar n.º 166 São Pedro",
+    "Escola Primária n.º 199 Campo da Vitória",
+    "Escola Primária n.º 201 Dr. António Agostinho Neto",
+    "Escola Primária n.º 202 Irmã Edith",
+    "Escola Primária n.º 204 Major Canhangulo",
+    "Escola Primária Metodista n.º 209 São Paulo",
+    "Escola Primária Católica n.º 210 Vila Matilde",
+    "Complexo Escolar n.º 274 Nossa Senhora de Guadalupe",
+    "Complexo Escolar n.º 282 Kudyelela",
+    "Complexo Escolar n.º 285 Cambondo",
+    "Complexo Escolar Metodista Sião n.º 289 Monte Sinai",
+    "Complexo Escolar n.º 291 Quissol",
+    "Complexo Escolar n.º 292 Samora Machel",
+    "Complexo Escolar Católico n.º 293 São Francisco de Assis",
+    "Instituto Politécnico Industrial n.º 299 José Eduardo dos Santos"
+  ];
+  var DRAFT_KEY = "cadastro-docente-rascunho";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $("form");
+  function use(n){ try { return window.claude && window.claude.use ? window.claude.use(n) : Promise.resolve(null); } catch (e) { return Promise.resolve(null); } }
+  var state = { db: null, uid: null, isAdmin: false, lastRecord: null };
+
+  function fill(list, id) {
+    var dl = $(id);
+    list.forEach(function (v) { var o = document.createElement("option"); o.value = v; dl.appendChild(o); });
+  }
+  fill(MUNICIPIOS, "dl-municipios");
+  fill(ESCOLAS, "dl-escolas");
+
+  (function buildGrau() {
+    var sel = $("f-grau");
+    var g1 = document.createElement("optgroup"); g1.label = "Grau";
+    for (var i = 1; i <= 13; i++) { var o = document.createElement("option"); o.textContent = i + ".º Grau"; g1.appendChild(o); }
+    var g2 = document.createElement("optgroup"); g2.label = "Classe";
+    for (var j = 1; j <= 6; j++) { var p = document.createElement("option"); p.textContent = j + ".ª Classe"; g2.appendChild(p); }
+    sel.appendChild(g1); sel.appendChild(g2);
+  })();
+
+  function radio(name) { var r = form.querySelector('input[name="' + name + '"]:checked'); return r ? r.value : ""; }
+  function trim(id) { return $(id).value.replace(/\s+/g, " ").trim(); }
+  function categoria() {
+    var v = $("f-categoria").value;
+    return v === "__outra" ? trim("f-categoria-outra") : v;
+  }
+
+  function read() {
+    return {
+      trat: radio("trat"), nome: trim("f-nome"), agente: trim("f-agente"),
+      categoria: categoria(), grau: $("f-grau").value,
+      colocacao: trim("f-colocacao"), origem: trim("f-origem"),
+      destino: trim("f-destino"), escola: trim("f-escola"), interesse: $("f-interesse").checked,
+      motivo: radio("motivo"), proximidade: $("f-proximidade").checked, detalhe: $("f-detalhe").value.trim(),
+      parecer: $("f-parecer").value, dataParecer: $("f-data").value, local: trim("f-local"), director: trim("f-director")
+    };
+  }
+
+  /* ---------- Resumo redigido como o parecer ---------- */
+  function slot(parent, text, ph) {
+    var s = document.createElement("span");
+    s.className = "slot" + (text ? "" : " empty");
+    s.textContent = text || ph;
+    parent.appendChild(s);
+  }
+  function txt(parent, t) { parent.appendChild(document.createTextNode(t)); }
+
+  function renderSummary() {
+    var d = read(), fem = d.trat === "Senhora";
+    var p1 = $("sum-1"), p2 = $("sum-2");
+    p1.textContent = ""; p2.textContent = "";
+    txt(p1, "A Direcção Municipal da Educação aprecia a solicitação de vaga apresentada ");
+    txt(p1, fem ? "pela " : "pelo ");
+    slot(p1, d.trat, "Senhor ou Senhora"); txt(p1, " "); slot(p1, d.nome, "nome completo");
+    txt(p1, fem ? ", portadora do n.º de Agente " : ", portador do n.º de Agente ");
+    slot(p1, d.agente, "000000");
+    txt(p1, ", actualmente "); slot(p1, d.categoria, "categoria"); txt(p1, ", "); slot(p1, d.grau, "grau");
+    txt(p1, fem ? ", colocada em " : ", colocado em ");
+    slot(p1, d.colocacao, "instituição actual");
+    txt(p1, ", Município de "); slot(p1, d.origem, "município actual"); txt(p1, ".");
+
+    txt(p2, d.interesse ? "Manifesta o interesse em exercer as suas funções no Município de " : "Pretende exercer funções no Município de ");
+    slot(p2, d.destino, "destino"); txt(p2, ", na ");
+    slot(p2, d.escola, "escola com vaga"); txt(p2, ". ");
+    slot(p2, d.motivo, "motivo do pedido");
+    if (d.proximidade) txt(p2, ", nomeadamente o interesse em exercer funções em estabelecimento de ensino próximo da sua residência");
+    txt(p2, ".");
+
+    var need = [d.trat, d.nome, d.agente, d.categoria, d.grau, d.colocacao, d.origem, d.destino, d.escola, d.interesse, d.motivo];
+    var done = need.filter(Boolean).length;
+    $("bar").style.width = Math.round(done / need.length * 100) + "%";
+    $("bar-label").textContent = done + " de " + need.length + " campos obrigatórios preenchidos";
+  }
+
+  /* ---------- Rascunho local ---------- */
+  var saveTimer = null;
+  function saveDraft() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try {
+        var d = read(); d._cat = $("f-categoria").value; d._catOutra = $("f-categoria-outra").value;
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+      } catch (e) {}
+    }, 400);
+  }
+  function loadDraft() {
+    try {
+      var raw = localStorage.getItem(DRAFT_KEY); if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d.trat) { var r = form.querySelector('input[name="trat"][value="' + d.trat + '"]'); if (r) r.checked = true; }
+      if (d.motivo) { var m = form.querySelector('input[name="motivo"]'); Array.prototype.forEach.call(form.querySelectorAll('input[name="motivo"]'), function (x) { if (x.value === d.motivo) x.checked = true; }); }
+      $("f-nome").value = d.nome || ""; $("f-agente").value = d.agente || "";
+      if (d._cat) $("f-categoria").value = d._cat;
+      $("f-categoria-outra").value = d._catOutra || "";
+      if (d.grau) $("f-grau").value = d.grau;
+      $("f-colocacao").value = d.colocacao || ""; $("f-origem").value = d.origem || "";
+      if (d.destino) $("f-destino").value = d.destino;
+      $("f-escola").value = d.escola || ""; $("f-interesse").checked = !!d.interesse;
+      $("f-proximidade").checked = !!d.proximidade; $("f-detalhe").value = d.detalhe || "";
+    } catch (e) {}
+  }
+  function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+
+  function syncOutra() { $("wrap-outra").hidden = $("f-categoria").value !== "__outra"; }
+
+  /* ---------- Validação ---------- */
+  var RULES = [
+    ["trat", "err-trat", function (d) { return d.trat ? "" : "Escolha Senhor ou Senhora."; }],
+    ["f-nome", "err-nome", function (d) { return d.nome.split(" ").length >= 2 && d.nome.length >= 5 ? "" : "Escreva o nome completo, com pelo menos nome e apelido."; }],
+    ["f-agente", "err-agente", function (d) { return /^\d{6,10}$/.test(d.agente) ? "" : "O n.º de Agente tem entre 6 e 10 algarismos."; }],
+    ["f-categoria", "err-categoria", function () { return $("f-categoria").value ? "" : "Seleccione a categoria."; }],
+    ["f-categoria-outra", "err-categoria-outra", function () { return $("f-categoria").value === "__outra" && !trim("f-categoria-outra") ? "Indique a categoria." : ""; }],
+    ["f-grau", "err-grau", function (d) { return d.grau ? "" : "Seleccione o grau ou a classe."; }],
+    ["f-colocacao", "err-colocacao", function (d) { return d.colocacao.length >= 3 ? "" : "Indique onde o docente está colocado."; }],
+    ["f-origem", "err-origem", function (d) { return d.origem ? "" : "Indique o município actual."; }],
+    ["f-destino", "err-destino", function (d) { return d.destino ? "" : "Indique o município de destino."; }],
+    ["f-escola", "err-escola", function (d) { return d.escola.length >= 3 ? "" : "Indique a escola com vaga."; }],
+    ["f-interesse", "err-interesse", function (d) { return d.interesse ? "" : "Confirme o interesse em exercer funções neste Município."; }],
+    ["motivo", "err-motivo", function (d) { return d.motivo ? "" : "Escolha a natureza do motivo."; }]
+  ];
+  function validate() {
+    var d = read(), first = null;
+    RULES.forEach(function (r) {
+      var msg = r[2](d), el = $(r[1]);
+      el.textContent = msg;
+      var input = r[0] === "trat" || r[0] === "motivo" ? null : $(r[0]);
+      if (input) input.classList.toggle("invalid", !!msg);
+      if (msg && !first) first = input || form.querySelector('input[name="' + r[0] + '"]');
+    });
+    if (first) { first.scrollIntoView({ block: "center", behavior: "smooth" }); try { first.focus({ preventScroll: true }); } catch (e) {} }
+    return !first;
+  }
+
+  /* ---------- Gravação ---------- */
+  function newCode() {
+    var a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", s = "", i;
+    var r = new Uint8Array(6); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(r) : r.forEach(function (_, k) { r[k] = Math.floor(Math.random() * 256); });
+    for (i = 0; i < 6; i++) s += a[r[i] % a.length];
+    return "CD" + s;
+  }
+  function buildRecord() {
+    var d = read();
+    return {
+      codigo: newCode(), trat: d.trat, nome: d.nome, agente: d.agente, categoria: d.categoria, grau: d.grau,
+      colocacao: d.colocacao, municipioOrigem: d.origem, municipioDestino: d.destino, escola: d.escola,
+      interesse: true, motivo: d.motivo, proximidade: d.proximidade, detalhe: d.detalhe,
+      parecer: state.isAdmin ? d.parecer : "Pendente",
+      dataParecer: state.isAdmin ? d.dataParecer : "", local: d.local, director: d.director,
+      criadoEm: new Date().toISOString()
+    };
+  }
+  async function saveRecord(rec) {
+    var ref = state.db.doc("cadastros/" + state.uid);
+    var snap = await ref.get();
+    var list = snap.exists && Array.isArray(snap.data().fichas) ? snap.data().fichas.slice() : [];
+    list.push(rec);
+    await ref.set({ fichas: list });
+  }
+
+  function msg(t, bad) { var m = $("form-msg"); m.textContent = t || ""; m.className = "form-msg" + (bad ? " bad" : ""); }
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    msg("");
+    if (!validate()) { msg("Corrija os campos assinalados.", true); return; }
+    var rec = buildRecord();
+    var btn = $("btn-submit");
+    if (!state.db || !state.uid) {
+      state.lastRecord = rec;
+      msg("O envio não está disponível neste momento. Pode descarregar a ficha e entregá-la na Direcção.", true);
+      showCsvOne();
+      return;
+    }
+    btn.disabled = true; btn.textContent = "A registar";
+    try {
+      await saveRecord(rec);
+      state.lastRecord = rec;
+      clearDraft();
+      $("done-name").textContent = rec.nome;
+      $("done-code").textContent = rec.codigo;
+      form.hidden = true; $("done").hidden = false;
+      showCsvOne();
+      $("done").scrollIntoView({ block: "start", behavior: "smooth" });
+    } catch (err) {
+      var code = err && err.code;
+      msg(code === "invalid_argument" ? "Não tem permissão para registar pedidos nesta página. Peça acesso de contribuidor a quem a partilhou." :
+          code === "quota_exceeded" ? "O limite de registos foi atingido. Contacte a Direcção." :
+          "Não foi possível registar agora. Tente novamente dentro de instantes.", true);
+    } finally { btn.disabled = false; btn.textContent = "Registar pedido"; }
+  });
+
+  function resetForm() {
+    form.reset(); $("f-destino").value = "Quêssua"; syncOutra();
+    Array.prototype.forEach.call(form.querySelectorAll(".invalid"), function (x) { x.classList.remove("invalid"); });
+    Array.prototype.forEach.call(form.querySelectorAll(".err"), function (x) { x.textContent = ""; });
+    clearDraft(); msg(""); renderSummary();
+  }
+  $("btn-reset").addEventListener("click", resetForm);
+  $("btn-new").addEventListener("click", function () {
+    resetForm(); $("done").hidden = true; form.hidden = false; $("top").scrollIntoView({ behavior: "smooth" });
+  });
+
+  form.addEventListener("input", function (e) {
+    if (e.target.classList) e.target.classList.remove("invalid");
+    if (e.target.id === "f-agente") e.target.value = e.target.value.replace(/\D/g, "");
+    syncOutra(); renderSummary(); saveDraft();
+  });
+  form.addEventListener("change", function () { syncOutra(); renderSummary(); saveDraft(); });
+
+  /* ---------- CSV ---------- */
+  var COLS = [
+    ["codigo", "Código"], ["trat", "Tratamento"], ["nome", "Nome completo"], ["agente", "N.º de Agente"],
+    ["categoria", "Categoria"], ["grau", "Grau ou classe"], ["colocacao", "Colocação actual"],
+    ["municipioOrigem", "Município actual"], ["municipioDestino", "Município de destino"], ["escola", "Escola pretendida"],
+    ["motivo", "Motivo"], ["proximidade", "Próximo da residência"], ["detalhe", "Descrição do motivo"],
+    ["parecer", "Parecer"], ["dataParecer", "Data do parecer"], ["local", "Local"], ["director", "Director Municipal"], ["criadoEm", "Registado em"]
+  ];
+  function csvCell(v) {
+    if (typeof v === "boolean") v = v ? "Sim" : "Não";
+    v = v == null ? "" : String(v);
+    if (/^[=+\-@]/.test(v)) v = "'" + v;
+    return '"' + v.replace(/"/g, '""') + '"';
+  }
+  function toCsv(rows) {
+    var out = [COLS.map(function (c) { return csvCell(c[1]); }).join(";")];
+    rows.forEach(function (r) { out.push(COLS.map(function (c) { return csvCell(r[c[0]]); }).join(";")); });
+    return "﻿" + out.join("\r\n");
+  }
+  async function saveCsv(rows, name, btn) {
+    var dl = await use("downloads");
+    var old = btn.textContent;
+    if (!dl) { btn.textContent = "Download indisponível"; setTimeout(function () { btn.textContent = old; }, 2500); return; }
+    try { await dl.save({ filename: name, data: toCsv(rows) }); }
+    catch (e) { if (!e || e.code !== "declined") { btn.textContent = "Não foi possível descarregar"; setTimeout(function () { btn.textContent = old; }, 2500); } }
+  }
+  function showCsvOne() {
+    var b = $("btn-csv-one");
+    use("downloads").then(function (dl) { b.hidden = !dl; }).catch(function () { b.hidden = true; });
+  }
+  $("btn-csv-one").addEventListener("click", function () {
+    if (state.lastRecord) saveCsv([state.lastRecord], "ficha-" + state.lastRecord.codigo + ".csv", $("btn-csv-one"));
+  });
+
+  /* ---------- Registos (apenas para quem edita a página) ---------- */
+  var allRows = [];
+  function renderRows() {
+    var body = $("rec-body"); body.textContent = "";
+    $("rec-empty").hidden = allRows.length > 0;
+    $("btn-csv-all").hidden = allRows.length === 0;
+    $("rec-count").textContent = allRows.length === 1 ? "1 ficha registada" : allRows.length + " fichas registadas";
+    allRows.forEach(function (r) {
+      var tr = document.createElement("tr");
+      function td(build) { var c = document.createElement("td"); build(c); tr.appendChild(c); }
+      td(function (c) { var s = document.createElement("span"); s.className = "mono"; s.textContent = r.codigo; c.appendChild(s); });
+      td(function (c) {
+        var b = document.createElement("strong"); b.textContent = r.trat + " " + r.nome; c.appendChild(b);
+        c.appendChild(document.createElement("br"));
+        var s = document.createElement("span"); s.className = "mono"; s.textContent = r.agente; c.appendChild(s);
+      });
+      td(function (c) { c.textContent = r.categoria + ", " + r.grau; });
+      td(function (c) { c.textContent = r.colocacao + " (" + r.municipioOrigem + ")"; });
+      td(function (c) { c.textContent = r.escola + ", " + r.municipioDestino; });
+      td(function (c) { c.textContent = r.motivo + (r.proximidade ? ", perto da residência" : ""); });
+      td(function (c) {
+        var sel = document.createElement("select"); sel.setAttribute("aria-label", "Parecer de " + r.nome);
+        ["Pendente", "Favorável", "Desfavorável"].forEach(function (o) { var op = document.createElement("option"); op.textContent = o; if (o === r.parecer) op.selected = true; sel.appendChild(op); });
+        sel.addEventListener("change", function () { mutate(r, function (f) { f.parecer = sel.value; if (sel.value !== "Pendente" && !f.dataParecer) f.dataParecer = new Date().toISOString().slice(0, 10); }); });
+        c.appendChild(sel);
+      });
+      td(function (c) { c.textContent = new Date(r.criadoEm).toLocaleDateString("pt-PT"); });
+      td(function (c) {
+        var b = document.createElement("button"); b.type = "button"; b.className = "btn ghost small"; b.textContent = "Eliminar";
+        var armed = false, t;
+        b.addEventListener("click", function () {
+          if (!armed) { armed = true; b.textContent = "Confirmar"; t = setTimeout(function () { armed = false; b.textContent = "Eliminar"; }, 4000); return; }
+          clearTimeout(t); mutate(r, null);
+        });
+        c.appendChild(b);
+      });
+      body.appendChild(tr);
+    });
+  }
+  async function mutate(row, fn) {
+    try {
+      var ref = state.db.doc("cadastros/" + row._owner);
+      var snap = await ref.get();
+      var list = snap.exists && Array.isArray(snap.data().fichas) ? snap.data().fichas.slice() : [];
+      var idx = list.findIndex(function (f) { return f.codigo === row.codigo; });
+      if (idx < 0) return;
+      if (fn) { var copy = Object.assign({}, list[idx]); fn(copy); list[idx] = copy; } else list.splice(idx, 1);
+      await ref.set({ fichas: list });
+    } catch (e) { $("rec-count").textContent = "Não foi possível actualizar a ficha. Tente novamente."; }
+  }
+  $("btn-csv-all").addEventListener("click", function () { saveCsv(allRows, "cadastro-docentes.csv", $("btn-csv-all")); });
+
+  function watchRecords() {
+    $("records").hidden = false;
+    var timer = setTimeout(function () { $("rec-count").textContent = "A ligação está lenta. Os dados podem estar desactualizados."; }, 10000);
+    state.db.collection("cadastros").onSnapshot(function (snap) {
+      if (!snap.metadata.fromCache) clearTimeout(timer);
+      var rows = [];
+      snap.docs.forEach(function (doc) {
+        var f = (doc.data() || {}).fichas;
+        if (Array.isArray(f)) f.forEach(function (x) { rows.push(Object.assign({}, x, { _owner: doc.id })); });
+      });
+      rows.sort(function (a, b) { return a.criadoEm < b.criadoEm ? 1 : -1; });
+      allRows = rows; renderRows();
+    }, function () { clearTimeout(timer); $("rec-count").textContent = "Não foi possível ler os registos."; });
+  }
+
+  /* ---------- Arranque ---------- */
+  loadDraft(); syncOutra(); renderSummary();
+  $("f-data").value = new Date().toISOString().slice(0, 10);
+
+  Promise.all([use("db"), use("user")]).then(async function (r) {
+    var db = r[0], user = r[1];
+    if (!db || !user) { $("mode-notice").hidden = false; return; }
+    state.db = db;
+    try { state.uid = await user.id(); } catch (e) { state.uid = null; }
+    var canWrite = null;
+    try { canWrite = await user.can("data.write"); } catch (e) {}
+    if (!state.uid || canWrite === false) { $("mode-notice").hidden = false; }
+    try { state.isAdmin = !!(await user.canEdit()); } catch (e) {}
+    if (state.isAdmin) { $("sec-parecer").hidden = false; watchRecords(); }
+  }).catch(function () { $("mode-notice").hidden = false; });
+})();
+</script>
+
+</body></html>

@@ -1,10 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-AO">
-<head>
+<!DOCTYPE html><html lang="pt-AO"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cadastro de Avaliação de Desempenho Docente</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&amp;family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&amp;display=swap">
 <style>
 :root{--bg:#f4f6f7;--surface:#fff;--ink:#14202b;--muted:#566472;--line:#cfd7dd;--red:#b3202a;--gold:#c79a1f;--hero:#14202b;--hero-ink:#fff;--field:#fff;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -65,23 +63,23 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center
 </div></header>
 
 <main class="wrap" id="ficha">
-<form id="f" novalidate>
+<form id="f" novalidate="">
 
-<section class="card">
+<section class="card rams-card">
 <h2>Identificação do avaliado</h2>
 <p class="sub">Campos do cabeçalho da ficha (Anexo III).</p>
 <div class="grid">
 <div><label for="a">a) Província</label><input id="a" name="a"></div>
 <div><label for="b">b) Município</label><input id="b" name="b"></div>
 <div><label for="c">c) Escola / instituição</label><input id="c" name="c"></div>
-<div class="span2"><label for="nome">Nome completo *</label><input id="nome" name="nome" required autocomplete="name"></div>
-<div><label for="cat">Categoria *</label><input id="cat" name="categoria" required></div>
-<div><label for="ag">Agente nº *</label><input id="ag" name="agente" required inputmode="numeric"></div>
-<div><label for="dav">Data de avaliação *</label><input id="dav" name="dataAval" type="date" required></div>
+<div class="span2"><label for="nome">Nome completo *</label><input id="nome" name="nome" required="" autocomplete="name"></div>
+<div><label for="cat">Categoria *</label><input id="cat" name="categoria" required=""></div>
+<div><label for="ag">Agente nº *</label><input id="ag" name="agente" required="" inputmode="numeric"></div>
+<div><label for="dav">Data de avaliação *</label><input id="dav" name="dataAval" type="date" required=""></div>
 </div>
 </section>
 
-<section class="card">
+<section class="card rams-card">
 <h2>Período a que respeita a avaliação</h2>
 <p class="sub">Indique o intervalo avaliado.</p>
 <div class="grid">
@@ -90,7 +88,7 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center
 </div>
 </section>
 
-<section class="card">
+<section class="card rams-card">
 <h2>Classificação dos indicadores</h2>
 <p class="sub">Introduza a nota de cada indicador por trimestre. Os totais e as médias são calculados automaticamente.</p>
 <div class="tw"><table id="tb">
@@ -101,10 +99,10 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center
 <tr><td></td><td>Classificação qualitativa</td>
 <td><input name="ql0" aria-label="Qualitativa I trimestre"></td><td><input name="ql1" aria-label="Qualitativa II trimestre"></td><td><input name="ql2" aria-label="Qualitativa III trimestre"></td><td><input name="ql3" aria-label="Qualitativa final"></td></tr>
 </tfoot></table></div>
-<p class="note">1. A pontuação trimestral é a soma de todos os indicadores. 2. A média é a soma dos trimestres dividida pelos trimestres lectivos (os preenchidos). 3. A classificação qualitativa é a faixa correspondente à nota.</p>
-</section>
 
-<section class="card">
+<details class="rams-details"><summary>Ver detalhes</summary><p class="note">1. A pontuação trimestral é a soma de todos os indicadores. 2. A média é a soma dos trimestres dividida pelos trimestres lectivos (os preenchidos). 3. A classificação qualitativa é a faixa correspondente à nota.</p></details></section>
+
+<section class="card rams-card">
 <h2>Classificação anual dos indicadores</h2>
 <p class="sub">Média final por indicador e classificação final.</p>
 <div class="tw"><table><thead><tr><th class="n">Nº</th><th>Indicadores</th><th class="n">Média final</th></tr></thead><tbody id="anual"></tbody></table></div>
@@ -114,7 +112,7 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center
 </div>
 </section>
 
-<section class="card">
+<section class="card rams-card">
 <h2>Apreciação geral</h2>
 <p class="sub">Comentários dos avaliadores. Os comentários são feitos por trimestre.</p>
 <div class="grid">
@@ -125,7 +123,7 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center
 </div>
 </section>
 
-<section class="card">
+<section class="card rams-card">
 <h2>Avaliador</h2>
 <div class="grid">
 <div><label for="avn">Nome</label><input id="avn" name="avNome"></div>
@@ -135,7 +133,7 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center
 <div class="sig">Assinatura do avaliador</div>
 </section>
 
-<section class="card">
+<section class="card rams-card">
 <h2>Concordância com a avaliação</h2>
 <div class="radios" role="radiogroup" aria-label="Concordância">
 <label><input type="radio" name="conc" value="Concordo"> Concordo</label>
@@ -153,7 +151,7 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;text-align:center
 <button class="btn alt" type="reset" id="rs">Limpar</button>
 </div>
 
-<section class="card" id="lista"><h2>Cadastros guardados</h2><p class="sub">Guardados neste navegador.</p><div id="recs"><p class="note">Ainda não há cadastros.</p></div></section>
+<section class="card rams-card" id="lista"><h2>Cadastros guardados</h2><p class="sub">Guardados neste navegador.</p><div id="recs"><p class="note">Ainda não há cadastros.</p></div></section>
 </form>
 </main>
 <footer>Modelo: Diário da República, I Série — N.º 18, de 27 de Janeiro de 2022, Anexo III.</footer>
@@ -204,5 +202,6 @@ f.addEventListener("submit",function(e){
  msg.style.color="var(--ink)";msg.textContent="Cadastro guardado: "+d.nome+".";
 });
 </script>
-</body>
-</html>
+
+
+</body></html>

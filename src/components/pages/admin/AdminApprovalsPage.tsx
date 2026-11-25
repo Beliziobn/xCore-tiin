@@ -197,8 +197,10 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     loadApplications(true);
     const handleSync = () => refreshLocalApplications();
     window.addEventListener('sigre-data-synced', handleSync);
+    window.addEventListener('sigre-homologados-cleared', handleSync);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
+      window.removeEventListener('sigre-homologados-cleared', handleSync);
     };
   }, []);
 
@@ -372,7 +374,10 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
         // Add to global directors state only if School General Director
         if (onAddDirectorGlobal && updated.type === 'diretor') {
           const dirId = updated.userId || 'dir-' + Date.now();
-          const targetSchool = schools.find((s) => s.name === (targetSchoolName || updated.schoolName)) || schools[0] || {
+          const targetSchool =
+            schools.find((s) =>
+              schoolsMatch(s.name, targetSchoolName || updated.schoolName, s.id, updated.schoolId)
+            ) || {
             id: 'sch-temp',
             name: targetSchoolName || updated.schoolName,
             directorName: updated.fullName,

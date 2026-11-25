@@ -50,6 +50,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
   isLoggedIn,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [schoolQuotaSearch, setSchoolQuotaSearch] = useState('');
   const [docFilter, setDocFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || '');
@@ -82,6 +83,15 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
       quota: getSchoolStudentQuotaStatus(sc, students),
     }));
   }, [schools, detailedStudents, students]);
+
+  const filteredSchoolStudentQuotaList = useMemo(() => {
+    const term = schoolQuotaSearch.trim().toLowerCase();
+    if (!term) return schoolStudentQuotaList;
+    return schoolStudentQuotaList.filter(({ school }) => {
+      const searchKey = `${school.name} ${school.category || ''} ${school.natureza || 'Pública'}`.toLowerCase();
+      return searchKey.includes(term);
+    });
+  }, [schoolStudentQuotaList, schoolQuotaSearch]);
 
   const totalDeclaredStudentsAllSchools = useMemo(
     () => schoolStudentQuotaList.reduce((acc, item) => acc + item.quota.declaredTotal, 0),
@@ -213,8 +223,8 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
   }, [schools, schoolFilter]);
 
   return (
-    <div id="admin-students-page" className="w-full min-h-screen bg-[#f7f3f3]">
-      {/* Hero Header: "Meus alunos" matching 14.png */}
+    <div id="admin-students-page" className="w-full min-h-screen bg-white text-[#1D1D1F]">
+      {/* Hero Header: "Meus alunos" */}
       <Hero
         onOpenGetStarted={onOpenGetStarted}
         isLoggedIn={isLoggedIn}
@@ -222,201 +232,180 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
         customSubtitle=""
       />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Aviso Institucional de Competência: Director Municipal vs Director de Escola */}
-        <div className="mb-6 bg-[#0b3d5c] text-white rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <School className="w-4 h-4 text-cyan-300 shrink-0" />
-              <span className="text-xs font-black uppercase tracking-wider text-cyan-200">
-                Direcção Municipal da Educação (DME) • Consulta de Quantidades por Escola
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
-              O <strong>Director Municipal</strong> não cadastra alunos (visualiza apenas o resumo quantitativo por unidade escolar). <strong>Quem cadastra o aluno é o Director de Escola</strong>, pois no painel da escola o sistema identifica automaticamente qual instituição está a matricular o aluno.
-            </p>
-          </div>
+      <div className="max-w-[1180px] mx-auto px-4 sm:px-8 py-10">
+        {/* Aviso institucional discreto (substitui o banner azul-escuro — SigreAlunosMinimal) */}
+        <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border border-[#E5E5EA] rounded-[10px] text-[13px] text-[#6E6E73] mb-8 bg-white">
+          <span>
+            <strong className="text-[#1D1D1F] font-medium">Direcção Municipal da Educação (DME):</strong> Modo de consulta. O cadastro de alunos é feito exclusivamente pelo Director de Escola.
+          </span>
           {onSwitchToDirectorStudents && (
             <button
               type="button"
               onClick={() => onSwitchToDirectorStudents()}
-              className="shrink-0 bg-white hover:bg-cyan-50 text-[#0b3d5c] font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+              className="text-[#1D1D1F] border border-[#E5E5EA] hover:bg-[#F5F5F7] px-3.5 py-1.5 rounded-[8px] text-[13px] font-medium transition-colors whitespace-nowrap cursor-pointer"
             >
-              <GraduationCap className="w-4 h-4" />
-              <span>Aceder Painel do Director de Escola</span>
+              Painel do Director
             </button>
           )}
         </div>
 
-        {/* Resumo Básico das Quantidades de Alunos por Escola (Total, Feminino e Masculino) */}
-        <div className="mb-8 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        {/* Cabeçalho e KPIs limpos sem caixas coloridas (SigreAlunosMinimal) */}
+        <div className="mb-10">
+          <div className="flex flex-wrap items-end justify-between gap-6 mb-7">
             <div>
-              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <UsersIcon className="w-5 h-5 text-[#f75142]" />
-                <span>Resumo Básico de Quantidades de Alunos por Escola</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Síntese quantitativa municipal por unidade escolar com distribuição por sexo (Feminino e Masculino) e situação da quota declarada no Instrumento Complementar 2026/2027.
+              <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-[#1D1D1F] leading-tight">
+                Quantidades de Alunos por Escola
+              </h1>
+              <p className="text-[13px] text-[#6E6E73] mt-1">
+                Instrumento Complementar 2026/2027
               </p>
             </div>
-
-            {/* Totais Gerais da Rede Municipal */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 shrink-0">
-              <div className="px-3 py-2 rounded-xl bg-slate-900 text-white text-center">
-                <span className="block text-[9px] font-bold uppercase text-slate-300">Total Alunos</span>
-                <span className="text-base font-black">{totalRegisteredStudentsAllSchools}</span>
-              </div>
-              <div className="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-rose-700">Sexo Feminino</span>
-                <span className="text-base font-black text-rose-800">{totalFemaleAllSchools}</span>
-              </div>
-              <div className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-indigo-700">Sexo Masculino</span>
-                <span className="text-base font-black text-indigo-800">{totalMaleAllSchools}</span>
-              </div>
-              <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-slate-500">Quota Declarada</span>
-                <span className="text-base font-black text-slate-800">{totalDeclaredStudentsAllSchools}</span>
-              </div>
-              <div className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-center">
-                <span className="block text-[9px] font-bold uppercase text-amber-800">Pendentes</span>
-                <span className="text-base font-black text-amber-900">{totalPendingStudentsAllSchools}</span>
-              </div>
-            </div>
+            <input
+              id="q"
+              type="search"
+              value={schoolQuotaSearch}
+              onChange={(e) => setSchoolQuotaSearch(e.target.value)}
+              placeholder="Pesquisar escola..."
+              aria-label="Pesquisar escola"
+              className="w-full sm:w-[280px] px-3.5 py-2 border border-[#E5E5EA] focus:border-[#1D1D1F] rounded-[9px] text-[14px] text-[#1D1D1F] placeholder:text-[#86868B] outline-none bg-white transition-colors"
+            />
           </div>
 
-          {schoolStudentQuotaList.length === 0 ? (
-            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
-              <School className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-800">Nenhuma escola cadastrada no sistema</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Cadastre primeiro as unidades escolares na aba &ldquo;Escolas&rdquo; para acompanhar o resumo quantitativo de alunos.
-              </p>
+          <section className="flex flex-wrap gap-8 py-4 border-t border-b border-[#E5E5EA] mb-6">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                Total Alunos
+              </div>
+              <div className="text-[22px] font-semibold tabular-nums tracking-[-0.02em] text-[#1D1D1F]">
+                {totalRegisteredStudentsAllSchools.toLocaleString('pt-AO')}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                Feminino
+              </div>
+              <div className="text-[22px] font-semibold tabular-nums tracking-[-0.02em] text-[#6E6E73]">
+                {totalFemaleAllSchools.toLocaleString('pt-AO')}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                Masculino
+              </div>
+              <div className="text-[22px] font-semibold tabular-nums tracking-[-0.02em] text-[#6E6E73]">
+                {totalMaleAllSchools.toLocaleString('pt-AO')}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                Quota Declarada
+              </div>
+              <div className="text-[22px] font-semibold tabular-nums tracking-[-0.02em] text-[#1D1D1F]">
+                {totalDeclaredStudentsAllSchools.toLocaleString('pt-AO')}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.04em] text-[#86868B] mb-1">
+                Pendentes
+              </div>
+              <div className="text-[22px] font-semibold tabular-nums tracking-[-0.02em] text-[#1D1D1F]">
+                {totalPendingStudentsAllSchools.toLocaleString('pt-AO')}
+              </div>
+            </div>
+          </section>
+
+          {/* Tabela minimalista (substitui os cartões redundantes) */}
+          {filteredSchoolStudentQuotaList.length === 0 ? (
+            <div className="py-10 text-center border-b border-[#E5E5EA] text-[14px] text-[#6E6E73]">
+              Nenhuma unidade escolar encontrada para a pesquisa.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {schoolStudentQuotaList.map(({ school, quota }) => {
-                const femPct =
-                  quota.registeredCount > 0
-                    ? Math.round((quota.registeredFemaleCount / quota.registeredCount) * 100)
-                    : 0;
-                const mascPct =
-                  quota.registeredCount > 0 ? Math.max(0, 100 - femPct) : 0;
-
-                return (
-                  <div
-                    key={school.id}
-                    className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:shadow-sm transition flex flex-col justify-between gap-3.5"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#0b3d5c] block">
-                            {school.category} • {school.natureza || 'Pública'}
-                          </span>
-                          <h4 className="text-sm sm:text-base font-black text-slate-900 leading-snug mt-0.5">
-                            {school.name}
-                          </h4>
-                        </div>
-                        <span
-                          className={`shrink-0 text-[10px] font-black px-2.5 py-1 rounded-full border ${
-                            quota.pendingCount > 0
-                              ? 'bg-amber-100 text-amber-900 border-amber-300'
-                              : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          }`}
-                        >
-                          {quota.pendingCount > 0
-                            ? `${quota.pendingCount} Pendentes de Cadastro`
-                            : 'Quota Completa'}
-                        </span>
-                      </div>
-
-                      {/* Frase de Resumo Básico exacto como pedido pelo utilizador */}
-                      <div className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
-                        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed">
-                          Na escola <strong className="text-slate-950 font-black">{school.name}</strong> tem{' '}
-                          <strong className="text-slate-950 font-black">{quota.registeredCount} alunos</strong>, dos quais{' '}
-                          <strong className="text-rose-700 font-black">
-                            {quota.registeredFemaleCount} são do sexo feminino
-                          </strong>{' '}
-                          e{' '}
-                          <strong className="text-indigo-700 font-black">
-                            {quota.registeredMaleCount} são do sexo masculino
-                          </strong>
-                          .
-                        </p>
-                      </div>
-
-                      {/* Contadores Visuais: Total | Sexo Feminino | Sexo Masculino */}
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-white rounded-xl py-2 px-2 border border-slate-200">
-                          <span className="block text-[10px] uppercase text-slate-500 font-bold">Total de Alunos</span>
-                          <span className="text-lg font-black text-slate-900">{quota.registeredCount}</span>
-                        </div>
-                        <div className="bg-rose-50/80 rounded-xl py-2 px-2 border border-rose-200">
-                          <span className="block text-[10px] uppercase text-rose-700 font-bold">Sexo Feminino</span>
-                          <span className="text-lg font-black text-rose-800">{quota.registeredFemaleCount}</span>
-                          <span className="block text-[10px] text-rose-600 font-semibold">{femPct}%</span>
-                        </div>
-                        <div className="bg-indigo-50/80 rounded-xl py-2 px-2 border border-indigo-200">
-                          <span className="block text-[10px] uppercase text-indigo-700 font-bold">Sexo Masculino</span>
-                          <span className="text-lg font-black text-indigo-800">{quota.registeredMaleCount}</span>
-                          <span className="block text-[10px] text-indigo-600 font-semibold">{mascPct}%</span>
-                        </div>
-                      </div>
-
-                      {/* Barra de Proporção Feminino vs Masculino */}
-                      <div className="space-y-1">
-                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden flex">
-                          {quota.registeredCount > 0 && (
-                            <>
-                              <div
-                                className="h-full bg-rose-500 transition-all"
-                                style={{ width: `${femPct}%` }}
-                                title={`Sexo Feminino: ${quota.registeredFemaleCount} (${femPct}%)`}
-                              />
-                              <div
-                                className="h-full bg-indigo-600 transition-all"
-                                style={{ width: `${mascPct}%` }}
-                                title={`Sexo Masculino: ${quota.registeredMaleCount} (${mascPct}%)`}
-                              />
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500">
-                          <span>Quota Declarada pela Escola: <strong>{quota.declaredTotal}</strong></span>
-                          <span>Pendentes de Cadastro: <strong className="text-amber-800">{quota.pendingCount}</strong></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/70">
-                      <button
-                        type="button"
-                        onClick={() => setSchoolFilter(schoolFilter === school.name ? 'all' : school.name)}
-                        className="text-[11px] font-bold text-slate-700 hover:text-slate-900 cursor-pointer"
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[14px]">
+                <thead>
+                  <tr>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-[0.04em] text-[#86868B] py-3 px-3.5 border-b border-[#E5E5EA]">
+                      Unidade Escolar
+                    </th>
+                    <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[#86868B] py-3 px-3.5 border-b border-[#E5E5EA] tabular-nums">
+                      Alunos (F / M)
+                    </th>
+                    <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[#86868B] py-3 px-3.5 border-b border-[#E5E5EA] tabular-nums">
+                      Quota
+                    </th>
+                    <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[#86868B] py-3 px-3.5 border-b border-[#E5E5EA] tabular-nums">
+                      Pendentes
+                    </th>
+                    <th className="text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[#86868B] py-3 px-3.5 border-b border-[#E5E5EA] tabular-nums">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSchoolStudentQuotaList.map(({ school, quota }) => {
+                    const isFilteringThisSchool = schoolFilter === school.name;
+                    return (
+                      <tr
+                        key={school.id}
+                        className="hover:bg-[#F5F5F7] transition-colors"
                       >
-                        {schoolFilter === school.name ? '✓ A filtrar esta escola' : 'Filtrar alunos desta escola'}
-                      </button>
-                      {onSwitchToDirectorStudents && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveDirectorSchoolId(school.id);
-                            onSwitchToDirectorStudents(school.id, school.name);
-                          }}
-                          className="text-[11px] font-bold text-[#0b3d5c] hover:underline cursor-pointer flex items-center gap-1"
-                          title="Abrir painel do Director desta Escola para cadastrar alunos"
-                        >
-                          <span>Painel do Director desta Escola</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                        <td className="py-4 px-3.5 border-b border-[#E5E5EA] align-middle">
+                          <div className="font-medium text-[#1D1D1F]">
+                            {school.name}
+                          </div>
+                          <div className="text-[12px] text-[#86868B] mt-0.5">
+                            {school.category} · {school.natureza || 'Pública'}
+                          </div>
+                        </td>
+                        <td className="py-4 px-3.5 border-b border-[#E5E5EA] align-middle text-right tabular-nums">
+                          <strong className="font-semibold text-[#1D1D1F]">
+                            {quota.registeredCount.toLocaleString('pt-AO')}
+                          </strong>
+                          <div className="text-[12px] text-[#6E6E73]">
+                            F: {quota.registeredFemaleCount} · M: {quota.registeredMaleCount}
+                          </div>
+                        </td>
+                        <td className="py-4 px-3.5 border-b border-[#E5E5EA] align-middle text-right tabular-nums text-[#1D1D1F]">
+                          {quota.declaredTotal.toLocaleString('pt-AO')}
+                        </td>
+                        <td className="py-4 px-3.5 border-b border-[#E5E5EA] align-middle text-right tabular-nums">
+                          <strong className="font-semibold text-[#1D1D1F]">
+                            {quota.pendingCount.toLocaleString('pt-AO')}
+                          </strong>
+                        </td>
+                        <td className="py-4 px-3.5 border-b border-[#E5E5EA] align-middle">
+                          <div className="flex items-center justify-end gap-4 text-[13px] whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setSchoolFilter(isFilteringThisSchool ? 'all' : school.name)}
+                              className={`cursor-pointer transition-colors ${
+                                isFilteringThisSchool
+                                  ? 'text-[#1D1D1F] font-semibold underline'
+                                  : 'text-[#6E6E73] hover:text-[#1D1D1F]'
+                              }`}
+                            >
+                              {isFilteringThisSchool ? 'A filtrar' : 'Filtrar alunos'}
+                            </button>
+                            {onSwitchToDirectorStudents && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveDirectorSchoolId(school.id);
+                                  onSwitchToDirectorStudents(school.id, school.name);
+                                }}
+                                className="text-[#0071E3] hover:underline font-medium cursor-pointer"
+                                title="Abrir painel do Director desta Escola"
+                              >
+                                Painel →
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

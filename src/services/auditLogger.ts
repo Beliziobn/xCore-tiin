@@ -5,6 +5,9 @@
  */
 
 import { AuditLog, AuditAction, AuditSeverity } from '../types/audit';
+import { auth, db } from '../firebase';
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { isExpressApiAvailable } from '../utils/apiAvailability';
 
 const LOCAL_STORAGE_KEY = 'ucore_audit_logs_v1';
 const MAX_LOCAL_LOGS = 500;
@@ -44,7 +47,6 @@ export class AuditLogger {
 
     if (typeof window !== 'undefined') {
       try {
-        const { auth } = await import('../firebase');
         currentUserId = auth?.currentUser?.uid;
         currentUserEmail = auth?.currentUser?.email || undefined;
       } catch {
@@ -78,26 +80,20 @@ export class AuditLogger {
     // 1. Guardar localmente para visualização instantânea no painel
     this.saveToLocalCache(logItem);
 
-    // 2. Enviar para a API Express com rate limiting
-    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+    // 2. Enviar para a API Express apenas quando o servidor Express estiver ativo
+    if (typeof window !== 'undefined' && typeof fetch === 'function' && isExpressApiAvailable()) {
       try {
         fetch('/api/audit/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(logItem),
-        }).catch(() => {
-          // Silencioso em caso de indisponibilidade transitória
-        });
-      } catch {
-        // Ignora erro de rede para não bloquear a UI
-      }
+        }).catch(() => {});
+      } catch {}
     }
 
     // 3. Tentar persistir no Firestore se autenticado no browser (conforme RLS de audit_logs)
     if (typeof window !== 'undefined' && currentUserId && currentUserId === actorId) {
       try {
-        const { db } = await import('../firebase');
-        const { collection, doc, setDoc } = await import('firebase/firestore');
         if (db) {
           const docRef = doc(collection(db, 'audit_logs'), id);
           await setDoc(docRef, {
@@ -112,8 +108,8 @@ export class AuditLogger {
             timestamp: logItem.timestamp,
           });
         }
-      } catch (err) {
-        console.debug('Nota: Registro no Firestore de auditoria diferido (offline/permissão)');
+      } catch {
+        // Offline / permissão diferida
       }
     }
 

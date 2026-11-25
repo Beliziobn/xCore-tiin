@@ -44,13 +44,16 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
   const [isClockAccelerated, setIsClockAccelerated] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [lastCheckedTime, setLastCheckedTime] = useState<string>('há instantes');
+  const [syncTick, setSyncTick] = useState(0);
 
   const matchedApp = React.useMemo(() => {
     const apps = getPendingApplications();
     return apps.find(
-      (a) => a.userId === currentUser.id || a.email.toLowerCase() === currentUser.email.toLowerCase()
+      (a) =>
+        a.userId === currentUser.id ||
+        (a.email && currentUser.email && a.email.toLowerCase() === currentUser.email.toLowerCase())
     );
-  }, [currentUser.id, currentUser.email]);
+  }, [currentUser.id, currentUser.email, syncTick]);
 
   const isAdminScopeMember =
     currentUser.scope === 'administracao' ||
@@ -104,6 +107,7 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       try {
         if (promoteIfApproved()) return;
         await syncApplicationsFromServer(true);
+        if (isMounted) setSyncTick((t) => t + 1);
         promoteIfApproved();
       } catch {
         // ignore
@@ -111,13 +115,20 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     };
 
     const handleRealtimeSync = () => {
+      if (isMounted) setSyncTick((t) => t + 1);
       promoteIfApproved();
     };
 
     window.addEventListener('sigre-data-synced', handleRealtimeSync);
     pollStatus();
+    const intervalId = window.setInterval(() => {
+      if (!promoted) {
+        pollStatus();
+      }
+    }, 8000);
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
       window.removeEventListener('sigre-data-synced', handleRealtimeSync);
     };
   }, [currentUser, onApprovalConfirmed, showToast, approverRole]);

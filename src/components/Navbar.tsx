@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText, Archive, Zap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications, syncApplicationsFromServer, isSchoolDirectorApproval, schoolsMatch, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
-import { fetchQuickRequests } from '../utils/quickServicesStorage';
+import { getCachedQuickRequests } from '../utils/quickServicesStorage';
 import {
   loadVagaDocenteRecords,
   recordBelongsToDirectorSchool,
@@ -10,6 +10,8 @@ import {
   syncVagasDocentesFromFirestore,
   formatDateTimePt,
 } from './pages/CadastroDocenteVagaSection';
+
+let lastNavbarCloudSyncAt = 0;
 
 interface NavbarProps {
   onOpenGetStarted: () => void;
@@ -183,9 +185,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       } catch {}
     };
 
-    const updateQuickRequests = async () => {
+    const updateQuickRequests = () => {
       try {
-        const reqs = await fetchQuickRequests();
+        const reqs = getCachedQuickRequests();
         const isDir = activeRole === 'diretor' || currentUser?.role === 'diretor';
         const allowedForDirector = ['BOLETIM_NOTAS', 'DECLARACAO_MATRICULA', 'GUIA_TRANSFERENCIA'];
         const userSchool = currentUser?.schoolName?.trim().toLowerCase();
@@ -216,12 +218,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const updateCounts = () => {
       refreshCountsFromLocal();
-      syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
-      syncApplicationsFromServer().then((all) => {
-        // All homologations now route exclusively to the central Admin account (dmedoquessua@gmail.com)
-        const admPending = all.filter((a) => a.status === 'pendente').length;
-        setPendingAppsCount({ director: 0, admin: admPending });
-      }).catch(() => {});
+      const now = Date.now();
+      if (now - lastNavbarCloudSyncAt > 60000) {
+        lastNavbarCloudSyncAt = now;
+        syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
+        syncApplicationsFromServer()
+          .then((all) => {
+            const admPending = all.filter((a) => a.status === 'pendente').length;
+            setPendingAppsCount({ director: 0, admin: admPending });
+          })
+          .catch(() => {});
+      }
     };
 
     updateCounts();
@@ -695,48 +702,55 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   )}
 
-                  {/* Serviços SIGRE Oficial (Para Diretores de Escola apenas Serviços Rápidos) */}
-                  <button
-                    id="dropdown-servicos-sigre-btn"
-                    onClick={() => {
-                      onSelectPage(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'declaracao-efectividade');
-                      setShowPagesDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-emerald-50 hover:text-emerald-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      {activeRole === 'diretor' ? (
-                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      ) : (
+                  {/* Serviços SIGRE Oficial (Exclusivo para Administração Municipal) */}
+                  {currentUser && currentUser.role === 'admin' && activeRole === 'admin' && (
+                    <button
+                      id="dropdown-servicos-sigre-btn"
+                      onClick={() => {
+                        onSelectPage('declaracao-efectividade');
+                        setShowPagesDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-emerald-50 hover:text-emerald-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-bold cursor-pointer flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2">
                         <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                      )}
-                      <span>{activeRole === 'diretor' ? 'Serviços Rápidos (SIGRE)' : 'Serviços SIGRE'}</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      {currentUser && (activeRole === 'admin' || activeRole === 'diretor') && pendingQuickRequestsCount > 0 && (
-                        <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full animate-pulse">
-                          {pendingQuickRequestsCount}
-                        </span>
-                      )}
-                      <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
-                    </span>
-                  </button>
+                        <span>Serviços SIGRE</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {pendingQuickRequestsCount > 0 && (
+                          <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                            {pendingQuickRequestsCount}
+                          </span>
+                        )}
+                        <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+                      </span>
+                    </button>
+                  )}
 
-                  {/* Serviços Rápidos ao Cidadão (Sem Login - Apenas para usuários normais/visitantes) */}
-                  {(!currentUser || (activeRole !== 'admin' && activeRole !== 'diretor')) && (
+                  {/* Serviços Rápidos (Para Diretores, Subdiretores, Professores e outros órgãos escolares) */}
+                  {(!currentUser || activeRole !== 'admin' || currentUser.role !== 'admin') && (
                     <button
                       id="dropdown-servicos-rapidos-btn"
                       onClick={() => {
-                        onSelectPage('servicos-rapidos');
+                        onSelectPage(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos');
                         setShowPagesDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-amber-50 hover:text-amber-950 transition-colors border-t border-slate-100 uppercase tracking-wider font-black cursor-pointer flex items-center justify-between"
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-900 hover:bg-amber-50 hover:text-amber-950 transition-colors border-t border-slate-100 mt-1 uppercase tracking-wider font-black cursor-pointer flex items-center justify-between"
                     >
                       <span className="flex items-center gap-2">
                         <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                         <span>Serviços Rápidos</span>
                       </span>
-                      <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">Sem login</span>
+                      <span className="flex items-center gap-1">
+                        {currentUser && activeRole === 'diretor' && pendingQuickRequestsCount > 0 && (
+                          <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                            {pendingQuickRequestsCount}
+                          </span>
+                        )}
+                        <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.5 rounded">
+                          {currentUser ? 'Escola' : 'Sem login'}
+                        </span>
+                      </span>
                     </button>
                   )}
                 </div>
@@ -1322,47 +1336,53 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </button>
           )}
-          <button
-            id="mobile-menu-servicos-sigre-btn"
-            onClick={() => {
-              onSelectPage(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'declaracao-efectividade');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 px-3 text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              {activeRole === 'diretor' ? (
-                <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
-              ) : (
-                <FileText className="w-4 h-4 text-[#f75142]" />
-              )}
-              <span>{activeRole === 'diretor' ? 'Serviços Rápidos (SIGRE)' : 'Serviços SIGRE'}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              {currentUser && (activeRole === 'admin' || activeRole === 'diretor') && pendingQuickRequestsCount > 0 && (
-                <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
-                  {pendingQuickRequestsCount}
-                </span>
-              )}
-              <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
-            </div>
-          </button>
-
-          {(!currentUser || (activeRole !== 'admin' && activeRole !== 'diretor')) && (
+          {currentUser && currentUser.role === 'admin' && activeRole === 'admin' && (
             <button
+              id="mobile-menu-servicos-sigre-btn"
               onClick={() => {
-                onSelectPage('servicos-rapidos');
+                onSelectPage('declaracao-efectividade');
+                setMobileMenuOpen(false);
+              }}
+              className="text-left py-2 px-3 text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#f75142]" />
+                <span>Serviços SIGRE</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {pendingQuickRequestsCount > 0 && (
+                  <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                    {pendingQuickRequestsCount}
+                  </span>
+                )}
+                <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Oficial</span>
+              </div>
+            </button>
+          )}
+
+          {(!currentUser || activeRole !== 'admin' || currentUser.role !== 'admin') && (
+            <button
+              id="mobile-menu-servicos-rapidos-btn"
+              onClick={() => {
+                onSelectPage(activeRole === 'diretor' ? 'diretor-servicos-rapidos' : 'servicos-rapidos');
                 setMobileMenuOpen(false);
               }}
               className="text-left py-2 px-3 text-amber-950 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-between"
             >
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-amber-600 fill-amber-600" />
-                <span>Serviços Rápidos (Sem login)</span>
+                <span>Serviços Rápidos</span>
               </div>
-              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
-                Acesso Livre
-              </span>
+              <div className="flex items-center gap-1">
+                {currentUser && activeRole === 'diretor' && pendingQuickRequestsCount > 0 && (
+                  <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                    {pendingQuickRequestsCount}
+                  </span>
+                )}
+                <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
+                  {currentUser ? 'Escola' : 'Acesso Livre'}
+                </span>
+              </div>
             </button>
           )}
           {onOpenChat && (

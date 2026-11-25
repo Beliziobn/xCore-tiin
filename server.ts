@@ -782,6 +782,8 @@ async function startServer() {
           (!cType || !eType || cType === eType) &&
           (!cNormSchool || !eNormSchool || cNormSchool === eNormSchool)
         ) {
+          if (cBi.length >= 5 && eBi.length >= 5 && cBi !== eBi) return false;
+          if (cHasPersonalEmail && !isGenericPlaceholderEmail(eEmail) && cEmail !== eEmail) return false;
           return true;
         }
         return false;
@@ -1871,6 +1873,165 @@ async function startServer() {
     });
   });
 
+  const canonicalizeAndPromoteApplications = (incomingList: any[]) => {
+    if (!Array.isArray(incomingList) || incomingList.length === 0) return;
+    const normalizedIncoming = incomingList.map((appItem) => {
+      const cleanBi = String(appItem.biNumber || "").trim().replace(/\s+/g, "").toUpperCase();
+      return {
+        ...appItem,
+        ...(cleanBi ? { biNumber: cleanBi } : {}),
+        targetApproverRole: "admin",
+        targetApproverEmail: "dmedoquessua@gmail.com",
+        approverDirectorName: "Director Municipal da Educação (dmedoquessua@gmail.com)",
+        _updatedAt: Number(appItem._updatedAt || Date.now()),
+      };
+    });
+
+    const mergedRaw = upsertByKey(
+      networkStore.applications,
+      normalizedIncoming,
+      (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
+    );
+
+    const canonicalApps: any[] = [];
+    for (const candidate of mergedRaw) {
+      if (!candidate) continue;
+      const cId = String(candidate.id || "").trim().toLowerCase();
+      const cUid = String(candidate.userId || "").trim().toLowerCase();
+      const cBase = stripEntityIdPrefix(candidate.userId || candidate.id);
+      const cBi = String(candidate.biNumber || "").trim().replace(/\s+/g, "").toUpperCase();
+      const cEmail = String(candidate.email || "").trim().toLowerCase();
+      const isGeneric = isGenericPlaceholderEmail(cEmail);
+      const idx = canonicalApps.findIndex((ex) => {
+        const eId = String(ex.id || "").trim().toLowerCase();
+        const eUid = String(ex.userId || "").trim().toLowerCase();
+        const eBase = stripEntityIdPrefix(ex.userId || ex.id);
+        const eBi = String(ex.biNumber || "").trim().replace(/\s+/g, "").toUpperCase();
+        const eEmail = String(ex.email || "").trim().toLowerCase();
+        if (cId && eId && cId === eId) return true;
+        if (cUid && eUid && cUid === eUid) return true;
+        if (cBase && eBase && cBase === eBase) return true;
+        if (cBi && eBi && cBi.length >= 5 && cBi === eBi) return true;
+        if (!isGeneric && !isGenericPlaceholderEmail(eEmail) && cEmail === eEmail) return true;
+        return false;
+      });
+      if (idx >= 0) {
+        const prev = canonicalApps[idx];
+        const isApproved = prev.status === "aprovado" || candidate.status === "aprovado" || Boolean(prev.approvedAt) || Boolean(candidate.approvedAt);
+        const isRejected = !isApproved && (prev.status === "rejeitado" || candidate.status === "rejeitado");
+        const preferCand = (candidate.status === "aprovado" && prev.status !== "aprovado") || Number(candidate._updatedAt || 0) > Number(prev._updatedAt || 0);
+        const primary = preferCand ? candidate : prev;
+        const secondary = preferCand ? prev : candidate;
+        canonicalApps[idx] = {
+          ...secondary,
+          ...primary,
+          id: prev.id || candidate.id,
+          userId: prev.userId || candidate.userId,
+          email: !isGenericPlaceholderEmail(primary.email) ? primary.email : (!isGenericPlaceholderEmail(secondary.email) ? secondary.email : primary.email || secondary.email),
+          biNumber: primary.biNumber || secondary.biNumber,
+          status: isApproved ? "aprovado" : isRejected ? "rejeitado" : "pendente",
+          approvedAt: primary.approvedAt || secondary.approvedAt,
+          approvedBy: primary.approvedBy || secondary.approvedBy,
+          complementaryData: primary.complementaryData || secondary.complementaryData,
+          targetApproverRole: "admin",
+          targetApproverEmail: "dmedoquessua@gmail.com",
+        };
+      } else {
+        canonicalApps.push(candidate);
+      }
+    }
+    networkStore.applications = canonicalApps;
+
+    // Automatically promote matching users in networkStore.users to 'ativo' and sync rosters whenever approved
+    const approvedApps = networkStore.applications.filter(
+      (a: any) => a && (a.status === "aprovado" || Boolean(a.approvedAt))
+    );
+    if (approvedApps.length > 0) {
+      const usersList = Array.isArray(networkStore.users) ? [...networkStore.users] : [];
+      let usersPromoted = false;
+      for (const appItem of approvedApps) {
+        const aUid = String(appItem.userId || "").trim().toLowerCase();
+        const aId = String(appItem.id || "").trim().toLowerCase();
+        const aBase = stripEntityIdPrefix(appItem.userId || appItem.id);
+        const aEmail = String(appItem.email || "").trim().toLowerCase();
+        const aBi = String(appItem.biNumber || "").trim().replace(/\s+/g, "").toUpperCase();
+        const isGeneric = isGenericPlaceholderEmail(aEmail);
+        let foundIdx = -1;
+        for (let i = 0; i < usersList.length; i++) {
+          const u = usersList[i];
+          if (!u) continue;
+          const uId = String(u.id || u.userId || "").trim().toLowerCase();
+          const uBase = stripEntityIdPrefix(u.id || u.userId);
+          const uEmail = String(u.email || "").trim().toLowerCase();
+          const uBi = String(u.biNumber || "").trim().replace(/\s+/g, "").toUpperCase();
+          if (
+            (aUid && uId === aUid) ||
+            (aId && uId === aId) ||
+            (aBase && uBase && aBase === uBase) ||
+            (!isGeneric && aEmail && uEmail === aEmail) ||
+            (aBi && aBi.length >= 5 && uBi === aBi)
+          ) {
+            foundIdx = i;
+            if (u.status !== "ativo") {
+              usersList[i] = {
+                ...u,
+                status: "ativo",
+                approvedAt: u.approvedAt || appItem.approvedAt,
+                approvedBy: u.approvedBy || appItem.approvedBy,
+                _updatedAt: Date.now(),
+              };
+              usersPromoted = true;
+            }
+          }
+        }
+        if (foundIdx === -1 && aEmail && !isGeneric) {
+          const parts = String(appItem.fullName || "").trim().split(/\s+/).filter(Boolean);
+          const isDme = appItem.scope === "administracao" || appItem.type === "membro_dme" || Boolean(appItem.adminRole);
+          const isProf = appItem.type === "professor" || appItem.schoolRole === "professor";
+          usersList.push({
+            id: appItem.userId || appItem.id,
+            firstName: parts[0] || "Utilizador",
+            lastName: parts.slice(1).join(" "),
+            email: aEmail,
+            role: isDme ? "admin" : isProf ? "professor" : "diretor",
+            scope: isDme ? "administracao" : "escola",
+            schoolRole: isDme ? undefined : appItem.schoolRole || (isProf ? "professor" : "diretor_geral"),
+            adminRole: isDme ? appItem.adminRole || "chefe_reparticao" : undefined,
+            cargoTitle: appItem.roleRequested || "Utilizador Institucional",
+            schoolName: appItem.schoolName || (isDme ? "Direcção Municipal da Educação de Quêssua" : "Unidade Escolar"),
+            schoolId: appItem.schoolId,
+            biNumber: appItem.biNumber,
+            phone: appItem.phone,
+            passwordVerifier: appItem.passwordVerifier,
+            status: "ativo",
+            approvedAt: appItem.approvedAt,
+            approvedBy: appItem.approvedBy,
+            approverTargetRole: "admin",
+            approverTargetEmail: "dmedoquessua@gmail.com",
+            _updatedAt: Date.now(),
+          });
+          usersPromoted = true;
+        }
+
+        // Also update school directorName if an approved director arrived
+        if ((appItem.type === "diretor" || appItem.schoolRole === "diretor_geral") && appItem.schoolName && appItem.fullName) {
+          const normTargetSchool = normalizeAscii(cleanSchoolNameSpaces(appItem.schoolName));
+          networkStore.schools = (networkStore.schools || []).map((sc: any) => {
+            if (!sc) return sc;
+            const scNorm = normalizeAscii(cleanSchoolNameSpaces(sc.name || sc.nomeOficial || ""));
+            if ((appItem.schoolId && sc.id === appItem.schoolId) || (normTargetSchool && scNorm === normTargetSchool)) {
+              return { ...sc, directorName: appItem.fullName };
+            }
+            return sc;
+          });
+        }
+      }
+      if (usersPromoted) {
+        networkStore.users = usersList;
+      }
+    }
+  };
+
   app.post("/api/network/applications", (req, res) => {
     const { application, applications, user } = req.body || {};
     const tombstonesSet = new Set(networkStore.tombstones || []);
@@ -1903,138 +2064,11 @@ async function startServer() {
     let didMutate = false;
 
     if (validIncoming.length > 0) {
-      const normalizedIncoming = validIncoming.map((appItem) => ({
-        ...appItem,
-        targetApproverRole: "admin",
-        targetApproverEmail: "dmedoquessua@gmail.com",
-        approverDirectorName: "Director Municipal da Educação (dmedoquessua@gmail.com)",
-        _updatedAt: Number(appItem._updatedAt || Date.now()),
-      }));
-
-      const mergedRaw = upsertByKey(
-        networkStore.applications,
-        normalizedIncoming,
-        (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
-      );
-      // Canonical deduplication by userId / BI / personal email so duplicate docs for the same person never leave a ghost 'pendente'
-      const canonicalApps: any[] = [];
-      for (const candidate of mergedRaw) {
-        if (!candidate) continue;
-        const cId = String(candidate.id || "").trim().toLowerCase();
-        const cUid = String(candidate.userId || "").trim().toLowerCase();
-        const cBi = String(candidate.biNumber || "").trim().toUpperCase();
-        const cEmail = String(candidate.email || "").trim().toLowerCase();
-        const isGeneric = !cEmail || cEmail.startsWith("escola.") || cEmail.endsWith("@med.gov.ao");
-        const idx = canonicalApps.findIndex((ex) => {
-          const eId = String(ex.id || "").trim().toLowerCase();
-          const eUid = String(ex.userId || "").trim().toLowerCase();
-          const eBi = String(ex.biNumber || "").trim().toUpperCase();
-          const eEmail = String(ex.email || "").trim().toLowerCase();
-          if (cId && eId && cId === eId) return true;
-          if (cUid && eUid && cUid === eUid) return true;
-          if (cBi && eBi && cBi.length >= 5 && cBi === eBi) return true;
-          if (!isGeneric && eEmail && cEmail === eEmail) return true;
-          return false;
-        });
-        if (idx >= 0) {
-          const prev = canonicalApps[idx];
-          const isApproved = prev.status === "aprovado" || candidate.status === "aprovado" || Boolean(prev.approvedAt) || Boolean(candidate.approvedAt);
-          const isRejected = !isApproved && (prev.status === "rejeitado" || candidate.status === "rejeitado");
-          const preferCand = (candidate.status === "aprovado" && prev.status !== "aprovado") || Number(candidate._updatedAt || 0) > Number(prev._updatedAt || 0);
-          const primary = preferCand ? candidate : prev;
-          const secondary = preferCand ? prev : candidate;
-          canonicalApps[idx] = {
-            ...secondary,
-            ...primary,
-            status: isApproved ? "aprovado" : isRejected ? "rejeitado" : "pendente",
-            approvedAt: primary.approvedAt || secondary.approvedAt,
-            approvedBy: primary.approvedBy || secondary.approvedBy,
-            complementaryData: primary.complementaryData || secondary.complementaryData,
-            targetApproverRole: "admin",
-            targetApproverEmail: "dmedoquessua@gmail.com",
-          };
-        } else {
-          canonicalApps.push(candidate);
-        }
-      }
-      networkStore.applications = canonicalApps;
+      canonicalizeAndPromoteApplications(validIncoming);
       const afterAppsSnap = JSON.stringify((networkStore.applications || []).map(({ _updatedAt, ...rest }) => rest));
-      if (afterAppsSnap !== beforeAppsSnap) {
+      const afterUsersMidSnap = JSON.stringify((networkStore.users || []).map(({ _updatedAt, ...rest }) => rest));
+      if (afterAppsSnap !== beforeAppsSnap || afterUsersMidSnap !== beforeUsersSnap) {
         didMutate = true;
-      }
-
-      // Automatically promote matching users in networkStore.users to 'ativo' whenever their application is 'aprovado'
-      const approvedApps = networkStore.applications.filter(
-        (a: any) => a && (a.status === "aprovado" || Boolean(a.approvedAt))
-      );
-      if (approvedApps.length > 0) {
-        const usersList = Array.isArray(networkStore.users) ? [...networkStore.users] : [];
-        let usersPromoted = false;
-        for (const appItem of approvedApps) {
-          const aUid = String(appItem.userId || "").trim().toLowerCase();
-          const aId = String(appItem.id || "").trim().toLowerCase();
-          const aEmail = String(appItem.email || "").trim().toLowerCase();
-          const aBi = String(appItem.biNumber || "").trim().toUpperCase();
-          const isGeneric = !aEmail || aEmail.startsWith("escola.") || aEmail.endsWith("@med.gov.ao");
-          let foundIdx = -1;
-          for (let i = 0; i < usersList.length; i++) {
-            const u = usersList[i];
-            if (!u) continue;
-            const uId = String(u.id || u.userId || "").trim().toLowerCase();
-            const uEmail = String(u.email || "").trim().toLowerCase();
-            const uBi = String(u.biNumber || "").trim().toUpperCase();
-            if (
-              (aUid && uId === aUid) ||
-              (aId && uId === aId) ||
-              (!isGeneric && aEmail && uEmail === aEmail) ||
-              (aBi && aBi.length >= 5 && uBi === aBi)
-            ) {
-              foundIdx = i;
-              if (u.status !== "ativo") {
-                usersList[i] = {
-                  ...u,
-                  status: "ativo",
-                  approvedAt: u.approvedAt || appItem.approvedAt,
-                  approvedBy: u.approvedBy || appItem.approvedBy,
-                  _updatedAt: Date.now(),
-                };
-                usersPromoted = true;
-              }
-            }
-          }
-          if (foundIdx === -1 && aEmail && !isGeneric) {
-            const parts = String(appItem.fullName || "").trim().split(/\s+/).filter(Boolean);
-            const isDme = appItem.scope === "administracao" || appItem.type === "membro_dme" || Boolean(appItem.adminRole);
-            const isProf = appItem.type === "professor" || appItem.schoolRole === "professor";
-            usersList.push({
-              id: appItem.userId || appItem.id,
-              firstName: parts[0] || "Utilizador",
-              lastName: parts.slice(1).join(" "),
-              email: aEmail,
-              role: isDme ? "admin" : isProf ? "professor" : "diretor",
-              scope: isDme ? "administracao" : "escola",
-              schoolRole: isDme ? undefined : appItem.schoolRole || (isProf ? "professor" : "diretor_geral"),
-              adminRole: isDme ? appItem.adminRole || "chefe_reparticao" : undefined,
-              cargoTitle: appItem.roleRequested || "Utilizador Institucional",
-              schoolName: appItem.schoolName || (isDme ? "Direcção Municipal da Educação de Quêssua" : "Unidade Escolar"),
-              schoolId: appItem.schoolId,
-              biNumber: appItem.biNumber,
-              phone: appItem.phone,
-              passwordVerifier: appItem.passwordVerifier,
-              status: "ativo",
-              approvedAt: appItem.approvedAt,
-              approvedBy: appItem.approvedBy,
-              approverTargetRole: "admin",
-              approverTargetEmail: "dmedoquessua@gmail.com",
-              _updatedAt: Date.now(),
-            });
-            usersPromoted = true;
-          }
-        }
-        if (usersPromoted) {
-          networkStore.users = usersList;
-          didMutate = true;
-        }
       }
     }
 
@@ -2581,11 +2615,7 @@ async function startServer() {
     if (Array.isArray(applications) && applications.length > 0) {
       const valid = sanitizeCollectionList("applications", applications, tombstonesSet);
       if (valid.length > 0) {
-        networkStore.applications = upsertByKey(
-          networkStore.applications,
-          valid,
-          (a) => String(a.id || a.userId || a.email || "").trim().toLowerCase()
-        );
+        canonicalizeAndPromoteApplications(valid);
         changed = true;
       }
     }
@@ -3325,10 +3355,35 @@ async function startServer() {
     }
 
     const existing = networkStore.quickRequests[index];
-    const { status, responseMessage, resolvedBy, details } = req.body || {};
+    const {
+      status,
+      responseMessage,
+      resolvedBy,
+      details,
+      title,
+      requesterName,
+      requesterPhone,
+      requesterEmail,
+      requesterRoleTitle,
+      targetRole,
+      targetSchoolId,
+      targetSchoolName,
+      destinationSchoolId,
+      destinationSchoolName,
+    } = req.body || {};
 
     const updated = {
       ...existing,
+      ...(title !== undefined ? { title } : {}),
+      ...(requesterName !== undefined ? { requesterName } : {}),
+      ...(requesterPhone !== undefined ? { requesterPhone } : {}),
+      ...(requesterEmail !== undefined ? { requesterEmail } : {}),
+      ...(requesterRoleTitle !== undefined ? { requesterRoleTitle } : {}),
+      ...(targetRole !== undefined ? { targetRole } : {}),
+      ...(targetSchoolId !== undefined ? { targetSchoolId } : {}),
+      ...(targetSchoolName !== undefined ? { targetSchoolName } : {}),
+      ...(destinationSchoolId !== undefined ? { destinationSchoolId } : {}),
+      ...(destinationSchoolName !== undefined ? { destinationSchoolName } : {}),
       status: status || existing.status,
       updatedAt: new Date().toISOString(),
       details: {
@@ -3336,7 +3391,7 @@ async function startServer() {
         ...(details || {}),
         responseMessage: responseMessage !== undefined ? responseMessage : existing.details?.responseMessage,
         resolvedBy: resolvedBy !== undefined ? resolvedBy : existing.details?.resolvedBy,
-        resolvedAt: status === 'CONCLUIDO' || status === 'REJEITADO' ? new Date().toISOString() : existing.details?.resolvedAt,
+        resolvedAt: status === 'CONCLUIDO' || status === 'REJEITADO' || status === 'CANCELADO' ? new Date().toISOString() : existing.details?.resolvedAt,
       },
     };
 

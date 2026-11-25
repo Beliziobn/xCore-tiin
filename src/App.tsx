@@ -58,6 +58,7 @@ import {
   isAccountDeleted,
   findRegisteredAccountByEmail,
   checkUserApprovalStatus,
+  schoolsMatch,
 } from './utils/authApprovalStorage';
 import { initRealtimeQuickRequestsSync } from './utils/quickServicesStorage';
 import {
@@ -1354,7 +1355,7 @@ export default function App() {
       }
 
       if (
-        (activeRole === 'diretor' || currentUser.role === 'diretor') &&
+        currentUser.role !== 'admin' &&
         (pageId === 'declaracao-efectividade' ||
           pageId === 'servicos-sigre' ||
           pageId === 'sigre-servicos' ||
@@ -1366,9 +1367,13 @@ export default function App() {
           pageId === 'servico' ||
           pageId === 'guia-ferias' ||
           pageId === 'guia-de-ferias' ||
-          pageId === 'guia-colocacao')
+          pageId === 'guia-colocacao' ||
+          pageId === 'ficha-avaliacao')
       ) {
-        targetView = 'diretor-servicos-rapidos';
+        targetView =
+          currentUser.role === 'diretor' || activeRole === 'diretor'
+            ? 'diretor-servicos-rapidos'
+            : 'servicos-rapidos';
       }
 
       const accessCheck = canUserAccessView(currentUser, targetView);
@@ -1575,14 +1580,21 @@ export default function App() {
       pageId === 'sigre-servicos' ||
       pageId === 'efectividade' ||
       pageId === 'mapa-efectividade' ||
-      pageId === 'efectividade-branco'
+      pageId === 'efectividade-branco' ||
+      pageId === 'declaracao-servico' ||
+      pageId === 'declaracao-de-servico' ||
+      pageId === 'servico' ||
+      pageId === 'guia-ferias' ||
+      pageId === 'guia-de-ferias' ||
+      pageId === 'guia-colocacao' ||
+      pageId === 'ficha-avaliacao'
     ) {
-      if (activeRole === 'diretor') {
-        setCurrentView('diretor-servicos-rapidos');
-      } else if (activeRole === 'professor') {
-        setCurrentView('cadastro-docente');
-      } else {
+      if (currentUser?.role === 'admin' && activeRole === 'admin') {
         setCurrentView('declaracao-efectividade');
+      } else if (currentUser?.role === 'diretor' || activeRole === 'diretor') {
+        setCurrentView('diretor-servicos-rapidos');
+      } else {
+        setCurrentView('servicos-rapidos');
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -1645,12 +1657,7 @@ export default function App() {
         currentView === 'servicos-sem-login' ||
         currentView === 'servicos-cidadao' ||
         currentView === 'balcao-rapido' ||
-        currentView === 'pedidos-rapidos' ||
-        currentView === 'declaracao-efectividade' ||
-        currentView === 'declaracao-servico' ||
-        currentView === 'declaracao-de-servico' ||
-        currentView === 'efectividade' ||
-        currentView === 'servico';
+        currentView === 'pedidos-rapidos';
 
       if (!isPublicView) {
         return (
@@ -1908,13 +1915,19 @@ export default function App() {
           directors={adminDirectors}
           schools={adminSchools}
           onAddDirectorGlobal={(director) => {
-            setAdminDirectors((prev) => [director, ...prev]);
+            setAdminDirectors((prev) => {
+              const dirEmail = (director.email || '').trim().toLowerCase();
+              const filtered = prev.filter(
+                (d) =>
+                  d.id !== director.id &&
+                  (!dirEmail || (d.email || '').trim().toLowerCase() !== dirEmail)
+              );
+              return [director, ...filtered];
+            });
             if (director.schoolName) {
-              const normTarget = director.schoolName.trim().toLowerCase();
               setAdminSchools((prev) =>
                 prev.map((sc) => {
-                  const scNorm = sc.name.trim().toLowerCase();
-                  if (scNorm === normTarget || scNorm.includes(normTarget) || normTarget.includes(scNorm)) {
+                  if (schoolsMatch(sc.name, director.schoolName, sc.id)) {
                     return { ...sc, directorName: director.name };
                   }
                   return sc;
@@ -1924,7 +1937,15 @@ export default function App() {
             showToast(`Diretor(a) "${director.name}" homologado(a) no Sigre!`);
           }}
           onAddTeacherGlobal={(teacher) => {
-            setAdminTeachers((prev) => [teacher, ...prev]);
+            setAdminTeachers((prev) => {
+              const tEmail = (teacher.email || '').trim().toLowerCase();
+              const filtered = prev.filter(
+                (t) =>
+                  t.id !== teacher.id &&
+                  (!tEmail || (t.email || '').trim().toLowerCase() !== tEmail)
+              );
+              return [teacher, ...filtered];
+            });
             showToast(`Professor(a) "${teacher.name}" homologado(a) no Sigre!`);
           }}
           showToast={showToast}
@@ -2441,175 +2462,74 @@ export default function App() {
       );
     }
 
-    // Declaração de Efectividade / Serviços SIGRE (Modelo Oficial em Branco)
+    // Declaração de Efectividade / Serviços SIGRE (Exclusivo para Administração Municipal)
     if (
       currentView === 'declaracao-efectividade' ||
       currentView === 'servicos-sigre' ||
       currentView === 'sigre-servicos' ||
       currentView === 'efectividade' ||
-      currentView === 'mapa-efectividade'
-    ) {
-      // Na conta dos directores de escola abre Serviços SIGRE (Serviços Rápidos + Triagem de Pedidos de Vaga)
-      if (isSessionStarted && currentUser?.role === 'diretor') {
-        return (
-          <DeclaracaoEfectividadePage
-            onOpenGetStarted={() => handleOpenAuth('login')}
-            isLoggedIn={isSessionStarted}
-            currentUser={currentUser}
-            initialTab="pedidos"
-            onNavigateHome={() => {
-              setCurrentView('home');
-              setCurrentPage('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        );
-      }
-
-      // Na conta dos professores abre Serviços SIGRE na aba Pedido de Vaga Docente
-      if (isSessionStarted && currentUser?.role === 'professor') {
-        return (
-          <DeclaracaoEfectividadePage
-            onOpenGetStarted={() => handleOpenAuth('login')}
-            isLoggedIn={isSessionStarted}
-            currentUser={currentUser}
-            initialTab="cadastro-docente"
-            onNavigateHome={() => {
-              setCurrentView('home');
-              setCurrentPage('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        );
-      }
-
-      const isAdmin = Boolean(isSessionStarted && currentUser && currentUser.role === 'admin');
-
-      if (!isAdmin) {
-        return (
-          <QuickServicesPage
-            initialServiceType="DECLARACAO_EFECTIVIDADE"
-            onNavigateHome={() => {
-              setCurrentView('home');
-              setCurrentPage('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onNavigateToLogin={() => handleOpenAuth('login')}
-          />
-        );
-      }
-
-      return (
-        <DeclaracaoEfectividadePage
-          onOpenGetStarted={() => handleOpenAuth('login')}
-          isLoggedIn={isSessionStarted}
-          currentUser={currentUser}
-          initialTab="form"
-          onNavigateHome={() => {
-            setCurrentView('home');
-            setCurrentPage('home');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        />
-      );
-    }
-
-    // Guia de Férias (Serviços SIGRE)
-    if (
+      currentView === 'mapa-efectividade' ||
       currentView === 'guia-ferias' ||
-      currentView === 'guia-de-ferias'
-    ) {
-      if (isSessionStarted && currentUser?.role === 'diretor') {
-        return (
-          <DeclaracaoEfectividadePage
-            onOpenGetStarted={() => handleOpenAuth('login')}
-            isLoggedIn={isSessionStarted}
-            currentUser={currentUser}
-            initialTab="pedidos"
-            onNavigateHome={() => {
-              setCurrentView('home');
-              setCurrentPage('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        );
-      }
-
-      const isAdmin = Boolean(isSessionStarted && currentUser && currentUser.role === 'admin');
-
-      if (!isAdmin) {
-        return (
-          <QuickServicesPage
-            initialServiceType="GUIA_FERIAS"
-            onNavigateHome={() => {
-              setCurrentView('home');
-              setCurrentPage('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onNavigateToLogin={() => handleOpenAuth('login')}
-          />
-        );
-      }
-
-      return (
-        <DeclaracaoEfectividadePage
-          onOpenGetStarted={() => handleOpenAuth('login')}
-          isLoggedIn={isSessionStarted}
-          currentUser={currentUser}
-          initialTab="guia-ferias"
-          onNavigateHome={() => {
-            setCurrentView('home');
-            setCurrentPage('home');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        />
-      );
-    }
-
-    // Declaração de Serviço (Nova Aba Oficial em Branco)
-    if (
+      currentView === 'guia-de-ferias' ||
       currentView === 'declaracao-servico' ||
       currentView === 'declaracao-de-servico' ||
-      currentView === 'servico'
+      currentView === 'servico' ||
+      currentView === 'guia-colocacao' ||
+      currentView === 'ficha-avaliacao'
     ) {
-      if (isSessionStarted && currentUser?.role === 'diretor') {
-        return (
-          <DeclaracaoEfectividadePage
-            onOpenGetStarted={() => handleOpenAuth('login')}
-            isLoggedIn={isSessionStarted}
-            currentUser={currentUser}
-            initialTab="pedidos"
-            onNavigateHome={() => {
-              setCurrentView('home');
-              setCurrentPage('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        );
-      }
-
       const isAdmin = Boolean(isSessionStarted && currentUser && currentUser.role === 'admin');
 
       if (!isAdmin) {
+        if (isSessionStarted && currentUser?.role === 'diretor') {
+          return (
+            <DeclaracaoEfectividadePage
+              onOpenGetStarted={() => handleOpenAuth('login')}
+              isLoggedIn={isSessionStarted}
+              currentUser={currentUser}
+              initialTab="pedidos"
+              onNavigateHome={() => {
+                setCurrentView('home');
+                setCurrentPage('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          );
+        }
+
         return (
           <QuickServicesPage
-            initialServiceType="DECLARACAO_SERVICO"
+            key="quick-services-page-non-admin"
+            initialPageView="catalog"
             onNavigateHome={() => {
               setCurrentView('home');
               setCurrentPage('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateToLogin={() => handleOpenAuth('login')}
+            availableSchools={adminSchools}
           />
         );
       }
+
+      const requestedInitialTab =
+        currentView === 'guia-ferias' || currentView === 'guia-de-ferias'
+          ? 'guia-ferias'
+          : currentView === 'declaracao-servico' ||
+            currentView === 'declaracao-de-servico' ||
+            currentView === 'servico'
+          ? 'declaracao-servico'
+          : currentView === 'guia-colocacao'
+          ? 'guia-colocacao'
+          : currentView === 'ficha-avaliacao'
+          ? 'ficha-avaliacao'
+          : 'form';
 
       return (
         <DeclaracaoEfectividadePage
           onOpenGetStarted={() => handleOpenAuth('login')}
           isLoggedIn={isSessionStarted}
           currentUser={currentUser}
-          initialTab="declaracao-servico"
+          initialTab={requestedInitialTab}
           onNavigateHome={() => {
             setCurrentView('home');
             setCurrentPage('home');
@@ -2855,7 +2775,7 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 w-full bg-[#f7f3f3] relative">
+        <main className="flex-1 w-full bg-[#FAFAFA] relative">
           {/* Dynamic Stat Cards Grid with distinct clickable vs non-clickable designs */}
           <StatCards
             session={activeSession}
@@ -2948,10 +2868,10 @@ export default function App() {
             }}
           />
 
-          {/* Seção Principal: Assistente Inteligente IA & Central com AIInputWithLoading */}
+          {/* Seção Principal: Assistente Inteligente IA & Central com AIInputWithLoading (Política Visual Dieter Rams) */}
           <section className="max-w-4xl mx-auto px-4 sm:px-6 mb-12">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-[0_10px_35px_rgba(0,0,0,0.04)] text-center relative overflow-hidden">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-6">
+            <div className="rams-card text-center relative overflow-hidden">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#1D1D1F] mb-6">
                 Central de Pareceres & Análises Rápidas
               </h2>
 
@@ -2970,10 +2890,10 @@ export default function App() {
                     setRagInitialQuery('Como é calculada a nota trimestral (MT) e qual o peso da MAC no Ensino Geral?');
                     setIsRagModalOpen(true);
                   }}
-                  className="text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  className="text-xs font-semibold bg-white hover:bg-[#F5F5F7] text-[#1D1D1F] px-3.5 py-1.5 rounded-[10px] border border-[#E5E5EA] transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>🧠 Pareceres & RAG Inteligente MED</span>
+                  <Sparkles className="w-3.5 h-3.5 text-[#1D1D1F]" />
+                  <span>Pareceres & RAG Inteligente MED</span>
                 </button>
                 {activeRole === 'diretor' && (
                   <button
@@ -2982,9 +2902,9 @@ export default function App() {
                       setCurrentView('diretor-pautas');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="text-xs font-black bg-[#fef2f1] hover:bg-[#fee4e2] text-[#f75142] px-3.5 py-1.5 rounded-full border border-[#f75142]/30 transition-colors cursor-pointer shadow-2xs"
+                    className="text-xs font-semibold bg-[#1D1D1F] hover:bg-black text-white px-3.5 py-1.5 rounded-[10px] border border-[#1D1D1F] transition-colors cursor-pointer"
                   >
-                    📋 Aba de Mini-Pautas & Pauta Final (Por Turma)
+                    Aba de Mini-Pautas & Pauta Final (Por Turma)
                   </button>
                 )}
                 <button
@@ -2993,31 +2913,31 @@ export default function App() {
                     setCurrentView('diretor-presenca');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                  className="text-xs font-semibold bg-white hover:bg-[#F5F5F7] text-[#1D1D1F] px-3.5 py-1.5 rounded-[10px] border border-[#E5E5EA] transition-colors cursor-pointer"
                 >
-                  📅 Abrir Livro de Ponto (Calendário)
+                  Abrir Livro de Ponto (Calendário)
                 </button>
                 <button
                   type="button"
                   onClick={() => handleHomeAICommand('Resumo de presenças dos professores')}
-                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                  className="text-xs font-semibold bg-white hover:bg-[#F5F5F7] text-[#1D1D1F] px-3.5 py-1.5 rounded-[10px] border border-[#E5E5EA] transition-colors cursor-pointer"
                 >
-                  📊 Resumo de Presenças Docentes
+                  Resumo de Presenças Docentes
                 </button>
                 <button
                   type="button"
                   onClick={() => handleHomeAICommand('Panorama de turmas e alunos')}
-                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
+                  className="text-xs font-semibold bg-white hover:bg-[#F5F5F7] text-[#1D1D1F] px-3.5 py-1.5 rounded-[10px] border border-[#E5E5EA] transition-colors cursor-pointer"
                 >
-                  🎓 Panorama Geral de Alunos
+                  Panorama Geral de Alunos
                 </button>
               </div>
 
               {homeAIResponse && (
-                <div className="mt-6 text-left p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-bottom-2">
+                <div className="mt-6 text-left p-4 sm:p-5 bg-[#F5F5F7] rounded-[14px] border border-[#E5E5EA] animate-in fade-in slide-in-from-bottom-2">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#1D1D1F]">
+                      <span className="w-2 h-2 rounded-full bg-[#1D1D1F]" />
                       <span>Resposta do Assistente Sigre:</span>
                     </div>
                     <button
@@ -3026,13 +2946,13 @@ export default function App() {
                         setRagInitialQuery('Consultar base normativa e regulamentar oficial');
                         setIsRagModalOpen(true);
                       }}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-semibold text-[#0071E3] hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <Sparkles className="w-3.5 h-3.5 text-[#0071E3]" />
                       <span>Abrir Parecer RAG →</span>
                     </button>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                  <p className="text-xs sm:text-sm text-[#1D1D1F] whitespace-pre-line leading-relaxed">
                     {homeAIResponse}
                   </p>
                 </div>
@@ -3057,7 +2977,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f3f3] text-[#002133] flex flex-col font-sans selection:bg-[#f75142] selection:text-white relative">
+    <div className="min-h-screen bg-[#FAFAFA] text-[#1D1D1F] flex flex-col font-sans selection:bg-[#1D1D1F] selection:text-white relative">
       {/* Toast Alert Notification (Posicionado no canto inferior direito com região viva acessível WCAG 4.1.3) */}
       {toastMessage && (
         <div 

@@ -93,16 +93,6 @@ export const SchoolDetailModal: React.FC<SchoolDetailModalProps> = ({
         {/* Header */}
         <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3.5">
-            {school.logoSvg ? (
-              <div
-                className="w-12 h-12 rounded-2xl p-1 bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner"
-                dangerouslySetInnerHTML={{ __html: sanitizeSvgMarkup(school.logoSvg) }}
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-2xl bg-[#f75142]/20 border border-[#f75142]/40 text-[#f75142] flex items-center justify-center shadow-inner shrink-0">
-                <School className="w-6 h-6 text-[#f75142]" />
-              </div>
-            )}
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-[10px] font-black tracking-wider uppercase px-2 py-0.5 rounded-md border ${getNatureBadgeColor(data.natureza)}`}>
@@ -136,14 +126,6 @@ export const SchoolDetailModal: React.FC<SchoolDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 print:hidden">
-            <button
-              onClick={handlePrint}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Imprimir ficha da escola"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Imprimir Ficha</span>
-            </button>
 
             {onEdit && (
               <button
@@ -756,19 +738,6 @@ export const SchoolDetailModal: React.FC<SchoolDetailModalProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between print:hidden">
-          <span className="text-xs text-slate-500">
-            Registo SIGE homologado no ecossistema municipal do Quêssua
-          </span>
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition-colors cursor-pointer"
-          >
-            Fechar Ficha
-          </button>
         </div>
       </div>
     </div>

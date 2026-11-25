@@ -1,0 +1,34 @@
+/* Política Visual Dieter Rams / Apple HIG - Gerado Automaticamente */
+:root {
+  --rams-bg: #FFFFFF;
+  --rams-border: #E5E5EA;
+  --rams-text: #1D1D1F;
+  --rams-muted: #6E6E73;
+  --rams-accent: #0071E3;
+  --rams-radius: 14px;
+}
+.rams-card, .rams-modal {
+  background: var(--rams-bg) !important;
+  border: 1px solid var(--rams-border) !important;
+  border-radius: var(--rams-radius) !important;
+  box-shadow: none !important;
+  color: var(--rams-text) !important;
+  padding: 24px !important;
+}
+.rams-badge-clean {
+  background: transparent !important;
+  border: none !important;
+  color: var(--rams-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 !important;
+}
+.rams-details summary {
+  cursor: pointer;
+  color: var(--rams-accent);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 8px;
+}

@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html lang="pt-AO">
-<head>
+<!DOCTYPE html><html lang="pt-AO"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cadastro de Funcionários · Guia de Férias</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,700&amp;family=Public+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f1f3ef;--surface:#fff;--ink:#16262b;--muted:#5a6a6e;--line:#cfd6d2;--red:#a81d28;--gold:#b88a14;--ok:#1f6b45;--paper:#fffdf6;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
@@ -67,7 +65,7 @@ footer{border-top:1px solid var(--line);padding:22px 0 30px;color:var(--muted);f
 </style>
 </head>
 <body>
-<div class="flag" aria-hidden="true"></div>
+
 <header class="hero"><div class="wrap">
   <p class="inst">República de Angola · Governo Provincial de Malanje · Administração Municipal do Quéssua</p>
   <h1>Cadastro de funcionários para guia de férias</h1>
@@ -76,44 +74,44 @@ footer{border-top:1px solid var(--line);padding:22px 0 30px;color:var(--muted);f
 
 <div class="wrap"><main class="grid">
 <div>
-<form id="f" novalidate>
+<form id="f" novalidate="">
   <fieldset><legend>Dados do funcionário</legend>
     <div class="row">
       <div><label for="trat">Tratamento</label>
         <select id="trat"><option value="o Senhor">Senhor</option><option value="a Senhora">Senhora</option></select></div>
-      <div><label for="agente">Nº de agente</label><input id="agente" inputmode="numeric" placeholder="Ex.: 01620510" required><div class="err" id="e-agente"></div></div>
-      <div class="full"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" required><div class="err" id="e-nome"></div></div>
-      <div><label for="cat">Categoria <small>(carreira)</small></label><input id="cat" value="P.E.P.E.S." required><div class="err" id="e-cat"></div></div>
-      <div><label for="grau">Grau</label><input id="grau" value="10º Grau" required><div class="err" id="e-grau"></div></div>
-      <div class="full"><label for="funcao">Função</label><input id="funcao" placeholder="Ex.: Subdirectora Pedagógica" required><div class="err" id="e-funcao"></div></div>
+      <div><label for="agente">Nº de agente</label><input id="agente" inputmode="numeric" placeholder="Ex.: 01620510" required=""><div class="err" id="e-agente"></div></div>
+      <div class="full"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" required=""><div class="err" id="e-nome"></div></div>
+      <div><label for="cat">Categoria <small>(carreira)</small></label><input id="cat" value="P.E.P.E.S." required=""><div class="err" id="e-cat"></div></div>
+      <div><label for="grau">Grau</label><input id="grau" value="10º Grau" required=""><div class="err" id="e-grau"></div></div>
+      <div class="full"><label for="funcao">Função</label><input id="funcao" placeholder="Ex.: Subdirectora Pedagógica" required=""><div class="err" id="e-funcao"></div></div>
     </div>
   </fieldset>
 
   <fieldset><legend>Local de colocação</legend>
     <div class="row">
-      <div><label for="tipoesc">Tipo de escola</label><input id="tipoesc" value="Escola Primária" required><div class="err" id="e-tipoesc"></div></div>
-      <div><label for="nesc">Nº da escola</label><input id="nesc" inputmode="numeric" placeholder="Ex.: 126" required><div class="err" id="e-nesc"></div></div>
-      <div class="full"><label for="local">Localidade</label><input id="local" placeholder="Ex.: Campo da Victória" required><div class="err" id="e-local"></div></div>
+      <div><label for="tipoesc">Tipo de escola</label><input id="tipoesc" value="Escola Primária" required=""><div class="err" id="e-tipoesc"></div></div>
+      <div><label for="nesc">Nº da escola</label><input id="nesc" inputmode="numeric" placeholder="Ex.: 126" required=""><div class="err" id="e-nesc"></div></div>
+      <div class="full"><label for="local">Localidade</label><input id="local" placeholder="Ex.: Campo da Victória" required=""><div class="err" id="e-local"></div></div>
     </div>
   </fieldset>
 
   <fieldset><legend>Licença</legend>
     <div class="row">
-      <div><label for="tipolic">Tipo de licença</label><input id="tipolic" value="Licença Disciplinar (férias)" required></div>
-      <div><label for="ano">Ano económico</label><input id="ano" inputmode="numeric" maxlength="4" value="2025" required><div class="err" id="e-ano"></div></div>
-      <div><label for="dias">Duração <small>(dias)</small></label><input id="dias" type="number" min="1" max="90" value="30" required><div class="err" id="e-dias"></div></div>
-      <div><label for="ini">Início</label><input id="ini" type="date" required><div class="err" id="e-ini"></div></div>
-      <div class="full"><label for="fim">Término <small>(calculado a partir do início e da duração; pode alterar)</small></label><input id="fim" type="date" required><div class="err" id="e-fim"></div></div>
+      <div><label for="tipolic">Tipo de licença</label><input id="tipolic" value="Licença Disciplinar (férias)" required=""></div>
+      <div><label for="ano">Ano económico</label><input id="ano" inputmode="numeric" maxlength="4" value="2025" required=""><div class="err" id="e-ano"></div></div>
+      <div><label for="dias">Duração <small>(dias)</small></label><input id="dias" type="number" min="1" max="90" value="30" required=""><div class="err" id="e-dias"></div></div>
+      <div><label for="ini">Início</label><input id="ini" type="date" required=""><div class="err" id="e-ini"></div></div>
+      <div class="full"><label for="fim">Término <small>(calculado a partir do início e da duração; pode alterar)</small></label><input id="fim" type="date" required=""><div class="err" id="e-fim"></div></div>
     </div>
   </fieldset>
 
   <fieldset><legend>Emissão da guia</legend>
     <div class="row">
-      <div><label for="ng">Nº da guia</label><input id="ng" inputmode="numeric" placeholder="Ex.: 015" required><div class="err" id="e-ng"></div></div>
-      <div><label for="ang">Ano da guia</label><input id="ang" inputmode="numeric" maxlength="4" value="2025" required><div class="err" id="e-ang"></div></div>
-      <div><label for="lemi">Local de emissão</label><input id="lemi" value="Quéssua" required></div>
-      <div><label for="demi">Data de emissão</label><input id="demi" type="date" required><div class="err" id="e-demi"></div></div>
-      <div class="full"><label for="dir">Nome do Director Municipal</label><input id="dir" value="Belízio Miguel dos Santos António" required><div class="err" id="e-dir"></div></div>
+      <div><label for="ng">Nº da guia</label><input id="ng" inputmode="numeric" placeholder="Ex.: 015" required=""><div class="err" id="e-ng"></div></div>
+      <div><label for="ang">Ano da guia</label><input id="ang" inputmode="numeric" maxlength="4" value="2025" required=""><div class="err" id="e-ang"></div></div>
+      <div><label for="lemi">Local de emissão</label><input id="lemi" value="Quéssua" required=""></div>
+      <div><label for="demi">Data de emissão</label><input id="demi" type="date" required=""><div class="err" id="e-demi"></div></div>
+      <div class="full"><label for="dir">Nome do Director Municipal</label><input id="dir" value="Belízio Miguel dos Santos António" required=""><div class="err" id="e-dir"></div></div>
     </div>
     <details class="inst-box"><summary>Entidade emissora (já preenchida)</summary>
       <div class="row">
@@ -213,5 +211,6 @@ $("f").addEventListener("reset",()=>setTimeout(()=>{
 
 render();
 </script>
-</body>
-</html>
+
+
+</body></html>

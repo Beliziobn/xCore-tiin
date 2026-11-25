@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cadastro de Funcionários · Guia de Férias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f1f3ef;--surface:#fff;--ink:#16262b;--muted:#5a6a6e;--line:#cfd6d2;--red:#a81d28;--gold:#b88a14;--ok:#1f6b45;--paper:#fffdf6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101a1d;--surface:#18262a;--ink:#e8eeeb;--muted:#9fb0b2;--line:#2f4045;--red:#e0626b;--gold:#e0b64a;--ok:#5fc08c;--paper:#1d2b2f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101a1d;--surface:#18262a;--ink:#e8eeeb;--muted:#9fb0b2;--line:#2f4045;--red:#e0626b;--gold:#e0b64a;--ok:#5fc08c;--paper:#1d2b2f;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "Public Sans",system-ui,sans-serif}
+h1,h2,h3{font-family:"Source Serif 4",Georgia,serif;margin:0;line-height:1.15}
+.wrap{max-width:1160px;margin:0 auto;padding:0 20px}
+.flag{height:6px;background:linear-gradient(90deg,var(--red) 0 50%,var(--ink) 50% 100%);position:relative}
+.flag::after{content:"";position:absolute;left:50%;top:0;width:60px;height:6px;background:var(--gold);transform:translateX(-50%)}
+header.hero{padding:44px 0 28px}
+.inst{color:var(--muted);font-size:14px;margin:0 0 18px}
+.hero h1{font-size:clamp(32px,5.4vw,56px);font-weight:700;max-width:16ch;letter-spacing:-.01em}
+.hero p.lead{max-width:56ch;color:var(--muted);font-size:18px;margin:16px 0 0}
+main.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:28px;padding-bottom:56px;align-items:start}
+@media (max-width:900px){main.grid{grid-template-columns:1fr}}
+form{display:grid;gap:20px}
+fieldset{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:20px 20px 22px;margin:0;min-width:0}
+legend{font-family:"Source Serif 4",Georgia,serif;font-weight:700;font-size:20px;padding:0 8px;margin-left:-8px}
+.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+.row .full{grid-column:1/-1}
+@media (max-width:560px){.row{grid-template-columns:1fr}}
+label{display:block;font-weight:600;font-size:14px;margin-bottom:5px}
+label small{font-weight:400;color:var(--muted)}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px 11px;min-height:44px}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+input[aria-invalid="true"]{border-color:var(--red)}
+.err{color:var(--red);font-size:13px;margin-top:4px;min-height:0}
+details.inst-box{border:1px dashed var(--line);border-radius:4px;padding:10px 14px;margin-top:16px}
+details summary{cursor:pointer;font-weight:600;font-size:14px}
+details .row{margin-top:12px}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+button{font:600 16px "Public Sans",sans-serif;min-height:46px;padding:0 22px;border-radius:4px;cursor:pointer;border:1px solid var(--ink)}
+.primary{background:var(--red);color:#fff;border-color:var(--red)}
+.primary:hover{filter:brightness(1.08)}
+.ghost{background:transparent;color:var(--ink)}
+aside{position:sticky;top:16px}
+@media (max-width:900px){aside{position:static}}
+.sheet{background:var(--paper);border:1px solid var(--line);border-top:4px solid var(--red);border-radius:2px;padding:26px 26px 30px;font-family:"Source Serif 4",Georgia,serif;font-size:15.5px;line-height:1.7;box-shadow:0 1px 0 var(--line)}
+.sheet .head{text-align:center;font-size:13px;line-height:1.45;margin-bottom:14px}
+.sheet .head b{display:block;font-size:14px}
+.sheet h3{text-align:center;font-size:18px;margin:14px 0}
+.sheet p{margin:0 0 12px;text-align:justify;hyphens:auto}
+.sheet .sign{text-align:center;margin-top:22px}
+.sheet .sign span{display:block;border-top:1px solid var(--ink);width:70%;margin:26px auto 4px}
+.ph{color:var(--muted);background:color-mix(in srgb,var(--gold) 16%,transparent);padding:0 3px;border-radius:2px}
+.filled{font-weight:700}
+.cap{font:500 13px "Public Sans",sans-serif;color:var(--muted);margin:0 0 8px}
+.done{display:none;margin-top:20px;border:1px solid var(--ok);background:var(--surface);border-radius:6px;padding:16px 18px}
+.done.show{display:block}
+.done h2{font-size:20px;color:var(--ok)}
+.reg{margin:14px 0 0;padding:0;list-style:none;font-size:14px}
+.reg li{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:8px 0}
+footer{border-top:1px solid var(--line);padding:22px 0 30px;color:var(--muted);font-size:13px}
+@media (prefers-reduced-motion:no-preference){.done.show{animation:in .35s ease-out}@keyframes in{from{opacity:0;transform:translateY(6px)}}}
+</style>
+</head>
+<body>
+<div class="flag" aria-hidden="true"></div>
+<header class="hero"><div class="wrap">
+  <p class="inst">República de Angola · Governo Provincial de Malanje · Administração Municipal do Quéssua</p>
+  <h1>Cadastro de funcionários para guia de férias</h1>
+  <p class="lead">Preencha os dados do funcionário e da licença. A guia ao lado vai sendo escrita à medida que digita.</p>
+</div></header>
+
+<div class="wrap"><main class="grid">
+<div>
+<form id="f" novalidate>
+  <fieldset><legend>Dados do funcionário</legend>
+    <div class="row">
+      <div><label for="trat">Tratamento</label>
+        <select id="trat"><option value="o Senhor">Senhor</option><option value="a Senhora">Senhora</option></select></div>
+      <div><label for="agente">Nº de agente</label><input id="agente" inputmode="numeric" placeholder="Ex.: 01620510" required><div class="err" id="e-agente"></div></div>
+      <div class="full"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" required><div class="err" id="e-nome"></div></div>
+      <div><label for="cat">Categoria <small>(carreira)</small></label><input id="cat" value="P.E.P.E.S." required><div class="err" id="e-cat"></div></div>
+      <div><label for="grau">Grau</label><input id="grau" value="10º Grau" required><div class="err" id="e-grau"></div></div>
+      <div class="full"><label for="funcao">Função</label><input id="funcao" placeholder="Ex.: Subdirectora Pedagógica" required><div class="err" id="e-funcao"></div></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Local de colocação</legend>
+    <div class="row">
+      <div><label for="tipoesc">Tipo de escola</label><input id="tipoesc" value="Escola Primária" required><div class="err" id="e-tipoesc"></div></div>
+      <div><label for="nesc">Nº da escola</label><input id="nesc" inputmode="numeric" placeholder="Ex.: 126" required><div class="err" id="e-nesc"></div></div>
+      <div class="full"><label for="local">Localidade</label><input id="local" placeholder="Ex.: Campo da Victória" required><div class="err" id="e-local"></div></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Licença</legend>
+    <div class="row">
+      <div><label for="tipolic">Tipo de licença</label><input id="tipolic" value="Licença Disciplinar (férias)" required></div>
+      <div><label for="ano">Ano económico</label><input id="ano" inputmode="numeric" maxlength="4" value="2025" required><div class="err" id="e-ano"></div></div>
+      <div><label for="dias">Duração <small>(dias)</small></label><input id="dias" type="number" min="1" max="90" value="30" required><div class="err" id="e-dias"></div></div>
+      <div><label for="ini">Início</label><input id="ini" type="date" required><div class="err" id="e-ini"></div></div>
+      <div class="full"><label for="fim">Término <small>(calculado a partir do início e da duração; pode alterar)</small></label><input id="fim" type="date" required><div class="err" id="e-fim"></div></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Emissão da guia</legend>
+    <div class="row">
+      <div><label for="ng">Nº da guia</label><input id="ng" inputmode="numeric" placeholder="Ex.: 015" required><div class="err" id="e-ng"></div></div>
+      <div><label for="ang">Ano da guia</label><input id="ang" inputmode="numeric" maxlength="4" value="2025" required><div class="err" id="e-ang"></div></div>
+      <div><label for="lemi">Local de emissão</label><input id="lemi" value="Quéssua" required></div>
+      <div><label for="demi">Data de emissão</label><input id="demi" type="date" required><div class="err" id="e-demi"></div></div>
+      <div class="full"><label for="dir">Nome do Director Municipal</label><input id="dir" value="Belízio Miguel dos Santos António" required><div class="err" id="e-dir"></div></div>
+    </div>
+    <details class="inst-box"><summary>Entidade emissora (já preenchida)</summary>
+      <div class="row">
+        <div><label for="prov">Governo Provincial de</label><input id="prov" value="Malanje"></div>
+        <div><label for="mun">Município</label><input id="mun" value="Quéssua"></div>
+      </div>
+    </details>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" class="primary">Guardar cadastro</button>
+    <button type="reset" class="ghost" id="reset">Limpar campos</button>
+  </div>
+</form>
+
+<div class="done" id="done" role="status" aria-live="polite">
+  <h2 id="done-t">Cadastro guardado</h2>
+  <p id="done-p" style="margin:6px 0 0;color:var(--muted)"></p>
+  <ul class="reg" id="reg"></ul>
+</div>
+</div>
+
+<aside aria-label="Pré-visualização da guia">
+  <p class="cap">Pré-visualização da guia</p>
+  <article class="sheet" id="sheet"></article>
+</aside>
+</main></div>
+
+<footer><div class="wrap">Os registos desta página ficam apenas neste navegador e são perdidos ao fechar. Para os guardar de forma permanente, a página precisa de ser ligada a uma base de dados.</div></footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const v=id=>$(id).value.trim();
+const pd=s=>{if(!s)return null;const[a,b,c]=s.split("-").map(Number);return{d:c,m:b,y:a}};
+const fmt=s=>{const d=pd(s);return d?`${d.d} de ${MESES[d.m-1]} de ${d.y}`:null};
+const f=(val,ph)=>val?`<span class="filled">${esc(val)}</span>`:`<span class="ph">${ph}</span>`;
+const plain=(val,ph)=>val?esc(val):`<span class="ph">${ph}</span>`;
+
+function render(){
+  const ag=v("tipolic"),dias=v("dias");
+  const esc_=[v("tipoesc"),v("nesc")?"nº "+v("nesc"):""].filter(Boolean).join(" ");
+  const col=[esc_,v("local")].filter(Boolean).join(" – ");
+  const ng=v("ng"),ang=v("ang");
+  $("sheet").innerHTML=`
+  <div class="head">República de Angola<br>Governo Provincial de ${plain(v("prov"),"Província")}<br>Administração Municipal do ${plain(v("mun"),"Município")}<br><b>Direção Municipal de Educação do ${plain(v("mun"),"Município")}</b></div>
+  <h3>GUIA DE FÉRIAS Nº ${ng?esc(ng):"____"}/${ang?esc(ang):"____"}</h3>
+  <p>Por esta Direcção Municipal de Educação do ${plain(v("mun"),"Município")}, faz-se constar às autoridades a quem o conhecimento desta competir que segue viagem deste Município em gozo de ${f(ag,"tipo de licença")} (${f(dias?dias+" dias":"","duração")}) referente ao ano económico de ${f(v("ano"),"ano")}, ${esc($("trat").value)} ${f(v("nome"),"nome completo")}, ${plain(v("cat"),"categoria")} ${plain(v("grau"),"grau")}, sob o agente nº ${f(v("agente"),"nº de agente")}, com a função de ${f(v("funcao"),"função")}, colocado(a) na ${f(col,"escola e localidade")}, a partir do dia ${f(fmt(v("ini")),"data de início")} com término a ${f(fmt(v("fim")),"data de fim")}.</p>
+  <p>Para que não lhe ponham impedimento, mandei passar a presente guia que vai por mim assinada e autenticada com o carimbo a óleo, em uso nesta Direcção.</p>
+  <p><b>A Direcção Municipal de Educação do ${plain(v("mun"),"Município")}, ${plain(v("lemi"),"local")}, aos ${f(fmt(v("demi")),"data de emissão")}.</b></p>
+  <div class="sign"><b>O Director Municipal</b><span></span>${f(v("dir"),"nome do director")}</div>`;
+}
+
+function autoFim(){
+  const d=pd($("ini").value),n=parseInt($("dias").value,10);
+  if(!d||!n)return;
+  const t=new Date(Date.UTC(d.y,d.m-1,d.d+n));
+  $("fim").value=t.toISOString().slice(0,10);
+}
+
+const req=["nome","agente","cat","grau","funcao","tipoesc","nesc","local","ano","dias","ini","fim","ng","ang","demi","dir"];
+const msgs={nome:"Escreva o nome completo.",agente:"Indique o nº de agente.",cat:"Indique a categoria.",grau:"Indique o grau.",funcao:"Indique a função.",tipoesc:"Indique o tipo de escola.",nesc:"Indique o nº da escola.",local:"Indique a localidade.",ano:"Use 4 dígitos, como 2025.",dias:"Indique um número de dias entre 1 e 90.",ini:"Escolha a data de início.",fim:"Escolha a data de término.",ng:"Indique o nº da guia.",ang:"Use 4 dígitos, como 2025.",demi:"Escolha a data de emissão.",dir:"Indique o nome do Director Municipal."};
+
+function check(id){
+  const el=$(id);let ok=!!el.value.trim();
+  if(ok&&(id==="ano"||id==="ang"))ok=/^\d{4}$/.test(el.value.trim());
+  if(ok&&id==="dias")ok=+el.value>=1&&+el.value<=90;
+  if(ok&&id==="fim"&&$("ini").value)ok=$("fim").value>=$("ini").value;
+  const e=$("e-"+id);
+  el.setAttribute("aria-invalid",ok?"false":"true");
+  if(e)e.textContent=ok?"":(id==="fim"&&$("fim").value?"O término não pode ser antes do início.":msgs[id]);
+  return ok;
+}
+
+document.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",()=>{
+  if(el.id==="ini"||el.id==="dias")autoFim();
+  if(req.includes(el.id)&&el.getAttribute("aria-invalid")==="true")check(el.id);
+  render();
+}));
+
+const records=[];
+$("f").addEventListener("submit",e=>{
+  e.preventDefault();
+  const bad=req.filter(id=>!check(id));
+  if(bad.length){$(bad[0]).focus();return}
+  records.unshift({nome:v("nome"),agente:v("agente"),ini:fmt(v("ini")),fim:fmt(v("fim"))});
+  $("done").classList.add("show");
+  $("done-p").textContent=`${records[0].nome} (agente nº ${records[0].agente}) foi registado(a) com férias de ${records[0].ini} a ${records[0].fim}.`;
+  $("reg").innerHTML=records.map(r=>`<li><span>${esc(r.nome)} · nº ${esc(r.agente)}</span><span>${esc(r.ini)} – ${esc(r.fim)}</span></li>`).join("");
+  $("done").scrollIntoView({block:"nearest"});
+});
+$("f").addEventListener("reset",()=>setTimeout(()=>{
+  req.forEach(id=>{$(id).setAttribute("aria-invalid","false");const e=$("e-"+id);if(e)e.textContent=""});
+  $("done").classList.remove("show");render();
+},0));
+
+render();
+</script>
+</body>
+</html>
