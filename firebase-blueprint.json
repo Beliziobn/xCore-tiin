@@ -572,6 +572,7 @@
         "rejectedApplications": { "type": "number", "description": "Candidaturas rejeitadas" },
         "totalQuickRequests": { "type": "number", "description": "Total de pedidos rápidos" },
         "pendingQuickRequests": { "type": "number", "description": "Pedidos rápidos ativos/pendentes" },
+        "completedQuickRequests": { "type": "number", "description": "Pedidos rápidos concluídos" },
         "totalEfectividade": { "type": "number", "description": "Total de registos de efectividade" },
         "totalDeclaracaoServico": { "type": "number", "description": "Total de declarações de serviço" },
         "updatedAt": { "type": "string", "description": "Data ISO da última atualização" }
@@ -710,6 +711,24 @@
         "$ref": "#/entities/Teacher"
       },
       "description": "Guias oficiais de colocação emitidas pela Direcção Municipal de Educação"
+    },
+    "/fichas_avaliacao/{fichaId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Fichas individuais de avaliação de desempenho docente e administrativo"
+    },
+    "/cadastro_docente/{recordId}": {
+      "schema": {
+        "$ref": "#/entities/Teacher"
+      },
+      "description": "Registos oficiais do cadastro docente e levantamento de vagas"
+    },
+    "/tombstones/{tombstoneId}": {
+      "schema": {
+        "$ref": "#/entities/AuditLog"
+      },
+      "description": "Marcadores de exclusão para impedir ressurreição de registos apagados durante a sincronização"
     }
   }
 }

@@ -69,12 +69,15 @@ const GUIAS_FERIAS_COL = 'guias_ferias';
 const GUIAS_COLOCACAO_COL = 'guias_colocacao';
 const FICHAS_AVALIACAO_COL = 'fichas_avaliacao';
 const CADASTRO_DOCENTE_COL = 'cadastro_docente';
+const AUDIT_LOGS_COL = 'audit_logs';
 const TOMBSTONES_COL = 'tombstones';
 const STATS_COL = 'stats';
 const DASHBOARD_STATS_DOC_ID = 'dashboard';
 
 export const REALTIME_LISTENER_LIMIT = 30;
 export const PAGINATION_PAGE_SIZE = 30;
+export const ANNOUNCEMENTS_LIMIT = 30;
+export const SCHOOLS_LIST_LIMIT = 100;
 const ACTIVE_QUICK_REQUEST_STATUSES = [
   'PENDENTE',
   'EM_ANALISE',
@@ -219,6 +222,7 @@ export interface DashboardStats {
   rejectedApplications: number;
   totalQuickRequests: number;
   pendingQuickRequests: number;
+  completedQuickRequests?: number;
   totalEfectividade: number;
   totalDeclaracaoServico: number;
   updatedAt?: string;
@@ -231,7 +235,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats | null> {
     if (snap.exists()) {
       return snap.data() as DashboardStats;
     }
-    return await refreshDashboardStatsFromServerCounts();
+    return null;
   } catch (err) {
     logFirestorePermissionOrQuotaError(err, OperationType.GET, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
     return null;
@@ -387,7 +391,14 @@ export async function fetchCollectionPage<T = any>(
   if (isFirestoreReadQuotaExhausted()) {
     return { items: [], lastDoc: null, hasMore: false, ok: false, quotaExhausted: true };
   }
-  const pageSize = Math.min(Math.max(options?.pageSize ?? PAGINATION_PAGE_SIZE, 1), 49);
+  const maxLimitForCollection =
+    colName === SCHOOLS_COL
+      ? SCHOOLS_LIST_LIMIT
+      : colName === ANNOUNCEMENTS_COL
+      ? ANNOUNCEMENTS_LIMIT
+      : 50;
+  const maxPageSize = Math.max(1, maxLimitForCollection - 1);
+  const pageSize = Math.min(Math.max(options?.pageSize ?? PAGINATION_PAGE_SIZE, 1), maxPageSize);
   const orderField = options?.orderField || 'updatedAt';
   const orderDirection = options?.orderDirection || 'desc';
   try {
@@ -947,17 +958,25 @@ export async function saveQuickRequestToFirestore(request: QuickServiceRequest):
       { merge: true }
     );
     const isNowActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(request.status as any);
+    const isNowCompleted = request.status === 'CONCLUIDO';
     if (prevStatus === null) {
       incrementDashboardStats({
         totalQuickRequests: 1,
         ...(isNowActive ? { pendingQuickRequests: 1 } : {}),
+        ...(isNowCompleted ? { completedQuickRequests: 1 } : {}),
       }).catch(() => {});
     } else if (prevStatus !== request.status) {
       const wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(prevStatus as any);
+      const wasCompleted = prevStatus === 'CONCLUIDO';
+      const deltas: Partial<Record<Exclude<keyof DashboardStats, 'updatedAt'>, number>> = {};
       if (wasActive !== isNowActive) {
-        incrementDashboardStats({
-          pendingQuickRequests: isNowActive ? 1 : -1,
-        }).catch(() => {});
+        deltas.pendingQuickRequests = isNowActive ? 1 : -1;
+      }
+      if (wasCompleted !== isNowCompleted) {
+        deltas.completedQuickRequests = isNowCompleted ? 1 : -1;
+      }
+      if (Object.keys(deltas).length > 0) {
+        incrementDashboardStats(deltas).catch(() => {});
       }
     }
   } catch (error) {
@@ -1041,8 +1060,17 @@ export async function updateQuickRequestInFirestore(
     if (updates.status && prevStatus !== null && prevStatus !== updates.status) {
       const wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(prevStatus as any);
       const isNowActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(updates.status as any);
+      const wasCompleted = prevStatus === 'CONCLUIDO';
+      const isNowCompleted = updates.status === 'CONCLUIDO';
+      const deltas: Partial<Record<Exclude<keyof DashboardStats, 'updatedAt'>, number>> = {};
       if (wasActive !== isNowActive) {
-        incrementDashboardStats({ pendingQuickRequests: isNowActive ? 1 : -1 }).catch(() => {});
+        deltas.pendingQuickRequests = isNowActive ? 1 : -1;
+      }
+      if (wasCompleted !== isNowCompleted) {
+        deltas.completedQuickRequests = isNowCompleted ? 1 : -1;
+      }
+      if (Object.keys(deltas).length > 0) {
+        incrementDashboardStats(deltas).catch(() => {});
       }
     }
   } catch (error) {
@@ -1058,13 +1086,16 @@ export async function deleteQuickRequestFromFirestore(id: string): Promise<void>
     if (isFirestoreWriteQuotaExhausted()) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     let wasActive = false;
+    let wasCompleted = false;
     let existed = false;
     if (!isFirestoreReadQuotaExhausted()) {
       try {
         const snap = await getDoc(ref);
         if (snap.exists()) {
           existed = true;
-          wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(snap.data()?.status);
+          const st = snap.data()?.status;
+          wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(st);
+          wasCompleted = st === 'CONCLUIDO';
         }
       } catch {}
     }
@@ -1073,6 +1104,7 @@ export async function deleteQuickRequestFromFirestore(id: string): Promise<void>
       incrementDashboardStats({
         totalQuickRequests: -1,
         ...(wasActive ? { pendingQuickRequests: -1 } : {}),
+        ...(wasCompleted ? { completedQuickRequests: -1 } : {}),
       }).catch(() => {});
     }
   } catch (error) {
@@ -1084,6 +1116,8 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
   if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
     let totalDeleted = 0;
+    let deletedActive = 0;
+    let deletedCompleted = 0;
     while (true) {
       const snapshot = await getDocs(
         query(collection(db, QUICK_REQUESTS_COL), orderBy('updatedAt', 'desc'), limit(50))
@@ -1091,6 +1125,9 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
       if (snapshot.empty) break;
       const batch = writeBatch(db);
       snapshot.forEach((d) => {
+        const st = d.data()?.status;
+        if (ACTIVE_QUICK_REQUEST_STATUSES.includes(st)) deletedActive++;
+        if (st === 'CONCLUIDO') deletedCompleted++;
         addEntityTombstone(QUICK_REQUESTS_COL, d.id);
         batch.delete(d.ref);
         totalDeleted++;
@@ -1101,6 +1138,8 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
     if (totalDeleted > 0) {
       incrementDashboardStats({
         totalQuickRequests: -totalDeleted,
+        ...(deletedActive > 0 ? { pendingQuickRequests: -deletedActive } : {}),
+        ...(deletedCompleted > 0 ? { completedQuickRequests: -deletedCompleted } : {}),
       }).catch(() => {});
     }
     return totalDeleted;
@@ -1383,10 +1422,10 @@ export async function deleteSchoolFromFirestore(schoolId: string, schoolName?: s
   }
 }
 
-export async function fetchSchoolsFromFirestore(limitCount: number = 50): Promise<AdminSchool[]> {
+export async function fetchSchoolsFromFirestore(limitCount: number = SCHOOLS_LIST_LIMIT): Promise<AdminSchool[]> {
   if (isFirestoreReadQuotaExhausted()) return [];
   try {
-    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const safeLimit = Math.min(Math.max(limitCount, 1), SCHOOLS_LIST_LIMIT);
     const q = query(
       collection(db, SCHOOLS_COL),
       orderBy('updatedAt', 'desc'),
@@ -1409,11 +1448,11 @@ export async function fetchSchoolsFromFirestore(limitCount: number = 50): Promis
 
 export function subscribeToSchools(
   onUpdate: (schools: AdminSchool[]) => void,
-  maxLimit: number = REALTIME_LISTENER_LIMIT
+  maxLimit: number = SCHOOLS_LIST_LIMIT
 ): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
-    const safeLimit = Math.min(Math.max(maxLimit, 1), 50);
+    const safeLimit = Math.min(Math.max(maxLimit, 1), SCHOOLS_LIST_LIMIT);
     const q = query(
       collection(db, SCHOOLS_COL),
       orderBy('updatedAt', 'desc'),
@@ -1832,6 +1871,25 @@ export async function deleteDirectorFromFirestore(directorId: string): Promise<v
   }
 }
 
+export async function fetchDirectorsFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, DIRECTORS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, DIRECTORS_COL);
+    return [];
+  }
+}
+
 export function subscribeToDirectors(onUpdate: (directors: any[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
@@ -2045,6 +2103,10 @@ export function subscribeToStaff(onUpdate: (staff: any[]) => void): Unsubscribe 
 export async function saveBatchStudentsToFirestore(students: Record<string, any>[]): Promise<number> {
   if (!Array.isArray(students) || students.length === 0 || isFirestoreWriteQuotaExhausted()) return 0;
   let saved = 0;
+  let newCount = 0;
+  const existingIds = new Set(
+    safeReadJsonArray<any>('ucore_admin_students').map((s) => sanitizeDocId(s?.id || s?.nomeCompleto || s?.name))
+  );
   const CHUNK_SIZE = 450;
   const { nowTs, nowIso } = resolveNowTimestamp();
   for (let i = 0; i < students.length; i += CHUNK_SIZE) {
@@ -2053,6 +2115,10 @@ export async function saveBatchStudentsToFirestore(students: Record<string, any>
     chunk.forEach((student) => {
       const id = sanitizeDocId(student.id || student.nomeCompleto || student.name);
       if (!id) return;
+      if (!existingIds.has(id)) {
+        existingIds.add(id);
+        newCount++;
+      }
       const nomeCompleto = student.nomeCompleto || student.name || 'Estudante';
       const schoolId = student.schoolId || student.escola || student.schoolName || 'escola_municipal';
       const turma = student.turma || 'Turma A';
@@ -2077,8 +2143,8 @@ export async function saveBatchStudentsToFirestore(students: Record<string, any>
     });
     await batch.commit();
   }
-  if (saved > 0) {
-    refreshDashboardStatsFromServerCounts().catch(() => {});
+  if (newCount > 0) {
+    incrementDashboardStats({ totalStudents: newCount }).catch(() => {});
   }
   return saved;
 }
@@ -2086,6 +2152,10 @@ export async function saveBatchStudentsToFirestore(students: Record<string, any>
 export async function saveBatchTeachersToFirestore(teachers: Record<string, any>[]): Promise<number> {
   if (!Array.isArray(teachers) || teachers.length === 0 || isFirestoreWriteQuotaExhausted()) return 0;
   let saved = 0;
+  let newCount = 0;
+  const existingIds = new Set(
+    safeReadJsonArray<any>('ucore_admin_teachers').map((t) => sanitizeDocId(t?.id || t?.nomeCompleto || t?.name))
+  );
   const CHUNK_SIZE = 450;
   const { nowTs, nowIso } = resolveNowTimestamp();
   for (let i = 0; i < teachers.length; i += CHUNK_SIZE) {
@@ -2094,6 +2164,10 @@ export async function saveBatchTeachersToFirestore(teachers: Record<string, any>
     chunk.forEach((teacher) => {
       const id = sanitizeDocId(teacher.id || teacher.nomeCompleto || teacher.name);
       if (!id) return;
+      if (!existingIds.has(id)) {
+        existingIds.add(id);
+        newCount++;
+      }
       const ref = doc(db, TEACHERS_COL, id);
       batch.set(
         ref,
@@ -2104,8 +2178,8 @@ export async function saveBatchTeachersToFirestore(teachers: Record<string, any>
     });
     await batch.commit();
   }
-  if (saved > 0) {
-    refreshDashboardStatsFromServerCounts().catch(() => {});
+  if (newCount > 0) {
+    incrementDashboardStats({ totalTeachers: newCount }).catch(() => {});
   }
   return saved;
 }
@@ -2113,6 +2187,12 @@ export async function saveBatchTeachersToFirestore(teachers: Record<string, any>
 export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]): Promise<number> {
   if (!Array.isArray(staffList) || staffList.length === 0 || isFirestoreWriteQuotaExhausted()) return 0;
   let saved = 0;
+  let newCount = 0;
+  const existingIds = new Set(
+    safeReadJsonArray<any>('ucore_registered_staff_v1').map((s) =>
+      sanitizeDocId(s?.id || s?.bi || s?.agente || s?.nomeCompleto || s?.name)
+    )
+  );
   const CHUNK_SIZE = 450;
   const { nowTs, nowIso } = resolveNowTimestamp();
   for (let i = 0; i < staffList.length; i += CHUNK_SIZE) {
@@ -2123,6 +2203,10 @@ export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]
         staffMember.id || staffMember.bi || staffMember.agente || staffMember.nomeCompleto || staffMember.name
       );
       if (!id) return;
+      if (!existingIds.has(id)) {
+        existingIds.add(id);
+        newCount++;
+      }
       const nomeCompleto = staffMember.nomeCompleto || staffMember.name || 'Funcionário';
       const funcao = staffMember.funcao || staffMember.role || staffMember.cargo || 'Administrativo / Apoio';
       const schoolName =
@@ -2146,8 +2230,8 @@ export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]
     });
     await batch.commit();
   }
-  if (saved > 0) {
-    refreshDashboardStatsFromServerCounts().catch(() => {});
+  if (newCount > 0) {
+    incrementDashboardStats({ totalStaff: newCount }).catch(() => {});
   }
   return saved;
 }
@@ -2604,13 +2688,34 @@ export async function deleteAnnouncementFromFirestore(id: string): Promise<void>
   }
 }
 
+export async function fetchAnnouncementsFromFirestore(
+  limitCount: number = ANNOUNCEMENTS_LIMIT
+): Promise<SchoolAnnouncement[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), ANNOUNCEMENTS_LIMIT);
+    const q = query(
+      collection(db, ANNOUNCEMENTS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: SchoolAnnouncement[] = [];
+    snapshot.forEach((d) => list.push(d.data() as SchoolAnnouncement));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, ANNOUNCEMENTS_COL);
+    return [];
+  }
+}
+
 export function subscribeToAnnouncements(onUpdate: (list: SchoolAnnouncement[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, ANNOUNCEMENTS_COL),
       orderBy('updatedAt', 'desc'),
-      limit(REALTIME_LISTENER_LIMIT)
+      limit(ANNOUNCEMENTS_LIMIT)
     );
     return onSnapshot(
       q,
@@ -2652,6 +2757,25 @@ export async function deleteRoomFromFirestore(id: string): Promise<void> {
     await deleteDoc(doc(db, ROOMS_COL, docId));
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.DELETE, ROOMS_COL);
+  }
+}
+
+export async function fetchRoomsFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<DirectorRoom[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, ROOMS_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: DirectorRoom[] = [];
+    snapshot.forEach((d) => list.push(d.data() as DirectorRoom));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, ROOMS_COL);
+    return [];
   }
 }
 
@@ -2703,6 +2827,25 @@ export async function deleteClassFromFirestore(id: string): Promise<void> {
     await deleteDoc(doc(db, CLASSES_COL, docId));
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.DELETE, CLASSES_COL);
+  }
+}
+
+export async function fetchClassesFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<DirectorClass[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, CLASSES_COL),
+      orderBy('updatedAt', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: DirectorClass[] = [];
+    snapshot.forEach((d) => list.push(d.data() as DirectorClass));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, CLASSES_COL);
+    return [];
   }
 }
 
@@ -3073,6 +3216,50 @@ export function subscribeToCadastroDocente(onUpdate: (records: any[]) => void): 
   }
 }
 
+export async function fetchAuditLogsFromFirestore(limitCount: number = PAGINATION_PAGE_SIZE): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
+  try {
+    const safeLimit = Math.min(Math.max(limitCount, 1), 50);
+    const q = query(
+      collection(db, AUDIT_LOGS_COL),
+      orderBy('timestamp', 'desc'),
+      limit(safeLimit)
+    );
+    const snapshot = await getDocs(q);
+    const list: any[] = [];
+    snapshot.forEach((d) => list.push(d.data()));
+    return list;
+  } catch (err) {
+    logFirestorePermissionOrQuotaError(err, OperationType.LIST, AUDIT_LOGS_COL);
+    return [];
+  }
+}
+
+export function subscribeToAuditLogs(onUpdate: (logs: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
+  try {
+    const q = query(
+      collection(db, AUDIT_LOGS_COL),
+      orderBy('timestamp', 'desc'),
+      limit(REALTIME_LISTENER_LIMIT)
+    );
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => list.push(d.data()));
+        onUpdate(list);
+      },
+      (err) => {
+        logFirestorePermissionOrQuotaError(err, OperationType.LIST, AUDIT_LOGS_COL);
+      }
+    );
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
+    return () => {};
+  }
+}
+
 export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsubscribe {
   if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
@@ -3268,7 +3455,7 @@ export function initViewScopedRealtimeSync(scope?: RealtimeSyncScope): () => voi
     );
   }
 
-  // 1. REAL-TIME SCHOOLS UNIFICATION (Bounded)
+  // 1. REAL-TIME SCHOOLS UNIFICATION (Bounded <= 100)
   if (enabledCols.has('schools')) {
     unsubs.push(
       subscribeToSchools((cloudSchools) => {
@@ -3367,7 +3554,7 @@ export function initViewScopedRealtimeSync(scope?: RealtimeSyncScope): () => voi
         } catch (e) {
           console.warn('[UnifiedSync] Erro ao unificar escolas:', e);
         }
-      })
+      }, SCHOOLS_LIST_LIMIT)
     );
   }
 

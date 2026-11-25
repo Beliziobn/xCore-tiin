@@ -106,6 +106,7 @@ export class AuditLogger {
             targetType: logItem.targetType || null,
             details: logItem.details,
             timestamp: logItem.timestamp,
+            updatedAt: logItem.timestamp,
           });
         }
       } catch {

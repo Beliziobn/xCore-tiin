@@ -10,7 +10,6 @@ import {
   saveQuickRequestToFirestore,
   fetchQuickRequestsFromFirestore,
   fetchQuickRequestsByStatusPage,
-  fetchCollectionCount,
   fetchDashboardStats,
   type FirestorePageResult,
   PAGINATION_PAGE_SIZE,
@@ -1143,7 +1142,7 @@ export async function fetchArchivedQuickRequestsPage(options: {
 }
 
 /**
- * Returns authoritative quick requests counts from stats/dashboard or getCountFromServer (Rule 4).
+ * Returns authoritative quick requests counts strictly from stats/dashboard single-doc aggregator (Rule 5).
  */
 export async function getQuickRequestsServerCounts(): Promise<{
   total: number;
@@ -1152,26 +1151,21 @@ export async function getQuickRequestsServerCounts(): Promise<{
 }> {
   try {
     const stats = await fetchDashboardStats();
+    const cached = getCachedQuickRequests();
     if (stats && typeof stats.totalQuickRequests === 'number') {
-      const concluidos =
-        (await fetchCollectionCount('quickRequests', [
-          { field: 'status', op: '==', value: 'CONCLUIDO' },
-        ])) ?? 0;
       return {
         total: stats.totalQuickRequests,
         pendentes: stats.pendingQuickRequests ?? 0,
-        concluidos,
+        concluidos:
+          typeof stats.completedQuickRequests === 'number'
+            ? stats.completedQuickRequests
+            : cached.filter((r) => r.status === 'CONCLUIDO').length,
       };
     }
-    const [total, pendentes, concluidos] = await Promise.all([
-      fetchCollectionCount('quickRequests'),
-      fetchCollectionCount('quickRequests', [{ field: 'status', op: '==', value: 'PENDENTE' }]),
-      fetchCollectionCount('quickRequests', [{ field: 'status', op: '==', value: 'CONCLUIDO' }]),
-    ]);
     return {
-      total: total ?? 0,
-      pendentes: pendentes ?? 0,
-      concluidos: concluidos ?? 0,
+      total: cached.length,
+      pendentes: cached.filter((r) => r.status === 'PENDENTE').length,
+      concluidos: cached.filter((r) => r.status === 'CONCLUIDO').length,
     };
   } catch {
     const cached = getCachedQuickRequests();

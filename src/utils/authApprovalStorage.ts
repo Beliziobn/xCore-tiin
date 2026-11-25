@@ -7,7 +7,6 @@ import {
   saveApplicationToFirestore,
   fetchApplicationsFromFirestoreWithStatus,
   fetchApplicationsByStatusPage,
-  fetchCollectionCount,
   fetchDashboardStats,
   type FirestorePageResult,
   PAGINATION_PAGE_SIZE,
@@ -865,7 +864,7 @@ export async function syncArchivedApplicationsPage(options: {
 }
 
 /**
- * Returns authoritative application counts from stats/dashboard (single doc) or getCountFromServer (Rule 4).
+ * Returns authoritative application counts strictly from stats/dashboard single-doc aggregator (Rule 5).
  */
 export async function getApplicationsCountsFromServer(): Promise<{
   total: number;
@@ -883,17 +882,12 @@ export async function getApplicationsCountsFromServer(): Promise<{
         rejeitados: stats.rejectedApplications ?? 0,
       };
     }
-    const [total, pendentes, aprovados, rejeitados] = await Promise.all([
-      fetchCollectionCount('applications'),
-      fetchCollectionCount('applications', [{ field: 'status', op: '==', value: 'pendente' }]),
-      fetchCollectionCount('applications', [{ field: 'status', op: '==', value: 'aprovado' }]),
-      fetchCollectionCount('applications', [{ field: 'status', op: '==', value: 'rejeitado' }]),
-    ]);
+    const local = getPendingApplications();
     return {
-      total: total ?? 0,
-      pendentes: pendentes ?? 0,
-      aprovados: aprovados ?? 0,
-      rejeitados: rejeitados ?? 0,
+      total: local.length,
+      pendentes: local.filter((a) => a.status === 'pendente').length,
+      aprovados: local.filter((a) => a.status === 'aprovado').length,
+      rejeitados: local.filter((a) => a.status === 'rejeitado').length,
     };
   } catch {
     const local = getPendingApplications();

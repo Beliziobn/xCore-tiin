@@ -2,12 +2,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // =========================================================================
     // Helper Functions & Validation Blueprints
     // Note: SIGRE currently authenticates institutional accounts via custom
-    // email/password verification in-app (without Firebase Auth tokens).
-    // Once Firebase Auth is enabled for all SIGRE logins, tighten read/write
-    // predicates below to require isSignedIn() / isAdmin().
+    // email/password verification in-app (without mandatory Firebase Auth tokens).
+    // All list queries enforce strict upper bounds via request.query.limit
+    // to prevent unbounded collection scans and protect daily read quotas.
     // =========================================================================
 
     function isSignedIn() {
@@ -18,12 +23,17 @@ service cloud.firestore {
       return id is string && id.size() > 0 && id.size() <= 128 && !id.matches('.*(/|\\.\\.).*');
     }
 
+    function hasBoundedQueryLimit(maxLimit) {
+      return request.query.limit is int && request.query.limit > 0 && request.query.limit <= maxLimit;
+    }
+
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email != null && (
+        (request.auth.token.email != null && request.auth.token.email_verified == true && (
           request.auth.token.email == 'dmedoquessua@gmail.com' ||
-          request.auth.token.email == 'beliziodos20@gmail.com'
+          request.auth.token.email == 'beliziodos20@gmail.com' ||
+          request.auth.token.email == 'socienciadaeduca2018@gmail.com'
         ))
       );
     }
@@ -68,199 +78,221 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // Collection: /applications/{applicationId}
+    // Collection: /applications/{applicationId} (limit <= 50)
     // ==========================================
     match /applications/{applicationId} {
-      allow read: if true;
+      allow get: if isValidId(applicationId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidApplicationWrite(applicationId);
       allow delete: if isValidId(applicationId);
     }
 
     // ==========================================
-    // Collection: /quickRequests/{requestId}
+    // Collection: /quickRequests/{requestId} (limit <= 50)
     // ==========================================
     match /quickRequests/{requestId} {
-      allow read: if true;
+      allow get: if isValidId(requestId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(requestId);
       allow delete: if isValidId(requestId);
     }
 
     // ==========================================
-    // Collection: /schools/{schoolId}
+    // Collection: /schools/{schoolId} (limit <= 100)
     // ==========================================
     match /schools/{schoolId} {
-      allow read: if true;
+      allow get: if isValidId(schoolId);
+      allow list: if hasBoundedQueryLimit(100);
       allow create, update: if isValidSchoolWrite(schoolId);
       allow delete: if isValidId(schoolId);
     }
 
     // ==========================================
-    // Collection: /directors/{directorId}
+    // Collection: /directors/{directorId} (limit <= 50)
     // ==========================================
     match /directors/{directorId} {
-      allow read: if true;
+      allow get: if isValidId(directorId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(directorId);
       allow delete: if isValidId(directorId);
     }
 
     // ==========================================
-    // Collection: /dme_staff/{staffId}
+    // Collection: /dme_staff/{staffId} (limit <= 50)
     // ==========================================
     match /dme_staff/{staffId} {
-      allow read: if true;
+      allow get: if isValidId(staffId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(staffId);
       allow delete: if isValidId(staffId);
     }
 
     // ==========================================
-    // Collection: /teachers/{teacherId}
+    // Collection: /teachers/{teacherId} (limit <= 50)
     // ==========================================
     match /teachers/{teacherId} {
-      allow read: if true;
+      allow get: if isValidId(teacherId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(teacherId);
       allow delete: if isValidId(teacherId);
     }
 
     // ==========================================
-    // Collection: /students/{studentId}
+    // Collection: /students/{studentId} (limit <= 50)
     // ==========================================
     match /students/{studentId} {
-      allow read: if true;
+      allow get: if isValidId(studentId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(studentId);
       allow delete: if isValidId(studentId);
     }
 
     // ==========================================
-    // Collection: /staff/{staffId}
+    // Collection: /staff/{staffId} (limit <= 50)
     // ==========================================
     match /staff/{staffId} {
-      allow read: if true;
+      allow get: if isValidId(staffId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(staffId);
       allow delete: if isValidId(staffId);
     }
 
     // ==========================================
-    // Collection: /efectividade/{recordId}
+    // Collection: /efectividade/{recordId} (limit <= 50)
     // ==========================================
     match /efectividade/{recordId} {
-      allow read: if true;
+      allow get: if isValidId(recordId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(recordId);
       allow delete: if isValidId(recordId);
     }
 
     // ==========================================
-    // Collection: /declaracao_servico/{recordId}
+    // Collection: /declaracao_servico/{recordId} (limit <= 50)
     // ==========================================
     match /declaracao_servico/{recordId} {
-      allow read: if true;
+      allow get: if isValidId(recordId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(recordId);
       allow delete: if isValidId(recordId);
     }
 
     // ==========================================
-    // Collection: /grades/{gradeId}
+    // Collection: /grades/{gradeId} (limit <= 50)
     // ==========================================
     match /grades/{gradeId} {
-      allow read: if true;
+      allow get: if isValidId(gradeId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(gradeId);
       allow delete: if isValidId(gradeId);
     }
 
     // ==========================================
-    // Collection: /attendance/{recordId}
+    // Collection: /attendance/{recordId} (limit <= 50)
     // ==========================================
     match /attendance/{recordId} {
-      allow read: if true;
+      allow get: if isValidId(recordId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(recordId);
       allow delete: if isValidId(recordId);
     }
 
     // ==========================================
-    // Collection: /announcements/{announcementId}
+    // Collection: /announcements/{announcementId} (limit <= 30)
     // ==========================================
     match /announcements/{announcementId} {
-      allow read: if true;
+      allow get: if isValidId(announcementId);
+      allow list: if hasBoundedQueryLimit(30);
       allow create, update: if isValidEntityWrite(announcementId);
       allow delete: if isValidId(announcementId);
     }
 
     // ==========================================
-    // Collection: /rooms/{roomId}
+    // Collection: /rooms/{roomId} (limit <= 50)
     // ==========================================
     match /rooms/{roomId} {
-      allow read: if true;
+      allow get: if isValidId(roomId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(roomId);
       allow delete: if isValidId(roomId);
     }
 
     // ==========================================
-    // Collection: /classes/{classId}
+    // Collection: /classes/{classId} (limit <= 50)
     // ==========================================
     match /classes/{classId} {
-      allow read: if true;
+      allow get: if isValidId(classId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(classId);
       allow delete: if isValidId(classId);
     }
 
     // ==========================================
-    // Collection: /chatMessages/{messageId}
+    // Collection: /chatMessages/{messageId} (limit <= 50)
     // ==========================================
     match /chatMessages/{messageId} {
-      allow read: if true;
+      allow get: if isValidId(messageId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(messageId);
       allow delete: if isValidId(messageId);
     }
 
     // ==========================================
-    // Collection: /guias_ferias/{guiaId}
+    // Collection: /guias_ferias/{guiaId} (limit <= 50)
     // ==========================================
     match /guias_ferias/{guiaId} {
-      allow read: if true;
+      allow get: if isValidId(guiaId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(guiaId);
       allow delete: if isValidId(guiaId);
     }
 
     // ==========================================
-    // Collection: /guias_colocacao/{guiaId}
+    // Collection: /guias_colocacao/{guiaId} (limit <= 50)
     // ==========================================
     match /guias_colocacao/{guiaId} {
-      allow read: if true;
+      allow get: if isValidId(guiaId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(guiaId);
       allow delete: if isValidId(guiaId);
     }
 
     // ==========================================
-    // Collection: /fichas_avaliacao/{fichaId}
+    // Collection: /fichas_avaliacao/{fichaId} (limit <= 50)
     // ==========================================
     match /fichas_avaliacao/{fichaId} {
-      allow read: if true;
+      allow get: if isValidId(fichaId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(fichaId);
       allow delete: if isValidId(fichaId);
     }
 
     // ==========================================
-    // Collection: /cadastro_docente/{recordId}
+    // Collection: /cadastro_docente/{recordId} (limit <= 50)
     // ==========================================
     match /cadastro_docente/{recordId} {
-      allow read: if true;
+      allow get: if isValidId(recordId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(recordId);
       allow delete: if isValidId(recordId);
     }
 
     // ==========================================
-    // Collection: /tombstones/{tombstoneId}
+    // Collection: /tombstones/{tombstoneId} (limit <= 50)
     // ==========================================
     match /tombstones/{tombstoneId} {
-      allow read: if true;
+      allow get: if isValidId(tombstoneId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(tombstoneId);
       allow delete: if isValidId(tombstoneId);
     }
 
     // ==========================================
-    // Collection: /users/{userId}
+    // Collection: /users/{userId} (limit <= 50)
     // ==========================================
     match /users/{userId} {
-      allow read: if true;
+      allow get: if isValidId(userId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create, update: if isValidEntityWrite(userId);
       allow delete: if isValidId(userId);
     }
@@ -270,33 +302,37 @@ service cloud.firestore {
     // Strictly restricted — no unauthenticated privilege escalation
     // ==========================================
     match /admins/{adminId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn() && isValidId(adminId);
+      allow list: if false;
       allow write: if isAdmin() && isValidId(adminId);
     }
 
     // ==========================================
-    // Collection: /audit_logs/{logId}
+    // Collection: /audit_logs/{logId} (limit <= 50)
     // Immutable append-only audit logs
     // ==========================================
     match /audit_logs/{logId} {
-      allow read: if true;
+      allow get: if isValidId(logId);
+      allow list: if hasBoundedQueryLimit(50);
       allow create: if isValidEntityWrite(logId);
       allow update, delete: if false;
     }
 
     // ==========================================
     // Collection: /stats/{statId}
-    // Single-document dashboard aggregator counters
+    // Single-document dashboard aggregator counters (no list queries)
     // ==========================================
     match /stats/{statId} {
-      allow read: if true;
+      allow get: if isValidId(statId);
+      allow list: if false;
       allow create, update: if isValidEntityWrite(statId);
       allow delete: if false;
     }
 
     // Connection test document
     match /test/connection {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
     }
   }
 }
