@@ -36,7 +36,8 @@ import {
   ChevronDown,
   ClipboardList,
   LayoutGrid,
-  CreditCard
+  CreditCard,
+  Search
 } from 'lucide-react';
 import teacherImg from '../../assets/images/teacher_classroom_1788697035170.jpg';
 import { verifyPassword, updatePassword, encodePasswordVerifier } from '../../utils/passwordService';
@@ -444,10 +445,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [regStep, setRegStep] = useState<1 | 2 | 3>(1);
   const [hasChosenRole, setHasChosenRole] = useState<boolean>(false);
   const [regMunicipalityValue, setRegMunicipalityValue] = useState<string>('quessua');
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState<string>('');
   const [stepErrors, setStepErrors] = useState<{ [key: number]: string }>({});
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [registrationSubmitted, setRegistrationSubmitted] = useState<boolean>(false);
   const [submittedUserAccount, setSubmittedUserAccount] = useState<UserAccount | null>(null);
+
+  const filteredRegisteredSchools = React.useMemo(() => {
+    const q = schoolSearchQuery
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+    if (!q) return registeredSchools;
+    return registeredSchools.filter((sc) => {
+      const reg = getSchoolRegistrationData(sc);
+      const haystack = `${sc.name || ''} ${reg.codigoSIGE || sc.codigoSIGE || ''} ${sc.directorName || ''} ${sc.location || ''}`
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [registeredSchools, schoolSearchQuery]);
 
   // Keep selectedSchoolId synced with registeredSchools and auto-fill municipality from registered school data
   useEffect(() => {
@@ -2792,6 +2811,63 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                             <span className="required-mark">*</span>
                           </label>
 
+                          {institutionalScope === 'escola' && regMunicipalityValue && (
+                            <div className="control" style={{ marginBottom: '8px' }}>
+                              <Search />
+                              <input
+                                id="school-search"
+                                type="text"
+                                value={schoolSearchQuery}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSchoolSearchQuery(val);
+                                  const q = val
+                                    .normalize('NFD')
+                                    .replace(/[\u0300-\u036f]/g, '')
+                                    .trim()
+                                    .toLowerCase();
+                                  if (q) {
+                                    const matches = registeredSchools.filter((sc) => {
+                                      const reg = getSchoolRegistrationData(sc);
+                                      const haystack = `${sc.name || ''} ${reg.codigoSIGE || sc.codigoSIGE || ''} ${sc.directorName || ''} ${sc.location || ''}`
+                                        .normalize('NFD')
+                                        .replace(/[\u0300-\u036f]/g, '')
+                                        .toLowerCase();
+                                      return haystack.includes(q);
+                                    });
+                                    if (matches.length > 0 && !matches.some((m) => m.id === selectedSchoolId)) {
+                                      setSelectedSchoolId(matches[0].id);
+                                      setSchoolOrUnitName(matches[0].name);
+                                      clearSingleFieldError('school');
+                                    }
+                                  }
+                                }}
+                                placeholder="Escreva o nome da escola ou código SIGE para procurar..."
+                                style={{ paddingRight: schoolSearchQuery ? '74px' : '16px' }}
+                              />
+                              {schoolSearchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSchoolSearchQuery('')}
+                                  style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    border: 0,
+                                    background: '#eef3f7',
+                                    color: '#16354d',
+                                    borderRadius: '6px',
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Limpar
+                                </button>
+                              )}
+                            </div>
+                          )}
+
                           <div className="control">
                             <Building2 />
                             {institutionalScope === 'escola' ? (
@@ -2813,9 +2889,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                                   <option value="">Selecione primeiro o município</option>
                                 ) : (
                                   <>
-                                    <option value="">Selecione a unidade escolar</option>
-                                    {registeredSchools.length > 0 ? (
-                                      registeredSchools.map((s) => {
+                                    <option value="">
+                                      {schoolSearchQuery.trim()
+                                        ? `${filteredRegisteredSchools.length} escola(s) encontrada(s) — selecione abaixo`
+                                        : 'Selecione a unidade escolar'}
+                                    </option>
+                                    {filteredRegisteredSchools.length > 0 ? (
+                                      filteredRegisteredSchools.map((s) => {
                                         const reg = getSchoolRegistrationData(s);
                                         const code = reg.codigoSIGE || s.codigoSIGE || 'SIGE-102012';
                                         return (
@@ -2826,7 +2906,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                                       })
                                     ) : (
                                       <option value="" disabled>
-                                        Nenhuma unidade escolar registada neste município
+                                        {schoolSearchQuery.trim()
+                                          ? `Nenhuma escola encontrada para "${schoolSearchQuery}"`
+                                          : 'Nenhuma unidade escolar registada neste município'}
                                       </option>
                                     )}
                                   </>
