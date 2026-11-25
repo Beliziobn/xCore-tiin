@@ -50,6 +50,7 @@ import type {
 import {
   createNewSchoolRegistrationData,
   convertRegistrationDataToAdminSchool,
+  getSchoolRegistrationData,
   DEFICIENCIAS_DISPONIVEIS,
   calculateTotalClassesOffered,
   saveRegisteredSchool,
@@ -185,81 +186,97 @@ export const SchoolRegistrationModal: React.FC<SchoolRegistrationModalProps> = (
   useEffect(() => {
     if (!isOpen) return;
 
-    if (initialData) {
-      setNomeOficial(initialData.nomeOficial || '');
-      setCodigoSIGE(initialData.codigoSIGE || '');
-      setRua(initialData.endereco.rua || '');
-      setBairro(initialData.endereco.bairro || '');
-      setComuna(initialData.endereco.comuna || 'Quêssua Sede');
-      setMunicipio(initialData.endereco.municipio || defaultMunicipality);
-      setProvincia(initialData.endereco.provincia || defaultProvince);
-      setLatitude(initialData.coordenadas?.latitude || '-9.47214');
-      setLongitude(initialData.coordenadas?.longitude || '16.48391');
-      setContactoTelefonico(initialData.contactoTelefonico || '+244 923 456 789');
-      setEmailDireccao(initialData.emailDireccao || '');
-      setDirectorNome(initialData.director.nome || '');
-      setDirectorContacto(initialData.director.contacto || '');
-      setDirectorEmail(initialData.director.email || '');
-      setAnoCriacao(initialData.anoCriacao || 1984);
-      setNatureza(initialData.natureza || 'Pública');
-      setOferta(initialData.oferta);
+    const effectiveInitialData =
+      initialData ||
+      existingSchool?.registrationData ||
+      (existingSchool ? getSchoolRegistrationData(existingSchool) : null);
 
-      setSalasDefinitivas(initialData.infraestrutura.salasDefinitivas || 0);
-      setSalasProvisorias(initialData.infraestrutura.salasProvisorias || 0);
-      setSalasImprovisadas(initialData.infraestrutura.salasImprovisadas || 0);
-      setSalasAoArLivre(initialData.infraestrutura.salasAoArLivre || 0);
-      setTurmasFuncionamento(initialData.infraestrutura.turmasFuncionamento || 12);
-      setTurnos(initialData.infraestrutura.turnos || ['Manhã', 'Tarde']);
-      setTemBiblioteca(initialData.infraestrutura.temBiblioteca);
-      setTemCantinaRefeitorio(initialData.infraestrutura.temCantinaRefeitorio);
-      setTemAguaPotavel(initialData.infraestrutura.temAguaPotavel);
-      setTipoAgua(initialData.infraestrutura.tipoAgua || 'Furo Artesiano');
-      setTemElectricidade(initialData.infraestrutura.temElectricidade);
-      setTipoElectricidade(initialData.infraestrutura.tipoElectricidade || 'Rede Elétrica');
-      setAcessibilidadeDeficiencia(initialData.infraestrutura.acessibilidadeDeficiencia);
-      setDetalhesAcessibilidade(initialData.infraestrutura.detalhesAcessibilidade || '');
+    if (effectiveInitialData) {
+      setNomeOficial(existingSchool?.name || effectiveInitialData.nomeOficial || '');
+      setCodigoSIGE(
+        existingSchool?.codigoSIGE ||
+          effectiveInitialData.codigoSIGE ||
+          `SIGE-${Math.floor(100000 + Math.random() * 900000)}`
+      );
+      setRua(effectiveInitialData.endereco?.rua || '');
+      setBairro(effectiveInitialData.endereco?.bairro || '');
+      setComuna(effectiveInitialData.endereco?.comuna || 'Quêssua Sede');
+      setMunicipio(effectiveInitialData.endereco?.municipio || defaultMunicipality);
+      setProvincia(effectiveInitialData.endereco?.provincia || defaultProvince);
+      setLatitude(effectiveInitialData.coordenadas?.latitude || '-9.47214');
+      setLongitude(effectiveInitialData.coordenadas?.longitude || '16.48391');
+      setContactoTelefonico(
+        existingSchool?.phone || effectiveInitialData.contactoTelefonico || '+244 923 456 789'
+      );
+      setEmailDireccao(existingSchool?.email || effectiveInitialData.emailDireccao || '');
+      setDirectorNome(existingSchool?.directorName || effectiveInitialData.director?.nome || '');
+      setDirectorContacto(effectiveInitialData.director?.contacto || existingSchool?.phone || '');
+      setDirectorEmail(effectiveInitialData.director?.email || '');
+      setAnoCriacao(effectiveInitialData.anoCriacao || 1984);
+      setNatureza(existingSchool?.natureza || effectiveInitialData.natureza || 'Pública');
+      if (effectiveInitialData.oferta) {
+        setOferta(effectiveInitialData.oferta);
+      }
 
-      setTotalEducadoresInfancia(initialData.pessoal.totalEducadoresInfancia || 0);
-      setTotalAuxiliaresAccaoEducativa(initialData.pessoal.totalAuxiliaresAccaoEducativa || 0);
-      setTotalDocentesProfessores(initialData.pessoal.totalDocentesProfessores || 0);
-      setTotalAlfabetizadores(initialData.pessoal.totalAlfabetizadores || 0);
-      setTotalPessoalNaoDocente(initialData.pessoal.totalPessoalNaoDocente || 0);
-      setDocentesComFormacao(initialData.pessoal.docentesComFormacaoPedagogica || 0);
-      setDocentesSemFormacao(initialData.pessoal.docentesSemFormacaoPedagogica || 0);
+      setSalasDefinitivas(
+        effectiveInitialData.infraestrutura?.salasDefinitivas ??
+          (existingSchool ? Math.max(1, Math.round(existingSchool.roomsCount * 0.8)) : 0)
+      );
+      setSalasProvisorias(
+        effectiveInitialData.infraestrutura?.salasProvisorias ??
+          (existingSchool ? Math.max(0, Math.round(existingSchool.roomsCount * 0.2)) : 0)
+      );
+      setSalasImprovisadas(effectiveInitialData.infraestrutura?.salasImprovisadas || 0);
+      setSalasAoArLivre(effectiveInitialData.infraestrutura?.salasAoArLivre || 0);
+      setTurmasFuncionamento(
+        effectiveInitialData.infraestrutura?.turmasFuncionamento ??
+          existingSchool?.turmasCount ??
+          12
+      );
+      setTurnos(effectiveInitialData.infraestrutura?.turnos || ['Manhã', 'Tarde']);
+      setTemBiblioteca(Boolean(effectiveInitialData.infraestrutura?.temBiblioteca));
+      setTemCantinaRefeitorio(Boolean(effectiveInitialData.infraestrutura?.temCantinaRefeitorio));
+      setTemAguaPotavel(Boolean(effectiveInitialData.infraestrutura?.temAguaPotavel));
+      setTipoAgua(effectiveInitialData.infraestrutura?.tipoAgua || 'Furo Artesiano');
+      setTemElectricidade(Boolean(effectiveInitialData.infraestrutura?.temElectricidade));
+      setTipoElectricidade(effectiveInitialData.infraestrutura?.tipoElectricidade || 'Rede Elétrica');
+      setAcessibilidadeDeficiencia(Boolean(effectiveInitialData.infraestrutura?.acessibilidadeDeficiencia));
+      setDetalhesAcessibilidade(effectiveInitialData.infraestrutura?.detalhesAcessibilidade || '');
+
+      setTotalEducadoresInfancia(effectiveInitialData.pessoal?.totalEducadoresInfancia || 0);
+      setTotalAuxiliaresAccaoEducativa(effectiveInitialData.pessoal?.totalAuxiliaresAccaoEducativa || 0);
+      setTotalDocentesProfessores(
+        effectiveInitialData.pessoal?.totalDocentesProfessores ??
+          existingSchool?.teachersCount ??
+          0
+      );
+      setTotalAlfabetizadores(effectiveInitialData.pessoal?.totalAlfabetizadores || 0);
+      setTotalPessoalNaoDocente(effectiveInitialData.pessoal?.totalPessoalNaoDocente || 0);
+      setDocentesComFormacao(
+        effectiveInitialData.pessoal?.docentesComFormacaoPedagogica ??
+          (existingSchool ? Math.max(1, Math.round(existingSchool.teachersCount * 0.85)) : 0)
+      );
+      setDocentesSemFormacao(
+        effectiveInitialData.pessoal?.docentesSemFormacaoPedagogica ??
+          (existingSchool ? Math.max(0, Math.round(existingSchool.teachersCount * 0.15)) : 0)
+      );
       setTotalAlunosDeclarados(
-        typeof initialData.pessoal.totalAlunosDeclarados === 'number'
-          ? initialData.pessoal.totalAlunosDeclarados
+        typeof effectiveInitialData.pessoal?.totalAlunosDeclarados === 'number'
+          ? effectiveInitialData.pessoal.totalAlunosDeclarados
           : existingSchool?.declaredStudentsCount ??
             ((existingSchool?.studentsWithDocs || 0) + (existingSchool?.studentsWithoutDocs || 0) || 567)
       );
 
-      setEmPlenoFuncionamento(initialData.situacao.emPlenoFuncionamento);
-      setEscolaNovaCriada(initialData.situacao.escolaNovaCriada);
-      setRegimeComplexoEscolar(initialData.situacao.regimeComplexoEscolar);
-      setObservacoesDificuldades(initialData.situacao.observacoesDificuldades || '');
+      setEmPlenoFuncionamento(effectiveInitialData.situacao?.emPlenoFuncionamento ?? true);
+      setEscolaNovaCriada(Boolean(effectiveInitialData.situacao?.escolaNovaCriada));
+      setRegimeComplexoEscolar(Boolean(effectiveInitialData.situacao?.regimeComplexoEscolar));
+      setObservacoesDificuldades(effectiveInitialData.situacao?.observacoesDificuldades || '');
 
-      setDocumentoCriacaoNumero(initialData.validacao.documentoCriacaoNumero || '');
-      setDataDocumentoCriacao(initialData.validacao.dataDocumentoCriacao || '');
-      setOrgaoEmissor(initialData.validacao.orgaoEmissor || '');
-      setResponsavelNome(initialData.validacao.responsavelPreenchimentoNome || '');
-      setResponsavelCargo(initialData.validacao.responsavelPreenchimentoCargo || '');
-    } else if (existingSchool) {
-      setNomeOficial(existingSchool.name);
-      setCodigoSIGE(existingSchool.codigoSIGE || `SIGE-${Math.floor(100000 + Math.random() * 900000)}`);
-      setDirectorNome(existingSchool.directorName);
-      setContactoTelefonico(existingSchool.phone);
-      setEmailDireccao(existingSchool.email);
-      setSalasDefinitivas(Math.max(1, Math.round(existingSchool.roomsCount * 0.8)));
-      setSalasProvisorias(Math.max(0, Math.round(existingSchool.roomsCount * 0.2)));
-      setTurmasFuncionamento(existingSchool.turmasCount);
-      setTotalDocentesProfessores(existingSchool.teachersCount);
-      setDocentesComFormacao(Math.max(1, Math.round(existingSchool.teachersCount * 0.85)));
-      setDocentesSemFormacao(Math.max(0, Math.round(existingSchool.teachersCount * 0.15)));
-      setTotalAlunosDeclarados(
-        existingSchool.declaredStudentsCount ??
-          ((existingSchool.studentsWithDocs || 0) + (existingSchool.studentsWithoutDocs || 0) || 567)
-      );
-      setNatureza(existingSchool.natureza || 'Pública');
+      setDocumentoCriacaoNumero(effectiveInitialData.validacao?.documentoCriacaoNumero || '');
+      setDataDocumentoCriacao(effectiveInitialData.validacao?.dataDocumentoCriacao || '');
+      setOrgaoEmissor(effectiveInitialData.validacao?.orgaoEmissor || '');
+      setResponsavelNome(effectiveInitialData.validacao?.responsavelPreenchimentoNome || '');
+      setResponsavelCargo(effectiveInitialData.validacao?.responsavelPreenchimentoCargo || '');
     } else {
       // Clean defaults
       const template = createNewSchoolRegistrationData({

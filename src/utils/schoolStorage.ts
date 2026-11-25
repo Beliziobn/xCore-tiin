@@ -776,7 +776,14 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
     return [school];
   }
 
-  const norm = (str?: string) => (str || '').trim().toLowerCase();
+  const norm = (str?: string) =>
+    (str || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+
   if (!school || !school.name || isModeloCentralSchool(school.name)) {
     return [];
   }
@@ -787,11 +794,34 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
     removeEntityTombstone('schools', school.name.trim().toLowerCase());
     if (school.codigoSIGE) removeEntityTombstone('schools', school.codigoSIGE);
 
-    const regData = school.registrationData || getSchoolRegistrationData(school);
-    const schoolWithReg: AdminSchool & { _updatedAt?: number } = {
+    const baseRegData = school.registrationData || getSchoolRegistrationData(school);
+    const nowTs = Date.now();
+    const nowIso = new Date(nowTs).toISOString();
+    const regData: SchoolRegistrationData = {
+      ...baseRegData,
+      id: school.id || baseRegData.id || `sch-${nowTs}`,
+      nomeOficial: school.name.trim(),
+      codigoSIGE: school.codigoSIGE || baseRegData.codigoSIGE || `SIGE-${Math.floor(100000 + Math.random() * 900000)}`,
+      natureza: school.natureza || baseRegData.natureza || 'Pública',
+      contactoTelefonico: school.phone || baseRegData.contactoTelefonico || '+244 923 456 789',
+      emailDireccao: school.email || baseRegData.emailDireccao || '',
+      director: {
+        ...(baseRegData.director || { contacto: '', email: '' }),
+        nome: school.directorName || baseRegData.director?.nome || 'Diretor a Designar',
+      },
+    };
+    const schoolWithReg: AdminSchool & { _updatedAt?: number; updatedAt?: string } = {
       ...school,
+      id: regData.id,
+      name: regData.nomeOficial,
+      codigoSIGE: regData.codigoSIGE,
+      natureza: regData.natureza,
+      directorName: regData.director.nome,
+      phone: regData.contactoTelefonico,
+      email: regData.emailDireccao,
       registrationData: regData,
-      _updatedAt: Date.now(),
+      _updatedAt: nowTs,
+      updatedAt: nowIso,
     };
 
     // 1. Update ucore_admin_schools & ucore_registered_schools_v1
@@ -801,18 +831,35 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
       ? existingList.filter((s) => s && s.name && !isModeloCentralSchool(s.name))
       : [];
 
-    const existingIdx = safeList.findIndex(
-      (s) => s.id === school.id || norm(s.name) === norm(school.name)
+    // Match by ID first so renaming an existing school replaces the old record cleanly
+    let existingIdx = safeList.findIndex(
+      (s) => s.id && schoolWithReg.id && String(s.id).trim().toLowerCase() === String(schoolWithReg.id).trim().toLowerCase()
     );
+    if (existingIdx < 0) {
+      existingIdx = safeList.findIndex((s) => norm(s.name) === norm(schoolWithReg.name));
+    }
+
+    const oldSchoolName = existingIdx >= 0 ? safeList[existingIdx].name : undefined;
 
     let nextSchools: AdminSchool[];
     if (existingIdx >= 0) {
-      nextSchools = [...safeList];
-      nextSchools[existingIdx] = {
-        ...nextSchools[existingIdx],
-        ...schoolWithReg,
-        registrationData: schoolWithReg.registrationData || nextSchools[existingIdx].registrationData,
-      };
+      nextSchools = safeList
+        .map((s, idx) =>
+          idx === existingIdx
+            ? {
+                ...s,
+                ...schoolWithReg,
+                registrationData: schoolWithReg.registrationData || s.registrationData,
+              }
+            : s
+        )
+        // Remove any duplicate entry that had the old or new name under a different ID
+        .filter(
+          (s, idx) =>
+            idx === existingIdx ||
+            (norm(s.name) !== norm(schoolWithReg.name) &&
+              (!oldSchoolName || norm(s.name) !== norm(oldSchoolName)))
+        );
     } else {
       nextSchools = [schoolWithReg, ...safeList];
     }
@@ -820,19 +867,34 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
     localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(nextSchools));
     localStorage.setItem('ucore_registered_schools_v1', JSON.stringify(nextSchools));
 
-    // 2. Also update sigre_school_registrations with full 7-section registrationData
+    // 2. Also update sigre_school_registrations with full 7-section registrationData (replacing old name if renamed)
     const rawReg = localStorage.getItem('sigre_school_registrations');
     const existingRegList: SchoolRegistrationData[] = rawReg ? JSON.parse(rawReg) : [];
     const safeRegList = Array.isArray(existingRegList)
       ? existingRegList.filter((r) => r && r.nomeOficial && !isModeloCentralSchool(r.nomeOficial))
       : [];
 
-    const regIdx = safeRegList.findIndex(
-      (r) => r.id === regData.id || norm(r.nomeOficial) === norm(regData.nomeOficial)
+    let regIdx = safeRegList.findIndex(
+      (r) => r.id && regData.id && String(r.id).trim().toLowerCase() === String(regData.id).trim().toLowerCase()
     );
+    if (regIdx < 0) {
+      regIdx = safeRegList.findIndex(
+        (r) =>
+          norm(r.nomeOficial) === norm(regData.nomeOficial) ||
+          (oldSchoolName && norm(r.nomeOficial) === norm(oldSchoolName))
+      );
+    }
+
     const nextRegList =
       regIdx >= 0
-        ? safeRegList.map((r, idx) => (idx === regIdx ? regData : r))
+        ? safeRegList
+            .map((r, idx) => (idx === regIdx ? regData : r))
+            .filter(
+              (r, idx) =>
+                idx === regIdx ||
+                (norm(r.nomeOficial) !== norm(regData.nomeOficial) &&
+                  (!oldSchoolName || norm(r.nomeOficial) !== norm(oldSchoolName)))
+            )
         : [regData, ...safeRegList];
 
     localStorage.setItem('sigre_school_registrations', JSON.stringify(nextRegList));
@@ -1354,9 +1416,9 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
           if (isEntityTombstoned(tombstoneCol, lItem.id || k)) return;
           if (map.has(k)) {
             const sItem = map.get(k);
-            const lTs = Number(lItem._updatedAt || 0);
-            const sTs = Number(sItem._updatedAt || 0);
-            const merged = lTs > sTs ? { ...sItem, ...lItem } : { ...lItem, ...sItem };
+            const lTs = Number(lItem._updatedAt || Date.parse(lItem.updatedAt || '') || 0);
+            const sTs = Number(sItem._updatedAt || Date.parse(sItem.updatedAt || '') || 0);
+            const merged = lTs >= sTs ? { ...sItem, ...lItem } : { ...lItem, ...sItem };
             // Never allow 'pendente' to downgrade 'aprovado' or 'ativo'
             if (lItem.status === 'aprovado' || sItem.status === 'aprovado' || lItem.approvedAt || sItem.approvedAt) {
               merged.status = 'aprovado';
@@ -1422,23 +1484,57 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         }
       }
 
-      // 1. Merge Schools (Server authoritative)
+      // 1. Merge Schools (Non-destructive union of Server + Local/Firestore, deduplicating by ID and normalized name)
       if (Array.isArray(data.schools) && !dirtyCollections.has('schools')) {
-        const mergedSchools = reconcileList(
+        const validServerSchools = data.schools.filter((s: any) => s && s.name && !isModeloCentralSchool(s.name));
+        const rawMergedSchools = reconcileList(
           localSchools,
-          data.schools.filter((s: any) => s && s.name && !isModeloCentralSchool(s.name)),
+          validServerSchools,
           'schools',
           (s) => String(s.id || norm(s.name)).trim().toLowerCase()
         ).filter((s) => !isEntityTombstoned('schools', s.name));
 
-        if (JSON.stringify(mergedSchools) !== JSON.stringify(localSchools)) {
-          setLocalStorageFromServer(STORAGE_KEY_SCHOOLS, JSON.stringify(mergedSchools));
-          setLocalStorageFromServer('ucore_registered_schools_v1', JSON.stringify(mergedSchools));
-          const regs = mergedSchools.map((sc) => sc.registrationData).filter(Boolean);
+        // Deduplicate any schools that matched by normalized name under different IDs, keeping newest edit
+        const dedupedSchools: AdminSchool[] = [];
+        rawMergedSchools.forEach((sc: AdminSchool) => {
+          const n = norm(sc.name);
+          const sId = String(sc.id || '').trim().toLowerCase();
+          const idx = dedupedSchools.findIndex(
+            (ex) => (sId && ex.id && String(ex.id).trim().toLowerCase() === sId) || norm(ex.name) === n
+          );
+          if (idx >= 0) {
+            const prev = dedupedSchools[idx];
+            const prevTs = Number((prev as any)._updatedAt || Date.parse((prev as any).updatedAt || '') || 0);
+            const nextTs = Number((sc as any)._updatedAt || Date.parse((sc as any).updatedAt || '') || 0);
+            const primary = nextTs >= prevTs ? sc : prev;
+            const secondary = nextTs >= prevTs ? prev : sc;
+            dedupedSchools[idx] = {
+              ...secondary,
+              ...primary,
+              registrationData: primary.registrationData || secondary.registrationData,
+            };
+          } else {
+            dedupedSchools.push(sc);
+          }
+        });
+
+        if (JSON.stringify(dedupedSchools) !== JSON.stringify(localSchools)) {
+          setLocalStorageFromServer(STORAGE_KEY_SCHOOLS, JSON.stringify(dedupedSchools));
+          setLocalStorageFromServer('ucore_registered_schools_v1', JSON.stringify(dedupedSchools));
+          const regs = dedupedSchools.map((sc) => sc.registrationData).filter(Boolean);
           if (regs.length > 0) {
             setLocalStorageFromServer('sigre_school_registrations', JSON.stringify(regs));
           }
           changed = true;
+        }
+
+        // If local/Firestore has schools that were missing on Express, push them to Express so all endpoints stay aligned
+        if (dedupedSchools.length > validServerSchools.length && isExpressApiAvailable()) {
+          fetch('/api/network/schools', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schools: dedupedSchools }),
+          }).catch(() => {});
         }
       }
 

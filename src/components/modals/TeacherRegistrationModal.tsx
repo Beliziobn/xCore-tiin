@@ -111,13 +111,30 @@ export const TeacherRegistrationModal: React.FC<TeacherRegistrationModalProps> =
   }, [isOpen]);
 
   const availableSchools = useMemo<AdminSchool[]>(() => {
-    const map = new Map<string, AdminSchool>();
-    initialAdminSchools.forEach((s) => map.set(s.id, s));
+    const norm = (str?: string) =>
+      (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+    const list: AdminSchool[] = [];
     const stored = getRegisteredSchoolsFromStorage();
-    if (stored.length > 0) {
-      stored.forEach((s) => map.set(s.id, s));
-    }
-    return Array.from(map.values());
+    [...initialAdminSchools, ...stored].forEach((sc) => {
+      if (!sc || !sc.name) return;
+      const n = norm(sc.name);
+      if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) return;
+      const sId = String(sc.id || '').trim().toLowerCase();
+      const idx = list.findIndex(
+        (ex) => (sId && ex.id && String(ex.id).trim().toLowerCase() === sId) || norm(ex.name) === n
+      );
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...sc, registrationData: sc.registrationData || list[idx].registrationData };
+      } else {
+        list.push(sc);
+      }
+    });
+    return list;
   }, [isOpen, schoolRefreshTick]);
 
   const currentMatchedSchool = useMemo<AdminSchool | undefined>(() => {

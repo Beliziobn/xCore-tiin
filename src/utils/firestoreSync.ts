@@ -628,8 +628,17 @@ export async function saveSchoolToFirestore(school: AdminSchool): Promise<void> 
     if (school.codigoSIGE) {
       removeEntityTombstone(SCHOOLS_COL, school.codigoSIGE);
     }
+    const nowTs = Number((school as any)._updatedAt || Date.now());
     const ref = doc(db, SCHOOLS_COL, docId);
-    await setDoc(ref, cleanObject({ ...school, updatedAt: new Date().toISOString() }), { merge: true });
+    await setDoc(
+      ref,
+      cleanObject({
+        ...school,
+        _updatedAt: nowTs,
+        updatedAt: new Date(nowTs).toISOString(),
+      }),
+      { merge: true }
+    );
   } catch (error) {
     console.warn('[Firestore] Erro ao gravar escola no Firestore:', error);
   }
@@ -1883,7 +1892,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           }
         });
 
-        // Merge authoritative cloud schools (and delete banned ones from Firestore)
+        // Merge authoritative cloud schools (and delete banned ones from Firestore), comparing timestamps so newest edits win
         cloudSchools.forEach((cs) => {
           if (!cs || !cs.name) return;
           if (isBannedSchoolOrEntity(cs)) {
@@ -1897,7 +1906,19 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
               return item && (norm(item.id) === norm(cs.id) || norm(item.name) === norm(cs.name));
             }) || norm(cs.id || cs.name);
           const existing = map.get(matchKey);
-          map.set(matchKey, existing ? { ...existing, ...cs, registrationData: cs.registrationData || existing.registrationData } : cs);
+          if (existing) {
+            const eTs = Number((existing as any)._updatedAt || Date.parse((existing as any).updatedAt || '') || 0);
+            const cTs = Number((cs as any)._updatedAt || Date.parse((cs as any).updatedAt || '') || 0);
+            const primary = cTs >= eTs ? cs : existing;
+            const secondary = cTs >= eTs ? existing : cs;
+            map.set(matchKey, {
+              ...secondary,
+              ...primary,
+              registrationData: primary.registrationData || secondary.registrationData,
+            });
+          } else {
+            map.set(matchKey, cs);
+          }
         });
 
         const unifiedSchools = Array.from(map.values());
@@ -1909,18 +1930,18 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
           .filter(Boolean);
         safeWriteJsonIfChanged('sigre_school_registrations', unifiedRegs);
 
+        // Mirror unified schools into local Express backend so both stay 100% consistent across containers
+        const validUnifiedSchools = unifiedSchools.filter(
+          (cs) => cs && cs.name && !isBannedSchoolOrEntity(cs) && !isEntityTombstoned(SCHOOLS_COL, cs.id) && !isEntityTombstoned(SCHOOLS_COL, cs.name)
+        );
+        if (validUnifiedSchools.length > 0 && (changedSchools || validUnifiedSchools.length !== localAdminSchools.length)) {
+          fetch('/api/network/schools', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schools: validUnifiedSchools }),
+          }).catch(() => {});
+        }
         if (changedSchools) {
-          // Mirror valid Firestore schools into local Express backend so both stay 100% consistent across containers
-          const validCloudSchools = cloudSchools.filter(
-            (cs) => cs && cs.name && !isBannedSchoolOrEntity(cs) && !isEntityTombstoned(SCHOOLS_COL, cs.id) && !isEntityTombstoned(SCHOOLS_COL, cs.name)
-          );
-          if (validCloudSchools.length > 0) {
-            fetch('/api/network/schools', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ schools: validCloudSchools }),
-            }).catch(() => {});
-          }
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
       } catch (e) {

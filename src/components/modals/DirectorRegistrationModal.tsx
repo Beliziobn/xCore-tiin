@@ -185,15 +185,31 @@ export const DirectorRegistrationModal: React.FC<DirectorRegistrationModalProps>
   }, [isOpen]);
 
   const availableSchools = useMemo(() => {
+    const norm = (str?: string) =>
+      (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
     const stored = getRegisteredSchoolsFromStorage();
-    const map = new Map<string, AdminSchool>();
+    const list: AdminSchool[] = [];
     for (const s of [...schools, ...stored]) {
-      if (s && s.id && s.name) {
-        map.set(s.id, s);
+      if (!s || !s.name) continue;
+      const n = norm(s.name);
+      if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) continue;
+      const sId = String(s.id || '').trim().toLowerCase();
+      const idx = list.findIndex(
+        (ex) => (sId && ex.id && String(ex.id).trim().toLowerCase() === sId) || norm(ex.name) === n
+      );
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...s, registrationData: s.registrationData || list[idx].registrationData };
+      } else {
+        list.push(s);
       }
     }
-    return Array.from(map.values());
-  }, [schools, schoolRefreshTick]);
+    return list;
+  }, [schools, schoolRefreshTick, isOpen]);
 
   // Handle school selection to auto-inherit attributes from the registered school
   const handleSchoolChange = (schoolId: string) => {

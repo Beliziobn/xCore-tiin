@@ -573,40 +573,94 @@ export function getRegisteredSchoolsFromStorage(): AdminSchool[] {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return [];
   }
-  const norm = (str?: string) => (str || '').trim().toLowerCase();
-  const map = new Map<string, AdminSchool>();
+  const norm = (str?: string) =>
+    (str || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+
+  const list: AdminSchool[] = [];
+  const upsertSchool = (sc: AdminSchool) => {
+    if (!sc || !sc.name) return;
+    const n = norm(sc.name);
+    if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) {
+      return;
+    }
+    const sId = String(sc.id || '').trim().toLowerCase();
+    const sCode = norm(sc.codigoSIGE || sc.registrationData?.codigoSIGE);
+    const existingIdx = list.findIndex((item) => {
+      const iId = String(item.id || '').trim().toLowerCase();
+      const iName = norm(item.name);
+      const iCode = norm(item.codigoSIGE || item.registrationData?.codigoSIGE);
+      if (sId && iId && sId === iId) return true;
+      if (n && iName && n === iName) return true;
+      if (sCode && iCode && sCode !== 'sige-102012' && sCode === iCode) return true;
+      return false;
+    });
+
+    if (existingIdx >= 0) {
+      const prev = list[existingIdx];
+      const prevTs = Number((prev as any)._updatedAt || Date.parse((prev as any).updatedAt || '') || 0);
+      const nextTs = Number((sc as any)._updatedAt || Date.parse((sc as any).updatedAt || '') || 0);
+      const primary = nextTs >= prevTs ? sc : prev;
+      const secondary = nextTs >= prevTs ? prev : sc;
+      list[existingIdx] = {
+        ...secondary,
+        ...primary,
+        id: prev.id || sc.id,
+        registrationData: primary.registrationData || secondary.registrationData,
+      };
+    } else {
+      list.push(sc);
+    }
+  };
 
   try {
     const raw = localStorage.getItem('ucore_admin_schools');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        parsed.forEach((sc: AdminSchool) => {
-          const n = norm(sc?.name);
-          if (n && !n.includes('modelo central')) {
-            map.set(n, sc);
-          }
-        });
+        parsed.forEach((sc: AdminSchool) => upsertSchool(sc));
       }
     }
 
-    // Also merge detailed school registrations if present
+    const rawV1 = localStorage.getItem('ucore_registered_schools_v1');
+    if (rawV1) {
+      const parsedV1 = JSON.parse(rawV1);
+      if (Array.isArray(parsedV1)) {
+        parsedV1.forEach((sc: AdminSchool) => upsertSchool(sc));
+      }
+    }
+
+    // Also merge detailed school registrations if present, matching by ID first so renamed schools don't resurrect old names
     const rawReg = localStorage.getItem('sigre_school_registrations');
     if (rawReg) {
       const parsedReg = JSON.parse(rawReg);
       if (Array.isArray(parsedReg)) {
         parsedReg.forEach((reg: SchoolRegistrationData) => {
           const n = norm(reg?.nomeOficial);
-          if (n && !n.includes('modelo central')) {
-            const existing = map.get(n);
-            const converted = convertRegistrationDataToAdminSchool(reg, existing);
-            map.set(n, converted);
+          if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) {
+            return;
           }
+          const rId = String(reg.id || '').trim().toLowerCase();
+          const existing = list.find(
+            (item) =>
+              (rId && String(item.id || '').trim().toLowerCase() === rId) ||
+              norm(item.name) === n
+          );
+          // If an existing school with the same ID already has a newer name in ucore_admin_schools, keep the newer name
+          if (existing && existing.registrationData && norm(existing.name) !== n) {
+            return;
+          }
+          const converted = convertRegistrationDataToAdminSchool(reg, existing);
+          upsertSchool(converted);
         });
       }
     }
 
-    return Array.from(map.values());
+    return list;
   } catch {
     return [];
   }

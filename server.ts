@@ -1750,7 +1750,7 @@ async function startServer() {
   // Ensures registered schools and their data appear for all users signing up
   // ============================================================================
   app.get("/api/network/state", (req, res) => {
-    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "no-cache");
     res.json({
       success: true,
       ...networkStore,
@@ -1758,7 +1758,7 @@ async function startServer() {
   });
 
   app.get("/api/network/schools", (req, res) => {
-    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "no-cache");
     res.json({
       success: true,
       schools: networkStore.schools,
@@ -1783,11 +1783,45 @@ async function startServer() {
       validIncoming.forEach((sc) => {
         removeServerTombstone("schools", sc.id, sc.name, sc.nomeOficial, sc.codigoSIGE);
       });
-      networkStore.schools = upsertByKey(
-        networkStore.schools,
-        validIncoming,
-        (sc) => String(sc.id || normalizeAscii(sc.name || sc.nomeOficial || "")).trim().toLowerCase()
-      );
+      const nextList: any[] = [...(networkStore.schools || [])];
+      for (const sc of validIncoming) {
+        const sId = String(sc.id || "").trim().toLowerCase();
+        const sName = normalizeAscii(sc.name || sc.nomeOficial || "");
+        const sCode = normalizeAscii(sc.codigoSIGE || sc.registrationData?.codigoSIGE || "");
+        const idx = nextList.findIndex((ex) => {
+          const eId = String(ex?.id || "").trim().toLowerCase();
+          const eName = normalizeAscii(ex?.name || ex?.nomeOficial || "");
+          const eCode = normalizeAscii(ex?.codigoSIGE || ex?.registrationData?.codigoSIGE || "");
+          if (sId && eId && sId === eId) return true;
+          if (sName && eName && sName === eName) return true;
+          if (sCode && eCode && sCode !== "sige-102012" && sCode === eCode) return true;
+          return false;
+        });
+        if (idx >= 0) {
+          const prev = nextList[idx];
+          const prevTs = Number(prev?._updatedAt || Date.parse(prev?.updatedAt || "") || 0);
+          const nextTs = Number(sc?._updatedAt || Date.parse(sc?.updatedAt || "") || 0);
+          // Single school POST (explicit edit/create) or newer timestamp always wins
+          const isExplicitSingle = Boolean(school && sc === school);
+          const primary = isExplicitSingle || nextTs >= prevTs ? sc : prev;
+          const secondary = isExplicitSingle || nextTs >= prevTs ? prev : sc;
+          nextList[idx] = {
+            ...secondary,
+            ...primary,
+            id: primary.id || secondary.id,
+            name: primary.name || primary.nomeOficial || secondary.name,
+            registrationData: primary.registrationData || secondary.registrationData,
+            _updatedAt: Number(primary._updatedAt || Date.now()),
+          };
+        } else {
+          nextList.push({
+            ...sc,
+            name: sc.name || sc.nomeOficial,
+            _updatedAt: Number(sc._updatedAt || Date.now()),
+          });
+        }
+      }
+      networkStore.schools = nextList;
       persistNetworkStore();
     }
 

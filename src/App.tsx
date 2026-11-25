@@ -1766,8 +1766,8 @@ export default function App() {
           schools={adminSchools}
           onOpenRegisterModal={() => setAdminModalType('school')}
           onUpdateSchool={(updated) => {
-            saveRegisteredSchool(updated);
-            setAdminSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+            const nextSchools = saveRegisteredSchool(updated);
+            setAdminSchools(nextSchools.length > 0 ? nextSchools : (prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
             showToast(`Dados da escola "${updated.name}" atualizados com sucesso!`);
           }}
           onDeleteSchool={(schoolId, schoolName) => {

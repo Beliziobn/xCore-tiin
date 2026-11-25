@@ -92,15 +92,31 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   }, [isOpen]);
 
   const registeredSchools = useMemo(() => {
+    const norm = (str?: string) =>
+      (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
     const fromStorage = getRegisteredSchoolsFromStorage();
     const combined = [...(propSchools || []), ...fromStorage];
-    const uniqueMap = new Map<string, AdminSchool>();
+    const list: AdminSchool[] = [];
     combined.forEach((sc) => {
-      if (sc && sc.name) {
-        uniqueMap.set(sc.name.trim().toLowerCase(), sc);
+      if (!sc || !sc.name) return;
+      const n = norm(sc.name);
+      if (!n || n.includes('modelo central') || n.includes('ciencia da educacao') || n.includes('socienciadaeduca')) return;
+      const sId = String(sc.id || '').trim().toLowerCase();
+      const idx = list.findIndex(
+        (ex) => (sId && ex.id && String(ex.id).trim().toLowerCase() === sId) || norm(ex.name) === n
+      );
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...sc, registrationData: sc.registrationData || list[idx].registrationData };
+      } else {
+        list.push(sc);
       }
     });
-    return Array.from(uniqueMap.values());
+    return list;
   }, [propSchools, isOpen, schoolRefreshTick]);
 
   // Active Wizard Step: 1=Aluno, 2=Escolaridade, 3=Classe e idade, 4=Responsável e documentos
