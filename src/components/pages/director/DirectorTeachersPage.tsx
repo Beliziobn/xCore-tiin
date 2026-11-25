@@ -35,7 +35,12 @@ import type {
   TeacherRegistrationData,
   DirectorClass,
 } from '../../../types';
-import { getPendingApplications, approveApplication, rejectApplication } from '../../../utils/authApprovalStorage';
+import {
+  getApplicationsForDirector,
+  approveApplicationAsync,
+  rejectApplicationAsync,
+  OFFICIAL_DME_ADMIN_EMAIL,
+} from '../../../utils/authApprovalStorage';
 import {
   getRegistrationDataFromDirectorTeacher,
   saveTeacher,
@@ -130,7 +135,7 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   const [activeTab, setActiveTab] = useState<'quadro' | 'distribuicao' | 'candidaturas'>('quadro');
   const [selectedDistClass, setSelectedDistClass] = useState<string>('Todas');
   const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>(() => {
-    return getPendingApplications('professor').filter((a) => a.status === 'pendente');
+    return getApplicationsForDirector(schoolName).filter((a) => a.type === 'professor' && a.status === 'pendente');
   });
   const [selectedApplication, setSelectedApplication] = useState<PendingApplication | null>(null);
   const [approvalToast, setApprovalToast] = useState<string | null>(null);
@@ -147,7 +152,9 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
   });
 
   const refreshPending = () => {
-    setPendingApplications(getPendingApplications('professor').filter((a) => a.status === 'pendente'));
+    setPendingApplications(
+      getApplicationsForDirector(schoolName).filter((a) => a.type === 'professor' && a.status === 'pendente')
+    );
   };
 
   useEffect(() => {
@@ -177,8 +184,8 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
     };
   }, []);
 
-  const handleApproveTeacherApplication = (appId: string, assignedData: { room: string; turma: string; shift: 'Manhã' | 'Tarde' }) => {
-    const res = approveApplication(appId, directorName);
+  const handleApproveTeacherApplication = async (appId: string, assignedData: { room: string; turma: string; shift: 'Manhã' | 'Tarde' }) => {
+    const res = await approveApplicationAsync(appId, directorName);
     if (res.success && res.app) {
       const updated = res.app;
       refreshPending();
@@ -224,8 +231,8 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
     }
   };
 
-  const handleRejectTeacherApplication = (appId: string, reason: string) => {
-    const res = rejectApplication(appId, reason, directorName);
+  const handleRejectTeacherApplication = async (appId: string, reason: string) => {
+    const res = await rejectApplicationAsync(appId, reason, directorName);
     if (res.success) {
       refreshPending();
       setApprovalToast(`Candidatura docente indeferida. A notificação foi registrada.`);
@@ -844,9 +851,9 @@ export const DirectorTeachersPage: React.FC<DirectorTeachersPageProps> = ({
               {pendingApplications.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
                   <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-                  <p className="text-sm font-bold text-slate-800">Nenhuma candidatura docente pendente nesta escola!</p>
+                  <p className="text-sm font-bold text-slate-800">Homologações Centralizadas na DME</p>
                   <p className="text-xs text-slate-500 mt-1">
-                    Novos professores que criarem conta indicando esta unidade aparecerão automaticamente aqui.
+                    Todas as novas inscrições de professores e funcionários são encaminhadas diretamente para homologação central na Direcção Municipal da Educação ({OFFICIAL_DME_ADMIN_EMAIL}).
                   </p>
                 </div>
               ) : (

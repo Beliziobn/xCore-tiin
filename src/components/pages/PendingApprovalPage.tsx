@@ -23,6 +23,12 @@ import {
   syncApplicationsFromServer,
   OFFICIAL_DME_ADMIN_EMAIL
 } from '../../utils/authApprovalStorage';
+import {
+  subscribeToSingleUserStatus,
+  fetchUserFromFirestore,
+  isFirestoreReadQuotaExhausted,
+} from '../../utils/firestoreSync';
+import { isExpressApiAvailable } from '../../utils/apiAvailability';
 import { SectionShader } from '../SectionShader';
 
 interface PendingApprovalPageProps {
@@ -80,33 +86,48 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     matchedApp?.roleRequested ||
     (isTeacher ? 'Professor(a) / Docente' : isAdminScopeMember ? 'Membro da Direção Municipal' : 'Pessoal do Âmbito Escolar');
 
-  // Background polling + instant real-time Firestore listener to auto-detect approval across devices
+  // Single-document real-time Firestore listener + focus/visibility sync + 60s visible-only fallback
   React.useEffect(() => {
     let isMounted = true;
     let promoted = false;
+
+    const triggerPromotion = (approvedByName?: string, approvedAtDate?: string) => {
+      if (!isMounted || promoted) return;
+      promoted = true;
+      const finalApprover = approvedByName || approverRole;
+      showToast?.(`A sua conta foi homologada por ${finalApprover}! A carregar o seu ambiente de trabalho...`);
+      const updated: UserAccount = {
+        ...currentUser,
+        status: 'ativo',
+        approvedAt: approvedAtDate || currentUser.approvedAt || new Date().toLocaleString('pt-AO'),
+        approvedBy: finalApprover,
+      };
+      onApprovalConfirmed(updated);
+    };
 
     const promoteIfApproved = () => {
       if (!isMounted || promoted) return false;
       const res = checkUserApprovalStatus(currentUser.id, currentUser.email, currentUser.biNumber);
       if (res.status === 'ativo') {
-        promoted = true;
-        showToast?.(`A sua conta foi homologada por ${res.app?.approvedBy || approverRole}! A carregar o seu ambiente de trabalho...`);
-        const updated: UserAccount = {
-          ...currentUser,
-          status: 'ativo',
-          approvedAt: res.app?.approvedAt || currentUser.approvedAt || new Date().toLocaleString('pt-AO'),
-          approvedBy: res.app?.approvedBy || currentUser.approvedBy || approverRole,
-        };
-        onApprovalConfirmed(updated);
+        triggerPromotion(res.app?.approvedBy, res.app?.approvedAt);
         return true;
       }
       return false;
     };
 
-    const pollStatus = async () => {
+    const pollStatus = async (useExpressOnlyIfQuotaExhausted: boolean = false) => {
       try {
         if (promoteIfApproved()) return;
-        await syncApplicationsFromServer(true);
+        if (isExpressApiAvailable()) {
+          await syncApplicationsFromServer(false);
+        } else if (!useExpressOnlyIfQuotaExhausted && !isFirestoreReadQuotaExhausted()) {
+          const singleUser = await fetchUserFromFirestore(currentUser.email || currentUser.id);
+          if (singleUser && (singleUser.status === 'ativo' || Boolean(singleUser.approvedAt))) {
+            triggerPromotion(singleUser.approvedBy, singleUser.approvedAt);
+            return;
+          }
+          await syncApplicationsFromServer(false);
+        }
         if (isMounted) setSyncTick((t) => t + 1);
         promoteIfApproved();
       } catch {
@@ -119,17 +140,35 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
       promoteIfApproved();
     };
 
-    window.addEventListener('sigre-data-synced', handleRealtimeSync);
-    pollStatus();
-    const intervalId = window.setInterval(() => {
-      if (!promoted) {
-        pollStatus();
+    const handleFocusOrVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (!promoted) pollStatus(false);
+    };
+
+    const unsubUserDoc = subscribeToSingleUserStatus(currentUser.email || currentUser.id, (cloudUser) => {
+      if (cloudUser && (cloudUser.status === 'ativo' || Boolean(cloudUser.approvedAt))) {
+        triggerPromotion(cloudUser.approvedBy, cloudUser.approvedAt);
       }
-    }, 8000);
+    });
+
+    window.addEventListener('sigre-data-synced', handleRealtimeSync);
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+    pollStatus(false);
+
+    const intervalId = window.setInterval(() => {
+      if (!promoted && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
+        pollStatus(true);
+      }
+    }, 60_000);
+
     return () => {
       isMounted = false;
+      unsubUserDoc();
       window.clearInterval(intervalId);
       window.removeEventListener('sigre-data-synced', handleRealtimeSync);
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
     };
   }, [currentUser, onApprovalConfirmed, showToast, approverRole]);
 

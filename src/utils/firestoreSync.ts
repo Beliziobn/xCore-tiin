@@ -73,26 +73,70 @@ const BANNED_ENTITY_IDS = new Set([
   'efec-1792963605316-86',
 ]);
 
-let firestoreQuotaCooldownUntil = 0;
+let firestoreReadCooldownUntil = 0;
+let firestoreWriteCooldownUntil = 0;
 
-export function isFirestoreQuotaExhausted(): boolean {
-  if (firestoreQuotaCooldownUntil === 0) return false;
-  if (Date.now() >= firestoreQuotaCooldownUntil) {
-    firestoreQuotaCooldownUntil = 0;
+function notifyFirestoreQuotaStatus(readExhausted: boolean, writeExhausted: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent('sigre-firestore-quota-status', {
+        detail: { readExhausted, writeExhausted },
+      })
+    );
+  } catch {}
+}
+
+export function isFirestoreReadQuotaExhausted(): boolean {
+  if (firestoreReadCooldownUntil === 0) return false;
+  if (Date.now() >= firestoreReadCooldownUntil) {
+    firestoreReadCooldownUntil = 0;
     return false;
   }
   return true;
 }
 
-export function markFirestoreQuotaIfExhausted(err: any): void {
+export function isFirestoreWriteQuotaExhausted(): boolean {
+  if (firestoreWriteCooldownUntil === 0) return false;
+  if (Date.now() >= firestoreWriteCooldownUntil) {
+    firestoreWriteCooldownUntil = 0;
+    return false;
+  }
+  return true;
+}
+
+export function isFirestoreQuotaExhausted(): boolean {
+  return isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted();
+}
+
+export function markFirestoreQuotaIfExhausted(err: any, operation: 'read' | 'write' = 'read'): void {
   const code = String(err?.code || '').toLowerCase();
   const msg = String(err?.message || err || '').toLowerCase();
-  if (
+  const isQuotaErr =
     code === 'resource-exhausted' ||
     msg.includes('resource-exhausted') ||
-    (msg.includes('quota') && !msg.includes('deadline'))
-  ) {
-    firestoreQuotaCooldownUntil = Date.now() + 30_000;
+    (msg.includes('quota') && !msg.includes('deadline')) ||
+    msg.includes('free daily read units') ||
+    msg.includes('free daily write units');
+  if (!isQuotaErr) return;
+
+  const isReadSpecific =
+    msg.includes('read units') ||
+    msg.includes('read quota') ||
+    (operation === 'read' && !msg.includes('write units'));
+
+  if (isReadSpecific) {
+    const wasExhausted = isFirestoreReadQuotaExhausted();
+    firestoreReadCooldownUntil = Date.now() + 120_000;
+    if (!wasExhausted) {
+      notifyFirestoreQuotaStatus(true, isFirestoreWriteQuotaExhausted());
+    }
+  } else {
+    const wasWriteExhausted = isFirestoreWriteQuotaExhausted();
+    firestoreWriteCooldownUntil = Date.now() + 60_000;
+    if (!wasWriteExhausted) {
+      notifyFirestoreQuotaStatus(isFirestoreReadQuotaExhausted(), true);
+    }
   }
 }
 
@@ -210,14 +254,14 @@ export function addEntityTombstone(col: string, id: string, skipRemotePropagatio
     localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
 
     if (!skipRemotePropagation) {
-      if (!isFirestoreQuotaExhausted()) {
+      if (!isFirestoreWriteQuotaExhausted()) {
         const tombDocId = sanitizeDocId(tombKey);
         if (tombDocId) {
           setDoc(
             doc(db, TOMBSTONES_COL, tombDocId),
             { key: tombKey, col, id: cleanId, deletedAt: new Date().toISOString() },
             { merge: true }
-          ).catch((e) => markFirestoreQuotaIfExhausted(e));
+          ).catch((e) => markFirestoreQuotaIfExhausted(e, 'write'));
         }
       }
       if (isExpressApiAvailable()) {
@@ -253,12 +297,12 @@ export function removeEntityTombstone(col: string, id: string): void {
     if (removed) {
       localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
     }
-    if (!isFirestoreQuotaExhausted()) {
+    if (!isFirestoreWriteQuotaExhausted()) {
       const candidateDocIds = new Set(
         [sanitizeDocId(`${col}::${cleanId}`), sanitizeDocId(`${col}:${rawClean}`)].filter(Boolean)
       );
       candidateDocIds.forEach((tombDocId) => {
-        deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch((e) => markFirestoreQuotaIfExhausted(e));
+        deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch((e) => markFirestoreQuotaIfExhausted(e, 'write'));
       });
     }
   } catch {}
@@ -286,7 +330,7 @@ export function isEntityTombstoned(col: string, id: string): boolean {
 // ============================================================================
 
 export async function saveApplicationToFirestore(app: PendingApplication): Promise<boolean> {
-  if (isFirestoreQuotaExhausted()) return false;
+  if (isFirestoreWriteQuotaExhausted()) return false;
   try {
     const docId = sanitizeDocId(app.id || app.userId);
     if (!docId) return false;
@@ -342,83 +386,62 @@ export async function saveApplicationToFirestore(app: PendingApplication): Promi
 
     const ref = doc(db, APPLICATIONS_COL, docId);
     await setDoc(ref, cleanObject(rawPayload), { merge: true });
-
-    // Clean any duplicate Firestore docs for the same person (never delete a higher-ranked 'aprovado' doc)
-    try {
-      const snap = await Promise.race([
-        getDocs(collection(db, APPLICATIONS_COL)),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
-      ]);
-      const targetUid = String(app.userId || '').trim().toLowerCase();
-      const targetEmail = cleanEmail.toLowerCase();
-      const isGeneric = !targetEmail || targetEmail.startsWith('escola.') || targetEmail.endsWith('@med.gov.ao');
-      const batch = writeBatch(db);
-      let duplicateCount = 0;
-
-      snap.forEach((d) => {
-        if (d.id === docId) return;
-        const data = d.data() as PendingApplication;
-        if (!data) return;
-        const dUid = String(data.userId || '').trim().toLowerCase();
-        const dEmail = String(data.email || '').trim().toLowerCase();
-        const dBi = String(data.biNumber || '').trim().replace(/\s+/g, '').toUpperCase();
-        const isSamePerson =
-          (targetUid && dUid && targetUid === dUid) ||
-          (normBi.length >= 5 && dBi === normBi) ||
-          (!isGeneric && dEmail && dEmail === targetEmail);
-        if (isSamePerson) {
-          const otherApproved = data.status === 'aprovado' || Boolean(data.approvedAt);
-          if (safeStatus === 'aprovado' || safeStatus === 'rejeitado' || !otherApproved) {
-            batch.delete(d.ref);
-            duplicateCount++;
-          }
-        }
-      });
-
-      if (duplicateCount > 0) {
-        await batch.commit();
-      }
-    } catch {}
-
     return true;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar candidatura no Firestore:', error);
     return false;
   }
 }
 
-export async function fetchApplicationsFromFirestore(): Promise<PendingApplication[]> {
-  if (isFirestoreQuotaExhausted()) return [];
+export interface FirestoreApplicationsFetchResult {
+  apps: PendingApplication[];
+  ok: boolean;
+  quotaExhausted: boolean;
+}
+
+export async function fetchApplicationsFromFirestoreWithStatus(): Promise<FirestoreApplicationsFetchResult> {
+  if (isFirestoreReadQuotaExhausted()) {
+    return { apps: [], ok: false, quotaExhausted: true };
+  }
   try {
     const ref = collection(db, APPLICATIONS_COL);
     const snapshot = await Promise.race([
       getDocs(ref),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 4500)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 5000)),
     ]);
     const list: PendingApplication[] = [];
     snapshot.forEach((d) => {
       list.push(d.data() as PendingApplication);
     });
-    return list;
+    if (firestoreReadCooldownUntil !== 0) {
+      firestoreReadCooldownUntil = 0;
+      notifyFirestoreQuotaStatus(false, isFirestoreWriteQuotaExhausted());
+    }
+    return { apps: list, ok: true, quotaExhausted: false };
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
-    return [];
+    markFirestoreQuotaIfExhausted(error, 'read');
+    return { apps: [], ok: false, quotaExhausted: isFirestoreReadQuotaExhausted() };
   }
+}
+
+export async function fetchApplicationsFromFirestore(): Promise<PendingApplication[]> {
+  const res = await fetchApplicationsFromFirestoreWithStatus();
+  return res.apps;
 }
 
 export async function updateApplicationInFirestore(
   appId: string,
   updates: Partial<PendingApplication>
 ): Promise<void> {
-  if (isFirestoreQuotaExhausted()) return;
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(appId);
     if (!docId) return;
     const ref = doc(db, APPLICATIONS_COL, docId);
     await setDoc(ref, cleanObject(updates), { merge: true });
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'write');
   }
 }
 
@@ -427,16 +450,16 @@ export async function deleteApplicationFromFirestore(appId: string): Promise<voi
     const docId = sanitizeDocId(appId);
     if (!docId) return;
     addEntityTombstone(APPLICATIONS_COL, docId);
-    if (isFirestoreQuotaExhausted()) return;
+    if (isFirestoreWriteQuotaExhausted()) return;
     const ref = doc(db, APPLICATIONS_COL, docId);
     await deleteDoc(ref);
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'write');
   }
 }
 
 export async function clearApprovedApplicationsFromFirestore(): Promise<number> {
-  if (isFirestoreQuotaExhausted()) return 0;
+  if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
     const ref = collection(db, APPLICATIONS_COL);
     const snapshot = await getDocs(ref);
@@ -457,7 +480,7 @@ export async function clearApprovedApplicationsFromFirestore(): Promise<number> 
     }
     return count;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'read');
     return 0;
   }
 }
@@ -465,12 +488,16 @@ export async function clearApprovedApplicationsFromFirestore(): Promise<number> 
 export function subscribeToApplications(
   onUpdate: (apps: PendingApplication[]) => void
 ): Unsubscribe {
-  if (isFirestoreQuotaExhausted()) return () => {};
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const ref = collection(db, APPLICATIONS_COL);
     return onSnapshot(
       ref,
       (snapshot) => {
+        if (firestoreReadCooldownUntil !== 0) {
+          firestoreReadCooldownUntil = 0;
+          notifyFirestoreQuotaStatus(false, isFirestoreWriteQuotaExhausted());
+        }
         const apps: PendingApplication[] = [];
         snapshot.forEach((docSnap) => {
           apps.push(docSnap.data() as PendingApplication);
@@ -478,11 +505,11 @@ export function subscribeToApplications(
         onUpdate(apps);
       },
       (error) => {
-        markFirestoreQuotaIfExhausted(error);
+        markFirestoreQuotaIfExhausted(error, 'read');
       }
     );
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -492,7 +519,7 @@ export function subscribeToApplications(
 // ============================================================================
 
 export async function saveQuickRequestToFirestore(request: QuickServiceRequest): Promise<void> {
-  if (isFirestoreQuotaExhausted()) return;
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(request.id);
     if (!docId) return;
@@ -500,12 +527,12 @@ export async function saveQuickRequestToFirestore(request: QuickServiceRequest):
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     await setDoc(ref, cleanObject(request), { merge: true });
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'write');
   }
 }
 
 export async function fetchQuickRequestsFromFirestore(): Promise<QuickServiceRequest[]> {
-  if (isFirestoreQuotaExhausted()) return [];
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     const snapshot = await getDocs(ref);
@@ -515,7 +542,7 @@ export async function fetchQuickRequestsFromFirestore(): Promise<QuickServiceReq
     });
     return list;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'read');
     return [];
   }
 }
@@ -524,14 +551,14 @@ export async function updateQuickRequestInFirestore(
   id: string,
   updates: Partial<QuickServiceRequest>
 ): Promise<void> {
-  if (isFirestoreQuotaExhausted()) return;
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(id);
     if (!docId) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     await setDoc(ref, cleanObject(updates), { merge: true });
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'write');
   }
 }
 
@@ -540,16 +567,16 @@ export async function deleteQuickRequestFromFirestore(id: string): Promise<void>
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(QUICK_REQUESTS_COL, docId);
-    if (isFirestoreQuotaExhausted()) return;
+    if (isFirestoreWriteQuotaExhausted()) return;
     const ref = doc(db, QUICK_REQUESTS_COL, docId);
     await deleteDoc(ref);
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'write');
   }
 }
 
 export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
-  if (isFirestoreQuotaExhausted()) return 0;
+  if (isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted()) return 0;
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     const snapshot = await getDocs(ref);
@@ -567,7 +594,7 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
     }
     return count;
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'read');
     return 0;
   }
 }
@@ -575,7 +602,7 @@ export async function clearAllQuickRequestsFromFirestore(): Promise<number> {
 export function subscribeToQuickRequests(
   onUpdate: (requests: QuickServiceRequest[]) => void
 ): Unsubscribe {
-  if (isFirestoreQuotaExhausted()) return () => {};
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const ref = collection(db, QUICK_REQUESTS_COL);
     return onSnapshot(
@@ -588,11 +615,11 @@ export function subscribeToQuickRequests(
         onUpdate(list);
       },
       (error) => {
-        markFirestoreQuotaIfExhausted(error);
+        markFirestoreQuotaIfExhausted(error, 'read');
       }
     );
   } catch (err) {
-    markFirestoreQuotaIfExhausted(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -602,7 +629,7 @@ export function subscribeToQuickRequests(
 // ============================================================================
 
 export async function saveUserToFirestore(user: UserAccount): Promise<void> {
-  if (isFirestoreQuotaExhausted()) return;
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const cleanEmail = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
     const docId = sanitizeDocId(cleanEmail || user.id || '');
@@ -639,11 +666,12 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
     const ref = doc(db, USERS_COL, docId);
     await setDoc(ref, cleanObject(rawUser), { merge: true });
   } catch (error) {
-    markFirestoreQuotaIfExhausted(error);
+    markFirestoreQuotaIfExhausted(error, 'write');
   }
 }
 
 export async function fetchUserFromFirestore(userIdOrEmail: string): Promise<UserAccount | null> {
+  if (isFirestoreReadQuotaExhausted()) return null;
   try {
     const key = sanitizeDocId(userIdOrEmail.trim().toLowerCase());
     if (!key) return null;
@@ -665,6 +693,7 @@ export async function fetchUserFromFirestore(userIdOrEmail: string): Promise<Use
     }
     return null;
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'read');
     console.warn('[Firestore] Erro ao buscar usuário no Firestore:', error);
     return null;
   }
@@ -675,13 +704,42 @@ export async function deleteUserFromFirestore(userIdOrEmail: string): Promise<vo
     const docId = sanitizeDocId((userIdOrEmail || '').trim().toLowerCase());
     if (!docId) return;
     addEntityTombstone(USERS_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, USERS_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar usuário no Firestore:', error);
   }
 }
 
+export function subscribeToSingleUserStatus(
+  userIdOrEmail: string,
+  onUpdate: (user: UserAccount) => void
+): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
+  try {
+    const docId = sanitizeDocId((userIdOrEmail || '').trim().toLowerCase());
+    if (!docId) return () => {};
+    const ref = doc(db, USERS_COL, docId);
+    return onSnapshot(
+      ref,
+      (snap) => {
+        if (snap.exists()) {
+          onUpdate(snap.data() as UserAccount);
+        }
+      },
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+      }
+    );
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
+    return () => {};
+  }
+}
+
 export function subscribeToUsers(onUpdate: (users: UserAccount[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const ref = collection(db, USERS_COL);
     return onSnapshot(
@@ -691,9 +749,13 @@ export function subscribeToUsers(onUpdate: (users: UserAccount[]) => void): Unsu
         snapshot.forEach((d) => list.push(d.data() as UserAccount));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Users subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Users subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -749,6 +811,7 @@ export async function deleteSchoolFromFirestore(schoolId: string, schoolName?: s
 }
 
 export async function fetchSchoolsFromFirestore(): Promise<AdminSchool[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, SCHOOLS_COL));
     const list: AdminSchool[] = [];
@@ -760,12 +823,14 @@ export async function fetchSchoolsFromFirestore(): Promise<AdminSchool[]> {
     });
     return list;
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'read');
     console.warn('[Firestore] Erro ao buscar escolas no Firestore:', error);
     return [];
   }
 }
 
 export function subscribeToSchools(onUpdate: (schools: AdminSchool[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, SCHOOLS_COL),
@@ -779,9 +844,13 @@ export function subscribeToSchools(onUpdate: (schools: AdminSchool[]) => void): 
         });
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Schools subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Schools subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -850,17 +919,20 @@ export async function clearAllTeachersFromFirestore(): Promise<number> {
 }
 
 export async function fetchTeachersFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, TEACHERS_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToTeachers(onUpdate: (teachers: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, TEACHERS_COL),
@@ -869,9 +941,13 @@ export function subscribeToTeachers(onUpdate: (teachers: any[]) => void): Unsubs
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Teachers subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Teachers subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -965,17 +1041,20 @@ export async function clearAllStudentsFromFirestore(): Promise<number> {
 }
 
 export async function fetchStudentsFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, STUDENTS_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToStudents(onUpdate: (students: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, STUDENTS_COL),
@@ -984,9 +1063,13 @@ export function subscribeToStudents(onUpdate: (students: any[]) => void): Unsubs
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Students subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Students subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1035,6 +1118,7 @@ export async function deleteDirectorFromFirestore(directorId: string): Promise<v
 }
 
 export function subscribeToDirectors(onUpdate: (directors: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, DIRECTORS_COL),
@@ -1043,14 +1127,19 @@ export function subscribeToDirectors(onUpdate: (directors: any[]) => void): Unsu
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Directors subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Directors subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export async function saveDmeStaffToFirestore(staff: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const id = sanitizeDocId(staff.id || staff.email || staff.role);
     if (!id) return;
@@ -1058,6 +1147,7 @@ export async function saveDmeStaffToFirestore(staff: Record<string, any>): Promi
     const ref = doc(db, DME_STAFF_COL, id);
     await setDoc(ref, cleanObject({ ...staff, id, updatedAt: new Date().toISOString() }), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar membro DME no Firestore:', error);
   }
 }
@@ -1067,13 +1157,16 @@ export async function deleteDmeStaffFromFirestore(staffId: string): Promise<void
     const docId = sanitizeDocId(staffId);
     if (!docId) return;
     addEntityTombstone(DME_STAFF_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, DME_STAFF_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar membro DME no Firestore:', error);
   }
 }
 
 export function subscribeToDmeStaff(onUpdate: (staff: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, DME_STAFF_COL),
@@ -1082,9 +1175,13 @@ export function subscribeToDmeStaff(onUpdate: (staff: any[]) => void): Unsubscri
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] DME Staff subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] DME Staff subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1135,17 +1232,20 @@ export async function deleteStaffFromFirestore(staffId: string): Promise<void> {
 }
 
 export async function fetchStaffFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, STAFF_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToStaff(onUpdate: (staff: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, STAFF_COL),
@@ -1154,9 +1254,13 @@ export function subscribeToStaff(onUpdate: (staff: any[]) => void): Unsubscribe 
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Staff subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Staff subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1300,17 +1404,20 @@ export async function clearAllEfectividadeFromFirestore(): Promise<number> {
 }
 
 export async function fetchEfectividadeFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, EFECTIVIDADE_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToEfectividade(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, EFECTIVIDADE_COL),
@@ -1319,9 +1426,13 @@ export function subscribeToEfectividade(onUpdate: (records: any[]) => void): Uns
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Efectividade subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Efectividade subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1372,17 +1483,20 @@ export async function clearAllDeclaracaoServicoFromFirestore(): Promise<number> 
 }
 
 export async function fetchDeclaracaoServicoFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, DECLARACAO_SERVICO_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToDeclaracaoServico(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, DECLARACAO_SERVICO_COL),
@@ -1391,9 +1505,13 @@ export function subscribeToDeclaracaoServico(onUpdate: (records: any[]) => void)
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Declaração de Serviço subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Declaração de Serviço subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1403,6 +1521,7 @@ export function subscribeToDeclaracaoServico(onUpdate: (records: any[]) => void)
 // ============================================================================
 
 export async function saveMiniPautaToFirestore(record: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const key = `${record.classe || ''}_${record.turma || ''}_${record.disciplina || ''}_${record.schoolName || ''}`
       .trim()
@@ -1412,11 +1531,13 @@ export async function saveMiniPautaToFirestore(record: Record<string, any>): Pro
     const ref = doc(db, GRADES_COL, docId);
     await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar mini-pauta no Firestore:', error);
   }
 }
 
 export function subscribeToMiniPautas(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, GRADES_COL),
@@ -1425,9 +1546,13 @@ export function subscribeToMiniPautas(onUpdate: (records: any[]) => void): Unsub
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Grades/MiniPautas subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Grades/MiniPautas subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1473,6 +1598,7 @@ export async function saveBatchAttendanceToFirestore(
 }
 
 export function subscribeToAttendance(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, ATTENDANCE_COL),
@@ -1481,9 +1607,13 @@ export function subscribeToAttendance(onUpdate: (records: any[]) => void): Unsub
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Attendance subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Attendance subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1493,6 +1623,7 @@ export function subscribeToAttendance(onUpdate: (records: any[]) => void): Unsub
 // ============================================================================
 
 export async function saveAnnouncementToFirestore(announcement: SchoolAnnouncement): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(announcement.id);
     if (!docId) return;
@@ -1500,6 +1631,7 @@ export async function saveAnnouncementToFirestore(announcement: SchoolAnnounceme
     const ref = doc(db, ANNOUNCEMENTS_COL, docId);
     await setDoc(ref, cleanObject(announcement), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar anúncio no Firestore:', error);
   }
 }
@@ -1509,13 +1641,16 @@ export async function deleteAnnouncementFromFirestore(id: string): Promise<void>
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(ANNOUNCEMENTS_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, ANNOUNCEMENTS_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar anúncio no Firestore:', error);
   }
 }
 
 export function subscribeToAnnouncements(onUpdate: (list: SchoolAnnouncement[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, ANNOUNCEMENTS_COL),
@@ -1524,14 +1659,19 @@ export function subscribeToAnnouncements(onUpdate: (list: SchoolAnnouncement[]) 
         snapshot.forEach((d) => list.push(d.data() as SchoolAnnouncement));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Announcements subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Announcements subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export async function saveRoomToFirestore(room: DirectorRoom): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(room.id || room.roomNumber);
     if (!docId) return;
@@ -1539,6 +1679,7 @@ export async function saveRoomToFirestore(room: DirectorRoom): Promise<void> {
     const ref = doc(db, ROOMS_COL, docId);
     await setDoc(ref, cleanObject(room), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar sala no Firestore:', error);
   }
 }
@@ -1548,13 +1689,16 @@ export async function deleteRoomFromFirestore(id: string): Promise<void> {
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(ROOMS_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, ROOMS_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar sala no Firestore:', error);
   }
 }
 
 export function subscribeToRooms(onUpdate: (list: DirectorRoom[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, ROOMS_COL),
@@ -1563,14 +1707,19 @@ export function subscribeToRooms(onUpdate: (list: DirectorRoom[]) => void): Unsu
         snapshot.forEach((d) => list.push(d.data() as DirectorRoom));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Rooms subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Rooms subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export async function saveClassToFirestore(cls: DirectorClass): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(cls.id || cls.name);
     if (!docId) return;
@@ -1578,6 +1727,7 @@ export async function saveClassToFirestore(cls: DirectorClass): Promise<void> {
     const ref = doc(db, CLASSES_COL, docId);
     await setDoc(ref, cleanObject(cls), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar classe no Firestore:', error);
   }
 }
@@ -1587,13 +1737,16 @@ export async function deleteClassFromFirestore(id: string): Promise<void> {
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(CLASSES_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, CLASSES_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar classe no Firestore:', error);
   }
 }
 
 export function subscribeToClasses(onUpdate: (list: DirectorClass[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, CLASSES_COL),
@@ -1602,25 +1755,32 @@ export function subscribeToClasses(onUpdate: (list: DirectorClass[]) => void): U
         snapshot.forEach((d) => list.push(d.data() as DirectorClass));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Classes subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Classes subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export async function saveChatMessageToFirestore(message: ChatMessage): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(message.id);
     if (!docId) return;
     const ref = doc(db, CHAT_MESSAGES_COL, docId);
     await setDoc(ref, cleanObject(message), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar mensagem de chat no Firestore:', error);
   }
 }
 
 export function subscribeToChatMessages(onUpdate: (list: ChatMessage[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, CHAT_MESSAGES_COL),
@@ -1629,9 +1789,13 @@ export function subscribeToChatMessages(onUpdate: (list: ChatMessage[]) => void)
         snapshot.forEach((d) => list.push(d.data() as ChatMessage));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] ChatMessages subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] ChatMessages subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1664,17 +1828,20 @@ export async function deleteGuiaFeriasFromFirestore(id: string): Promise<void> {
 }
 
 export async function fetchGuiasFeriasFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, GUIAS_FERIAS_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToGuiasFerias(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, GUIAS_FERIAS_COL),
@@ -1683,14 +1850,19 @@ export function subscribeToGuiasFerias(onUpdate: (records: any[]) => void): Unsu
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Guias de Férias subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Guias de Férias subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export async function saveGuiaColocacaoToFirestore(record: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(record.id || `${record.num || ''}_${record.ano || ''}_${record.agente || ''}`);
     if (!docId) return;
@@ -1698,6 +1870,7 @@ export async function saveGuiaColocacaoToFirestore(record: Record<string, any>):
     const ref = doc(db, GUIAS_COLOCACAO_COL, docId);
     await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar Guia de Colocação no Firestore:', error);
   }
 }
@@ -1707,24 +1880,29 @@ export async function deleteGuiaColocacaoFromFirestore(id: string): Promise<void
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(GUIAS_COLOCACAO_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, GUIAS_COLOCACAO_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar Guia de Colocação no Firestore:', error);
   }
 }
 
 export async function fetchGuiasColocacaoFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, GUIAS_COLOCACAO_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToGuiasColocacao(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, GUIAS_COLOCACAO_COL),
@@ -1733,14 +1911,19 @@ export function subscribeToGuiasColocacao(onUpdate: (records: any[]) => void): U
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Guias de Colocação subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Guias de Colocação subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export async function saveFichaAvaliacaoToFirestore(record: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(record.id || `${record.agente || ''}_${record.dataAval || ''}`);
     if (!docId) return;
@@ -1748,6 +1931,7 @@ export async function saveFichaAvaliacaoToFirestore(record: Record<string, any>)
     const ref = doc(db, FICHAS_AVALIACAO_COL, docId);
     await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar Ficha de Avaliação no Firestore:', error);
   }
 }
@@ -1757,24 +1941,29 @@ export async function deleteFichaAvaliacaoFromFirestore(id: string): Promise<voi
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(FICHAS_AVALIACAO_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, FICHAS_AVALIACAO_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar Ficha de Avaliação no Firestore:', error);
   }
 }
 
 export async function fetchFichasAvaliacaoFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, FICHAS_AVALIACAO_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToFichasAvaliacao(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, FICHAS_AVALIACAO_COL),
@@ -1783,14 +1972,19 @@ export function subscribeToFichasAvaliacao(onUpdate: (records: any[]) => void): 
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Fichas de Avaliação subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Fichas de Avaliação subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export async function saveCadastroDocenteToFirestore(record: Record<string, any>): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   try {
     const docId = sanitizeDocId(record.id || `${record.numNota || ''}_${record.bi || ''}_${record.nome || ''}`);
     if (!docId) return;
@@ -1798,6 +1992,7 @@ export async function saveCadastroDocenteToFirestore(record: Record<string, any>
     const ref = doc(db, CADASTRO_DOCENTE_COL, docId);
     await setDoc(ref, cleanObject({ ...record, id: record.id || docId }), { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao gravar Cadastro Docente no Firestore:', error);
   }
 }
@@ -1807,24 +2002,29 @@ export async function deleteCadastroDocenteFromFirestore(id: string): Promise<vo
     const docId = sanitizeDocId(id);
     if (!docId) return;
     addEntityTombstone(CADASTRO_DOCENTE_COL, docId);
+    if (isFirestoreWriteQuotaExhausted()) return;
     await deleteDoc(doc(db, CADASTRO_DOCENTE_COL, docId));
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
     console.warn('[Firestore] Erro ao eliminar Cadastro Docente no Firestore:', error);
   }
 }
 
 export async function fetchCadastroDocenteFromFirestore(): Promise<any[]> {
+  if (isFirestoreReadQuotaExhausted()) return [];
   try {
     const snapshot = await getDocs(collection(db, CADASTRO_DOCENTE_COL));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return [];
   }
 }
 
 export function subscribeToCadastroDocente(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, CADASTRO_DOCENTE_COL),
@@ -1833,14 +2033,19 @@ export function subscribeToCadastroDocente(onUpdate: (records: any[]) => void): 
         snapshot.forEach((d) => list.push(d.data()));
         onUpdate(list);
       },
-      (err) => console.warn('[Firestore] Cadastro Docente subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Cadastro Docente subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
 export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       collection(db, TOMBSTONES_COL),
@@ -1856,9 +2061,13 @@ export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsub
         });
         onUpdate(keys);
       },
-      (err) => console.warn('[Firestore] Tombstones subscription error:', err)
+      (err) => {
+        markFirestoreQuotaIfExhausted(err, 'read');
+        console.warn('[Firestore] Tombstones subscription error:', err);
+      }
     );
-  } catch {
+  } catch (err) {
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1903,6 +2112,7 @@ function safeWriteJsonIfChanged(key: string, data: any): boolean {
 
 export function initUnifiedRealtimeDatabaseSync(): () => void {
   if (typeof window === 'undefined') return () => {};
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   if (globalRealtimeUnsubscribe) {
     return globalRealtimeUnsubscribe;
   }
@@ -2019,7 +2229,11 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         const validUnifiedSchools = unifiedSchools.filter(
           (cs) => cs && cs.name && !isBannedSchoolOrEntity(cs) && !isEntityTombstoned(SCHOOLS_COL, cs.id) && !isEntityTombstoned(SCHOOLS_COL, cs.name)
         );
-        if (validUnifiedSchools.length > 0 && (changedSchools || validUnifiedSchools.length !== localAdminSchools.length)) {
+        if (
+          isExpressApiAvailable() &&
+          validUnifiedSchools.length > 0 &&
+          (changedSchools || validUnifiedSchools.length !== localAdminSchools.length)
+        ) {
           fetch('/api/network/schools', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3086,6 +3300,10 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
       classes,
       users,
     };
+
+    if (!isExpressApiAvailable()) {
+      return;
+    }
 
     const jsonBody = JSON.stringify(payload);
 

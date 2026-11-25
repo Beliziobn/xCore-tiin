@@ -1,12 +1,12 @@
 {
-  "projectId": "hip-ship-440ks",
-  "appId": "1:394490361963:web:ebcb768501bd16f242192e",
-  "apiKey": "AIzaSyAj0hJEYxpCVMUCIH1NzDcYI2Sl8IiCsco",
-  "authDomain": "hip-ship-440ks.firebaseapp.com",
+  "projectId": "sigre-7b309",
+  "appId": "1:1069488005698:web:3161995520a36b0b2d43db",
+  "apiKey": "AIzaSyC1YL2E_z3ZutWbeJu35theZFL6Mrol-rw",
+  "authDomain": "sigre-7b309.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-centralucore-5db64e5c-3a83-464e-9fb7-9cf45189257d",
-  "storageBucket": "hip-ship-440ks.firebasestorage.app",
-  "messagingSenderId": "394490361963",
+  "storageBucket": "sigre-7b309.firebasestorage.app",
+  "messagingSenderId": "1069488005698",
   "measurementId": "",
-  "oAuthClientId": "394490361963-4btf65ropqnpp8dlonjn74bi96ff47pi.apps.googleusercontent.com",
+  "oAuthClientId": "1069488005698-9187q4a0vd5h6ntng9t3ru05rs2v0oq9.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

@@ -218,16 +218,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const updateCounts = () => {
       refreshCountsFromLocal();
+      if (!currentUser || currentUser.status !== 'ativo') {
+        return;
+      }
       const now = Date.now();
       if (now - lastNavbarCloudSyncAt > 60000) {
         lastNavbarCloudSyncAt = now;
         syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
-        syncApplicationsFromServer()
-          .then((all) => {
-            const admPending = all.filter((a) => a.status === 'pendente').length;
-            setPendingAppsCount({ director: 0, admin: admPending });
-          })
-          .catch(() => {});
+        if (currentUser.role === 'admin') {
+          syncApplicationsFromServer()
+            .then((all) => {
+              const admPending = all.filter((a) => a.status === 'pendente').length;
+              setPendingAppsCount({ director: 0, admin: admPending });
+            })
+            .catch(() => {});
+        }
       }
     };
 

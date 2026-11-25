@@ -4,7 +4,8 @@ import { CANONICAL_APPLICATIONS, CANONICAL_USERS } from '../data/canonicalNetwor
 import { directorTeachersData } from '../data/directorData';
 import {
   saveApplicationToFirestore,
-  fetchApplicationsFromFirestore,
+  fetchApplicationsFromFirestoreWithStatus,
+  isFirestoreReadQuotaExhausted,
   updateApplicationInFirestore,
   deleteApplicationFromFirestore,
   clearApprovedApplicationsFromFirestore,
@@ -682,7 +683,7 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
     return applicationsSyncInFlight;
   }
   const now = Date.now();
-  if (!force && now - lastApplicationsSyncAt < 1000) {
+  if (!force && now - lastApplicationsSyncAt < 10_000) {
     return getPendingApplications();
   }
 
@@ -701,8 +702,10 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
             ])
           : Promise.resolve(null),
         Promise.race([
-          fetchApplicationsFromFirestore(),
-          new Promise<PendingApplication[]>((resolve) => setTimeout(() => resolve([]), 5000)),
+          fetchApplicationsFromFirestoreWithStatus(),
+          new Promise<{ apps: PendingApplication[]; ok: boolean; quotaExhausted: boolean }>((resolve) =>
+            setTimeout(() => resolve({ apps: [], ok: false, quotaExhausted: isFirestoreReadQuotaExhausted() }), 5500)
+          ),
         ]),
       ]);
 
@@ -710,9 +713,11 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
         serverResult.status === 'fulfilled' && serverResult.value && Array.isArray(serverResult.value.applications)
           ? serverResult.value.applications
           : [];
+      const firestoreReadSucceeded =
+        firestoreResult.status === 'fulfilled' && firestoreResult.value?.ok === true;
       const firestoreApps: PendingApplication[] =
-        firestoreResult.status === 'fulfilled' && Array.isArray(firestoreResult.value)
-          ? firestoreResult.value.filter((a) => a && !isApplicationTombstoned(a))
+        firestoreReadSucceeded && Array.isArray(firestoreResult.value.apps)
+          ? firestoreResult.value.apps.filter((a) => a && !isApplicationTombstoned(a))
           : [];
 
       // Heal stale local sigre_deleted_application_ids_v1 for applications that are live (non-tombstoned) in Cloud Firestore
@@ -774,9 +779,8 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
         }).catch(() => {});
       }
 
-      // 5. Mirror ALL missing or upgraded ('aprovado'/'rejeitado') apps to Cloud Firestore (no slice truncation, only mark pushed on success)
-      const firestoreReadSucceeded = firestoreResult.status === 'fulfilled';
-      if (firestoreReadSucceeded || firestoreApps.length > 0 || serverApps.length > 0) {
+      // 5. Mirror missing or upgraded ('aprovado'/'rejeitado') apps to Cloud Firestore ONLY when Firestore read succeeded
+      if (firestoreReadSucceeded) {
         const missingOrUpgradedInFirestore = merged.filter((ma) => {
           const fsMatch = firestoreApps.find((fa) => matchesRecordIdentity(fa, ma));
           const needsPush =
@@ -823,11 +827,15 @@ let realtimeUnsubscribe: (() => void) | null = null;
 export function initRealtimeApplicationsSync(
   onUpdate?: (apps: PendingApplication[]) => void
 ): () => void {
+  if (isFirestoreReadQuotaExhausted()) {
+    return () => {};
+  }
   if (realtimeUnsubscribe) {
     return realtimeUnsubscribe;
   }
 
   let latestFirestoreApps: PendingApplication[] = [];
+  let hasReceivedSnapshot = false;
 
   const applyCombinedSnapshot = (firestoreApps: PendingApplication[]) => {
     try {
@@ -852,23 +860,25 @@ export function initRealtimeApplicationsSync(
             body: JSON.stringify({ applications: validApps }),
           }).catch(() => {});
         }
-        // Push any user-backed app missing from Firestore
-        userBackedApps.forEach((ua) => {
-          const inFs = liveFsApps.some(
-            (fa) =>
-              fa.id === ua.id ||
-              (fa.userId && ua.userId && fa.userId === ua.userId) ||
-              (normalizeBi(fa.biNumber).length >= 5 && normalizeBi(fa.biNumber) === normalizeBi(ua.biNumber))
-          );
-          const sig = `${ua.status}:${ua.approvedAt || ''}`;
-          if (!inFs && pushedAppStatusToFirestore.get(ua.id) !== sig) {
-            saveApplicationToFirestore(ua)
-              .then((ok) => {
-                if (ok) pushedAppStatusToFirestore.set(ua.id, sig);
-              })
-              .catch(() => {});
-          }
-        });
+        // Push any user-backed app missing from Firestore ONLY when a real snapshot arrived
+        if (hasReceivedSnapshot) {
+          userBackedApps.forEach((ua) => {
+            const inFs = liveFsApps.some(
+              (fa) =>
+                fa.id === ua.id ||
+                (fa.userId && ua.userId && fa.userId === ua.userId) ||
+                (normalizeBi(fa.biNumber).length >= 5 && normalizeBi(fa.biNumber) === normalizeBi(ua.biNumber))
+            );
+            const sig = `${ua.status}:${ua.approvedAt || ''}`;
+            if (!inFs && pushedAppStatusToFirestore.get(ua.id) !== sig) {
+              saveApplicationToFirestore(ua)
+                .then((ok) => {
+                  if (ok) pushedAppStatusToFirestore.set(ua.id, sig);
+                })
+                .catch(() => {});
+            }
+          });
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
@@ -880,12 +890,15 @@ export function initRealtimeApplicationsSync(
   };
 
   const fsUnsub = subscribeToApplications((firestoreApps) => {
+    hasReceivedSnapshot = true;
     latestFirestoreApps = firestoreApps || [];
     applyCombinedSnapshot(latestFirestoreApps);
   });
 
   const handleUsersUpdated = () => {
-    applyCombinedSnapshot(latestFirestoreApps);
+    if (hasReceivedSnapshot) {
+      applyCombinedSnapshot(latestFirestoreApps);
+    }
   };
   if (typeof window !== 'undefined') {
     window.addEventListener('sigre-users-updated', handleUsersUpdated);

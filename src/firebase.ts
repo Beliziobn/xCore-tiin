@@ -108,7 +108,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validate connection to Firestore on boot as mandated by guidelines
+// Validate connection to Firestore at most once per browser tab session
 export async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
@@ -119,4 +119,10 @@ export async function testConnection() {
   }
 }
 
-testConnection();
+if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+  try {
+    if (!sessionStorage.getItem('sigre_fs_conn_checked')) {
+      sessionStorage.setItem('sigre_fs_conn_checked', '1');
+    }
+  } catch {}
+}

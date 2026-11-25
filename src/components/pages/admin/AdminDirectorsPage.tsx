@@ -23,7 +23,12 @@ import {
 import { Hero } from '../../Hero';
 import type { AdminDirector, AdminSchool, DirectorRegistrationData, PendingApplication } from '../../../types';
 import { getStoredDirectors, saveDirector, buildInitialDirectorDossier } from '../../../utils/directorStorage';
-import { getPendingApplications, approveApplication, rejectApplication } from '../../../utils/authApprovalStorage';
+import {
+  getPendingApplications,
+  approveApplicationAsync,
+  rejectApplicationAsync,
+  syncApplicationsFromServer,
+} from '../../../utils/authApprovalStorage';
 import { DirectorDetailModal } from '../../modals/DirectorDetailModal';
 import { DirectorRegistrationModal } from '../../modals/DirectorRegistrationModal';
 import { DirectorApplicationModal } from '../../modals/DirectorApplicationModal';
@@ -87,12 +92,13 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
       refreshPending();
     };
     handleSync();
+    syncApplicationsFromServer(false).then(() => refreshPending()).catch(() => {});
     window.addEventListener('sigre-data-synced', handleSync);
     return () => window.removeEventListener('sigre-data-synced', handleSync);
   }, []);
 
-  const handleApproveApplication = (appId: string) => {
-    const res = approveApplication(appId, 'Administrador Central (DME)');
+  const handleApproveApplication = async (appId: string) => {
+    const res = await approveApplicationAsync(appId, 'Administrador Central (DME)');
     if (res.success && res.app) {
       const updated = res.app;
       refreshPending();
@@ -118,8 +124,8 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
     }
   };
 
-  const handleRejectApplication = (appId: string, reason: string) => {
-    const res = rejectApplication(appId, reason, 'Administrador Central (DME)');
+  const handleRejectApplication = async (appId: string, reason: string) => {
+    const res = await rejectApplicationAsync(appId, reason, 'Administrador Central (DME)');
     if (res.success) {
       refreshPending();
       setApprovalToast(`Candidatura recusada. Notificação emitida para o candidato.`);
@@ -328,7 +334,10 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
 
           <button
             id="tab-candidaturas-pendentes"
-            onClick={() => setActiveTab('candidaturas')}
+            onClick={() => {
+              setActiveTab('candidaturas');
+              syncApplicationsFromServer(false).then(() => refreshPending()).catch(() => {});
+            }}
             className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'candidaturas'
                 ? 'bg-[#f75142] text-white shadow-xs'
@@ -370,7 +379,9 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
                   </p>
                 </div>
                 <button
-                  onClick={refreshPending}
+                  onClick={() => {
+                    syncApplicationsFromServer(true).then(() => refreshPending()).catch(() => {});
+                  }}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />

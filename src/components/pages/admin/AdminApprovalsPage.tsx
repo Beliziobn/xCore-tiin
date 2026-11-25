@@ -55,6 +55,8 @@ import {
   OFFICIAL_DME_ADMIN_EMAIL
 } from '../../../utils/authApprovalStorage';
 import { buildInitialDirectorDossier, saveDirector } from '../../../utils/directorStorage';
+import { isFirestoreReadQuotaExhausted } from '../../../utils/firestoreSync';
+import { isExpressApiAvailable } from '../../../utils/apiAvailability';
 import { Hero } from '../../Hero';
 
 interface AdminApprovalsPageProps {
@@ -86,6 +88,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedApp, setSelectedApp] = useState<PendingApplication | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [cloudReadQuotaBlocked, setCloudReadQuotaBlocked] = useState<boolean>(
+    () => isFirestoreReadQuotaExhausted() && !isExpressApiAvailable()
+  );
   const hasInitializedStatusRef = useRef(false);
 
   // Approval Modal State
@@ -183,6 +188,7 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       unified = deduplicateApplicationsList(all);
     }
     setApplications(unified);
+    setCloudReadQuotaBlocked(isFirestoreReadQuotaExhausted() && !isExpressApiAvailable());
     if (!hasInitializedStatusRef.current && unified.length > 0) {
       hasInitializedStatusRef.current = true;
       const pendCount = unified.filter((a) => a.status === 'pendente').length;
@@ -196,11 +202,29 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
   useEffect(() => {
     loadApplications(true);
     const handleSync = () => refreshLocalApplications();
+    const handleQuotaStatus = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ readExhausted?: boolean }>).detail;
+      const blocked =
+        typeof detail?.readExhausted === 'boolean'
+          ? detail.readExhausted
+          : isFirestoreReadQuotaExhausted();
+      setCloudReadQuotaBlocked(blocked && !isExpressApiAvailable());
+    };
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      loadApplications(false);
+    };
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('sigre-homologados-cleared', handleSync);
+    window.addEventListener('sigre-firestore-quota-status', handleQuotaStatus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     return () => {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('sigre-homologados-cleared', handleSync);
+      window.removeEventListener('sigre-firestore-quota-status', handleQuotaStatus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
   }, []);
 
@@ -556,7 +580,20 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
-        
+        {cloudReadQuotaBlocked && (
+          <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex items-start gap-3 shadow-xs">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs sm:text-sm space-y-1">
+              <p className="font-bold">
+                Limite diário gratuito de leituras do Firebase atingido hoje
+              </p>
+              <p className="text-amber-900 leading-relaxed">
+                As novas inscrições continuam a ser gravadas na nuvem, mas a leitura entre dispositivos diferentes nesta ligação estática fica temporariamente retida até à reposição diária automática da quota do Firebase (ou ativação do plano Blaze no projeto Firebase).
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Executive Summary & Protocol Strip */}
         <section className="bg-white rounded-2xl border border-slate-200/90 shadow-xs mb-6 overflow-hidden">
           <div className="p-5 sm:p-6 bg-transparent text-slate-900">

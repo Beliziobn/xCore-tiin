@@ -63,6 +63,7 @@ import {
 import { initRealtimeQuickRequestsSync } from './utils/quickServicesStorage';
 import {
   initUnifiedRealtimeDatabaseSync,
+  isFirestoreReadQuotaExhausted,
   saveTeacherToFirestore,
   saveStudentToFirestore,
   saveDirectorToFirestore,
@@ -445,21 +446,15 @@ export default function App() {
         // ignore
       }
     };
-    const triggerFullNetworkSync = () => {
-      syncApplicationsFromServer()
-        .then(() => handleSync())
-        .catch(() => {});
-      syncSchoolsFromServer()
-        .then(() => {
-          isInitialSyncCompleteRef.current = true;
-          handleSync();
-        })
-        .catch(() => {});
-    };
-    triggerFullNetworkSync();
-    const unsubApps = initRealtimeApplicationsSync();
-    const unsubQuick = initRealtimeQuickRequestsSync();
-    const unsubUnifiedDb = initUnifiedRealtimeDatabaseSync();
+    syncSchoolsFromServer()
+      .then(() => {
+        isInitialSyncCompleteRef.current = true;
+        handleSync();
+      })
+      .catch(() => {
+        isInitialSyncCompleteRef.current = true;
+      });
+
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
     window.addEventListener('ucore-students-updated', handleSync);
@@ -467,9 +462,6 @@ export default function App() {
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('ucore-teachers-updated', handleSync);
       window.removeEventListener('ucore-students-updated', handleSync);
-      if (typeof unsubApps === 'function') unsubApps();
-      if (typeof unsubQuick === 'function') unsubQuick();
-      if (typeof unsubUnifiedDb === 'function') unsubUnifiedDb();
     };
   }, []);
 
@@ -592,6 +584,36 @@ export default function App() {
       window.removeEventListener('sigre-data-synced', checkActiveAccountStatus);
     };
   }, [currentUser]);
+
+  // Role-scoped & session-gated real-time Firestore listeners:
+  // Never open 21 full-collection onSnapshot listeners for unauthenticated landing visitors.
+  useEffect(() => {
+    if (!currentUser) return;
+    if (isFirestoreReadQuotaExhausted()) return;
+
+    const cleanups: Array<() => void> = [];
+
+    if (currentUser.status === 'ativo') {
+      if (currentUser.role === 'admin') {
+        const unsubApps = initRealtimeApplicationsSync();
+        if (typeof unsubApps === 'function') cleanups.push(unsubApps);
+      }
+      if (currentUser.role === 'admin' || currentUser.role === 'diretor') {
+        const unsubQuick = initRealtimeQuickRequestsSync();
+        if (typeof unsubQuick === 'function') cleanups.push(unsubQuick);
+      }
+      const unsubUnified = initUnifiedRealtimeDatabaseSync();
+      if (typeof unsubUnified === 'function') cleanups.push(unsubUnified);
+    }
+
+    return () => {
+      cleanups.forEach((fn) => {
+        try {
+          fn();
+        } catch {}
+      });
+    };
+  }, [currentUser?.id, currentUser?.role, currentUser?.status]);
 
   // Active Role and session configuration state
   const [activeRole, setActiveRole] = useState<'admin' | 'diretor' | 'professor'>(() => {
