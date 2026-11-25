@@ -20,6 +20,7 @@ import {
   isBannedSchoolOrEntity,
   getEntityTombstones,
   addEntityTombstone,
+  removeEntityTombstone,
   deleteApplicationFromFirestore,
 } from './firestoreSync';
 import { purgeDeletedAccountCredentials, deduplicateApplicationsList, stripAppIdPrefix } from './authApprovalStorage';
@@ -779,7 +780,19 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
   }
 
   try {
-    // 1. Update ucore_admin_schools
+    // 0. Clear any previous local or Firestore tombstone for this school so it is never hidden
+    if (school.id) removeEntityTombstone('schools', school.id);
+    removeEntityTombstone('schools', school.name.trim().toLowerCase());
+    if (school.codigoSIGE) removeEntityTombstone('schools', school.codigoSIGE);
+
+    const regData = school.registrationData || getSchoolRegistrationData(school);
+    const schoolWithReg: AdminSchool & { _updatedAt?: number } = {
+      ...school,
+      registrationData: regData,
+      _updatedAt: Date.now(),
+    };
+
+    // 1. Update ucore_admin_schools & ucore_registered_schools_v1
     const rawSchools = localStorage.getItem(STORAGE_KEY_SCHOOLS);
     const existingList: AdminSchool[] = rawSchools ? JSON.parse(rawSchools) : [];
     const safeList = Array.isArray(existingList)
@@ -795,17 +808,17 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
       nextSchools = [...safeList];
       nextSchools[existingIdx] = {
         ...nextSchools[existingIdx],
-        ...school,
-        registrationData: school.registrationData || nextSchools[existingIdx].registrationData,
+        ...schoolWithReg,
+        registrationData: schoolWithReg.registrationData || nextSchools[existingIdx].registrationData,
       };
     } else {
-      nextSchools = [school, ...safeList];
+      nextSchools = [schoolWithReg, ...safeList];
     }
 
     localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(nextSchools));
+    localStorage.setItem('ucore_registered_schools_v1', JSON.stringify(nextSchools));
 
     // 2. Also update sigre_school_registrations with full 7-section registrationData
-    const regData = school.registrationData || getSchoolRegistrationData(school);
     const rawReg = localStorage.getItem('sigre_school_registrations');
     const existingRegList: SchoolRegistrationData[] = rawReg ? JSON.parse(rawReg) : [];
     const safeRegList = Array.isArray(existingRegList)
@@ -822,15 +835,15 @@ export function saveRegisteredSchool(school: AdminSchool): AdminSchool[] {
 
     localStorage.setItem('sigre_school_registrations', JSON.stringify(nextRegList));
 
-    // 3. Persist immediately to Firebase Firestore cloud database in real time
-    const schoolWithReg: AdminSchool = { ...school, registrationData: regData };
+    // 3. Persist immediately to Firebase Firestore cloud database in real time (shared across ALL devices & URLs)
     saveSchoolToFirestore(schoolWithReg).catch(() => {});
 
-    // 4. Push to shared backend store so other users/browsers signing up see this school immediately
+    // 4. Push to shared backend store so other users/browsers on this server see this school immediately
     fetch('/api/network/schools', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ school: schoolWithReg }),
+      keepalive: true,
     }).catch(() => {});
 
     window.dispatchEvent(new CustomEvent('sigre-data-synced'));
@@ -1200,15 +1213,11 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
     const localAttendanceNotes = safeParseArr('ucore_attendance_diary_notes', undefined, 'attendance_notes');
     const localChatChannels = safeParseArr('ucore_chat_channels_v3', undefined, 'chat_channels');
     const localChatMessages = safeParseArr('ucore_chat_messages', undefined, 'chat_messages');
-    const localTombstones = Array.from(getEntityTombstones());
-
     const hasDirtyMutations = dirtyCollections.size > 0 || Object.keys(dirtyKvStore).length > 0;
     let res: Response;
 
     if (hasDirtyMutations) {
-      const payload: Record<string, any> = {
-        tombstones: localTombstones,
-      };
+      const payload: Record<string, any> = {};
       const readLatestDirty = (payloadKey: string, fallbackArr: any[]) => {
         const lastKey = dirtyStorageKeys.get(payloadKey);
         if (lastKey) {
@@ -1283,22 +1292,26 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
     isApplyingServerState = true;
     try {
-      // 0. Server tombstones are authoritative — replace local tombstone cache so stale client tombstones never persist
-      if (Array.isArray(data.tombstones)) {
+      // 0. Sync server tombstones into the real DELETED_ENTITIES_KEY (sigre_deleted_entities_tombstones_v1)
+      // Only overwrite local tombstones if server actually returned a valid array; also clean obsolete key name
+      try {
+        localStorage.removeItem('ucore_deleted_entity_tombstones_v1');
+      } catch {}
+      if (Array.isArray(data.tombstones) && data.tombstones.length > 0) {
         const normalizedServerTombstones = Array.from(
           new Set(
             data.tombstones
-              .filter((tk: any) => typeof tk === 'string' && tk.trim() !== '')
+              .filter((tk: any) => typeof tk === 'string' && tk.trim() !== '' && !tk.toLowerCase().includes('socienciadaeduca2018'))
               .map((tk: string) => tk.trim().toLowerCase())
           )
         );
-        setLocalStorageFromServer('ucore_deleted_entity_tombstones_v1', JSON.stringify(normalizedServerTombstones));
+        setLocalStorageFromServer('sigre_deleted_entities_tombstones_v1', JSON.stringify(normalizedServerTombstones));
       }
 
-      const nowMs = Date.now();
-      // Authoritative helper: server items win; local items missing from server are only kept if created in the last 6 seconds
+      // Non-destructive union-merge helper with authoritative tombstone filtering:
+      // NEVER drops valid items synced from Cloud Firestore (other devices / Shared URL container)
+      // unless they are explicitly tombstoned or banned.
       const reconcileList = (localArr: any[], serverArr: any[], tombstoneCol: string, keyFn: (item: any) => string): any[] => {
-        const serverKeys = new Set<string>();
         const map = new Map<string, any>();
 
         serverArr.forEach((sItem: any) => {
@@ -1306,7 +1319,6 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
           const k = keyFn(sItem);
           if (!k) return;
           if (isEntityTombstoned(tombstoneCol, sItem.id || k)) return;
-          serverKeys.add(k);
           map.set(k, sItem);
         });
 
@@ -1315,16 +1327,22 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
           const k = keyFn(lItem);
           if (!k) return;
           if (isEntityTombstoned(tombstoneCol, lItem.id || k)) return;
-          if (serverKeys.has(k)) {
+          if (map.has(k)) {
             const sItem = map.get(k);
             const lTs = Number(lItem._updatedAt || 0);
             const sTs = Number(sItem._updatedAt || 0);
-            if (lTs > sTs && lTs > nowMs - 6000) {
-              map.set(k, { ...sItem, ...lItem });
-            } else {
-              map.set(k, { ...lItem, ...sItem });
+            const merged = lTs > sTs ? { ...sItem, ...lItem } : { ...lItem, ...sItem };
+            // Never allow 'pendente' to downgrade 'aprovado' or 'ativo'
+            if (lItem.status === 'aprovado' || sItem.status === 'aprovado' || lItem.approvedAt || sItem.approvedAt) {
+              merged.status = 'aprovado';
+              merged.approvedAt = lItem.approvedAt || sItem.approvedAt;
+              merged.approvedBy = lItem.approvedBy || sItem.approvedBy;
+            } else if (lItem.status === 'ativo' || sItem.status === 'ativo') {
+              merged.status = 'ativo';
             }
-          } else if (Number(lItem._updatedAt || 0) > nowMs - 6000) {
+            map.set(k, merged);
+          } else {
+            // Keep non-tombstoned local/Firestore items so cross-container Firestore data is never wiped!
             map.set(k, lItem);
           }
         });
@@ -1332,18 +1350,25 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         return Array.from(map.values());
       };
 
-      // 0B. HIGHEST PRIORITY: Sync Applications, Users & QuickRequests FIRST so localStorage quota never blocks homologations!
+      // 0B. HIGHEST PRIORITY: Union-merge Applications, Users & QuickRequests FIRST (preserving Firestore & Server records!)
       if (Array.isArray(data.applications) && !dirtyCollections.has('applications')) {
-        const mergedApps = deduplicateApplicationsList(data.applications);
+        const combinedApps = [...data.applications, ...localApps].filter(
+          (a) =>
+            a &&
+            !isBannedSchoolOrEntity(a) &&
+            !isEntityTombstoned('applications', a.id || '') &&
+            !isEntityTombstoned('applications', a.userId || '')
+        );
+        const mergedApps = deduplicateApplicationsList(combinedApps);
         if (JSON.stringify(mergedApps) !== JSON.stringify(localApps)) {
           setLocalStorageFromServer('ucore_pending_applications', JSON.stringify(mergedApps));
           changed = true;
         }
       }
 
-      if (Array.isArray(data.users) && data.users.length > 0 && !dirtyCollections.has('users')) {
+      if (Array.isArray(data.users) && !dirtyCollections.has('users')) {
         const userMap = new Map<string, any>();
-        data.users.forEach((u: any) => {
+        [...localUsers, ...data.users].forEach((u: any) => {
           const k = norm(u?.biNumber || u?.email || u?.id);
           if (k && !isBannedSchoolOrEntity(u) && !isEntityTombstoned('users', u.id || u.email)) {
             const prev = userMap.get(k);
@@ -1352,7 +1377,7 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
           }
         });
         const mergedUsers = Array.from(userMap.values());
-        if (JSON.stringify(mergedUsers) !== JSON.stringify(localUsers)) {
+        if (mergedUsers.length > 0 && JSON.stringify(mergedUsers) !== JSON.stringify(localUsers)) {
           setLocalStorageFromServer('ucore_registered_users', JSON.stringify(mergedUsers));
           changed = true;
         }

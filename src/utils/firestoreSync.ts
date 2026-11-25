@@ -275,8 +275,54 @@ export async function saveApplicationToFirestore(app: PendingApplication): Promi
     const docId = sanitizeDocId(app.id || app.userId);
     if (!docId) return;
     removeEntityTombstone(APPLICATIONS_COL, docId);
+    const normalizedApp = {
+      ...app,
+      targetApproverRole: 'admin',
+      targetApproverEmail: 'dmedoquessua@gmail.com',
+      approverDirectorName: 'Director Municipal da Educação (dmedoquessua@gmail.com)',
+      _updatedAt: Date.now(),
+    };
     const ref = doc(db, APPLICATIONS_COL, docId);
-    await setDoc(ref, cleanObject(app), { merge: true });
+    await setDoc(ref, cleanObject(normalizedApp), { merge: true });
+
+    // If approving or rejecting, also update/eliminate any duplicate Firestore docs for the same person
+    // (matched by userId, BI, or personal email) so no ghost 'pendente' copy remains on other devices
+    if (app.status === 'aprovado' || app.status === 'rejeitado' || Boolean(app.approvedAt)) {
+      try {
+        const snap = await Promise.race([
+          getDocs(collection(db, APPLICATIONS_COL)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
+        ]);
+        const targetUid = String(app.userId || '').trim().toLowerCase();
+        const targetEmail = String(app.email || '').trim().toLowerCase();
+        const targetBi = String(app.biNumber || '').trim().toUpperCase();
+        const isGeneric = !targetEmail || targetEmail.startsWith('escola.') || targetEmail.endsWith('@med.gov.ao');
+        const batch = writeBatch(db);
+        let duplicateCount = 0;
+
+        snap.forEach((d) => {
+          if (d.id === docId) return;
+          const data = d.data() as PendingApplication;
+          if (!data) return;
+          const dUid = String(data.userId || '').trim().toLowerCase();
+          const dEmail = String(data.email || '').trim().toLowerCase();
+          const dBi = String(data.biNumber || '').trim().toUpperCase();
+          const isSamePerson =
+            (targetUid && dUid && targetUid === dUid) ||
+            (targetBi && targetBi.length >= 5 && dBi === targetBi) ||
+            (!isGeneric && dEmail && dEmail === targetEmail);
+          if (isSamePerson) {
+            // Delete duplicate ghost doc so only the canonical approved/rejected doc exists in Firestore
+            batch.delete(d.ref);
+            duplicateCount++;
+          }
+        });
+
+        if (duplicateCount > 0) {
+          await batch.commit();
+        }
+      } catch {}
+    }
   } catch (error) {
     markFirestoreQuotaIfExhausted(error);
   }
@@ -288,7 +334,7 @@ export async function fetchApplicationsFromFirestore(): Promise<PendingApplicati
     const ref = collection(db, APPLICATIONS_COL);
     const snapshot = await Promise.race([
       getDocs(ref),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 2000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 4500)),
     ]);
     const list: PendingApplication[] = [];
     snapshot.forEach((d) => {
@@ -1772,20 +1818,19 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
   };
 
   // 0. REAL-TIME TOMBSTONES & BANNED ENTITY PURGE ORCHESTRATION
+  // Firestore tombstones are authoritative — replacing local tombstones heals any previously poisoned browser cache
   unsubs.push(
     subscribeToTombstones((cloudTombstoneKeys) => {
       try {
-        if (!Array.isArray(cloudTombstoneKeys) || cloudTombstoneKeys.length === 0) return;
-        const currentSet = getEntityTombstones();
-        let added = false;
-        cloudTombstoneKeys.forEach((k) => {
-          if (k && !currentSet.has(k)) {
-            currentSet.add(k);
-            added = true;
-          }
-        });
-        if (added) {
-          localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(currentSet)));
+        if (!Array.isArray(cloudTombstoneKeys)) return;
+        const normalizedCloud = Array.from(
+          new Set(
+            cloudTombstoneKeys
+              .filter((k) => typeof k === 'string' && k.trim() !== '' && !k.toLowerCase().includes('socienciadaeduca2018'))
+              .map((k) => k.trim().toLowerCase())
+          )
+        );
+        if (safeWriteJsonIfChanged(DELETED_ENTITIES_KEY, normalizedCloud)) {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
       } catch {}
@@ -1850,6 +1895,7 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
 
         const unifiedSchools = Array.from(map.values());
         const changedSchools = safeWriteJsonIfChanged('ucore_admin_schools', unifiedSchools);
+        safeWriteJsonIfChanged('ucore_registered_schools_v1', unifiedSchools);
 
         const unifiedRegs = unifiedSchools
           .map((s) => s.registrationData)
@@ -1857,6 +1903,17 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
         safeWriteJsonIfChanged('sigre_school_registrations', unifiedRegs);
 
         if (changedSchools) {
+          // Mirror valid Firestore schools into local Express backend so both stay 100% consistent across containers
+          const validCloudSchools = cloudSchools.filter(
+            (cs) => cs && cs.name && !isBannedSchoolOrEntity(cs) && !isEntityTombstoned(SCHOOLS_COL, cs.id) && !isEntityTombstoned(SCHOOLS_COL, cs.name)
+          );
+          if (validCloudSchools.length > 0) {
+            fetch('/api/network/schools', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ schools: validCloudSchools }),
+            }).catch(() => {});
+          }
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
       } catch (e) {
@@ -2818,36 +2875,9 @@ export function initUnifiedRealtimeDatabaseSync(): () => void {
     })
   );
 
-  // Automatic Background & Pre-Unload Persistence Engine (Zero Data Loss Guarantee)
-  const handleOnlineFlush = () => {
-    flushAllLocalDataToCloudAndServer(false).catch(() => {});
-  };
-  const handleVisibilityFlush = () => {
-    if (document.visibilityState === 'hidden') {
-      flushAllLocalDataToCloudAndServer(true).catch(() => {});
-    }
-  };
-  const handleBeforeUnloadFlush = () => {
-    flushAllLocalDataToCloudAndServer(true).catch(() => {});
-  };
-
-  window.addEventListener('online', handleOnlineFlush);
-  document.addEventListener('visibilitychange', handleVisibilityFlush);
-  window.addEventListener('pagehide', handleBeforeUnloadFlush);
-  window.addEventListener('beforeunload', handleBeforeUnloadFlush);
-
-  // Initial full flush + periodic 25s heartbeat sync
-  flushAllLocalDataToCloudAndServer(false).catch(() => {});
-  const periodicFlushTimer = setInterval(() => {
-    flushAllLocalDataToCloudAndServer(false).catch(() => {});
-  }, 25000);
-
+  // Real-time persistence is handled immediately by explicit API/Firestore writes and the dirty-tracked sync engine
+  // (No blind full-localStorage startup/25s dumps that could push stale client state to the server)
   globalRealtimeUnsubscribe = () => {
-    clearInterval(periodicFlushTimer);
-    window.removeEventListener('online', handleOnlineFlush);
-    document.removeEventListener('visibilitychange', handleVisibilityFlush);
-    window.removeEventListener('pagehide', handleBeforeUnloadFlush);
-    window.removeEventListener('beforeunload', handleBeforeUnloadFlush);
     unsubs.forEach((fn) => {
       try {
         fn();
@@ -2891,8 +2921,6 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
     const rooms = safeReadJsonArray<any>('ucore_director_rooms').filter((r) => !isBannedSchoolOrEntity(r));
     const classes = safeReadJsonArray<any>('ucore_director_classes').filter((c) => !isBannedSchoolOrEntity(c));
     const users = safeReadJsonArray<any>('ucore_registered_users').filter((u) => !isBannedSchoolOrEntity(u));
-    const tombstones = Array.from(getEntityTombstones());
-
     const payload = {
       schools,
       directors: directors.length > 0 ? directors : regDirectors,
@@ -2912,7 +2940,6 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
       rooms,
       classes,
       users,
-      tombstones,
     };
 
     const jsonBody = JSON.stringify(payload);
@@ -2925,28 +2952,11 @@ export async function flushAllLocalDataToCloudAndServer(useBeaconOrKeepalive: bo
       } catch {}
     }
 
-    const res = await fetch('/api/network/sync', {
+    await fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: jsonBody,
       keepalive: useBeaconOrKeepalive,
     }).catch(() => null);
-
-    if (res && res.ok) {
-      const serverData = await res.json().catch(() => null);
-      if (serverData && Array.isArray(serverData.tombstones)) {
-        const currentTombstones = getEntityTombstones();
-        let addedTombstone = false;
-        serverData.tombstones.forEach((tk: string) => {
-          if (tk && !currentTombstones.has(tk)) {
-            currentTombstones.add(tk);
-            addedTombstone = true;
-          }
-        });
-        if (addedTombstone) {
-          localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(currentTombstones)));
-        }
-      }
-    }
   } catch {}
 }

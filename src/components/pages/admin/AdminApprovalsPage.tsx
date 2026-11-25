@@ -42,9 +42,8 @@ import type {
 } from '../../../types';
 import {
   getPendingApplications,
-  approveApplication,
-  rejectApplication,
-  savePendingApplication,
+  approveApplicationAsync,
+  rejectApplicationAsync,
   savePendingApplicationAsync,
   syncApplicationsFromServer,
   deleteApplication,
@@ -343,9 +342,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     setIsApproveModalOpen(true);
   };
 
-  // Confirm approve
-  const handleConfirmApprove = () => {
-    if (!appToApprove) return;
+  // Confirm approve (awaits Cloud Firestore + Server persistence so approvals immediately reflect across ALL devices)
+  const handleConfirmApprove = async () => {
+    if (!appToApprove || isSubmitting) return;
     setIsSubmitting(true);
 
     const finalNivelAcademico = nivelAcademico === 'Outro' && nivelAcademicoOutro.trim()
@@ -366,11 +365,11 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       observacoesComplementares: `${dispatchNumber} - ${approvalNotes.trim() || 'Homologação e posse oficial concedidas.'}`,
     };
 
-    setTimeout(() => {
-      const res = approveApplication(appToApprove.id, adminName, compData);
+    try {
+      const res = await approveApplicationAsync(appToApprove.id, adminName, compData);
       if (res.success && res.app) {
         const updated = res.app;
-        loadApplications();
+        refreshLocalApplications();
 
         // Add to global directors state only if School General Director
         if (onAddDirectorGlobal && updated.type === 'diretor') {
@@ -457,12 +456,13 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
         }
 
         const notify = showToast || alert;
-        notify(`Registo de "${updated.fullName}" (${updated.roleRequested || 'Quadros DME'}) homologado com sucesso pelo Administrador Central (DME)! Acesso liberado.`);
+        notify(`Registo de "${updated.fullName}" (${updated.roleRequested || 'Quadros DME'}) homologado e sincronizado na nuvem com sucesso!`);
       }
+    } finally {
       setIsSubmitting(false);
       setIsApproveModalOpen(false);
       setAppToApprove(null);
-    }, 400);
+    }
   };
 
   // Open reject modal
@@ -472,22 +472,23 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     setIsRejectModalOpen(true);
   };
 
-  // Confirm reject
-  const handleConfirmReject = () => {
-    if (!appToReject || !rejectReason.trim()) return;
+  // Confirm reject (awaits Cloud Firestore + Server persistence)
+  const handleConfirmReject = async () => {
+    if (!appToReject || !rejectReason.trim() || isSubmitting) return;
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const res = rejectApplication(appToReject.id, rejectReason.trim(), adminName);
+    try {
+      const res = await rejectApplicationAsync(appToReject.id, rejectReason.trim(), adminName);
       if (res.success) {
-        loadApplications();
+        refreshLocalApplications();
         const notify = showToast || alert;
-        notify(`Inscrição de ${appToReject.fullName} indeferida.`);
+        notify(`Inscrição de ${appToReject.fullName} indeferida e sincronizada.`);
       }
+    } finally {
       setIsSubmitting(false);
       setIsRejectModalOpen(false);
       setAppToReject(null);
-    }, 400);
+    }
   };
 
   // Simulate new director registration

@@ -20,6 +20,7 @@ import {
   deleteDirectorFromFirestore,
   deleteDmeStaffFromFirestore,
   isBannedSchoolOrEntity,
+  isEntityTombstoned,
 } from './firestoreSync';
 import { encodePasswordVerifier, deleteUserCredentials } from './passwordService';
 
@@ -390,6 +391,13 @@ function writeApplicationsWithoutDirtyEcho(apps: PendingApplication[]): void {
  * so applications created on any device appear immediately in dmedoquessua@gmail.com.
  * Uses an in-flight singleton mutex so simultaneous callers share a single fast request.
  */
+const pushedAppStatusToFirestore = new Map<string, string>();
+
+/**
+ * Synchronizes pending & approved applications bidirectionally between Cloud Firestore
+ * (shared across ALL devices, Preview & Shared URLs) and the backend server (/api/network/applications)
+ * so approvals and registrations made on ANY device reflect immediately everywhere.
+ */
 export async function syncApplicationsFromServer(force: boolean = false): Promise<PendingApplication[]> {
   if (applicationsSyncInFlight) {
     return applicationsSyncInFlight;
@@ -403,56 +411,101 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
     try {
       const combined: PendingApplication[] = [];
 
-      // 1. Fetch authoritative server applications first (instant from memory)
-      let serverApps: PendingApplication[] = [];
-      try {
-        const res = await Promise.race([
-          fetch('/api/network/applications', { headers: { Accept: 'application/json' } }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 6000)),
-        ]);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.applications)) {
-            serverApps = data.applications;
-            combined.push(...serverApps);
-          }
-        }
-      } catch {}
-
-      // 2. Opportunistic Firestore pull with strict 1500ms timeout (never blocks if quota exhausted)
-      try {
-        const firestoreApps = await Promise.race([
+      // 1. Fetch Express server AND Cloud Firestore in parallel (Firestore is the shared source across ais-dev & ais-pre!)
+      const [serverResult, firestoreResult] = await Promise.allSettled([
+        Promise.race([
+          fetch('/api/network/applications', { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]),
+        Promise.race([
           fetchApplicationsFromFirestore(),
-          new Promise<PendingApplication[]>((resolve) => setTimeout(() => resolve([]), 1500)),
-        ]);
-        if (Array.isArray(firestoreApps) && firestoreApps.length > 0) {
-          combined.push(...firestoreApps);
-        }
-      } catch {}
+          new Promise<PendingApplication[]>((resolve) => setTimeout(() => resolve([]), 4500)),
+        ]),
+      ]);
 
-      // 3. Include local applications
+      const serverApps: PendingApplication[] =
+        serverResult.status === 'fulfilled' && serverResult.value && Array.isArray(serverResult.value.applications)
+          ? serverResult.value.applications
+          : [];
+      const firestoreApps: PendingApplication[] =
+        firestoreResult.status === 'fulfilled' && Array.isArray(firestoreResult.value)
+          ? firestoreResult.value.filter(
+              (a) =>
+                a &&
+                !isBannedSchoolOrEntity(a) &&
+                !isEntityTombstoned('applications', a.id || '') &&
+                !isEntityTombstoned('applications', a.userId || '')
+            )
+          : [];
+
+      // Heal stale local sigre_deleted_application_ids_v1 for applications that are live (non-tombstoned) in Cloud Firestore
+      if (firestoreApps.length > 0) {
+        firestoreApps.forEach((fa) => {
+          removeDeletedApplicationId(fa.id, fa.userId, fa.email, fa.biNumber);
+        });
+        combined.push(...firestoreApps);
+      }
+      if (serverApps.length > 0) {
+        const liveServerApps = serverApps.filter(
+          (a) =>
+            a &&
+            !isBannedSchoolOrEntity(a) &&
+            !isEntityTombstoned('applications', a.id || '') &&
+            !isEntityTombstoned('applications', a.userId || '')
+        );
+        liveServerApps.forEach((sa) => {
+          removeDeletedApplicationId(sa.id, sa.userId, sa.email, sa.biNumber);
+        });
+        combined.push(...liveServerApps);
+      }
+
+      // 2. Include local applications
       const localApps = getPendingApplications();
       combined.push(...localApps);
 
-      // 4. Canonically deduplicate & unify so no candidate is duplicated and 'aprovado' never downgrades to 'pendente'
+      // 3. Canonically deduplicate & unify so no candidate is duplicated and 'aprovado' ALWAYS wins over 'pendente'
       const merged = deduplicateApplicationsList(combined);
-      writeApplicationsWithoutDirtyEcho(merged);
+      const prevRaw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
+      const nextRaw = JSON.stringify(merged);
+      if (prevRaw !== nextRaw) {
+        writeApplicationsWithoutDirtyEcho(merged);
+      }
       lastApplicationsSyncAt = Date.now();
 
-      // 5. If any genuinely new local application is missing on server, push them in ONE batched request
-      if (serverApps.length > 0) {
-        const missingOrUpgraded = merged.filter((ma) => {
-          const srvMatch = serverApps.find((sa) => sa.id === ma.id || sa.userId === ma.userId);
-          return !srvMatch || (ma.status === 'aprovado' && srvMatch.status !== 'aprovado');
+      // 4. Mirror any missing or upgraded ('aprovado'/'rejeitado') apps to Express server in ONE batched POST
+      const missingOrUpgradedOnServer = merged.filter((ma) => {
+        const srvMatch = serverApps.find((sa) => sa.id === ma.id || (sa.userId && sa.userId === ma.userId));
+        if (!srvMatch) return true;
+        if (ma.status === 'aprovado' && srvMatch.status !== 'aprovado') return true;
+        if (ma.status === 'rejeitado' && srvMatch.status === 'pendente') return true;
+        return false;
+      });
+      if (missingOrUpgradedOnServer.length > 0) {
+        fetch('/api/network/applications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applications: missingOrUpgradedOnServer }),
+          keepalive: true,
+        }).catch(() => {});
+      }
+
+      // 5. Mirror any missing or upgraded ('aprovado'/'rejeitado') apps to Cloud Firestore (deduped in memory)
+      if (firestoreApps.length > 0 || serverApps.length > 0) {
+        const missingOrUpgradedInFirestore = merged.filter((ma) => {
+          const fsMatch = firestoreApps.find((fa) => fa.id === ma.id || (fa.userId && fa.userId === ma.userId));
+          const needsPush =
+            !fsMatch ||
+            (ma.status === 'aprovado' && fsMatch.status !== 'aprovado') ||
+            (ma.status === 'rejeitado' && fsMatch.status === 'pendente');
+          if (!needsPush) return false;
+          const sig = `${ma.status}:${ma.approvedAt || ''}`;
+          if (pushedAppStatusToFirestore.get(ma.id) === sig) return false;
+          pushedAppStatusToFirestore.set(ma.id, sig);
+          return true;
         });
-        if (missingOrUpgraded.length > 0) {
-          fetch('/api/network/applications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ applications: missingOrUpgraded }),
-            keepalive: true,
-          }).catch(() => {});
-        }
+        missingOrUpgradedInFirestore.slice(0, 15).forEach((item) => {
+          saveApplicationToFirestore(item).catch(() => {});
+        });
       }
 
       return merged;
@@ -468,8 +521,9 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
 }
 
 /**
- * Initializes a real-time cloud listener that keeps this device's application list
- * updated in real time whenever any candidate signs up on any mobile or desktop device.
+ * Initializes a real-time Cloud Firestore listener that keeps this device's application list
+ * AND local Express server updated instantaneously whenever any candidate signs up OR any admin
+ * approves/rejects a homologation on ANY other device (Preview, Shared URL, Mobile, Desktop).
  */
 let realtimeUnsubscribe: (() => void) | null = null;
 export function initRealtimeApplicationsSync(
@@ -481,12 +535,30 @@ export function initRealtimeApplicationsSync(
 
   realtimeUnsubscribe = subscribeToApplications((firestoreApps) => {
     try {
+      const liveFsApps = (firestoreApps || []).filter(
+        (a) =>
+          a &&
+          !isBannedSchoolOrEntity(a) &&
+          !isEntityTombstoned('applications', a.id || '') &&
+          !isEntityTombstoned('applications', a.userId || '')
+      );
+      liveFsApps.forEach((fa) => {
+        removeDeletedApplicationId(fa.id, fa.userId, fa.email, fa.biNumber);
+      });
       const localApps = getPendingApplications();
-      const validApps = deduplicateApplicationsList([...localApps, ...(firestoreApps || [])]);
+      const validApps = deduplicateApplicationsList([...liveFsApps, ...localApps]);
       const prevRaw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
       const nextRaw = JSON.stringify(validApps);
       if (prevRaw !== nextRaw) {
         writeApplicationsWithoutDirtyEcho(validApps);
+        // Mirror Cloud Firestore updates to this container's Express backend so GET /api/network/sync stays fresh
+        if (liveFsApps.length > 0) {
+          fetch('/api/network/applications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ applications: validApps }),
+          }).catch(() => {});
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
@@ -1105,7 +1177,7 @@ export function approveApplication(
       }
     }
 
-    // Push approval to Firestore cloud
+    // Push approval to Firestore cloud (also cleans any duplicate ghost 'pendente' docs for the same person)
     saveApplicationToFirestore(updatedApp).catch((e) => {
       console.warn('[authApprovalStorage] Falha ao atualizar homologação no Firestore:', e);
     });
@@ -1114,7 +1186,7 @@ export function approveApplication(
       fetch('/api/network/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application: updatedApp }),
+        body: JSON.stringify({ application: updatedApp, ...(activatedUser ? { user: activatedUser } : {}) }),
         keepalive: true,
       }).catch(() => {});
       window.dispatchEvent(new CustomEvent('sigre-data-synced'));
@@ -1125,6 +1197,51 @@ export function approveApplication(
     console.error('Erro ao aprovar candidatura:', e);
     return { success: false };
   }
+}
+
+/**
+ * Async version of approveApplication that AWAITS persistence to BOTH Cloud Firestore
+ * (cross-device shared DB) and /api/network/applications BEFORE returning, eliminating
+ * any race condition where an approval flickers back to 'pendente'.
+ */
+export async function approveApplicationAsync(
+  applicationId: string,
+  approverName: string = 'Administrador Sigre',
+  complementaryData?: PendingApprovalComplementaryData
+): Promise<{ success: boolean; app?: PendingApplication; activatedUser?: UserAccount }> {
+  const res = approveApplication(applicationId, approverName, complementaryData);
+  if (!res.success || !res.app) {
+    return res;
+  }
+
+  const updatedApp = res.app;
+  const activatedUser = res.activatedUser;
+
+  const postToServer = async () => {
+    await Promise.race([
+      fetch('/api/network/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application: updatedApp, ...(activatedUser ? { user: activatedUser } : {}) }),
+        keepalive: true,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+    ]);
+  };
+
+  await Promise.allSettled([
+    Promise.race([
+      saveApplicationToFirestore(updatedApp),
+      new Promise<void>((resolve) => setTimeout(resolve, 4500)),
+    ]),
+    postToServer().catch(() => postToServer().catch(() => {})),
+  ]);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+  }
+
+  return res;
 }
 
 /**
@@ -1186,6 +1303,34 @@ export function rejectApplication(
     console.error('Erro ao rejeitar candidatura:', e);
     return { success: false };
   }
+}
+
+export async function rejectApplicationAsync(
+  applicationId: string,
+  reason: string,
+  rejectorName: string = 'Responsável Sigre'
+): Promise<{ success: boolean; app?: PendingApplication }> {
+  const res = rejectApplication(applicationId, reason, rejectorName);
+  if (!res.success || !res.app) {
+    return res;
+  }
+  const updatedApp = res.app;
+  await Promise.allSettled([
+    Promise.race([
+      saveApplicationToFirestore(updatedApp),
+      new Promise<void>((resolve) => setTimeout(resolve, 4500)),
+    ]),
+    fetch('/api/network/applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ application: updatedApp }),
+      keepalive: true,
+    }).catch(() => {}),
+  ]);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+  }
+  return res;
 }
 
 /**

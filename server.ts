@@ -1604,17 +1604,21 @@ async function startServer() {
           if (Math.max(existingTs, incomingTs) > 0) {
             merged._updatedAt = Math.max(existingTs, incomingTs);
           }
-          // Never allow a stale 'pendente' payload from another device to downgrade an already approved/active record
-          if (
-            (existing.status === "aprovado" || Boolean(existing.approvedAt)) &&
-            item.status === "pendente" &&
-            incomingTs <= existingTs
-          ) {
+          // UNCONDITIONALLY never allow any 'pendente' payload from a stale device to downgrade an already approved/active record
+          const existingApproved = existing.status === "aprovado" || Boolean(existing.approvedAt);
+          const incomingApproved = item.status === "aprovado" || Boolean(item.approvedAt);
+          if (existingApproved || incomingApproved) {
             merged.status = "aprovado";
             merged.approvedAt = existing.approvedAt || item.approvedAt;
             merged.approvedBy = existing.approvedBy || item.approvedBy;
-          } else if (existing.status === "ativo" && item.status === "pendente" && incomingTs <= existingTs) {
+            merged.complementaryData = existing.complementaryData || item.complementaryData;
+          } else if (existing.status === "ativo" && item.status === "pendente") {
             merged.status = "ativo";
+            merged.approvedAt = existing.approvedAt || item.approvedAt;
+            merged.approvedBy = existing.approvedBy || item.approvedBy;
+          } else if (existing.status === "rejeitado" && item.status === "pendente" && incomingTs <= existingTs) {
+            merged.status = "rejeitado";
+            merged.rejectionReason = existing.rejectionReason || item.rejectionReason;
           }
           map.set(k, merged);
         } else {
@@ -1824,11 +1828,53 @@ async function startServer() {
         _updatedAt: Number(appItem._updatedAt || Date.now()),
       }));
 
-      networkStore.applications = upsertByKey(
+      const mergedRaw = upsertByKey(
         networkStore.applications,
         normalizedIncoming,
         (appItem) => String(appItem.id || appItem.userId || appItem.email || "").trim().toLowerCase()
       );
+      // Canonical deduplication by userId / BI / personal email so duplicate docs for the same person never leave a ghost 'pendente'
+      const canonicalApps: any[] = [];
+      for (const candidate of mergedRaw) {
+        if (!candidate) continue;
+        const cId = String(candidate.id || "").trim().toLowerCase();
+        const cUid = String(candidate.userId || "").trim().toLowerCase();
+        const cBi = String(candidate.biNumber || "").trim().toUpperCase();
+        const cEmail = String(candidate.email || "").trim().toLowerCase();
+        const isGeneric = !cEmail || cEmail.startsWith("escola.") || cEmail.endsWith("@med.gov.ao");
+        const idx = canonicalApps.findIndex((ex) => {
+          const eId = String(ex.id || "").trim().toLowerCase();
+          const eUid = String(ex.userId || "").trim().toLowerCase();
+          const eBi = String(ex.biNumber || "").trim().toUpperCase();
+          const eEmail = String(ex.email || "").trim().toLowerCase();
+          if (cId && eId && cId === eId) return true;
+          if (cUid && eUid && cUid === eUid) return true;
+          if (cBi && eBi && cBi.length >= 5 && cBi === eBi) return true;
+          if (!isGeneric && eEmail && cEmail === eEmail) return true;
+          return false;
+        });
+        if (idx >= 0) {
+          const prev = canonicalApps[idx];
+          const isApproved = prev.status === "aprovado" || candidate.status === "aprovado" || Boolean(prev.approvedAt) || Boolean(candidate.approvedAt);
+          const isRejected = !isApproved && (prev.status === "rejeitado" || candidate.status === "rejeitado");
+          const preferCand = (candidate.status === "aprovado" && prev.status !== "aprovado") || Number(candidate._updatedAt || 0) > Number(prev._updatedAt || 0);
+          const primary = preferCand ? candidate : prev;
+          const secondary = preferCand ? prev : candidate;
+          canonicalApps[idx] = {
+            ...secondary,
+            ...primary,
+            status: isApproved ? "aprovado" : isRejected ? "rejeitado" : "pendente",
+            approvedAt: primary.approvedAt || secondary.approvedAt,
+            approvedBy: primary.approvedBy || secondary.approvedBy,
+            complementaryData: primary.complementaryData || secondary.complementaryData,
+            targetApproverRole: "admin",
+            targetApproverEmail: "dmedoquessua@gmail.com",
+          };
+        } else {
+          canonicalApps.push(candidate);
+        }
+      }
+      networkStore.applications = canonicalApps;
       const afterAppsSnap = JSON.stringify((networkStore.applications || []).map(({ _updatedAt, ...rest }) => rest));
       if (afterAppsSnap !== beforeAppsSnap) {
         didMutate = true;
