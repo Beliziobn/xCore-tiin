@@ -180,7 +180,9 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       const data = await fetchQuickRequests();
       setRequests(data);
       if (isMasterAdmin) {
-        getQuickRequestsServerCounts().then(setServerCounts).catch(() => {});
+        getQuickRequestsServerCounts()
+          .then(setServerCounts)
+          .catch((err) => console.error('[QuickServices] Erro ao obter contagens do servidor:', err));
       }
     } catch (e) {
       console.error('[QuickServices] Failed to load requests:', e);
@@ -228,7 +230,8 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
       setRequests([]);
       setServerCounts({ total: 0, pendentes: 0, concluidos: 0 });
       showToast?.(`Todos os pedidos foram zerados com sucesso.`);
-    } catch {
+    } catch (err) {
+      console.error('[QuickServices] Erro ao zerar pedidos:', err);
       showToast?.('Erro ao zerar pedidos.');
     } finally {
       setIsLoading(false);
@@ -505,91 +508,95 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
     if (!vacancyModalRequest) return;
     setIsSubmittingVacancyResponse(true);
 
-    const destSchool =
-      vacancyModalRequest.destinationSchoolName ||
-      vacancyModalRequest.details?.destinationSchool ||
-      vacancyModalRequest.details?.purpose ||
-      activeDirectorSchoolName;
-    const classe =
-      vacancyModalRequest.details?.enrolledClasse ||
-      vacancyModalRequest.details?.studentClasse ||
-      '7ª Classe';
-    const responderName = isMasterAdmin
-      ? 'Belízio dos Santos (DME Quêssua)'
-      : `${currentUser?.firstName || 'Diretor(a)'} ${currentUser?.lastName || ''} (${destSchool})`.trim();
+    try {
+      const destSchool =
+        vacancyModalRequest.destinationSchoolName ||
+        vacancyModalRequest.details?.destinationSchool ||
+        vacancyModalRequest.details?.purpose ||
+        activeDirectorSchoolName;
+      const classe =
+        vacancyModalRequest.details?.enrolledClasse ||
+        vacancyModalRequest.details?.studentClasse ||
+        '7ª Classe';
+      const responderName = isMasterAdmin
+        ? 'Belízio dos Santos (DME Quêssua)'
+        : `${currentUser?.firstName || 'Diretor(a)'} ${currentUser?.lastName || ''} (${destSchool})`.trim();
 
-    const chosenTurmaObj = destinationTurmaVacancies.find((t) => t.turma === selectedVacancyTurma);
+      const chosenTurmaObj = destinationTurmaVacancies.find((t) => t.turma === selectedVacancyTurma);
 
-    if (decision === 'CONFIRM') {
-      if (!chosenTurmaObj || chosenTurmaObj.isFull) {
-        setIsSubmittingVacancyResponse(false);
-        showToast?.('A turma selecionada não possui vagas disponíveis.');
-        return;
-      }
+      if (decision === 'CONFIRM') {
+        if (!chosenTurmaObj || chosenTurmaObj.isFull) {
+          showToast?.('A turma selecionada não possui vagas disponíveis.');
+          return;
+        }
 
-      const msg = `A Direção da escola de destino (${destSchool}) CONFIRMOU A DISPONIBILIDADE DE VAGA para o(a) aluno(a) ${vacancyModalRequest.details?.studentName} na ${classe} e reservou lugar na ${chosenTurmaObj.turma} (${chosenTurmaObj.turno} • ${chosenTurmaObj.sala}). A escola de origem já pode emitir a Guia de Transferência Oficial.`;
+        const msg = `A Direção da escola de destino (${destSchool}) CONFIRMOU A DISPONIBILIDADE DE VAGA para o(a) aluno(a) ${vacancyModalRequest.details?.studentName} na ${classe} e reservou lugar na ${chosenTurmaObj.turma} (${chosenTurmaObj.turno} • ${chosenTurmaObj.sala}). A escola de origem já pode emitir a Guia de Transferência Oficial.`;
 
-      const res = await updateQuickRequestStatus(vacancyModalRequest.id, {
-        status: 'VAGA_CONFIRMADA',
-        responseMessage: msg,
-        resolvedBy: responderName,
-        destinationSchoolName: destSchool,
-        details: {
-          destinationSchool: destSchool,
-          vacancyRespondedAt: new Date().toISOString(),
-          vacancyRespondedBy: responderName,
-          vacancyNotes:
-            vacancyResponseNotes.trim() ||
-            `Vaga validada e lugar reservado na ${chosenTurmaObj.turma} (${chosenTurmaObj.turno}).`,
-          reservedTurma: chosenTurmaObj.turma,
-          reservedTurno: chosenTurmaObj.turno,
-          reservedSala: chosenTurmaObj.sala,
-        },
-      });
+        const res = await updateQuickRequestStatus(vacancyModalRequest.id, {
+          status: 'VAGA_CONFIRMADA',
+          responseMessage: msg,
+          resolvedBy: responderName,
+          destinationSchoolName: destSchool,
+          details: {
+            destinationSchool: destSchool,
+            vacancyRespondedAt: new Date().toISOString(),
+            vacancyRespondedBy: responderName,
+            vacancyNotes:
+              vacancyResponseNotes.trim() ||
+              `Vaga validada e lugar reservado na ${chosenTurmaObj.turma} (${chosenTurmaObj.turno}).`,
+            reservedTurma: chosenTurmaObj.turma,
+            reservedTurno: chosenTurmaObj.turno,
+            reservedSala: chosenTurmaObj.sala,
+          },
+        });
 
-      setIsSubmittingVacancyResponse(false);
-      if (res.success && res.request) {
-        setRequests((prev) => prev.map((r) => (r.id === vacancyModalRequest.id ? res.request! : r)));
-        setVacancyModalRequest(null);
-        showToast?.(
-          `Vaga confirmada e lugar reservado na ${chosenTurmaObj.turma} (${destSchool})!`
-        );
+        if (res.success && res.request) {
+          setRequests((prev) => prev.map((r) => (r.id === vacancyModalRequest.id ? res.request! : r)));
+          setVacancyModalRequest(null);
+          showToast?.(
+            `Vaga confirmada e lugar reservado na ${chosenTurmaObj.turma} (${destSchool})!`
+          );
+        } else {
+          showToast?.('Erro ao confirmar vaga na escola de destino.');
+        }
       } else {
-        showToast?.('Erro ao confirmar vaga na escola de destino.');
+        const msg = `A Direção da escola de destino (${destSchool}) informou que NÃO HÁ VAGA DISPONÍVEL para enquadrar o(a) aluno(a) ${vacancyModalRequest.details?.studentName} na ${classe}. ${
+          vacancyResponseNotes.trim()
+            ? `Justificação: ${vacancyResponseNotes.trim()}`
+            : 'Todas as turmas desta classe atingiram a capacidade máxima.'
+        }`;
+
+        const res = await updateQuickRequestStatus(vacancyModalRequest.id, {
+          status: 'SEM_VAGA_DESTINO',
+          responseMessage: msg,
+          resolvedBy: responderName,
+          destinationSchoolName: destSchool,
+          details: {
+            destinationSchool: destSchool,
+            vacancyRespondedAt: new Date().toISOString(),
+            vacancyRespondedBy: responderName,
+            vacancyNotes:
+              vacancyResponseNotes.trim() ||
+              'Sem disponibilidade de vagas nas turmas da classe pretendida.',
+            reservedTurma: undefined,
+            reservedTurno: undefined,
+            reservedSala: undefined,
+          },
+        });
+
+        if (res.success && res.request) {
+          setRequests((prev) => prev.map((r) => (r.id === vacancyModalRequest.id ? res.request! : r)));
+          setVacancyModalRequest(null);
+          showToast?.(`Indisponibilidade de vaga comunicada à escola de origem.`);
+        } else {
+          showToast?.('Erro ao registar resposta de indisponibilidade de vaga.');
+        }
       }
-    } else {
-      const msg = `A Direção da escola de destino (${destSchool}) informou que NÃO HÁ VAGA DISPONÍVEL para enquadrar o(a) aluno(a) ${vacancyModalRequest.details?.studentName} na ${classe}. ${
-        vacancyResponseNotes.trim()
-          ? `Justificação: ${vacancyResponseNotes.trim()}`
-          : 'Todas as turmas desta classe atingiram a capacidade máxima.'
-      }`;
-
-      const res = await updateQuickRequestStatus(vacancyModalRequest.id, {
-        status: 'SEM_VAGA_DESTINO',
-        responseMessage: msg,
-        resolvedBy: responderName,
-        destinationSchoolName: destSchool,
-        details: {
-          destinationSchool: destSchool,
-          vacancyRespondedAt: new Date().toISOString(),
-          vacancyRespondedBy: responderName,
-          vacancyNotes:
-            vacancyResponseNotes.trim() ||
-            'Sem disponibilidade de vagas nas turmas da classe pretendida.',
-          reservedTurma: undefined,
-          reservedTurno: undefined,
-          reservedSala: undefined,
-        },
-      });
-
+    } catch (err) {
+      console.error('[QuickServices] Erro ao responder pedido de vaga:', err);
+      showToast?.('Erro ao comunicar resposta de vaga.');
+    } finally {
       setIsSubmittingVacancyResponse(false);
-      if (res.success && res.request) {
-        setRequests((prev) => prev.map((r) => (r.id === vacancyModalRequest.id ? res.request! : r)));
-        setVacancyModalRequest(null);
-        showToast?.(`Indisponibilidade de vaga comunicada à escola de origem.`);
-      } else {
-        showToast?.('Erro ao registar resposta de indisponibilidade de vaga.');
-      }
     }
   };
 
@@ -752,44 +759,49 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
     if (!notifyModalRequest) return;
     setIsDispatching(true);
 
-    const author = isMasterAdmin
-      ? `Belízio dos Santos (Administrador Central DME - dmedoquessua@gmail.com)`
-      : `${currentUser?.firstName || 'Direção'} ${currentUser?.lastName || 'Escolar'}`;
+    try {
+      const author = isMasterAdmin
+        ? `Belízio dos Santos (Administrador Central DME - dmedoquessua@gmail.com)`
+        : `${currentUser?.firstName || 'Direção'} ${currentUser?.lastName || 'Escolar'}`;
 
-    const res = await updateQuickRequestStatus(notifyModalRequest.id, {
-      status: targetStatus,
-      responseMessage: notificationMessage.trim(),
-      resolvedBy: author,
-    });
+      const res = await updateQuickRequestStatus(notifyModalRequest.id, {
+        status: targetStatus,
+        responseMessage: notificationMessage.trim(),
+        resolvedBy: author,
+      });
 
-    setIsDispatching(false);
+      if (res.success && res.request) {
+        setRequests((prev) =>
+          prev.map((r) => (r.id === notifyModalRequest.id ? res.request! : r))
+        );
+        if (showToast) {
+          showToast(`Despacho do pedido ${notifyModalRequest.protocol} registado com sucesso!`);
+        }
 
-    if (res.success && res.request) {
-      setRequests((prev) =>
-        prev.map((r) => (r.id === notifyModalRequest.id ? res.request! : r))
-      );
-      if (showToast) {
-        showToast(`Despacho do pedido ${notifyModalRequest.protocol} registado com sucesso!`);
+        if (openWhatsAppAfter && notifyModalRequest.requesterPhone) {
+          const cleanPhone = notifyModalRequest.requesterPhone.replace(/\D/g, '');
+          const fullPhone = cleanPhone.startsWith('244') ? cleanPhone : `244${cleanPhone}`;
+          const encoded = encodeURIComponent(notificationMessage.trim());
+          const link = document.createElement('a');
+          link.href = `https://wa.me/${fullPhone}?text=${encoded}`;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+
+        setNotifyModalRequest(null);
+      } else {
+        if (showToast) {
+          showToast(res.error || 'Erro ao gravar o despacho do pedido.');
+        }
       }
-
-      if (openWhatsAppAfter && notifyModalRequest.requesterPhone) {
-        const cleanPhone = notifyModalRequest.requesterPhone.replace(/\D/g, '');
-        const fullPhone = cleanPhone.startsWith('244') ? cleanPhone : `244${cleanPhone}`;
-        const encoded = encodeURIComponent(notificationMessage.trim());
-        const link = document.createElement('a');
-        link.href = `https://wa.me/${fullPhone}?text=${encoded}`;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-
-      setNotifyModalRequest(null);
-    } else {
-      if (showToast) {
-        showToast(res.error || 'Erro ao gravar o despacho do pedido.');
-      }
+    } catch (err) {
+      console.error('[QuickServices] Erro ao gravar despacho do pedido:', err);
+      showToast?.('Erro ao gravar o despacho do pedido.');
+    } finally {
+      setIsDispatching(false);
     }
   };
 
@@ -850,120 +862,125 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
 
     setIsSubmittingDirect(true);
 
-    let title = '';
-    let details: QuickServiceRequest['details'] = {
-      studentName: enrollment.matchedName || directStudentName.trim(),
-      studentBiOrProcesso:
-        enrollment.codigoMatricula || directStudentBi.trim() || 'Registo Escolar',
-      studentClasse: enrollment.classe || directStudentClasse,
-      studentTurma: enrollment.turma || directStudentTurma,
-      studentPeriodo: enrollment.turno || directStudentPeriodo,
-      enrollmentVerified: true,
-      enrolledStudentId: enrollment.studentId,
-      enrolledCodigoMatricula: enrollment.codigoMatricula,
-      enrolledClasse: enrollment.classe,
-      enrolledTurma: enrollment.turma,
-      enrolledTurno: enrollment.turno,
-      enrolledSala: enrollment.sala,
-    };
-
-    if (directServiceType === 'BOLETIM_NOTAS') {
-      title = `Boletim de Notas - ${details.studentName} (${directTrimestre})`;
-      const gradesData = extractStudentGradesFromPautas({
-        studentName: details.studentName!,
-        schoolName: activeDirectorSchoolName,
-        classe: details.studentClasse!,
-        turma: details.studentTurma!,
-        trimestre: directTrimestre,
-      });
-      details = {
-        ...details,
-        trimestre: directTrimestre,
-        academicYear: '2025/2026',
-        gradesSnapshot: gradesData.gradesSnapshot,
-        overallAverage: gradesData.overallAverage,
-        gradingScaleType: gradesData.gradingScaleType,
-        gradingScaleLabel: gradesData.gradingScaleLabel,
-        academicStatus: gradesData.academicStatus,
+    try {
+      let title = '';
+      let details: QuickServiceRequest['details'] = {
+        studentName: enrollment.matchedName || directStudentName.trim(),
+        studentBiOrProcesso:
+          enrollment.codigoMatricula || directStudentBi.trim() || 'Registo Escolar',
+        studentClasse: enrollment.classe || directStudentClasse,
+        studentTurma: enrollment.turma || directStudentTurma,
+        studentPeriodo: enrollment.turno || directStudentPeriodo,
+        enrollmentVerified: true,
+        enrolledStudentId: enrollment.studentId,
+        enrolledCodigoMatricula: enrollment.codigoMatricula,
+        enrolledClasse: enrollment.classe,
+        enrolledTurma: enrollment.turma,
+        enrolledTurno: enrollment.turno,
+        enrolledSala: enrollment.sala,
       };
-    } else if (directServiceType === 'DECLARACAO_MATRICULA') {
-      title = `Declaração de Matrícula / Frequência - ${details.studentName}`;
-      details = {
-        ...details,
-        academicYear: '2025/2026',
-        purpose: directPurpose.trim() || 'Comprovativo de Matrícula e Frequência Escolar',
-      };
-    } else {
-      title = `Guia de Transferência Escolar - ${details.studentName}`;
-      details = {
-        ...details,
-        purpose: resolvedDestSchool,
-        destinationSchool: resolvedDestSchool,
-        vacancyRequestedAt: new Date().toISOString(),
-        vacancyRequestedBy: `${currentUser?.firstName || 'Direção'} (${activeDirectorSchoolName})`,
-      };
-    }
 
-    const res = await submitQuickServiceRequest({
-      serviceType: directServiceType,
-      title,
-      requesterName: directGuardianName.trim() || details.studentName!,
-      requesterPhone: directGuardianPhone.trim() || '+244 923 000 000',
-      requesterRoleTitle: 'Pedido / Emissão pela Direção Escolar',
-      targetRole: 'DIRECTOR',
-      targetSchoolName: activeDirectorSchoolName,
-      destinationSchoolName:
-        directServiceType === 'GUIA_TRANSFERENCIA' ? resolvedDestSchool : undefined,
-      details,
-    });
-
-    setIsSubmittingDirect(false);
-
-    if (res.success && res.request) {
-      if (directServiceType === 'GUIA_TRANSFERENCIA') {
-        // Transfer requires destination school vacancy consultation first
-        const vacRes = await updateQuickRequestStatus(res.request.id, {
-          status: 'AGUARDANDO_VAGA_DESTINO',
-          responseMessage: `Pedido de transferência registado com matrícula comprovada na ${details.studentClasse} (${details.studentTurma}). Consulta de vaga enviada para a Direção da escola de destino (${resolvedDestSchool}).`,
-          resolvedBy: currentUser?.firstName
-            ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
-            : 'Direção Escolar',
-          destinationSchoolName: resolvedDestSchool,
-          details,
+      if (directServiceType === 'BOLETIM_NOTAS') {
+        title = `Boletim de Notas - ${details.studentName} (${directTrimestre})`;
+        const gradesData = extractStudentGradesFromPautas({
+          studentName: details.studentName!,
+          schoolName: activeDirectorSchoolName,
+          classe: details.studentClasse!,
+          turma: details.studentTurma!,
+          trimestre: directTrimestre,
         });
-        const updatedReq = vacRes.request || {
-          ...res.request,
-          status: 'AGUARDANDO_VAGA_DESTINO' as QuickServiceStatus,
-          destinationSchoolName: resolvedDestSchool,
-          details,
+        details = {
+          ...details,
+          trimestre: directTrimestre,
+          academicYear: '2025/2026',
+          gradesSnapshot: gradesData.gradesSnapshot,
+          overallAverage: gradesData.overallAverage,
+          gradingScaleType: gradesData.gradingScaleType,
+          gradingScaleLabel: gradesData.gradingScaleLabel,
+          academicStatus: gradesData.academicStatus,
         };
-        setRequests((prev) => [updatedReq, ...prev.filter((r) => r.id !== updatedReq.id)]);
-        setIsDirectEmitModalOpen(false);
-        showToast?.(
-          `Consulta de vaga enviada para "${resolvedDestSchool}". A Guia será liberada após confirmação da vaga!`
-        );
+      } else if (directServiceType === 'DECLARACAO_MATRICULA') {
+        title = `Declaração de Matrícula / Frequência - ${details.studentName}`;
+        details = {
+          ...details,
+          academicYear: '2025/2026',
+          purpose: directPurpose.trim() || 'Comprovativo de Matrícula e Frequência Escolar',
+        };
       } else {
-        await updateQuickRequestStatus(res.request.id, {
-          status: 'CONCLUIDO',
-          responseMessage: 'Documento oficial emitido com matrícula e pauta verificadas pela Direção Escolar.',
-          resolvedBy: currentUser?.firstName
-            ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
-            : 'Direção Escolar',
-          details,
-        });
-        const updatedReq: QuickServiceRequest = {
-          ...res.request,
-          status: 'CONCLUIDO',
-          details,
+        title = `Guia de Transferência Escolar - ${details.studentName}`;
+        details = {
+          ...details,
+          purpose: resolvedDestSchool,
+          destinationSchool: resolvedDestSchool,
+          vacancyRequestedAt: new Date().toISOString(),
+          vacancyRequestedBy: `${currentUser?.firstName || 'Direção'} (${activeDirectorSchoolName})`,
         };
-        setRequests((prev) => [updatedReq, ...prev.filter((r) => r.id !== updatedReq.id)]);
-        setIsDirectEmitModalOpen(false);
-        setDocModalInitialMode('emissao');
-        setDocumentModalRequest(updatedReq);
-        showToast?.(`${title} gerado com sucesso!`);
       }
-    } else {
-      showToast?.(res.error || 'Erro ao emitir o documento.');
+
+      const res = await submitQuickServiceRequest({
+        serviceType: directServiceType,
+        title,
+        requesterName: directGuardianName.trim() || details.studentName!,
+        requesterPhone: directGuardianPhone.trim() || '+244 923 000 000',
+        requesterRoleTitle: 'Pedido / Emissão pela Direção Escolar',
+        targetRole: 'DIRECTOR',
+        targetSchoolName: activeDirectorSchoolName,
+        destinationSchoolName:
+          directServiceType === 'GUIA_TRANSFERENCIA' ? resolvedDestSchool : undefined,
+        details,
+      });
+
+      if (res.success && res.request) {
+        if (directServiceType === 'GUIA_TRANSFERENCIA') {
+          // Transfer requires destination school vacancy consultation first
+          const vacRes = await updateQuickRequestStatus(res.request.id, {
+            status: 'AGUARDANDO_VAGA_DESTINO',
+            responseMessage: `Pedido de transferência registado com matrícula comprovada na ${details.studentClasse} (${details.studentTurma}). Consulta de vaga enviada para a Direção da escola de destino (${resolvedDestSchool}).`,
+            resolvedBy: currentUser?.firstName
+              ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
+              : 'Direção Escolar',
+            destinationSchoolName: resolvedDestSchool,
+            details,
+          });
+          const updatedReq = vacRes.request || {
+            ...res.request,
+            status: 'AGUARDANDO_VAGA_DESTINO' as QuickServiceStatus,
+            destinationSchoolName: resolvedDestSchool,
+            details,
+          };
+          setRequests((prev) => [updatedReq, ...prev.filter((r) => r.id !== updatedReq.id)]);
+          setIsDirectEmitModalOpen(false);
+          showToast?.(
+            `Consulta de vaga enviada para "${resolvedDestSchool}". A Guia será liberada após confirmação da vaga!`
+          );
+        } else {
+          await updateQuickRequestStatus(res.request.id, {
+            status: 'CONCLUIDO',
+            responseMessage: 'Documento oficial emitido com matrícula e pauta verificadas pela Direção Escolar.',
+            resolvedBy: currentUser?.firstName
+              ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim()
+              : 'Direção Escolar',
+            details,
+          });
+          const updatedReq: QuickServiceRequest = {
+            ...res.request,
+            status: 'CONCLUIDO',
+            details,
+          };
+          setRequests((prev) => [updatedReq, ...prev.filter((r) => r.id !== updatedReq.id)]);
+          setIsDirectEmitModalOpen(false);
+          setDocModalInitialMode('emissao');
+          setDocumentModalRequest(updatedReq);
+          showToast?.(`${title} gerado com sucesso!`);
+        }
+      } else {
+        showToast?.(res.error || 'Erro ao emitir o documento.');
+      }
+    } catch (err) {
+      console.error('[QuickServices] Erro na emissão direta do documento:', err);
+      showToast?.('Erro ao emitir o documento.');
+    } finally {
+      setIsSubmittingDirect(false);
     }
   };
 

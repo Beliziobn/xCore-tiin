@@ -299,7 +299,9 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
     }
 
     if (isExpressApiAvailable()) {
-      fetch('/api/schools')
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      fetch('/api/schools', { signal: controller.signal })
         .then((res) => (res.ok ? res.json() : null))
         .then((json) => {
           if (json && Array.isArray(json.data) && json.data.length > 0) {
@@ -311,7 +313,10 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
             }
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error('[QuickServicesPage] Erro ao obter escolas:', err);
+        })
+        .finally(() => clearTimeout(timeoutId));
     }
   }, []);
 
@@ -424,8 +429,8 @@ export const QuickServicesPage: React.FC<QuickServicesPageProps> = ({
           }
           return changed ? updated : prev;
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error('[QuickServicesPage] Erro ao sincronizar estado dos pedidos:', err);
       }
     };
     syncMyRequestsStatuses();

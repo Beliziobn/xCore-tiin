@@ -130,7 +130,8 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
     try {
       const all = await syncApplicationsFromServer();
       directorApps = deduplicateApplicationsList(all).filter((a) => isSchoolDirectorApproval(a));
-    } catch {
+    } catch (err) {
+      console.error('[DirectorApprovals] Erro ao carregar candidaturas:', err);
       const all = getPendingApplications();
       directorApps = deduplicateApplicationsList(all).filter((a) => isSchoolDirectorApproval(a));
     }
@@ -165,8 +166,8 @@ export const DirectorApprovalsPage: React.FC<DirectorApprovalsPageProps> = ({
       setApplications(res.merged.filter((a) => isSchoolDirectorApproval(a)));
       setArchiveCursor(res.lastDoc);
       setHasMoreArchive(res.hasMore);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('[DirectorApprovals] Erro ao carregar arquivo de candidaturas:', err);
     } finally {
       setIsLoadingMore(false);
     }

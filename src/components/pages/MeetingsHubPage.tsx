@@ -45,8 +45,13 @@ export const MeetingsHubPage: React.FC<MeetingsHubPageProps> = ({
   const fetchRooms = async () => {
     if (!isExpressApiAvailable()) return;
     setIsLoadingRooms(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
     try {
-      const res = await fetch('/api/meetings/rooms', { headers: { Accept: 'application/json' } });
+      const res = await fetch('/api/meetings/rooms', {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
       if (checkExpressApiResponse(res)) {
         const data = await res.json();
         if (data.rooms && Array.isArray(data.rooms)) {
@@ -54,8 +59,9 @@ export const MeetingsHubPage: React.FC<MeetingsHubPageProps> = ({
         }
       }
     } catch (err) {
-      console.warn('[MeetingsHub] Error loading rooms:', err);
+      console.error('[MeetingsHub] Erro ao carregar salas:', err);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoadingRooms(false);
     }
   };

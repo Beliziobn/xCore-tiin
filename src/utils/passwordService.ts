@@ -270,6 +270,8 @@ export function updatePassword(
       // ignore
     }
 
+    const syncedUserIds = new Set<string>();
+
     // 2. Update active user in localStorage and Firestore
     try {
       const rawActive = localStorage.getItem('ucore_active_user');
@@ -288,7 +290,11 @@ export function updatePassword(
             updatedAt: nowIso,
           };
           localStorage.setItem('ucore_active_user', JSON.stringify(updatedActive));
-          saveUserToFirestore(updatedActive).catch(() => {});
+          const key = String(updatedActive.id || updatedActive.email || '').trim().toLowerCase();
+          if (key) syncedUserIds.add(key);
+          saveUserToFirestore(updatedActive).catch((err) =>
+            console.warn('[PasswordService] Erro ao sincronizar utilizador ativo no Firestore:', err)
+          );
         }
       }
     } catch {
@@ -313,7 +319,13 @@ export function updatePassword(
                 passwordVerifier: verifier,
                 updatedAt: nowIso,
               };
-              saveUserToFirestore(nextU).catch(() => {});
+              const key = String(nextU.id || nextU.email || '').trim().toLowerCase();
+              if (key && !syncedUserIds.has(key)) {
+                syncedUserIds.add(key);
+                saveUserToFirestore(nextU).catch((err) =>
+                  console.warn('[PasswordService] Erro ao sincronizar utilizador registado no Firestore:', err)
+                );
+              }
               return nextU;
             }
             return u;

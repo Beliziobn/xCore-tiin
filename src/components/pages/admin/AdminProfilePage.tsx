@@ -149,7 +149,9 @@ export const AdminProfilePage: React.FC<AdminProfilePageProps> = ({
         const pending = all.filter((a) => a.status === 'pendente').length;
         setPendingApprovalsCount(pending);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[AdminProfile] Erro ao sincronizar contagem de homologações:', err);
+      });
 
     return () => {
       mounted = false;

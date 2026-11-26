@@ -241,11 +241,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       const now = Date.now();
       if (now - lastNavbarCloudSyncAt > 60000) {
         lastNavbarCloudSyncAt = now;
-        syncVagasDocentesFromFirestore().then(() => updateVagasWorkflow()).catch(() => {});
+        syncVagasDocentesFromFirestore()
+          .then(() => updateVagasWorkflow())
+          .catch((err) => console.error('[Navbar] Erro ao sincronizar vagas docentes:', err));
         if (currentUser.role === 'admin') {
           fetchDashboardStats()
             .then((stats) => applyDashboardStats(stats))
-            .catch(() => {});
+            .catch((err) => console.error('[Navbar] Erro ao obter estatísticas do dashboard:', err));
         }
       }
     };

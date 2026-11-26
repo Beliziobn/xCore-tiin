@@ -430,18 +430,26 @@ export async function syncDeclaracaoServicoFromServer(): Promise<DeclaracaoServi
           }
         });
       }
-    } catch {}
+    } catch (err) {
+      console.error('[DeclaracaoServicoStorage] Erro ao obter declarações do Firestore:', err);
+    }
 
-    const res = await fetch('/api/declaracao-servico');
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.records)) {
-        data.records.forEach((sr: DeclaracaoServicoRecord) => {
-          if (sr && sr.id && !deletedIds.has(sr.id)) {
-            recordMap.set(sr.id, sr);
-          }
-        });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    try {
+      const res = await fetch('/api/declaracao-servico', { signal: controller.signal });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.records)) {
+          data.records.forEach((sr: DeclaracaoServicoRecord) => {
+            if (sr && sr.id && !deletedIds.has(sr.id)) {
+              recordMap.set(sr.id, sr);
+            }
+          });
+        }
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     const unsynced: DeclaracaoServicoRecord[] = [];
@@ -462,11 +470,14 @@ export async function syncDeclaracaoServicoFromServer(): Promise<DeclaracaoServi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: unsynced }),
-      }).catch(() => {});
+      }).catch((err) =>
+        console.error('[DeclaracaoServicoStorage] Erro ao enviar registos locais para servidor:', err)
+      );
     }
 
     return merged;
-  } catch {
+  } catch (err) {
+    console.error('[DeclaracaoServicoStorage] Erro ao sincronizar declarações de serviço:', err);
     return getStoredDeclaracaoServicoRecords();
   }
 }

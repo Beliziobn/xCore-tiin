@@ -92,7 +92,9 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
       refreshPending();
     };
     handleSync();
-    syncApplicationsFromServer(false).then(() => refreshPending()).catch(() => {});
+    syncApplicationsFromServer(false)
+      .then(() => refreshPending())
+      .catch((err) => console.error('[AdminDirectors] Erro ao sincronizar candidaturas:', err));
     window.addEventListener('sigre-data-synced', handleSync);
     return () => window.removeEventListener('sigre-data-synced', handleSync);
   }, []);
@@ -336,7 +338,9 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
             id="tab-candidaturas-pendentes"
             onClick={() => {
               setActiveTab('candidaturas');
-              syncApplicationsFromServer(false).then(() => refreshPending()).catch(() => {});
+              syncApplicationsFromServer(false)
+                .then(() => refreshPending())
+                .catch((err) => console.error('[AdminDirectors] Erro ao sincronizar candidaturas na aba:', err));
             }}
             className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'candidaturas'
@@ -380,7 +384,9 @@ export const AdminDirectorsPage: React.FC<AdminDirectorsPageProps> = ({
                 </div>
                 <button
                   onClick={() => {
-                    syncApplicationsFromServer(true).then(() => refreshPending()).catch(() => {});
+                    syncApplicationsFromServer(true)
+                      .then(() => refreshPending())
+                      .catch((err) => console.error('[AdminDirectors] Erro ao atualizar candidaturas:', err));
                   }}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >

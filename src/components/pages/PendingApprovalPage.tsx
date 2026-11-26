@@ -143,8 +143,8 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
         }
         if (isMounted) setSyncTick((t) => t + 1);
         promoteIfApproved();
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error('[PendingApproval] Erro ao verificar estado da candidatura:', err);
       }
     };
 
@@ -154,11 +154,17 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
     };
 
     const userKey = currentUser.email || currentUser.id;
-    const unsubUserDoc = subscribeToSingleUserStatus(userKey, (cloudUser) => {
-      if (cloudUser && (cloudUser.status === 'ativo' || Boolean(cloudUser.approvedAt))) {
-        triggerPromotion(cloudUser.approvedBy, cloudUser.approvedAt);
+    const unsubUserDoc = subscribeToSingleUserStatus(
+      userKey,
+      (cloudUser) => {
+        if (cloudUser && (cloudUser.status === 'ativo' || Boolean(cloudUser.approvedAt))) {
+          triggerPromotion(cloudUser.approvedBy, cloudUser.approvedAt);
+        }
+      },
+      (err) => {
+        console.error('[PendingApproval] Erro no listener onSnapshot do utilizador:', err);
       }
-    });
+    );
 
     window.addEventListener('sigre-data-synced', handleRealtimeSync);
     promoteIfApproved();
@@ -184,8 +190,8 @@ export const PendingApprovalPage: React.FC<PendingApprovalPageProps> = ({
 
     try {
       await syncApplicationsFromServer(true);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('[PendingApproval] Erro ao sincronizar estado da candidatura:', err);
     }
 
     // Continuous visual feedback with temporary clock acceleration

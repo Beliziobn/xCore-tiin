@@ -303,20 +303,27 @@ export async function syncFichaAvaliacaoFromServer(): Promise<FichaAvaliacaoReco
       }
       return local;
     }
-    const res = await fetch('/api/network/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fichasAvaliacao: local }),
-    });
-    if (!res.ok) return local;
-    const data = await res.json();
-    if (Array.isArray(data.fichasAvaliacao)) {
-      const merged = mergeFichaAvaliacaoCloudSnapshot(data.fichasAvaliacao);
-      window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
-      return merged;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    try {
+      const res = await fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fichasAvaliacao: local }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return local;
+      const data = await res.json();
+      if (Array.isArray(data.fichasAvaliacao)) {
+        const merged = mergeFichaAvaliacaoCloudSnapshot(data.fichasAvaliacao);
+        window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
+        return merged;
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
-  } catch {
-    // ignore offline
+  } catch (err) {
+    console.error('[FichaAvaliacaoStorage] Erro ao sincronizar com servidor:', err);
   }
   return local;
 }
@@ -344,14 +351,18 @@ export function saveFichaAvaliacaoRecord(
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    saveFichaAvaliacaoToFirestore(finalRecord).catch(() => {});
+    saveFichaAvaliacaoToFirestore(finalRecord).catch((err) =>
+      console.error('[FichaAvaliacaoStorage] Erro ao gravar no Firestore:', err)
+    );
     fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fichasAvaliacao: updated }),
-    }).catch(() => {});
+    }).catch((err) => console.error('[FichaAvaliacaoStorage] Erro ao sincronizar gravação:', err));
     window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated', { detail: finalRecord }));
-  } catch {}
+  } catch (err) {
+    console.error('[FichaAvaliacaoStorage] Erro ao guardar localmente:', err);
+  }
 
   return { success: true, record: finalRecord };
 }
@@ -360,16 +371,19 @@ export function deleteFichaAvaliacaoRecord(id: string): boolean {
   const existing = getStoredFichaAvaliacaoRecords();
   const filtered = existing.filter((r) => r.id !== id);
   try {
-    deleteFichaAvaliacaoFromFirestore(id).catch(() => {});
+    deleteFichaAvaliacaoFromFirestore(id).catch((err) =>
+      console.error('[FichaAvaliacaoStorage] Erro ao eliminar no Firestore:', err)
+    );
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fichasAvaliacao: filtered }),
-    }).catch(() => {});
+    }).catch((err) => console.error('[FichaAvaliacaoStorage] Erro ao sincronizar eliminação:', err));
     window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
     return true;
-  } catch {
+  } catch (err) {
+    console.error('[FichaAvaliacaoStorage] Erro ao eliminar registo:', err);
     return false;
   }
 }

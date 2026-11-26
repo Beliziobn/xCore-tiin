@@ -282,14 +282,14 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
     reloadQuickRequestsFromCache();
     fetchQuickRequests()
       .then((reqs) => computeQuickRequestsCount(reqs))
-      .catch(() => {});
+      .catch((err) => console.error('[Efectividade] Erro ao obter pedidos rápidos:', err));
     syncEfectividadeFromServer()
       .then((synced) => {
         if (Array.isArray(synced)) {
           setRecords(synced);
         }
       })
-      .catch(() => {});
+      .catch((err) => console.error('[Efectividade] Erro ao sincronizar declarações de efectividade:', err));
 
     const handler = () => {
       reloadRecords();

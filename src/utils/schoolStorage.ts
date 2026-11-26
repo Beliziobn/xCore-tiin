@@ -1365,23 +1365,37 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
         return localSchools;
       }
 
-      res = await fetch('/api/network/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const postController = new AbortController();
+      const postTimer = setTimeout(() => postController.abort(), 7000);
+      try {
+        res = await fetch('/api/network/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: postController.signal,
+        });
+      } finally {
+        clearTimeout(postTimer);
+      }
     } else {
       if (!isExpressApiAvailable()) {
         hasCompletedInitialServerPull = true;
         return localSchools;
       }
-      res = await fetch('/api/network/sync', {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          ...(lastKnownServerEtag && hasCompletedInitialServerPull ? { 'If-None-Match': lastKnownServerEtag } : {}),
-        },
-      });
+      const getController = new AbortController();
+      const getTimer = setTimeout(() => getController.abort(), 7000);
+      try {
+        res = await fetch('/api/network/sync', {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            ...(lastKnownServerEtag && hasCompletedInitialServerPull ? { 'If-None-Match': lastKnownServerEtag } : {}),
+          },
+          signal: getController.signal,
+        });
+      } finally {
+        clearTimeout(getTimer);
+      }
     }
 
     if (res.status === 304) {
@@ -2113,7 +2127,8 @@ export async function syncSchoolsFromServer(): Promise<AdminSchool[]> {
 
     const updatedRaw = localStorage.getItem(STORAGE_KEY_SCHOOLS);
     return updatedRaw ? JSON.parse(updatedRaw) : [];
-  } catch {
+  } catch (err) {
+    console.warn('[schoolStorage] Sincronização /api/network/sync falhou ou expirou:', err);
     const fallbackRaw = localStorage.getItem(STORAGE_KEY_SCHOOLS);
     return fallbackRaw ? JSON.parse(fallbackRaw) : [];
   }

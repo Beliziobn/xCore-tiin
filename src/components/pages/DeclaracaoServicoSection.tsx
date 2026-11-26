@@ -169,10 +169,15 @@ export const DeclaracaoServicoSection: React.FC<DeclaracaoServicoSectionProps> =
   useEffect(() => {
     reloadRecords();
 
-    const unsub = subscribeToDeclaracaoServico((cloudRecords) => {
-      const merged = mergeDeclaracaoServicoCloudSnapshot(cloudRecords);
-      setRecords(merged);
-    });
+    const unsub = subscribeToDeclaracaoServico(
+      (cloudRecords) => {
+        const merged = mergeDeclaracaoServicoCloudSnapshot(cloudRecords);
+        setRecords(merged);
+      },
+      (err) => {
+        console.error('[DeclaracaoServico] Erro no listener onSnapshot:', err);
+      }
+    );
 
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-declaracao-servico-updated', handleUpdated);

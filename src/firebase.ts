@@ -14,10 +14,10 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase app singleton
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Suppress internal @firebase/firestore transport timeout warnings in console.error
-// while preserving explicit application & permission error handling via handleFirestoreError
+// Preserve error-level @firebase/firestore logs (index/permission/offline failures)
+// while avoiding verbose debug/info noise
 try {
-  setLogLevel('silent');
+  setLogLevel('error');
 } catch {}
 
 // Clear any orphaned Firestore WebStorage multi-tab keys that may have exhausted localStorage quota
@@ -111,10 +111,17 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Validate connection to Firestore at most once per browser tab session
 export async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await Promise.race([
+      getDocFromServer(doc(db, 'test', 'connection')),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore connection test timeout')), 6000)
+      ),
+    ]);
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline or network connection is limited.');
+      console.error('Firebase client is offline or network connection is limited.', error);
+    } else {
+      console.warn('[Firestore] Aviso na verificação de ligação inicial:', error);
     }
   }
 }
@@ -123,6 +130,9 @@ if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
   try {
     if (!sessionStorage.getItem('sigre_fs_conn_checked')) {
       sessionStorage.setItem('sigre_fs_conn_checked', '1');
+      testConnection().catch((err) => {
+        console.error('[Firestore] Erro inesperado ao testar ligação:', err);
+      });
     }
   } catch {}
 }

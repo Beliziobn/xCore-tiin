@@ -8,6 +8,10 @@ import { AuditLog, AuditAction, AuditSeverity } from '../types/audit';
 import { auth, db } from '../firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { isExpressApiAvailable } from '../utils/apiAvailability';
+import {
+  isFirestoreWriteQuotaExhausted,
+  markFirestoreQuotaIfExhausted,
+} from '../utils/firestoreSync';
 
 const LOCAL_STORAGE_KEY = 'ucore_audit_logs_v1';
 const MAX_LOCAL_LOGS = 500;
@@ -92,25 +96,35 @@ export class AuditLogger {
     }
 
     // 3. Tentar persistir no Firestore se autenticado no browser (conforme RLS de audit_logs)
-    if (typeof window !== 'undefined' && currentUserId && currentUserId === actorId) {
+    if (
+      typeof window !== 'undefined' &&
+      currentUserId &&
+      currentUserId === actorId &&
+      !isFirestoreWriteQuotaExhausted()
+    ) {
       try {
         if (db) {
           const docRef = doc(collection(db, 'audit_logs'), id);
-          await setDoc(docRef, {
-            id: logItem.id,
-            action: logItem.action,
-            severity: logItem.severity,
-            actorId: logItem.actorId,
-            actorRole: logItem.actorRole,
-            targetId: logItem.targetId || null,
-            targetType: logItem.targetType || null,
-            details: logItem.details,
-            timestamp: logItem.timestamp,
-            updatedAt: logItem.timestamp,
-          });
+          await Promise.race([
+            setDoc(docRef, {
+              id: logItem.id,
+              action: logItem.action,
+              severity: logItem.severity,
+              actorId: logItem.actorId,
+              actorRole: logItem.actorRole,
+              targetId: logItem.targetId || null,
+              targetType: logItem.targetType || null,
+              details: logItem.details,
+              timestamp: logItem.timestamp,
+              updatedAt: logItem.timestamp,
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Audit log Firestore write timeout')), 5000)
+            ),
+          ]);
         }
-      } catch {
-        // Offline / permissão diferida
+      } catch (err) {
+        markFirestoreQuotaIfExhausted(err, 'write');
       }
     }
 

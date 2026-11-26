@@ -170,7 +170,9 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     try {
       await deleteApplication(appToDelete.id);
       await loadApplications();
-      getApplicationsCountsFromServer().then(setServerCounts).catch(() => {});
+      getApplicationsCountsFromServer()
+        .then(setServerCounts)
+        .catch((err) => console.error('[AdminApprovals] Erro ao atualizar contadores após eliminar:', err));
       showToast?.(`Registo de "${appToDelete.fullName}" eliminado com sucesso.`);
     } catch (e) {
       console.error('Erro ao eliminar:', e);
@@ -199,13 +201,16 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
     try {
       const all = await syncApplicationsFromServer(force);
       unified = deduplicateApplicationsList(all);
-    } catch {
+    } catch (err) {
+      console.error('[AdminApprovals] Erro ao carregar candidaturas:', err);
       const all = getPendingApplications();
       unified = deduplicateApplicationsList(all);
     }
     setApplications(unified);
     setCloudReadQuotaBlocked(isFirestoreReadQuotaExhausted() && !isExpressApiAvailable());
-    getApplicationsCountsFromServer().then(setServerCounts).catch(() => {});
+    getApplicationsCountsFromServer()
+      .then(setServerCounts)
+      .catch((err) => console.error('[AdminApprovals] Erro ao obter contadores de candidaturas:', err));
     if (!hasInitializedStatusRef.current && unified.length > 0) {
       hasInitializedStatusRef.current = true;
       const pendCount = unified.filter((a) => a.status === 'pendente').length;
@@ -231,7 +236,8 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
       setApplications(res.merged);
       setArchiveCursor(res.lastDoc);
       setHasMoreArchive(res.hasMore);
-    } catch {
+    } catch (err) {
+      console.error('[AdminApprovals] Erro ao carregar arquivo paginado de candidaturas:', err);
       refreshLocalApplications();
     } finally {
       setIsLoadingMore(false);
@@ -672,8 +678,13 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                   type="button"
                   onClick={async () => {
                     setIsSyncing(true);
-                    await loadApplications(true);
-                    setTimeout(() => setIsSyncing(false), 500);
+                    try {
+                      await loadApplications(true);
+                    } catch (err) {
+                      console.error('[AdminApprovals] Erro na sincronização manual:', err);
+                    } finally {
+                      setTimeout(() => setIsSyncing(false), 500);
+                    }
                   }}
                   className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
                   title="Sincronizar em tempo real com a base de dados central"

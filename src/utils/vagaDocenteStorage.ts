@@ -165,21 +165,28 @@ export async function syncVagasDocentesFromFirestore(): Promise<CadastroDocenteV
       }
       return local;
     }
-    const res = await fetch('/api/network/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cadastroDocente: local }),
-    });
-    if (!res.ok) return local;
-    const data = await res.json();
-    if (Array.isArray(data.cadastroDocente)) {
-      const merged = mergeCadastroDocenteCloudSnapshot(data.cadastroDocente);
-      window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
-      window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
-      return merged;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    try {
+      const res = await fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cadastroDocente: local }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return local;
+      const data = await res.json();
+      if (Array.isArray(data.cadastroDocente)) {
+        const merged = mergeCadastroDocenteCloudSnapshot(data.cadastroDocente);
+        window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
+        window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
+        return merged;
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
-  } catch {
-    // ignore offline
+  } catch (err) {
+    console.error('[VagaDocenteStorage] Erro ao sincronizar vagas docentes:', err);
   }
   return local;
 }

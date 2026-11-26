@@ -18,6 +18,8 @@ import {
   clearAllQuickRequestsFromFirestore,
   subscribeToQuickRequests,
   fetchStudentsFromFirestore,
+  isFirestoreReadQuotaExhausted,
+  isFirestoreWriteQuotaExhausted,
 } from './firestoreSync';
 import { getStoredStudents } from './studentStorage';
 import { isExpressApiAvailable, checkExpressApiResponse } from './apiAvailability';
@@ -648,11 +650,13 @@ export async function fetchQuickRequests(filters?: {
         });
       }
     } catch (err) {
-      console.warn('[QuickServices] Cloud fetch warning:', err);
+      console.error('[QuickServices] Cloud fetch error:', err);
     }
 
     // 2. Fetch from backend API (only when Express API backend is active)
     if (isExpressApiAvailable()) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 7000);
       try {
         const params = new URLSearchParams();
         if (filters?.schoolId) params.append('schoolId', filters.schoolId);
@@ -663,6 +667,7 @@ export async function fetchQuickRequests(filters?: {
 
         const res = await fetch(`/api/quick-requests?${params.toString()}`, {
           headers: { Accept: 'application/json' },
+          signal: controller.signal,
         });
         if (checkExpressApiResponse(res)) {
           const data = await res.json();
@@ -670,13 +675,19 @@ export async function fetchQuickRequests(filters?: {
             data.requests.forEach((r: QuickServiceRequest) => {
               if (r && r.id && !map.has(r.id)) {
                 map.set(r.id, r);
-                saveQuickRequestToFirestore(r).catch(() => {});
+                if (!isFirestoreWriteQuotaExhausted()) {
+                  saveQuickRequestToFirestore(r).catch((err) =>
+                    console.warn('[QuickServices] Falha ao espelhar pedido no Firestore:', err)
+                  );
+                }
               }
             });
           }
         }
       } catch (err) {
         console.warn('[QuickServices] Server API fetch failed, continuing with cloud/local:', err);
+      } finally {
+        clearTimeout(timer);
       }
     }
 
@@ -1167,7 +1178,8 @@ export async function getQuickRequestsServerCounts(): Promise<{
       pendentes: cached.filter((r) => r.status === 'PENDENTE').length,
       concluidos: cached.filter((r) => r.status === 'CONCLUIDO').length,
     };
-  } catch {
+  } catch (err) {
+    console.error('[QuickServices] Erro ao obter contagens do servidor:', err);
     const cached = getCachedQuickRequests();
     return {
       total: cached.length,
@@ -1183,45 +1195,57 @@ export async function getQuickRequestsServerCounts(): Promise<{
  */
 let quickRequestsUnsubscribe: (() => void) | null = null;
 export function initRealtimeQuickRequestsSync(
-  onUpdate?: (requests: QuickServiceRequest[]) => void
+  onUpdate?: (requests: QuickServiceRequest[]) => void,
+  onError?: (err: unknown) => void
 ): () => void {
+  if (isFirestoreReadQuotaExhausted()) {
+    onError?.(new Error('Firestore read quota exhausted'));
+    return () => {};
+  }
   if (quickRequestsUnsubscribe) {
     return quickRequestsUnsubscribe;
   }
 
-  const fsUnsub = subscribeToQuickRequests((activeCloudList) => {
-    try {
-      const cached = getCachedQuickRequests();
-      const map = new Map<string, QuickServiceRequest>();
-      // Retain previously loaded archived requests in local cache
-      cached.forEach((item) => {
-        if (
-          item &&
-          item.id &&
-          (item.status === 'CONCLUIDO' ||
-            item.status === 'REJEITADO' ||
-            item.status === 'CANCELADO' ||
-            item.status === 'SEM_VAGA_DESTINO')
-        ) {
-          map.set(item.id, item);
+  const fsUnsub = subscribeToQuickRequests(
+    (activeCloudList) => {
+      try {
+        const cached = getCachedQuickRequests();
+        const map = new Map<string, QuickServiceRequest>();
+        // Retain previously loaded archived requests in local cache
+        cached.forEach((item) => {
+          if (
+            item &&
+            item.id &&
+            (item.status === 'CONCLUIDO' ||
+              item.status === 'REJEITADO' ||
+              item.status === 'CANCELADO' ||
+              item.status === 'SEM_VAGA_DESTINO')
+          ) {
+            map.set(item.id, item);
+          }
+        });
+        activeCloudList.forEach((item) => {
+          if (item && item.id) {
+            map.set(item.id, { ...(map.get(item.id) || {}), ...item });
+          }
+        });
+        const merged = Array.from(map.values());
+        const changed = writeQuickCacheQuietly(merged);
+        lastQuickRequestsFetchAt = Date.now();
+        if (changed && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         }
-      });
-      activeCloudList.forEach((item) => {
-        if (item && item.id) {
-          map.set(item.id, { ...(map.get(item.id) || {}), ...item });
-        }
-      });
-      const merged = Array.from(map.values());
-      const changed = writeQuickCacheQuietly(merged);
-      lastQuickRequestsFetchAt = Date.now();
-      if (changed && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sigre-data-synced'));
+        onUpdate?.(merged);
+      } catch (e) {
+        console.error('[QuickServices] Erro no listener em tempo real:', e);
+        onError?.(e);
       }
-      onUpdate?.(merged);
-    } catch (e) {
-      console.warn('[QuickServices] Erro no listener em tempo real:', e);
+    },
+    (err) => {
+      console.error('[QuickServices] Erro na subscrição Firestore de Serviços Rápidos:', err);
+      onError?.(err);
     }
-  });
+  );
 
   quickRequestsUnsubscribe = () => {
     try {

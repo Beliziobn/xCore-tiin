@@ -283,7 +283,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         .then(() => {
           if (mounted) setStorageRevision((r) => r + 1);
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error('[AuthPage] Erro ao sincronizar escolas:', err);
+        });
     }
 
     const handleStorageUpdate = () => {
@@ -458,6 +460,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     photoURL?: string | null,
     manualRoleHint?: string
   ) => {
+    try {
     const cleanEmail = targetEmail.trim().toLowerCase();
     const isDirectorMunicipal =
       cleanEmail === 'dmedoquessua@gmail.com' ||
@@ -470,7 +473,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     //    so a validation done on another device immediately reflects (never trust stale local 'pendente' cache!)
     try {
       await syncApplicationsFromServer(true);
-    } catch {}
+    } catch (err) {
+      console.error('[AuthPage] Erro ao sincronizar candidaturas no login Google:', err);
+    }
     const approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
 
     // 2. Check registered accounts strictly by email
@@ -497,7 +502,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     if (!existingAccountLookup.wasDeletedByAdmin && !isAccountDeleted(cleanEmail, uid)) {
       try {
         existingFirestoreUser = await fetchUserFromFirestore(cleanEmail);
-      } catch {}
+      } catch (err) {
+        console.error('[AuthPage] Erro ao consultar utilizador no Firestore (login Google):', err);
+      }
     }
 
     // Check if account already exists in the system for this exact email
@@ -596,6 +603,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         `A sua candidatura como ${app.roleRequested} continua em análise na Direção Municipal da Educação. A aceder ao ambiente de acompanhamento...`
       );
       setTimeout(() => {
+        setIsGoogleLoading(false);
+        setLoading(false);
+        onAuthLoadingChange?.(false);
         onLoginSuccess(pendingUser);
       }, 600);
       return;
@@ -607,6 +617,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         `A sua candidatura foi indeferida pela administração: ${approvalCheck.app.rejectionReason || 'Contacte a Direção Municipal da Educação.'}`
       );
       setIsGoogleLoading(false);
+      setLoading(false);
+      onAuthLoadingChange?.(false);
       return;
     }
 
@@ -789,13 +801,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
     // Self-heal stale Firestore user doc if application was approved while users doc stayed 'pendente'
     if (resolvedAccountStatus === 'ativo' && existingFirestoreUser?.status === 'pendente') {
-      saveUserToFirestore(googleAccount).catch(() => {});
+      saveUserToFirestore(googleAccount).catch((err) =>
+        console.error('[AuthPage] Erro ao atualizar estado do utilizador Google no Firestore:', err)
+      );
     }
 
     setSuccessMsg(`Autenticado com sucesso via Google (${cleanEmail})! A aceder à plataforma...`);
     setTimeout(() => {
+      setIsGoogleLoading(false);
+      setLoading(false);
+      onAuthLoadingChange?.(false);
       onLoginSuccess(googleAccount);
     }, 400);
+    } catch (err) {
+      console.error('[AuthPage] Erro inesperado ao concluir login Google:', err);
+      setIsGoogleLoading(false);
+      setLoading(false);
+      onAuthLoadingChange?.(false);
+      setErrorMsg('Não foi possível concluir a autenticação Google. Tente novamente.');
+    }
   };
 
   const handleGoogleSignInFlow = async () => {
@@ -1057,7 +1081,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
       try {
         // 1. Force-sync fresh applications and user records from Cloud Firestore + Server before authenticating
-        await syncApplicationsFromServer(true).catch(() => {});
+        await syncApplicationsFromServer(true).catch((err) =>
+          console.error('[AuthPage] Erro ao sincronizar candidaturas no login:', err)
+        );
 
         const accountLookup = findRegisteredAccountByEmail(cleanEmail);
 
@@ -1073,7 +1099,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         let firestoreUser: UserAccount | null = null;
         try {
           firestoreUser = await fetchUserFromFirestore(cleanEmail);
-        } catch {}
+        } catch (err) {
+          console.error('[AuthPage] Erro ao consultar utilizador no Firestore (login):', err);
+        }
 
         if (
           firestoreUser &&
@@ -1330,7 +1358,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         } else {
           loggedUser.status = 'ativo';
           if (firestoreUser?.status === 'pendente') {
-            saveUserToFirestore(loggedUser).catch(() => {});
+            saveUserToFirestore(loggedUser).catch((err) =>
+              console.error('[AuthPage] Erro ao atualizar estado do utilizador no Firestore:', err)
+            );
           }
           setSuccessMsg(
             `Bem-vindo(a), ${loggedUser.greeting}! A aceder ao painel de ${loggedUser.cargoTitle}...`
@@ -1360,7 +1390,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
       try {
         // Sync fresh applications from cloud before checking duplicate accounts or occupied DME cargos
-        await syncApplicationsFromServer().catch(() => {});
+        await syncApplicationsFromServer().catch((err) =>
+          console.error('[AuthPage] Erro ao sincronizar candidaturas no registo:', err)
+        );
 
         // 1. Block duplicate registration of an existing email or BI (no one can overwrite or hijack another user's account)
         const dupCheck = checkDuplicateRegistration(email.trim(), biNumber.trim());
@@ -1384,7 +1416,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             setStepErrors((prev) => ({ ...prev, 3: cloudMsg }));
             return;
           }
-        } catch {}
+        } catch (err) {
+          console.error('[AuthPage] Erro ao verificar duplicado no Firestore:', err);
+        }
 
         // 2. If registering in Administração (DME), strictly block registering an already occupied cargo
         if (institutionalScope === 'administracao') {
@@ -3596,9 +3630,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <GoogleAccountPickerModal
         isOpen={showGooglePickerModal}
         onClose={() => setShowGooglePickerModal(false)}
-        onSelectAccount={(selectedEmail, selectedName, selectedRole) => {
+        onSelectAccount={async (selectedEmail, selectedName, selectedRole) => {
           setShowGooglePickerModal(false);
-          completeGoogleLogin(selectedEmail, selectedName, undefined, null, selectedRole);
+          setIsGoogleLoading(true);
+          await completeGoogleLogin(selectedEmail, selectedName, undefined, null, selectedRole);
         }}
         reason={googlePickerReason}
       />

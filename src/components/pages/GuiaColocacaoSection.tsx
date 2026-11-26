@@ -160,11 +160,18 @@ export const GuiaColocacaoSection: React.FC<GuiaColocacaoSectionProps> = ({
 
   useEffect(() => {
     reloadRecords();
-    syncGuiaColocacaoFromServer().then(() => reloadRecords()).catch(() => {});
-    const unsub = subscribeToGuiasColocacao((cloudRecords) => {
-      const merged = mergeGuiaColocacaoCloudSnapshot(cloudRecords);
-      setRecords(merged);
-    });
+    syncGuiaColocacaoFromServer()
+      .then(() => reloadRecords())
+      .catch((err) => console.error('[GuiaColocacao] Erro ao sincronizar guias de colocação:', err));
+    const unsub = subscribeToGuiasColocacao(
+      (cloudRecords) => {
+        const merged = mergeGuiaColocacaoCloudSnapshot(cloudRecords);
+        setRecords(merged);
+      },
+      (err) => {
+        console.error('[GuiaColocacao] Erro no listener onSnapshot:', err);
+      }
+    );
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-guia-colocacao-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);

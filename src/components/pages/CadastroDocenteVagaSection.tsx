@@ -363,7 +363,7 @@ function saveRecordsToStorage(list: CadastroDocenteVagaRecord[]): void {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cadastroDocente: list }),
-    }).catch(() => {});
+    }).catch((err) => console.error('[CadastroDocente] Erro ao sincronizar vagas com servidor:', err));
     window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated'));
     window.dispatchEvent(new CustomEvent('sigre-vagas-docentes-updated'));
   } catch {
@@ -416,11 +416,18 @@ export const CadastroDocenteVagaSection: React.FC<CadastroDocenteVagaSectionProp
 
   useEffect(() => {
     reloadRecords();
-    syncVagasDocentesFromFirestore().then(() => reloadRecords()).catch(() => {});
-    const unsub = subscribeToCadastroDocente((cloudRecords) => {
-      const merged = mergeCadastroDocenteCloudSnapshot(cloudRecords);
-      setRecords(merged);
-    });
+    syncVagasDocentesFromFirestore()
+      .then(() => reloadRecords())
+      .catch((err) => console.error('[CadastroDocente] Erro ao sincronizar vagas docentes:', err));
+    const unsub = subscribeToCadastroDocente(
+      (cloudRecords) => {
+        const merged = mergeCadastroDocenteCloudSnapshot(cloudRecords);
+        setRecords(merged);
+      },
+      (err) => {
+        console.error('[CadastroDocente] Erro no listener onSnapshot:', err);
+      }
+    );
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-cadastro-docente-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);

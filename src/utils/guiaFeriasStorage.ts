@@ -186,20 +186,27 @@ export async function syncGuiaFeriasFromServer(): Promise<GuiaFeriasRecord[]> {
       }
       return local;
     }
-    const res = await fetch('/api/network/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guiasFerias: local }),
-    });
-    if (!res.ok) return local;
-    const data = await res.json();
-    if (Array.isArray(data.guiasFerias)) {
-      const merged = mergeGuiaFeriasCloudSnapshot(data.guiasFerias);
-      window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
-      return merged;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    try {
+      const res = await fetch('/api/network/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guiasFerias: local }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return local;
+      const data = await res.json();
+      if (Array.isArray(data.guiasFerias)) {
+        const merged = mergeGuiaFeriasCloudSnapshot(data.guiasFerias);
+        window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
+        return merged;
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
-  } catch {
-    // ignore offline
+  } catch (err) {
+    console.error('[GuiaFeriasStorage] Erro ao sincronizar com servidor:', err);
   }
   return local;
 }
@@ -227,14 +234,18 @@ export function saveGuiaFeriasRecord(record: Omit<GuiaFeriasRecord, 'id' | 'cria
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    saveGuiaFeriasToFirestore(finalRecord).catch(() => {});
+    saveGuiaFeriasToFirestore(finalRecord).catch((err) =>
+      console.error('[GuiaFeriasStorage] Erro ao gravar no Firestore:', err)
+    );
     fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ guiasFerias: updated }),
-    }).catch(() => {});
+    }).catch((err) => console.error('[GuiaFeriasStorage] Erro ao sincronizar gravação:', err));
     window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated', { detail: finalRecord }));
-  } catch {}
+  } catch (err) {
+    console.error('[GuiaFeriasStorage] Erro ao guardar localmente:', err);
+  }
 
   return { success: true, record: finalRecord };
 }
@@ -244,15 +255,18 @@ export function deleteGuiaFeriasRecord(id: string): boolean {
   const filtered = existing.filter((r) => r.id !== id);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-    deleteGuiaFeriasFromFirestore(id).catch(() => {});
+    deleteGuiaFeriasFromFirestore(id).catch((err) =>
+      console.error('[GuiaFeriasStorage] Erro ao eliminar no Firestore:', err)
+    );
     fetch('/api/network/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ guiasFerias: filtered }),
-    }).catch(() => {});
+    }).catch((err) => console.error('[GuiaFeriasStorage] Erro ao sincronizar eliminação:', err));
     window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
     return true;
-  } catch {
+  } catch (err) {
+    console.error('[GuiaFeriasStorage] Erro ao eliminar registo:', err);
     return false;
   }
 }

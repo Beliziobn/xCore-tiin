@@ -63,15 +63,22 @@ class RealtimeChatManager {
       return;
     }
     try {
-      this.firestoreUnsub = subscribeToChatMessages((cloudMessages) => {
-        cloudMessages.forEach((msg) => {
-          if (msg && msg.id && !this.seenMessageIds.has(msg.id)) {
-            this.seenMessageIds.add(msg.id);
-            this.messageListeners.forEach((fn) => fn(msg));
-          }
-        });
-      });
-    } catch {}
+      this.firestoreUnsub = subscribeToChatMessages(
+        (cloudMessages) => {
+          cloudMessages.forEach((msg) => {
+            if (msg && msg.id && !this.seenMessageIds.has(msg.id)) {
+              this.seenMessageIds.add(msg.id);
+              this.messageListeners.forEach((fn) => fn(msg));
+            }
+          });
+        },
+        (err) => {
+          console.error('[RealtimeChat] Firestore subscription error:', err);
+        }
+      );
+    } catch (err) {
+      console.error('[RealtimeChat] Failed to start cloud chat sync:', err);
+    }
   }
 
   public stopCloudSync() {

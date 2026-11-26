@@ -1,8 +1,14 @@
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import {
+  isFirestoreReadQuotaExhausted,
+  isFirestoreWriteQuotaExhausted,
+  markFirestoreQuotaIfExhausted,
+} from '../utils/firestoreSync';
 import type { UserAccount } from '../types';
 
 export async function getUserProfile(userId: string): Promise<UserAccount | null> {
+  if (isFirestoreReadQuotaExhausted()) return null;
   const path = `users/${userId}`;
   try {
     const docRef = doc(db, 'users', userId);
@@ -33,12 +39,15 @@ export async function getUserProfile(userId: string): Promise<UserAccount | null
       rememberMe: true,
     };
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'read');
+    if (isFirestoreReadQuotaExhausted()) return null;
     handleFirestoreError(error, OperationType.GET, path);
     return null;
   }
 }
 
 export async function saveUserProfile(user: UserAccount): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   const path = `users/${user.id}`;
   try {
     const docRef = doc(db, 'users', user.id);
@@ -65,11 +74,14 @@ export async function saveUserProfile(user: UserAccount): Promise<void> {
 
     await setDoc(docRef, payload, { merge: true });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
+    if (isFirestoreWriteQuotaExhausted()) return;
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
 
 export async function updateAccountValidation(userId: string, validated: boolean, status: 'ativo' | 'validado' | 'pendente' | 'em_analise'): Promise<void> {
+  if (isFirestoreWriteQuotaExhausted()) return;
   const path = `users/${userId}`;
   try {
     const docRef = doc(db, 'users', userId);
@@ -79,6 +91,8 @@ export async function updateAccountValidation(userId: string, validated: boolean
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
+    markFirestoreQuotaIfExhausted(error, 'write');
+    if (isFirestoreWriteQuotaExhausted()) return;
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }

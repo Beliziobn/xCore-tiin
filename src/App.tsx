@@ -36,6 +36,7 @@ import {
   subscribeToDashboardStats,
   type DashboardStats,
   isFirestoreReadQuotaExhausted,
+  isFirestoreWriteQuotaExhausted,
   saveTeacherToFirestore,
   saveStudentToFirestore,
   saveDirectorToFirestore,
@@ -466,7 +467,8 @@ export default function App() {
         }
         runSyncNow();
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[App] Erro ao sincronizar escolas na inicialização:', err);
         isInitialSyncCompleteRef.current = true;
       });
 
@@ -590,7 +592,9 @@ export default function App() {
           try {
             localStorage.setItem('ucore_active_user', JSON.stringify(promotedUser));
           } catch {}
-          saveUserToFirestore(promotedUser).catch(() => {});
+          saveUserToFirestore(promotedUser).catch((err) =>
+            console.error('[App] Erro ao atualizar utilizador homologado no Firestore:', err)
+          );
           showToast(`Conta homologada com sucesso! Bem-vindo(a) à plataforma Sigre, ${promotedUser.firstName}.`);
         }
       }
@@ -635,11 +639,18 @@ export default function App() {
       .then((stats) => {
         if (stats) setDashboardStats(stats);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[App] Erro ao obter estatísticas do dashboard (getDoc):', err);
+      });
 
-    const unsubStats = subscribeToDashboardStats((stats) => {
-      setDashboardStats(stats);
-    });
+    const unsubStats = subscribeToDashboardStats(
+      (stats) => {
+        setDashboardStats(stats);
+      },
+      (err) => {
+        console.error('[App] Erro no listener onSnapshot de stats/dashboard:', err);
+      }
+    );
     cleanups.push(unsubStats);
 
     if (
@@ -650,7 +661,9 @@ export default function App() {
         viewLow.includes('approvals') ||
         viewLow.includes('inscric'))
     ) {
-      const unsubApps = initRealtimeApplicationsSync();
+      const unsubApps = initRealtimeApplicationsSync(undefined, (err) => {
+        console.error('[App] Erro no listener onSnapshot de candidaturas:', err);
+      });
       if (typeof unsubApps === 'function') cleanups.push(unsubApps);
     }
 
@@ -661,15 +674,22 @@ export default function App() {
         viewLow.includes('servicos') ||
         viewLow.includes('quick'))
     ) {
-      const unsubQuick = initRealtimeQuickRequestsSync();
+      const unsubQuick = initRealtimeQuickRequestsSync(undefined, (err) => {
+        console.error('[App] Erro no listener onSnapshot de serviços rápidos:', err);
+      });
       if (typeof unsubQuick === 'function') cleanups.push(unsubQuick);
     }
 
-    const unsubViewScoped = initViewScopedRealtimeSync({
-      view: currentView,
-      role: activeRole,
-      schoolId: currentUser.schoolId,
-    });
+    const unsubViewScoped = initViewScopedRealtimeSync(
+      {
+        view: currentView,
+        role: activeRole,
+        schoolId: currentUser.schoolId,
+      },
+      (err) => {
+        console.error('[App] Erro no listener onSnapshot da vista atual:', err);
+      }
+    );
     if (typeof unsubViewScoped === 'function') cleanups.push(unsubViewScoped);
 
     return () => {
@@ -680,6 +700,32 @@ export default function App() {
       });
     };
   }, [currentUser?.id, currentUser?.role, currentUser?.status, currentUser?.schoolId, currentView, activeRole]);
+
+  const hasShownWriteQuotaToastRef = useRef(false);
+  useEffect(() => {
+    const notifyWriteQuota = () => {
+      if (hasShownWriteQuotaToastRef.current) return;
+      hasShownWriteQuotaToastRef.current = true;
+      showToast(
+        'Cota diária gratuita de gravação no Firestore atingida. As novas alterações são mantidas localmente até à reposição diária da cota.'
+      );
+    };
+
+    if (isFirestoreWriteQuotaExhausted()) {
+      notifyWriteQuota();
+    }
+
+    const handleQuotaStatus = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ writeExhausted?: boolean }>).detail;
+      if (detail?.writeExhausted) {
+        notifyWriteQuota();
+      }
+    };
+    window.addEventListener('sigre-firestore-quota-status', handleQuotaStatus);
+    return () => {
+      window.removeEventListener('sigre-firestore-quota-status', handleQuotaStatus);
+    };
+  }, []);
 
 
 
@@ -1172,12 +1218,16 @@ export default function App() {
       // ignore
     }
     setCurrentUser(normalizedUser);
-    saveUserToFirestore(normalizedUser).catch(() => {});
+    saveUserToFirestore(normalizedUser).catch((err) =>
+      console.error('[App] Erro ao gravar utilizador após login:', err)
+    );
     if (normalizedUser.role === 'admin' || normalizedUser.role === 'diretor' || normalizedUser.role === 'professor') {
       setActiveRole(normalizedUser.role);
     }
     // Immediately synchronize all network collections upon login so any device sees the latest shared data
-    syncApplicationsFromServer(true).catch(() => {});
+    syncApplicationsFromServer(true).catch((err) =>
+      console.error('[App] Erro ao sincronizar candidaturas após login:', err)
+    );
     syncSchoolsFromServer()
       .then((syncedSchools) => {
         if (Array.isArray(syncedSchools) && syncedSchools.length > 0) {
@@ -1203,7 +1253,9 @@ export default function App() {
         window.dispatchEvent(new CustomEvent('sigre-data-synced'));
         window.dispatchEvent(new CustomEvent('ucore-teachers-updated'));
       })
-      .catch(() => {});
+      .catch((err) =>
+        console.error('[App] Erro ao sincronizar escolas após login:', err)
+      );
     setCurrentPage('home');
     setCurrentView('home');
     showToast(`${user.greeting || 'Olá ' + user.firstName}! Interface e configurações carregadas.`);
@@ -1303,7 +1355,9 @@ export default function App() {
       } catch {
         // ignore
       }
-      saveUserToFirestore(nextUser).catch(() => {});
+      saveUserToFirestore(nextUser).catch((err) =>
+        console.warn('[App] Erro ao sincronizar perfil do utilizador no Firestore:', err)
+      );
       return nextUser;
     });
 
@@ -1788,7 +1842,9 @@ export default function App() {
                 localStorage.setItem('ucore_registered_users', JSON.stringify(next));
               }
             } catch {}
-            saveUserToFirestore(activated).catch(() => {});
+            saveUserToFirestore(activated).catch((err) =>
+              console.warn('[App] Erro ao gravar ativação de conta no Firestore:', err)
+            );
             showToast(`Conta ativada com sucesso! Bem-vindo(a) à plataforma Sigre, ${activated.firstName}.`);
           }}
           showToast={showToast}
@@ -3322,7 +3378,9 @@ export default function App() {
             }}
             onAddTeacher={(newTeacher) => {
               setAdminTeachers((prev) => [newTeacher, ...prev]);
-              saveTeacherToFirestore(newTeacher).catch(() => {});
+              saveTeacherToFirestore(newTeacher).catch((err) =>
+                console.warn('[App] Erro ao gravar docente no Firestore:', err)
+              );
               showToast(`Docente "${newTeacher.name}" registrado com sucesso!`);
             }}
             onAddStudent={(newStudent) => {
@@ -3335,7 +3393,9 @@ export default function App() {
                 }
                 return [newStudent, ...prev];
               });
-              saveStudentToFirestore(newStudent).catch(() => {});
+              saveStudentToFirestore(newStudent).catch((err) =>
+                console.warn('[App] Erro ao gravar aluno no Firestore:', err)
+              );
               setAdminSchools((prevSchools) =>
                 prevSchools.map((sc) => {
                   const isMatch =
@@ -3357,7 +3417,9 @@ export default function App() {
             }}
             onAddDirector={(newDirector) => {
               setAdminDirectors((prev) => [newDirector, ...prev]);
-              saveDirectorToFirestore(newDirector).catch(() => {});
+              saveDirectorToFirestore(newDirector).catch((err) =>
+                console.warn('[App] Erro ao gravar director no Firestore:', err)
+              );
               showToast(`Diretor(a) "${newDirector.name}" homologado(a) com sucesso!`);
             }}
             availableSchools={adminSchools.map((s) => s.name)}

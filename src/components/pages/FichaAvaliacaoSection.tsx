@@ -186,11 +186,18 @@ export const FichaAvaliacaoSection: React.FC<FichaAvaliacaoSectionProps> = ({
 
   useEffect(() => {
     reloadRecords();
-    syncFichaAvaliacaoFromServer().then(() => reloadRecords()).catch(() => {});
-    const unsub = subscribeToFichasAvaliacao((cloudRecords) => {
-      const merged = mergeFichaAvaliacaoCloudSnapshot(cloudRecords);
-      setRecords(merged);
-    });
+    syncFichaAvaliacaoFromServer()
+      .then(() => reloadRecords())
+      .catch((err) => console.error('[FichaAvaliacao] Erro ao sincronizar fichas de avaliação:', err));
+    const unsub = subscribeToFichasAvaliacao(
+      (cloudRecords) => {
+        const merged = mergeFichaAvaliacaoCloudSnapshot(cloudRecords);
+        setRecords(merged);
+      },
+      (err) => {
+        console.error('[FichaAvaliacao] Erro no listener onSnapshot:', err);
+      }
+    );
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-ficha-avaliacao-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);

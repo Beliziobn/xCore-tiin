@@ -62,9 +62,14 @@ export const GoogleAccountPickerModal: React.FC<GoogleAccountPickerModalProps> =
     setIsChecking(true);
     try {
       // Sync applications and check Firestore so existing accounts are always recognized across devices
-      await syncApplicationsFromServer().catch(() => {});
+      await syncApplicationsFromServer().catch((err) => {
+        console.error('[GooglePicker] Erro ao sincronizar candidaturas:', err);
+      });
       const localLookup = findRegisteredAccountByEmail(emailTrim);
-      const cloudUser = await fetchUserFromFirestore(emailTrim).catch(() => null);
+      const cloudUser = await fetchUserFromFirestore(emailTrim).catch((err) => {
+        console.error('[GooglePicker] Erro ao consultar utilizador no Firestore:', err);
+        return null;
+      });
 
       const isMasterEmail =
         emailTrim === OFFICIAL_DME_ADMIN_EMAIL.toLowerCase() ||

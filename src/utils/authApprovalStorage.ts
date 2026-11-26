@@ -11,6 +11,7 @@ import {
   type FirestorePageResult,
   PAGINATION_PAGE_SIZE,
   isFirestoreReadQuotaExhausted,
+  isFirestoreWriteQuotaExhausted,
   updateApplicationInFirestore,
   deleteApplicationFromFirestore,
   clearApprovedApplicationsFromFirestore,
@@ -784,14 +785,16 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
         }).catch(() => {});
       }
 
-      // 5. Mirror missing or upgraded ('aprovado'/'rejeitado') apps to Cloud Firestore ONLY when Firestore read succeeded
-      if (firestoreReadSucceeded) {
+      // 5. Mirror missing 'pendente' or newly upgraded ('aprovado'/'rejeitado' still pendente in Firestore) apps ONLY when Firestore read succeeded & write quota available
+      if (firestoreReadSucceeded && !isFirestoreWriteQuotaExhausted()) {
         const missingOrUpgradedInFirestore = merged.filter((ma) => {
           const fsMatch = firestoreApps.find((fa) => matchesRecordIdentity(fa, ma));
-          const needsPush =
-            !fsMatch ||
-            (ma.status === 'aprovado' && fsMatch.status !== 'aprovado') ||
-            (ma.status === 'rejeitado' && fsMatch.status === 'pendente');
+          // Remember: firestoreApps only lists 'pendente' records (bounded query).
+          // Do NOT blindly re-upload historical 'aprovado'/'rejeitado' records on every reload.
+          const needsPush = fsMatch
+            ? (ma.status === 'aprovado' && fsMatch.status !== 'aprovado') ||
+              (ma.status === 'rejeitado' && fsMatch.status === 'pendente')
+            : ma.status === 'pendente';
           if (!needsPush) return false;
           const sig = `${ma.status}:${ma.approvedAt || ''}`;
           return pushedAppStatusToFirestore.get(ma.id) !== sig;
@@ -799,6 +802,7 @@ export async function syncApplicationsFromServer(force: boolean = false): Promis
 
         const BATCH_SIZE = 6;
         for (let i = 0; i < missingOrUpgradedInFirestore.length; i += BATCH_SIZE) {
+          if (isFirestoreWriteQuotaExhausted()) break;
           const chunk = missingOrUpgradedInFirestore.slice(i, i + BATCH_SIZE);
           await Promise.allSettled(
             chunk.map(async (item) => {
@@ -889,7 +893,8 @@ export async function getApplicationsCountsFromServer(): Promise<{
       aprovados: local.filter((a) => a.status === 'aprovado').length,
       rejeitados: local.filter((a) => a.status === 'rejeitado').length,
     };
-  } catch {
+  } catch (err) {
+    console.error('[authApprovalStorage] Falha ao obter contagens de candidaturas:', err);
     const local = getPendingApplications();
     return {
       total: local.length,
@@ -907,9 +912,11 @@ export async function getApplicationsCountsFromServer(): Promise<{
  */
 let realtimeUnsubscribe: (() => void) | null = null;
 export function initRealtimeApplicationsSync(
-  onUpdate?: (apps: PendingApplication[]) => void
+  onUpdate?: (apps: PendingApplication[]) => void,
+  onError?: (err: unknown) => void
 ): () => void {
   if (isFirestoreReadQuotaExhausted()) {
+    onError?.(new Error('Firestore read quota exhausted'));
     return () => {};
   }
   if (realtimeUnsubscribe) {
@@ -947,15 +954,22 @@ export function initRealtimeApplicationsSync(
       }
       onUpdate?.(validApps);
     } catch (e) {
-      console.warn('[authApprovalStorage] Erro no listener em tempo real:', e);
+      console.error('[authApprovalStorage] Erro no listener em tempo real:', e);
+      onError?.(e);
     }
   };
 
-  const fsUnsub = subscribeToApplications((firestoreApps) => {
-    hasReceivedSnapshot = true;
-    latestFirestoreApps = firestoreApps || [];
-    applyCombinedSnapshot(latestFirestoreApps);
-  });
+  const fsUnsub = subscribeToApplications(
+    (firestoreApps) => {
+      hasReceivedSnapshot = true;
+      latestFirestoreApps = firestoreApps || [];
+      applyCombinedSnapshot(latestFirestoreApps);
+    },
+    (err) => {
+      console.error('[authApprovalStorage] Erro na subscrição Firestore de candidaturas:', err);
+      onError?.(err);
+    }
+  );
 
   const handleUsersUpdated = () => {
     if (hasReceivedSnapshot) {
@@ -2885,6 +2899,8 @@ export function syncUpdatedUserProfileAcrossSystem(
     return false;
   };
 
+  const syncedUserKeys = new Set<string>();
+
   // 2. Update ucore_active_user
   try {
     const rawActive = localStorage.getItem('ucore_active_user');
@@ -2903,8 +2919,12 @@ export function syncUpdatedUserProfileAcrossSystem(
         updatedAt: nowIso,
       };
       localStorage.setItem('ucore_active_user', JSON.stringify(mergedActive));
-      if (mergedActive.id) {
-        saveUserToFirestore(mergedActive).catch(() => {});
+      if (mergedActive.id || mergedActive.email) {
+        const syncKey = String(mergedActive.email || mergedActive.id).trim().toLowerCase();
+        syncedUserKeys.add(syncKey);
+        saveUserToFirestore(mergedActive).catch((err) =>
+          console.warn('[authApprovalStorage] Falha ao sincronizar utilizador ativo no Firestore:', err)
+        );
       }
     }
   } catch {}
@@ -2927,8 +2947,12 @@ export function syncUpdatedUserProfileAcrossSystem(
             ...(updates.address !== undefined ? { address: updates.address } : {}),
             updatedAt: nowIso,
           };
-          if (nextU.id) {
-            saveUserToFirestore(nextU).catch(() => {});
+          const syncKey = String(nextU.email || nextU.id || '').trim().toLowerCase();
+          if (syncKey && !syncedUserKeys.has(syncKey)) {
+            syncedUserKeys.add(syncKey);
+            saveUserToFirestore(nextU).catch((err) =>
+              console.warn('[authApprovalStorage] Falha ao sincronizar utilizador registado no Firestore:', err)
+            );
           }
           return nextU;
         }
@@ -2941,7 +2965,13 @@ export function syncUpdatedUserProfileAcrossSystem(
           updatedAt: nowIso,
         };
         nextUsers.push(addedU);
-        saveUserToFirestore(addedU as UserAccount).catch(() => {});
+        const syncKey = String(addedU.email || addedU.id || '').trim().toLowerCase();
+        if (syncKey && !syncedUserKeys.has(syncKey)) {
+          syncedUserKeys.add(syncKey);
+          saveUserToFirestore(addedU as UserAccount).catch((err) =>
+            console.warn('[authApprovalStorage] Falha ao sincronizar novo utilizador no Firestore:', err)
+          );
+        }
       }
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(nextUsers));
     }

@@ -183,11 +183,18 @@ export const GuiaFeriasSection: React.FC<GuiaFeriasSectionProps> = ({
 
   useEffect(() => {
     reloadRecords();
-    syncGuiaFeriasFromServer().then(() => reloadRecords()).catch(() => {});
-    const unsub = subscribeToGuiasFerias((cloudRecords) => {
-      const merged = mergeGuiaFeriasCloudSnapshot(cloudRecords);
-      setRecords(merged);
-    });
+    syncGuiaFeriasFromServer()
+      .then(() => reloadRecords())
+      .catch((err) => console.error('[GuiaFerias] Erro ao sincronizar guias de férias:', err));
+    const unsub = subscribeToGuiasFerias(
+      (cloudRecords) => {
+        const merged = mergeGuiaFeriasCloudSnapshot(cloudRecords);
+        setRecords(merged);
+      },
+      (err) => {
+        console.error('[GuiaFerias] Erro no listener onSnapshot:', err);
+      }
+    );
     const handleUpdated = () => reloadRecords();
     window.addEventListener('sigre-guia-ferias-updated', handleUpdated);
     window.addEventListener('sigre-data-synced', handleUpdated);
