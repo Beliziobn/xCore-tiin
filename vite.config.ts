@@ -13,6 +13,20 @@ export default defineConfig(() => {
     },
     build: {
       modulePreload: false,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (id.includes('firebase')) return 'vendor-firebase';
+            if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+            if (id.includes('jspdf') || id.includes('html-to-image') || id.includes('html2canvas')) return 'vendor-pdf';
+            if (id.includes('exceljs') || id.includes('xlsx')) return 'vendor-excel';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('framer-motion') || id.includes('/motion/')) return 'vendor-motion';
+            if (id.includes('react-dom') || id.includes('/react/')) return 'vendor-react';
+          },
+        },
+      },
     },
     server: {
       host: '0.0.0.0',

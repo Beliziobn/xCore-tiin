@@ -1,52 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { StatCards } from './components/StatCards';
-import { CyanCardsSection } from './components/CyanCardsSection';
-import { CloudFooter } from './components/CloudFooter';
-import { AuthPage } from './components/pages/AuthPage';
-import { StatDetailModal } from './components/StatDetailModal';
-import { ModuleDetailModal } from './components/ModuleDetailModal';
-import { InfoModal, InfoModalType } from './components/InfoModal';
-import { SessionSettingsModal } from './components/SessionSettingsModal';
+import type { InfoModalType } from './components/InfoModal';
 import { sessionsData } from './data/sessionsData';
 import { initTheme } from './utils/themeService';
-
-// Director Pages
-import { DirectorStatisticsPage } from './components/pages/director/DirectorStatisticsPage';
-import { DirectorTeachersPage } from './components/pages/director/DirectorTeachersPage';
-import { DirectorStudentsPage } from './components/pages/director/DirectorStudentsPage';
-import { DirectorRoomsPage } from './components/pages/director/DirectorRoomsPage';
-import { DirectorClassesPage } from './components/pages/director/DirectorClassesPage';
-import { DirectorProfilePage } from './components/pages/director/DirectorProfilePage';
-import { DirectorAttendancePage } from './components/pages/director/DirectorAttendancePage';
-import { DirectorApprovalsPage } from './components/pages/director/DirectorApprovalsPage';
-import { DirectorPautasPage } from './components/pages/director/DirectorPautasPage';
-
-// Admin Pages & Components
-import { AdminStatisticsPage } from './components/pages/admin/AdminStatisticsPage';
-import { AdminSchoolsPage } from './components/pages/admin/AdminSchoolsPage';
-import { AdminTeachersPage } from './components/pages/admin/AdminTeachersPage';
-import { AdminStudentsPage } from './components/pages/admin/AdminStudentsPage';
-import { AdminDirectorsPage } from './components/pages/admin/AdminDirectorsPage';
-import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
-import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
-import { AdminApprovalsPage } from './components/pages/admin/AdminApprovalsPage';
-import { AdminRegistrationModal, AdminModalType } from './components/pages/admin/AdminRegistrationModal';
-import { AdminAuditLogsModal } from './components/pages/admin/AdminAuditLogsModal';
-import { ExcelExportModal } from './components/modals/ExcelExportModal';
-import { GoogleSheetsModal } from './components/modals/GoogleSheetsModal';
-import { 
-  initialAdminSchools, 
-  initialAdminTeachers, 
-  initialAdminStudents, 
-  initialAdminDirectors 
+import type { AdminModalType } from './components/pages/admin/AdminRegistrationModal';
+import {
+  initialAdminSchools,
+  initialAdminTeachers,
+  initialAdminStudents,
+  initialAdminDirectors,
 } from './data/adminData';
 import {
-  purgeModeloCentralData,
   deleteSchoolAndRelatedData,
   isModeloCentralSchool,
   saveRegisteredSchool,
@@ -74,60 +42,93 @@ import {
   saveUserToFirestore,
 } from './utils/firestoreSync';
 import { saveStudent } from './utils/studentStorage';
-
-// Teacher & Student Pages
-import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
-import { TeacherClassPage } from './components/pages/TeacherClassPage';
-import { TeacherProfilePage } from './components/pages/TeacherProfilePage';
-import { TeacherAttendancePage } from './components/pages/TeacherAttendancePage';
-import { StudentProfilePage } from './components/pages/StudentProfilePage';
-import { 
-  initialStudentsData, 
-  initialTeacherData, 
-  StudentProfile, 
+import {
+  initialStudentsData,
+  initialTeacherData,
+  StudentProfile,
   TeacherData,
-  defaultDisciplinasList
+  defaultDisciplinasList,
 } from './data/teacherData';
-
-// Chat System Components & Mock Data
-import { SupportChatModal } from './components/chat/SupportChatModal';
-import { FloatingChatButton } from './components/chat/FloatingChatButton';
 import { initialChatChannels, initialChatMessages } from './data/chatData';
 import { realtimeChat } from './utils/realtimeChat';
 import { initSmoothScroll, scrollToTop, refreshScrollReveals } from './utils/scrollManager';
-
-// School Team Section (Professores, Gestores e Coordenadores)
-import SchoolTeamSection, { defaultSchoolMembers, SchoolMember } from './components/ui/school-team-section';
+import type { SchoolMember } from './components/ui/school-team-section';
 import { AIInputWithLoading } from './components/ui/ai-input-with-loading';
-import { PublicLandingPage } from './components/pages/PublicLandingPage';
-import { PendingApprovalPage } from './components/pages/PendingApprovalPage';
-import { DemoRequestModal } from './components/modals/DemoRequestModal';
-import { AccessDeniedGuard } from './components/common/AccessDeniedGuard';
 import { canUserAccessView, getOwnProfileViewForUser } from './utils/authGuard';
-
-// Cookie Consent & Legal Pages
-import { CookieConsentBanner } from './components/cookies/CookieConsentBanner';
-import { AboutPlatformPage } from './components/pages/legal/AboutPlatformPage';
-import { TermsOfUsePage } from './components/pages/legal/TermsOfUsePage';
-import { PrivacyPolicyPage } from './components/pages/legal/PrivacyPolicyPage';
-import { SecurityDataProtectionPage } from './components/pages/legal/SecurityDataProtectionPage';
-
-// Real-Time Meetings & Video Calls (Zoom-style)
-import { ZoomMeetingModal } from './components/meetings/ZoomMeetingModal';
-import { MeetingsHubPage } from './components/pages/MeetingsHubPage';
-
-// Intelligent RAG Vector Engine & Academic Opinions
-import { RagIntelligenceModal } from './components/rag/RagIntelligenceModal';
 import { Sparkles, X } from 'lucide-react';
 
-// Public Institutional Pages: 404, Thank You, and Cases of Success
-import { NotFoundPage } from './components/pages/NotFoundPage';
-import { ThankYouPage } from './components/pages/ThankYouPage';
-import { CasesPage } from './components/pages/CasesPage';
-import { DeclaracaoEfectividadePage } from './components/pages/DeclaracaoEfectividadePage';
-import { QuickServicesPage } from './components/pages/QuickServicesPage';
-import { BackupManagerModal } from './components/modals/BackupManagerModal';
-import { QuickRequestsManagementView } from './components/quick-services/QuickRequestsManagementView';
+// Lazy-loaded landing, auth, and shared UI sections
+const AuthPage = lazy(() => import('./components/pages/AuthPage').then((m) => ({ default: m.AuthPage })));
+const PublicLandingPage = lazy(() => import('./components/pages/PublicLandingPage').then((m) => ({ default: m.PublicLandingPage })));
+const PendingApprovalPage = lazy(() => import('./components/pages/PendingApprovalPage').then((m) => ({ default: m.PendingApprovalPage })));
+const AccessDeniedGuard = lazy(() => import('./components/common/AccessDeniedGuard').then((m) => ({ default: m.AccessDeniedGuard })));
+const CyanCardsSection = lazy(() => import('./components/CyanCardsSection').then((m) => ({ default: m.CyanCardsSection })));
+const CloudFooter = lazy(() => import('./components/CloudFooter').then((m) => ({ default: m.CloudFooter })));
+const SchoolTeamSection = lazy(() => import('./components/ui/school-team-section'));
+const CookieConsentBanner = lazy(() => import('./components/cookies/CookieConsentBanner').then((m) => ({ default: m.CookieConsentBanner })));
+const FloatingChatButton = lazy(() => import('./components/chat/FloatingChatButton').then((m) => ({ default: m.FloatingChatButton })));
+
+// Lazy-loaded Director Pages
+const DirectorStatisticsPage = lazy(() => import('./components/pages/director/DirectorStatisticsPage').then((m) => ({ default: m.DirectorStatisticsPage })));
+const DirectorTeachersPage = lazy(() => import('./components/pages/director/DirectorTeachersPage').then((m) => ({ default: m.DirectorTeachersPage })));
+const DirectorStudentsPage = lazy(() => import('./components/pages/director/DirectorStudentsPage').then((m) => ({ default: m.DirectorStudentsPage })));
+const DirectorRoomsPage = lazy(() => import('./components/pages/director/DirectorRoomsPage').then((m) => ({ default: m.DirectorRoomsPage })));
+const DirectorClassesPage = lazy(() => import('./components/pages/director/DirectorClassesPage').then((m) => ({ default: m.DirectorClassesPage })));
+const DirectorProfilePage = lazy(() => import('./components/pages/director/DirectorProfilePage').then((m) => ({ default: m.DirectorProfilePage })));
+const DirectorAttendancePage = lazy(() => import('./components/pages/director/DirectorAttendancePage').then((m) => ({ default: m.DirectorAttendancePage })));
+const DirectorApprovalsPage = lazy(() => import('./components/pages/director/DirectorApprovalsPage').then((m) => ({ default: m.DirectorApprovalsPage })));
+const DirectorPautasPage = lazy(() => import('./components/pages/director/DirectorPautasPage').then((m) => ({ default: m.DirectorPautasPage })));
+
+// Lazy-loaded Admin Pages
+const AdminStatisticsPage = lazy(() => import('./components/pages/admin/AdminStatisticsPage').then((m) => ({ default: m.AdminStatisticsPage })));
+const AdminSchoolsPage = lazy(() => import('./components/pages/admin/AdminSchoolsPage').then((m) => ({ default: m.AdminSchoolsPage })));
+const AdminTeachersPage = lazy(() => import('./components/pages/admin/AdminTeachersPage').then((m) => ({ default: m.AdminTeachersPage })));
+const AdminStudentsPage = lazy(() => import('./components/pages/admin/AdminStudentsPage').then((m) => ({ default: m.AdminStudentsPage })));
+const AdminDirectorsPage = lazy(() => import('./components/pages/admin/AdminDirectorsPage').then((m) => ({ default: m.AdminDirectorsPage })));
+const AdminProfilePage = lazy(() => import('./components/pages/admin/AdminProfilePage').then((m) => ({ default: m.AdminProfilePage })));
+const AdminAnnouncementsPage = lazy(() => import('./components/pages/admin/AdminAnnouncementsPage').then((m) => ({ default: m.AdminAnnouncementsPage })));
+const AdminApprovalsPage = lazy(() => import('./components/pages/admin/AdminApprovalsPage').then((m) => ({ default: m.AdminApprovalsPage })));
+
+// Lazy-loaded Teacher & Student Pages
+const TeacherStatisticsPage = lazy(() => import('./components/pages/TeacherStatisticsPage').then((m) => ({ default: m.TeacherStatisticsPage })));
+const TeacherClassPage = lazy(() => import('./components/pages/TeacherClassPage').then((m) => ({ default: m.TeacherClassPage })));
+const TeacherProfilePage = lazy(() => import('./components/pages/TeacherProfilePage').then((m) => ({ default: m.TeacherProfilePage })));
+const TeacherAttendancePage = lazy(() => import('./components/pages/TeacherAttendancePage').then((m) => ({ default: m.TeacherAttendancePage })));
+const StudentProfilePage = lazy(() => import('./components/pages/StudentProfilePage').then((m) => ({ default: m.StudentProfilePage })));
+
+// Lazy-loaded Institutional, Legal, Meetings & Services Pages
+const AboutPlatformPage = lazy(() => import('./components/pages/legal/AboutPlatformPage').then((m) => ({ default: m.AboutPlatformPage })));
+const TermsOfUsePage = lazy(() => import('./components/pages/legal/TermsOfUsePage').then((m) => ({ default: m.TermsOfUsePage })));
+const PrivacyPolicyPage = lazy(() => import('./components/pages/legal/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
+const SecurityDataProtectionPage = lazy(() => import('./components/pages/legal/SecurityDataProtectionPage').then((m) => ({ default: m.SecurityDataProtectionPage })));
+const MeetingsHubPage = lazy(() => import('./components/pages/MeetingsHubPage').then((m) => ({ default: m.MeetingsHubPage })));
+const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+const ThankYouPage = lazy(() => import('./components/pages/ThankYouPage').then((m) => ({ default: m.ThankYouPage })));
+const CasesPage = lazy(() => import('./components/pages/CasesPage').then((m) => ({ default: m.CasesPage })));
+const DeclaracaoEfectividadePage = lazy(() => import('./components/pages/DeclaracaoEfectividadePage').then((m) => ({ default: m.DeclaracaoEfectividadePage })));
+const QuickServicesPage = lazy(() => import('./components/pages/QuickServicesPage').then((m) => ({ default: m.QuickServicesPage })));
+
+// Lazy-loaded Heavy Modals (downloaded & mounted strictly on demand)
+const StatDetailModal = lazy(() => import('./components/StatDetailModal').then((m) => ({ default: m.StatDetailModal })));
+const ModuleDetailModal = lazy(() => import('./components/ModuleDetailModal').then((m) => ({ default: m.ModuleDetailModal })));
+const InfoModal = lazy(() => import('./components/InfoModal').then((m) => ({ default: m.InfoModal })));
+const SessionSettingsModal = lazy(() => import('./components/SessionSettingsModal').then((m) => ({ default: m.SessionSettingsModal })));
+const AdminRegistrationModal = lazy(() => import('./components/pages/admin/AdminRegistrationModal').then((m) => ({ default: m.AdminRegistrationModal })));
+const AdminAuditLogsModal = lazy(() => import('./components/pages/admin/AdminAuditLogsModal').then((m) => ({ default: m.AdminAuditLogsModal })));
+const ExcelExportModal = lazy(() => import('./components/modals/ExcelExportModal').then((m) => ({ default: m.ExcelExportModal })));
+const GoogleSheetsModal = lazy(() => import('./components/modals/GoogleSheetsModal').then((m) => ({ default: m.GoogleSheetsModal })));
+const SupportChatModal = lazy(() => import('./components/chat/SupportChatModal').then((m) => ({ default: m.SupportChatModal })));
+const DemoRequestModal = lazy(() => import('./components/modals/DemoRequestModal').then((m) => ({ default: m.DemoRequestModal })));
+const ZoomMeetingModal = lazy(() => import('./components/meetings/ZoomMeetingModal').then((m) => ({ default: m.ZoomMeetingModal })));
+const RagIntelligenceModal = lazy(() => import('./components/rag/RagIntelligenceModal').then((m) => ({ default: m.RagIntelligenceModal })));
+const BackupManagerModal = lazy(() => import('./components/modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
+
+const RouteFallback: React.FC = () => (
+  <div className="w-full min-h-[55vh] flex flex-col items-center justify-center gap-3 px-4 py-16">
+    <div className="w-8 h-8 rounded-full border-[2.5px] border-slate-200 border-t-[#f75142] animate-spin" />
+    <span className="text-xs font-semibold text-slate-500 tracking-wide">A carregar módulo...</span>
+  </div>
+);
 
 import type { 
   EducationalModule, 
@@ -185,10 +186,7 @@ export default function App() {
     subtitle: 'A sua solicitação foi recebida e registada na plataforma Sigre.',
   });
 
-  // Purge any "Escola Modelo Central" and related records immediately on startup
-  if (typeof window !== 'undefined') {
-    purgeModeloCentralData();
-  }
+  // Note: purgeModeloCentralData() already runs once at schoolStorage module initialization.
 
   // Admin dynamic state (hydrated from both admin and detailed registration keys, falling back to canonical seed if empty)
   const [adminSchools, setAdminSchools] = useState<AdminSchool[]>(() => {
@@ -337,26 +335,20 @@ export default function App() {
     }
   };
 
-  // Initialize theme mode and sync network schools/data from server
+  // Track last synced raw JSON per collection to avoid redundant JSON.parse/stringify thrashing
+  const lastRawSyncRef = useRef<Record<string, string | null>>({});
+
+  // Initialize theme mode once on mount
   useEffect(() => {
     initTheme();
-    syncSchoolsFromServer()
-      .then((syncedSchools) => {
-        isInitialSyncCompleteRef.current = true;
-        if (Array.isArray(syncedSchools) && syncedSchools.length > 0) {
-          setAdminSchools(syncedSchools);
-        }
-      })
-      .catch(() => {
-        isInitialSyncCompleteRef.current = true;
-      });
   }, []);
 
-  // Persist admin entities on change (localStorage interceptor handles real-time server push)
+  // Persist admin entities on change (skipping redundant writes when raw value already matches)
   useEffect(() => {
     try {
       const nextJson = JSON.stringify(adminSchools);
-      if (localStorage.getItem('ucore_admin_schools') !== nextJson) {
+      if (lastRawSyncRef.current.schools !== nextJson && localStorage.getItem('ucore_admin_schools') !== nextJson) {
+        lastRawSyncRef.current.schools = nextJson;
         localStorage.setItem('ucore_admin_schools', nextJson);
       }
     } catch {
@@ -367,7 +359,8 @@ export default function App() {
   useEffect(() => {
     try {
       const nextJson = JSON.stringify(adminTeachers);
-      if (localStorage.getItem('ucore_admin_teachers') !== nextJson) {
+      if (lastRawSyncRef.current.teachers !== nextJson && localStorage.getItem('ucore_admin_teachers') !== nextJson) {
+        lastRawSyncRef.current.teachers = nextJson;
         localStorage.setItem('ucore_admin_teachers', nextJson);
       }
     } catch {
@@ -378,7 +371,8 @@ export default function App() {
   useEffect(() => {
     try {
       const nextJson = JSON.stringify(adminDirectors);
-      if (localStorage.getItem('ucore_admin_directors') !== nextJson) {
+      if (lastRawSyncRef.current.directors !== nextJson && localStorage.getItem('ucore_admin_directors') !== nextJson) {
+        lastRawSyncRef.current.directors = nextJson;
         localStorage.setItem('ucore_admin_directors', nextJson);
       }
     } catch {
@@ -389,7 +383,8 @@ export default function App() {
   useEffect(() => {
     try {
       const nextJson = JSON.stringify(adminStudents);
-      if (localStorage.getItem('ucore_admin_students') !== nextJson) {
+      if (lastRawSyncRef.current.students !== nextJson && localStorage.getItem('ucore_admin_students') !== nextJson) {
+        lastRawSyncRef.current.students = nextJson;
         localStorage.setItem('ucore_admin_students', nextJson);
       }
     } catch {
@@ -397,71 +392,79 @@ export default function App() {
     }
   }, [adminStudents]);
 
-  // Listen for sigre-data-synced and ucore-teachers-updated events so adminStudents, adminTeachers, adminSchools, teacherStudents, and chat stay in real-time sync
+  // Listen for sigre-data-synced and ucore-teachers-updated events (debounced to prevent bursts of JSON.parse freezes)
   useEffect(() => {
-    const handleSync = () => {
+    let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const runSyncNow = () => {
       try {
         const savedStudents = localStorage.getItem('ucore_admin_students');
-        if (savedStudents) {
+        if (savedStudents && savedStudents !== lastRawSyncRef.current.students) {
+          lastRawSyncRef.current.students = savedStudents;
           const parsed = JSON.parse(savedStudents);
-          if (Array.isArray(parsed)) {
-            setAdminStudents((prev) => (JSON.stringify(prev) === savedStudents ? prev : parsed));
-          }
+          if (Array.isArray(parsed)) setAdminStudents(parsed);
         }
         const savedTeachers = localStorage.getItem('ucore_admin_teachers');
-        if (savedTeachers) {
+        if (savedTeachers && savedTeachers !== lastRawSyncRef.current.teachers) {
+          lastRawSyncRef.current.teachers = savedTeachers;
           const parsed = JSON.parse(savedTeachers);
-          if (Array.isArray(parsed)) {
-            setAdminTeachers((prev) => (JSON.stringify(prev) === savedTeachers ? prev : parsed));
-          }
+          if (Array.isArray(parsed)) setAdminTeachers(parsed);
         }
         const savedSchools = localStorage.getItem('ucore_admin_schools');
-        if (savedSchools) {
+        if (savedSchools && savedSchools !== lastRawSyncRef.current.schools) {
           const parsed = JSON.parse(savedSchools);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const cleanSchools = deduplicateSchoolsCanonical(parsed);
             const cleanJson = JSON.stringify(cleanSchools);
-            setAdminSchools((prev) => (JSON.stringify(prev) === cleanJson ? prev : cleanSchools));
+            lastRawSyncRef.current.schools = cleanJson;
+            setAdminSchools(cleanSchools);
           }
         }
         const savedDirectors = localStorage.getItem('ucore_admin_directors');
-        if (savedDirectors) {
+        if (savedDirectors && savedDirectors !== lastRawSyncRef.current.directors) {
+          lastRawSyncRef.current.directors = savedDirectors;
           const parsed = JSON.parse(savedDirectors);
-          if (Array.isArray(parsed)) {
-            setAdminDirectors((prev) => (JSON.stringify(prev) === savedDirectors ? prev : parsed));
-          }
+          if (Array.isArray(parsed)) setAdminDirectors(parsed);
         }
         const savedTeacherStudents = localStorage.getItem('ucore_teacher_students');
-        if (savedTeacherStudents) {
+        if (savedTeacherStudents && savedTeacherStudents !== lastRawSyncRef.current.teacherStudents) {
+          lastRawSyncRef.current.teacherStudents = savedTeacherStudents;
           const parsed = JSON.parse(savedTeacherStudents);
-          if (Array.isArray(parsed)) {
-            setTeacherStudents((prev) =>
-              JSON.stringify(prev) === savedTeacherStudents ? prev : parsed
-            );
-          }
+          if (Array.isArray(parsed)) setTeacherStudents(parsed);
         }
         const savedChatMessages = localStorage.getItem('ucore_chat_messages');
-        if (savedChatMessages) {
+        if (savedChatMessages && savedChatMessages !== lastRawSyncRef.current.chatMessages) {
+          lastRawSyncRef.current.chatMessages = savedChatMessages;
           const parsed = JSON.parse(savedChatMessages);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setChatMessages((prev) => (JSON.stringify(prev) === savedChatMessages ? prev : parsed));
-          }
+          if (Array.isArray(parsed) && parsed.length > 0) setChatMessages(parsed);
         }
         const savedChatChannels = localStorage.getItem('ucore_chat_channels_v3');
-        if (savedChatChannels) {
+        if (savedChatChannels && savedChatChannels !== lastRawSyncRef.current.chatChannels) {
+          lastRawSyncRef.current.chatChannels = savedChatChannels;
           const parsed = JSON.parse(savedChatChannels);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setChatChannels((prev) => (JSON.stringify(prev) === savedChatChannels ? prev : parsed));
-          }
+          if (Array.isArray(parsed) && parsed.length > 0) setChatChannels(parsed);
         }
       } catch {
         // ignore
       }
     };
+
+    const handleSync = () => {
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        syncTimer = null;
+        runSyncNow();
+      }, 120);
+    };
+
     syncSchoolsFromServer()
-      .then(() => {
+      .then((syncedSchools) => {
         isInitialSyncCompleteRef.current = true;
-        handleSync();
+        if (Array.isArray(syncedSchools) && syncedSchools.length > 0) {
+          lastRawSyncRef.current.schools = JSON.stringify(syncedSchools);
+          setAdminSchools(syncedSchools);
+        }
+        runSyncNow();
       })
       .catch(() => {
         isInitialSyncCompleteRef.current = true;
@@ -471,6 +474,7 @@ export default function App() {
     window.addEventListener('ucore-teachers-updated', handleSync);
     window.addEventListener('ucore-students-updated', handleSync);
     return () => {
+      if (syncTimer) clearTimeout(syncTimer);
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('ucore-teachers-updated', handleSync);
       window.removeEventListener('ucore-students-updated', handleSync);
@@ -3046,15 +3050,19 @@ export default function App() {
           </section>
 
           {/* Optional Academic Modules Section */}
-          <CyanCardsSection onSelectModule={(module) => setSelectedModule(module)} />
+          <Suspense fallback={null}>
+            <CyanCardsSection onSelectModule={(module) => setSelectedModule(module)} />
+          </Suspense>
 
           {/* School Team Showcase (Professores Cadastrados no Sistema) - Only on home dashboard when session is started */}
           {currentPage === 'home' && currentView === 'home' && isSessionStarted && (
-            <SchoolTeamSection
-              members={schoolMembers}
-              title="Professores Cadastrados no Sistema"
-              subtitle="Corpo docente oficial registado na rede escolar do município de Quêssua."
-            />
+            <Suspense fallback={null}>
+              <SchoolTeamSection
+                members={schoolMembers}
+                title="Professores Cadastrados no Sistema"
+                subtitle="Corpo docente oficial registado na rede escolar do município de Quêssua."
+              />
+            </Suspense>
           )}
         </main>
       </>
@@ -3167,262 +3175,302 @@ export default function App() {
         }}
       />
 
-      {/* Main Routed View with smooth page transitions & skip-link landmark */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          id="main-content"
-          tabIndex={-1}
-          key={
-            !currentUser
-              ? `public-${currentView}-${currentPage}`
-              : currentPage === 'login' || currentPage === 'register'
-              ? `auth-${currentPage}`
-              : currentView === 'aluno-perfil'
-              ? `aluno-perfil-${selectedStudent?.id || 'current'}`
-              : `${activeRole}-${currentView}`
-          }
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="w-full flex-1 flex flex-col focus:outline-none"
-        >
+      {/* Main Routed View — instant mount with lightweight CSS fade (eliminates 400ms AnimatePresence wait lag) */}
+      <div
+        id="main-content"
+        tabIndex={-1}
+        key={
+          !currentUser
+            ? `public-${currentView}-${currentPage}`
+            : currentPage === 'login' || currentPage === 'register'
+            ? `auth-${currentPage}`
+            : currentView === 'aluno-perfil'
+            ? `aluno-perfil-${selectedStudent?.id || 'current'}`
+            : `${activeRole}-${currentView}`
+        }
+        className="w-full flex-1 flex flex-col focus:outline-none animate-in fade-in duration-100"
+      >
+        <Suspense fallback={<RouteFallback />}>
           {renderCurrentView()}
-        </motion.div>
-      </AnimatePresence>
+        </Suspense>
+      </div>
 
       {/* Organic Cloud Wave Footer (only visible when session is started) */}
       {isSessionStarted && (
-        <CloudFooter
-          onOpenAbout={() => {
-            setCurrentView('sobre');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onOpenTerms={() => {
-            setCurrentView('termos');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onOpenPrivacy={() => {
-            setCurrentView('privacidade');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onOpenSecurity={() => {
-            setCurrentView('seguranca');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onOpenCases={() => {
-            setCurrentView('cases');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onOpenCookieSettings={() => window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'))}
-          onOpenSupport={() => setInfoModalType('support')}
-        />
+        <Suspense fallback={null}>
+          <CloudFooter
+            onOpenAbout={() => {
+              setCurrentView('sobre');
+              scrollToTop(true);
+            }}
+            onOpenTerms={() => {
+              setCurrentView('termos');
+              scrollToTop(true);
+            }}
+            onOpenPrivacy={() => {
+              setCurrentView('privacidade');
+              scrollToTop(true);
+            }}
+            onOpenSecurity={() => {
+              setCurrentView('seguranca');
+              scrollToTop(true);
+            }}
+            onOpenCases={() => {
+              setCurrentView('cases');
+              scrollToTop(true);
+            }}
+            onOpenCookieSettings={() => window.dispatchEvent(new CustomEvent('open-ucore-cookie-preferences'))}
+            onOpenSupport={() => setInfoModalType('support')}
+          />
+        </Suspense>
       )}
 
       {/* Cookie Consent Banner & Preferences Modal */}
-      <CookieConsentBanner
-        onNavigateToPrivacy={() => {
-          setCurrentView('privacidade');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onNavigateToTerms={() => {
-          setCurrentView('termos');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onNavigateToSecurity={() => {
-          setCurrentView('seguranca');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-      />
+      <Suspense fallback={null}>
+        <CookieConsentBanner
+          onNavigateToPrivacy={() => {
+            setCurrentView('privacidade');
+            scrollToTop(true);
+          }}
+          onNavigateToTerms={() => {
+            setCurrentView('termos');
+            scrollToTop(true);
+          }}
+          onNavigateToSecurity={() => {
+            setCurrentView('seguranca');
+            scrollToTop(true);
+          }}
+        />
+      </Suspense>
 
       {/* Floating Support Chat Button (only visible when session is started) */}
       {isSessionStarted && (
-        <FloatingChatButton
-          onClick={() => setIsChatOpen(true)}
-          unreadCount={unreadChatCount}
-        />
+        <Suspense fallback={null}>
+          <FloatingChatButton
+            onClick={() => setIsChatOpen(true)}
+            unreadCount={unreadChatCount}
+          />
+        </Suspense>
       )}
 
-      {/* Demo Request Modal */}
-      <DemoRequestModal
-        isOpen={isDemoModalOpen}
-        onClose={() => setIsDemoModalOpen(false)}
-        onStartDemoSession={(role) => handleDirectDemoLogin(role || 'diretor')}
-        onOpenThankYouPage={(details) => {
-          setThankYouConfig({
-            type: 'school-registration',
-            title: 'Solicitação de Demonstração Recebida!',
-            subtitle: `Agradecemos o interesse, ${details.recipientName}. A equipa Sigre entrará em contacto para o agendamento da sessão experimental.`,
-            recipientName: details.recipientName,
-            schoolName: details.schoolName,
-            userEmail: details.userEmail,
-            referenceCode: details.referenceCode,
-          });
-          setCurrentView('obrigado');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-      />
+      {/* Lazy-mounted Modals — rendered & bundled strictly when opened */}
+      {isDemoModalOpen && (
+        <Suspense fallback={null}>
+          <DemoRequestModal
+            isOpen={isDemoModalOpen}
+            onClose={() => setIsDemoModalOpen(false)}
+            onStartDemoSession={(role) => handleDirectDemoLogin(role || 'diretor')}
+            onOpenThankYouPage={(details) => {
+              setThankYouConfig({
+                type: 'school-registration',
+                title: 'Solicitação de Demonstração Recebida!',
+                subtitle: `Agradecemos o interesse, ${details.recipientName}. A equipa Sigre entrará em contacto para o agendamento da sessão experimental.`,
+                recipientName: details.recipientName,
+                schoolName: details.schoolName,
+                userEmail: details.userEmail,
+                referenceCode: details.referenceCode,
+              });
+              setCurrentView('obrigado');
+              scrollToTop(true);
+            }}
+          />
+        </Suspense>
+      )}
 
-      {/* Card Detail Modal */}
-      <StatDetailModal
-        card={selectedCard}
-        onClose={() => setSelectedCard(null)}
-        roleTitle={activeSession.title}
-      />
+      {selectedCard && (
+        <Suspense fallback={null}>
+          <StatDetailModal
+            card={selectedCard}
+            onClose={() => setSelectedCard(null)}
+            roleTitle={activeSession.title}
+          />
+        </Suspense>
+      )}
 
-      {/* Session Settings Modal */}
-      <SessionSettingsModal
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-        session={activeSession}
-        onSaveSettings={handleSaveSettings}
-      />
+      {settingsModalOpen && (
+        <Suspense fallback={null}>
+          <SessionSettingsModal
+            isOpen={settingsModalOpen}
+            onClose={() => setSettingsModalOpen(false)}
+            session={activeSession}
+            onSaveSettings={handleSaveSettings}
+          />
+        </Suspense>
+      )}
 
-      {/* Module Detail Modal */}
-      <ModuleDetailModal
-        module={selectedModule}
-        onClose={() => setSelectedModule(null)}
-        onOpenGetStarted={() => handleOpenAuth('login')}
-        isLoggedIn={isSessionStarted}
-      />
+      {selectedModule && (
+        <Suspense fallback={null}>
+          <ModuleDetailModal
+            module={selectedModule}
+            onClose={() => setSelectedModule(null)}
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            isLoggedIn={isSessionStarted}
+          />
+        </Suspense>
+      )}
 
-      {/* Admin Registration Modal */}
-      <AdminRegistrationModal
-        type={adminModalType}
-        isOpen={adminModalType !== null}
-        onClose={() => setAdminModalType(null)}
-        onAddSchool={(newSchool) => {
-          const next = saveRegisteredSchool(newSchool);
-          setAdminSchools(next);
-          showToast(`Escola "${newSchool.name}" cadastrada na rede com sucesso!`);
-        }}
-        onAddTeacher={(newTeacher) => {
-          setAdminTeachers((prev) => [newTeacher, ...prev]);
-          saveTeacherToFirestore(newTeacher).catch(() => {});
-          showToast(`Docente "${newTeacher.name}" registrado com sucesso!`);
-        }}
-        onAddStudent={(newStudent) => {
-          setAdminStudents((prev) => {
-            const existingIdx = prev.findIndex((s) => s.id === newStudent.id);
-            if (existingIdx >= 0) {
-              const copy = [...prev];
-              copy[existingIdx] = newStudent;
-              return copy;
-            }
-            return [newStudent, ...prev];
-          });
-          saveStudentToFirestore(newStudent).catch(() => {});
-          setAdminSchools((prevSchools) =>
-            prevSchools.map((sc) => {
-              const isMatch =
-                (newStudent.schoolId && newStudent.schoolId === sc.id) ||
-                newStudent.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase();
-              if (isMatch) {
-                return {
-                  ...sc,
-                  studentsWithDocs: sc.studentsWithDocs + (newStudent.hasDocuments ? 1 : 0),
-                  studentsWithoutDocs: sc.studentsWithoutDocs + (newStudent.hasDocuments ? 0 : 1),
-                };
-              }
-              return sc;
-            })
-          );
-          showToast(
-            `Aluno(a) "${newStudent.name}" cadastrado(a) na escola "${newStudent.schoolName}" (${newStudent.registrationData?.tipoEscolaNome || newStudent.gradeClass}) com sucesso!`
-          );
-        }}
-        onAddDirector={(newDirector) => {
-          setAdminDirectors((prev) => [newDirector, ...prev]);
-          saveDirectorToFirestore(newDirector).catch(() => {});
-          showToast(`Diretor(a) "${newDirector.name}" homologado(a) com sucesso!`);
-        }}
-        availableSchools={adminSchools.map((s) => s.name)}
-        schools={adminSchools}
-      />
+      {adminModalType !== null && (
+        <Suspense fallback={null}>
+          <AdminRegistrationModal
+            type={adminModalType}
+            isOpen={adminModalType !== null}
+            onClose={() => setAdminModalType(null)}
+            onAddSchool={(newSchool) => {
+              const next = saveRegisteredSchool(newSchool);
+              setAdminSchools(next);
+              showToast(`Escola "${newSchool.name}" cadastrada na rede com sucesso!`);
+            }}
+            onAddTeacher={(newTeacher) => {
+              setAdminTeachers((prev) => [newTeacher, ...prev]);
+              saveTeacherToFirestore(newTeacher).catch(() => {});
+              showToast(`Docente "${newTeacher.name}" registrado com sucesso!`);
+            }}
+            onAddStudent={(newStudent) => {
+              setAdminStudents((prev) => {
+                const existingIdx = prev.findIndex((s) => s.id === newStudent.id);
+                if (existingIdx >= 0) {
+                  const copy = [...prev];
+                  copy[existingIdx] = newStudent;
+                  return copy;
+                }
+                return [newStudent, ...prev];
+              });
+              saveStudentToFirestore(newStudent).catch(() => {});
+              setAdminSchools((prevSchools) =>
+                prevSchools.map((sc) => {
+                  const isMatch =
+                    (newStudent.schoolId && newStudent.schoolId === sc.id) ||
+                    newStudent.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase();
+                  if (isMatch) {
+                    return {
+                      ...sc,
+                      studentsWithDocs: sc.studentsWithDocs + (newStudent.hasDocuments ? 1 : 0),
+                      studentsWithoutDocs: sc.studentsWithoutDocs + (newStudent.hasDocuments ? 0 : 1),
+                    };
+                  }
+                  return sc;
+                })
+              );
+              showToast(
+                `Aluno(a) "${newStudent.name}" cadastrado(a) na escola "${newStudent.schoolName}" (${newStudent.registrationData?.tipoEscolaNome || newStudent.gradeClass}) com sucesso!`
+              );
+            }}
+            onAddDirector={(newDirector) => {
+              setAdminDirectors((prev) => [newDirector, ...prev]);
+              saveDirectorToFirestore(newDirector).catch(() => {});
+              showToast(`Diretor(a) "${newDirector.name}" homologado(a) com sucesso!`);
+            }}
+            availableSchools={adminSchools.map((s) => s.name)}
+            schools={adminSchools}
+          />
+        </Suspense>
+      )}
 
-      {/* Info Modal (About, Support, Terms, Profile) */}
-      <InfoModal
-        type={infoModalType}
-        onClose={() => setInfoModalType(null)}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        onOpenGetStarted={() => handleOpenAuth('login')}
-        onOpenChat={() => {
-          setInfoModalType(null);
-          setIsChatOpen(true);
-        }}
-      />
+      {infoModalType !== null && (
+        <Suspense fallback={null}>
+          <InfoModal
+            type={infoModalType}
+            onClose={() => setInfoModalType(null)}
+            currentUser={currentUser}
+            onLogout={handleLogout}
+            onOpenGetStarted={() => handleOpenAuth('login')}
+            onOpenChat={() => {
+              setInfoModalType(null);
+              setIsChatOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
 
-      {/* Excel Export Modal (Nível Macro Municipal & Nível Micro Direção de Escola) */}
-      <ExcelExportModal
-        isOpen={isExcelExportModalOpen}
-        onClose={() => setIsExcelExportModalOpen(false)}
-        schools={adminSchools}
-        teachers={adminTeachers}
-        directors={adminDirectors}
-        students={adminStudents}
-        currentUser={currentUser}
-        onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
-      />
+      {isExcelExportModalOpen && (
+        <Suspense fallback={null}>
+          <ExcelExportModal
+            isOpen={isExcelExportModalOpen}
+            onClose={() => setIsExcelExportModalOpen(false)}
+            schools={adminSchools}
+            teachers={adminTeachers}
+            directors={adminDirectors}
+            students={adminStudents}
+            currentUser={currentUser}
+            onOpenGoogleSheets={() => setIsGoogleSheetsModalOpen(true)}
+          />
+        </Suspense>
+      )}
 
-      {/* Google Sheets Integration Modal */}
-      <GoogleSheetsModal
-        isOpen={isGoogleSheetsModalOpen}
-        onClose={() => setIsGoogleSheetsModalOpen(false)}
-        schools={adminSchools}
-        teachers={adminTeachers}
-        directors={adminDirectors}
-        students={adminStudents}
-      />
+      {isGoogleSheetsModalOpen && (
+        <Suspense fallback={null}>
+          <GoogleSheetsModal
+            isOpen={isGoogleSheetsModalOpen}
+            onClose={() => setIsGoogleSheetsModalOpen(false)}
+            schools={adminSchools}
+            teachers={adminTeachers}
+            directors={adminDirectors}
+            students={adminStudents}
+          />
+        </Suspense>
+      )}
 
-      {/* Admin Audit Logs & Security Modal (SSD & RLS) */}
-      <AdminAuditLogsModal
-        isOpen={isAuditLogsModalOpen}
-        onClose={() => setIsAuditLogsModalOpen(false)}
-      />
+      {isAuditLogsModalOpen && (
+        <Suspense fallback={null}>
+          <AdminAuditLogsModal
+            isOpen={isAuditLogsModalOpen}
+            onClose={() => setIsAuditLogsModalOpen(false)}
+          />
+        </Suspense>
+      )}
 
-      {/* Live Support & Assistance Chat Modal */}
-      <SupportChatModal
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        currentUser={currentUser}
-        activeRole={activeRole}
-        channels={chatChannels}
-        messages={chatMessages}
-        onSendMessage={handleSendMessage}
-        onStartCall={(roomId, title, isVideo) => {
-          handleOpenMeeting(roomId, title, isVideo);
-        }}
-      />
+      {isChatOpen && (
+        <Suspense fallback={null}>
+          <SupportChatModal
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            currentUser={currentUser}
+            activeRole={activeRole}
+            channels={chatChannels}
+            messages={chatMessages}
+            onSendMessage={handleSendMessage}
+            onStartCall={(roomId, title, isVideo) => {
+              handleOpenMeeting(roomId, title, isVideo);
+            }}
+          />
+        </Suspense>
+      )}
 
-      {/* Real-time Video/Voice Meetings & Zoom Conference Modal — mounted only during an active call */}
       {activeMeeting.isOpen && (
-        <ZoomMeetingModal
-          isOpen={activeMeeting.isOpen}
-          onClose={handleCloseMeeting}
-          roomId={activeMeeting.roomId}
-          roomTitle={activeMeeting.roomTitle}
-          currentUser={currentUser}
-          initialVideo={activeMeeting.initialVideo}
-          initialAudio={activeMeeting.initialAudio}
-        />
+        <Suspense fallback={null}>
+          <ZoomMeetingModal
+            isOpen={activeMeeting.isOpen}
+            onClose={handleCloseMeeting}
+            roomId={activeMeeting.roomId}
+            roomTitle={activeMeeting.roomTitle}
+            currentUser={currentUser}
+            initialVideo={activeMeeting.initialVideo}
+            initialAudio={activeMeeting.initialAudio}
+          />
+        </Suspense>
       )}
 
-      {/* Intelligent RAG Vector Knowledge Center Modal (MED Angola & Sigre) */}
-      <RagIntelligenceModal
-        isOpen={isRagModalOpen}
-        onClose={() => setIsRagModalOpen(false)}
-        currentUser={currentUser}
-        activeRole={activeRole}
-        initialQuery={ragInitialQuery}
-      />
+      {isRagModalOpen && (
+        <Suspense fallback={null}>
+          <RagIntelligenceModal
+            isOpen={isRagModalOpen}
+            onClose={() => setIsRagModalOpen(false)}
+            currentUser={currentUser}
+            activeRole={activeRole}
+            initialQuery={ragInitialQuery}
+          />
+        </Suspense>
+      )}
 
-      {/* Global Backup Vault & 1-Click Restoration Modal */}
-      <BackupManagerModal
-        isOpen={isGlobalBackupModalOpen}
-        onClose={() => setIsGlobalBackupModalOpen(false)}
-        currentUser={currentUser}
-      />
+      {isGlobalBackupModalOpen && (
+        <Suspense fallback={null}>
+          <BackupManagerModal
+            isOpen={isGlobalBackupModalOpen}
+            onClose={() => setIsGlobalBackupModalOpen(false)}
+            currentUser={currentUser}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

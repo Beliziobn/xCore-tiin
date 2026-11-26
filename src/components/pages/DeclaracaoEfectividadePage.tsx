@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import {
   FileText,
   Printer,
@@ -34,14 +34,22 @@ import {
 import { Hero } from '../Hero';
 import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import directorSignatureImg from '../../assets/images/assinatura_director_black.png';
-import { BackupManagerModal } from '../modals/BackupManagerModal';
-import { QuickRequestsManagementView } from '../quick-services/QuickRequestsManagementView';
-import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
-import { GuiaFeriasSection } from './GuiaFeriasSection';
-import { GuiaColocacaoSection } from './GuiaColocacaoSection';
-import { FichaAvaliacaoSection } from './FichaAvaliacaoSection';
-import { CadastroDocenteVagaSection } from './CadastroDocenteVagaSection';
 import type { UserAccount } from '../../types';
+
+const BackupManagerModal = lazy(() => import('../modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
+const QuickRequestsManagementView = lazy(() => import('../quick-services/QuickRequestsManagementView').then((m) => ({ default: m.QuickRequestsManagementView })));
+const DeclaracaoServicoSection = lazy(() => import('./DeclaracaoServicoSection').then((m) => ({ default: m.DeclaracaoServicoSection })));
+const GuiaFeriasSection = lazy(() => import('./GuiaFeriasSection').then((m) => ({ default: m.GuiaFeriasSection })));
+const GuiaColocacaoSection = lazy(() => import('./GuiaColocacaoSection').then((m) => ({ default: m.GuiaColocacaoSection })));
+const FichaAvaliacaoSection = lazy(() => import('./FichaAvaliacaoSection').then((m) => ({ default: m.FichaAvaliacaoSection })));
+const CadastroDocenteVagaSection = lazy(() => import('./CadastroDocenteVagaSection').then((m) => ({ default: m.CadastroDocenteVagaSection })));
+
+const TabSectionFallback: React.FC = () => (
+  <div className="w-full py-16 flex flex-col items-center justify-center gap-3">
+    <div className="w-7 h-7 rounded-full border-2 border-slate-200 border-t-[#f75142] animate-spin" />
+    <span className="text-xs font-semibold text-slate-500">A carregar secção...</span>
+  </div>
+);
 import {
   CadastramentoEfectividadeRecord,
   ANGOLA_PROVINCIAS,
@@ -2562,50 +2570,60 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* SERVICE 2: DECLARAÇÃO DE SERVIÇO (CONTA & SALÁRIO)             */}
             {/* ============================================================== */}
             {isAdmin && activeTab === 'declaracao-servico' && (
-              <DeclaracaoServicoSection
-                isLoggedIn={isLoggedIn}
-                currentUser={currentUser}
-              />
+              <Suspense fallback={<TabSectionFallback />}>
+                <DeclaracaoServicoSection
+                  isLoggedIn={isLoggedIn}
+                  currentUser={currentUser}
+                />
+              </Suspense>
             )}
 
             {/* ============================================================== */}
             {/* SERVICE 3: GUIA DE FÉRIAS (CADASTRO DE PESSOAL)                */}
             {/* ============================================================== */}
             {isAdmin && activeTab === 'guia-ferias' && (
-              <GuiaFeriasSection
-                isLoggedIn={isLoggedIn}
-                currentUser={currentUser}
-              />
+              <Suspense fallback={<TabSectionFallback />}>
+                <GuiaFeriasSection
+                  isLoggedIn={isLoggedIn}
+                  currentUser={currentUser}
+                />
+              </Suspense>
             )}
 
             {/* ============================================================== */}
             {/* SERVICE 4: GUIA DE COLOCAÇÃO (CADASTRO DE PESSOAL)             */}
             {/* ============================================================== */}
             {isAdmin && activeTab === 'guia-colocacao' && (
-              <GuiaColocacaoSection
-                isLoggedIn={isLoggedIn}
-                currentUser={currentUser}
-              />
+              <Suspense fallback={<TabSectionFallback />}>
+                <GuiaColocacaoSection
+                  isLoggedIn={isLoggedIn}
+                  currentUser={currentUser}
+                />
+              </Suspense>
             )}
 
             {/* ============================================================== */}
             {/* SERVICE 5: FICHA DE AVALIAÇÃO DE DESEMPENHO DOCENTE            */}
             {/* ============================================================== */}
             {isAdmin && activeTab === 'ficha-avaliacao' && (
-              <FichaAvaliacaoSection
-                isLoggedIn={isLoggedIn}
-                currentUser={currentUser}
-              />
+              <Suspense fallback={<TabSectionFallback />}>
+                <FichaAvaliacaoSection
+                  isLoggedIn={isLoggedIn}
+                  currentUser={currentUser}
+                />
+              </Suspense>
             )}
 
             {/* ============================================================== */}
             {/* SERVICE 6: CADASTRO DOCENTE (PEDIDO DE VAGA — QUÊSSUA)         */}
             {/* ============================================================== */}
             {activeTab === 'cadastro-docente' && (
-              <CadastroDocenteVagaSection
-                isLoggedIn={isLoggedIn}
-                currentUser={currentUser}
-              />
+              <Suspense fallback={<TabSectionFallback />}>
+                <CadastroDocenteVagaSection
+                  isLoggedIn={isLoggedIn}
+                  currentUser={currentUser}
+                />
+              </Suspense>
             )}
 
             {/* ============================================================== */}
@@ -2819,20 +2837,22 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
             {/* ============================================================== */}
             {activeTab === 'pedidos' && (
               <div className="space-y-6 animate-in fade-in duration-150">
-                <QuickRequestsManagementView
-                  currentUser={currentUser}
-                  activeRole={
-                    currentUser?.role === 'admin' ||
-                    currentUser?.email === 'dmedoquessua@gmail.com'
-                      ? 'admin'
-                      : ((currentUser?.role || 'diretor') as any)
-                  }
-                  schoolName={currentUser?.schoolName || ''}
-                  onNavigateToDeclaracaoEfectividade={
-                    isAdmin ? () => setActiveTab('form') : undefined
-                  }
-                  showToast={showToast}
-                />
+                <Suspense fallback={<TabSectionFallback />}>
+                  <QuickRequestsManagementView
+                    currentUser={currentUser}
+                    activeRole={
+                      currentUser?.role === 'admin' ||
+                      currentUser?.email === 'dmedoquessua@gmail.com'
+                        ? 'admin'
+                        : ((currentUser?.role || 'diretor') as any)
+                    }
+                    schoolName={currentUser?.schoolName || ''}
+                    onNavigateToDeclaracaoEfectividade={
+                      isAdmin ? () => setActiveTab('form') : undefined
+                    }
+                    showToast={showToast}
+                  />
+                </Suspense>
               </div>
             )}
 
@@ -3043,13 +3063,17 @@ export const DeclaracaoEfectividadePage: React.FC<DeclaracaoEfectividadePageProp
         </div>
       )}
 
-      {/* Modal do Cofre de Backups e Restauração Instantânea */}
-      <BackupManagerModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-        currentUser={currentUser}
-        onRestoreComplete={reloadRecords}
-      />
+      {/* Modal do Cofre de Backups e Restauração Instantânea (carregado sob demanda) */}
+      {isBackupModalOpen && (
+        <Suspense fallback={null}>
+          <BackupManagerModal
+            isOpen={isBackupModalOpen}
+            onClose={() => setIsBackupModalOpen(false)}
+            currentUser={currentUser}
+            onRestoreComplete={reloadRecords}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

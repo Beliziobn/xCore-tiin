@@ -1,5 +1,3 @@
-import Lenis from 'lenis';
-
 const PREFERS_REDUCED_MOTION =
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -48,86 +46,42 @@ export function refreshScrollReveals() {
           }
         });
       },
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+      { threshold: 0.08, rootMargin: '0px 0px -4% 0px' }
     );
   }
 
   targets.forEach((el) => activeObserver?.observe(el));
 }
 
-let lenisInstance: Lenis | null = null;
-let rafId: number | null = null;
-
+/**
+ * Lightweight native scroll manager (zero continuous rAF loop, zero body MutationObserver).
+ * Keeps scrolling crisp and native while updating the compact header state and scroll reveals.
+ */
 export function initSmoothScroll(): () => void {
   if (typeof window === 'undefined') {
     return () => {};
   }
 
-  if (PREFERS_REDUCED_MOTION) {
-    refreshScrollReveals();
-    const handleNativeScroll = () => updateHeaderState(window.scrollY);
-    window.addEventListener('scroll', handleNativeScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleNativeScroll);
-    };
-  }
-
-  try {
-    if (!lenisInstance) {
-      lenisInstance = new Lenis({
-        duration: 1.1,
-        easing: (t) => 1 - Math.pow(1 - t, 3), // ease-out cubic
-        smoothWheel: true,
-      });
-
-      (window as any).lenis = lenisInstance;
-      document.documentElement.classList.add('lenis', 'lenis-smooth');
-
-      const raf = (time: number) => {
-        lenisInstance?.raf(time);
-        rafId = requestAnimationFrame(raf);
-      };
-      rafId = requestAnimationFrame(raf);
-
-      lenisInstance.on('scroll', ({ scroll }: { scroll: number }) => {
-        updateHeaderState(scroll);
-      });
-    }
-
-    // Initial check
-    updateHeaderState(window.scrollY);
-    refreshScrollReveals();
-
-    // Observe mutations to automatically reveal new elements on page switch
-    const mutationObserver = new MutationObserver(() => {
-      refreshScrollReveals();
+  let ticking = false;
+  const handleNativeScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(() => {
+      updateHeaderState(window.scrollY);
+      ticking = false;
     });
-    mutationObserver.observe(document.body, { childList: true, subtree: true });
+  };
 
-    return () => {
-      mutationObserver.disconnect();
-      if (rafId) cancelAnimationFrame(rafId);
-      lenisInstance?.destroy();
-      lenisInstance = null;
-      (window as any).lenis = undefined;
-      document.documentElement.classList.remove('lenis', 'lenis-smooth');
-    };
-  } catch (err) {
-    console.warn('Smooth scroll unavailable, using native scroll:', err);
-    window.addEventListener('scroll', () => updateHeaderState(window.scrollY), {
-      passive: true,
-    });
-    refreshScrollReveals();
-    return () => {};
-  }
+  updateHeaderState(window.scrollY);
+  refreshScrollReveals();
+  window.addEventListener('scroll', handleNativeScroll, { passive: true });
+
+  return () => {
+    window.removeEventListener('scroll', handleNativeScroll);
+  };
 }
 
-export function scrollToTop(immediate = false) {
+export function scrollToTop(immediate = true) {
   if (typeof window === 'undefined') return;
-  const currentLenis = (window as any).lenis;
-  if (currentLenis && typeof currentLenis.scrollTo === 'function') {
-    currentLenis.scrollTo(0, { immediate });
-  } else {
-    window.scrollTo({ top: 0, behavior: immediate ? 'auto' : 'smooth' });
-  }
+  window.scrollTo({ top: 0, behavior: immediate ? 'auto' : 'smooth' });
 }

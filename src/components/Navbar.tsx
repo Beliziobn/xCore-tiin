@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, ChevronDown, User, CheckCircle2, Menu, X, BookOpen, Users, Calendar, LogOut, Home, MessageSquare, Box, Megaphone, GraduationCap, Loader2, Settings, ShieldCheck, LayoutDashboard, BarChart3, School, UserCheck, ClipboardCheck, DoorOpen, FileText, Archive, Zap } from 'lucide-react';
 import type { NotificationItem, UserAccount } from '../types';
 import { getPendingApplications, isSchoolDirectorApproval, schoolsMatch, OFFICIAL_DME_ADMIN_EMAIL } from '../utils/authApprovalStorage';
@@ -10,7 +10,7 @@ import {
   recordBelongsToProfessor,
   syncVagasDocentesFromFirestore,
   formatDateTimePt,
-} from './pages/CadastroDocenteVagaSection';
+} from '../utils/vagaDocenteStorage';
 
 let lastNavbarCloudSyncAt = 0;
 
@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(mockNotifications);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
+  const scrollProgressRef = useRef<HTMLDivElement>(null);
   const [navLoadingAction, setNavLoadingAction] = useState<'login' | 'register' | null>(null);
   const [pendingAppsCount, setPendingAppsCount] = useState({ director: 0, admin: 0 });
   const [pendingQuickRequestsCount, setPendingQuickRequestsCount] = useState(0);
@@ -251,7 +251,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
 
     updateCounts();
-    const handleSync = () => refreshCountsFromLocal();
+    let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleSync = () => {
+      if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+      syncDebounceTimer = setTimeout(() => {
+        syncDebounceTimer = null;
+        refreshCountsFromLocal();
+      }, 150);
+    };
     const handleStatsUpdated = (ev: Event) => {
       const detail = (ev as CustomEvent<{ stats?: DashboardStats }>).detail;
       if (detail?.stats) applyDashboardStats(detail.stats);
@@ -262,6 +269,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     window.addEventListener('sigre_quick_request_created', updateQuickRequests);
     window.addEventListener('sigre_quick_request_updated', updateQuickRequests);
     return () => {
+      if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
       window.removeEventListener('sigre-data-synced', handleSync);
       window.removeEventListener('sigre-dashboard-stats-updated', handleStatsUpdated);
       window.removeEventListener('sigre-vagas-docentes-updated', updateVagasWorkflow);
@@ -300,17 +308,31 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   useEffect(() => {
-    const handleScroll = () => {
+    let ticking = false;
+    let lastScrolled = window.scrollY > 20;
+    const updateScrollUi = () => {
+      ticking = false;
       const scrollY = window.scrollY;
-      setIsScrolled(scrollY > 20);
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (docHeight > 0) {
-        setScrollProgress(Math.min(100, Math.max(0, (scrollY / docHeight) * 100)));
+      const nextScrolled = scrollY > 20;
+      if (nextScrolled !== lastScrolled) {
+        lastScrolled = nextScrolled;
+        setIsScrolled(nextScrolled);
       }
+      const bar = scrollProgressRef.current;
+      if (bar) {
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const ratio = docHeight > 0 ? Math.min(1, Math.max(0, scrollY / docHeight)) : 0;
+        bar.style.transform = `scaleX(${ratio})`;
+      }
+    };
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(updateScrollUi);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+    updateScrollUi();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -370,12 +392,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </button>
 
-        {/* Dynamic Scroll Progress Bar */}
+        {/* Dynamic Scroll Progress Bar (GPU scaleX via ref — zero React re-renders) */}
         <div
           id="navbar-scroll-progress"
+          ref={scrollProgressRef}
           aria-hidden="true"
-          className="absolute bottom-0 left-0 h-[2.5px] bg-[#002133] transition-all duration-100 ease-out"
-          style={{ width: `${scrollProgress}%` }}
+          className="absolute bottom-0 left-0 w-full h-[2.5px] bg-[#002133] origin-left will-change-transform"
+          style={{ transform: 'scaleX(0)' }}
         />
 
         {/* Desktop Navigation Links - Shown only after user session starts */}

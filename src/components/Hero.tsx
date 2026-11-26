@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, GraduationCap } from 'lucide-react';
 import heroImg from '../assets/images/biblioteca_escolar.svg';
 import { SectionShader } from './SectionShader';
@@ -24,7 +24,7 @@ const SERVICE_TAGS = [
   ['Horários', 'Avaliações'],
 ];
 
-export const Hero: React.FC<HeroProps> = ({
+export const Hero: React.FC<HeroProps> = React.memo(({
   onOpenGetStarted,
   greeting,
   isLoggedIn,
@@ -34,22 +34,26 @@ export const Hero: React.FC<HeroProps> = ({
   badge,
   compact,
 }) => {
-  const [scrollY, setScrollY] = useState(0);
+  const floatCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Inner pages with customTitle do not use parallax — skip attaching any scroll listener
+    if (customTitle) return;
     let ticking = false;
     const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          setScrollY(window.scrollY);
-          ticking = false;
-        });
-        ticking = true;
-      }
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        if (floatCardRef.current) {
+          const offset = Math.min(7, window.scrollY * 0.015);
+          floatCardRef.current.style.transform = `translate3d(0, ${offset}px, 0)`;
+        }
+        ticking = false;
+      });
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [customTitle]);
 
   /* ---------------------------------------------------------------------
    * Inner-page banner (coral). Kept for every page that passes customTitle.
@@ -118,8 +122,6 @@ export const Hero: React.FC<HeroProps> = ({
   /* ---------------------------------------------------------------------
    * Homepage hero (white) — matches the Sigre reference composition.
    * ------------------------------------------------------------------- */
-  const floatSlow = Math.min(28, scrollY * 0.06);
-
   return (
     <section
       id="sigre-hero-section"
@@ -193,8 +195,8 @@ export const Hero: React.FC<HeroProps> = ({
         {/* Hero Image Showcase with White Contour and Attached Centered Stat Cards */}
         <div className="mt-12 sm:mt-16 w-full max-w-4xl px-4 sm:px-8 reveal-up" data-reveal-delay="0.15">
           <div
-            className="relative w-full transition-transform duration-100 ease-out"
-            style={{ transform: `translateY(${floatSlow * 0.25}px)` }}
+            ref={floatCardRef}
+            className="relative w-full will-change-transform"
           >
             {/* ---- Central photo with clean Dieter Rams 1px border and 14px radius ---- */}
             <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-[14px] overflow-hidden border border-[#E5E5EA] bg-[#F5F5F7]">
@@ -202,6 +204,7 @@ export const Hero: React.FC<HeroProps> = ({
                 src={heroImg}
                 alt="Biblioteca escolar e centro de documentação pedagógica"
                 title="Biblioteca escolar e centro de documentação pedagógica"
+                decoding="async"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-center"
               />
@@ -272,4 +275,6 @@ export const Hero: React.FC<HeroProps> = ({
       </div>
     </section>
   );
-};
+});
+
+Hero.displayName = 'Hero';
