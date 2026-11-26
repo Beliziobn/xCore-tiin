@@ -284,29 +284,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isRegisterLoading = (isAuthLoading && authLoadingAction === 'register') || navLoadingAction === 'register';
 
   const handleLoginClick = () => {
-    if (isLoginLoading || isRegisterLoading) return;
-    setNavLoadingAction('login');
     if (onNavigateToLogin) {
       onNavigateToLogin();
     } else {
       onOpenGetStarted();
     }
-    setTimeout(() => {
-      setNavLoadingAction(null);
-    }, 450);
   };
 
   const handleRegisterClick = () => {
-    if (isLoginLoading || isRegisterLoading) return;
-    setNavLoadingAction('register');
     if (onNavigateToRegister) {
       onNavigateToRegister();
     } else {
       onOpenGetStarted();
     }
-    setTimeout(() => {
-      setNavLoadingAction(null);
-    }, 450);
   };
 
   useEffect(() => {

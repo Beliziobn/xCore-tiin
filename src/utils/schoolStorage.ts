@@ -1074,7 +1074,7 @@ function scheduleDirtyFlush(): void {
   flushTimer = setTimeout(() => {
     flushTimer = null;
     syncSchoolsFromServer().catch(() => {});
-  }, 400);
+  }, 1500);
 }
 
 export function initUniversalRealtimeSyncEngine(): void {
@@ -1086,87 +1086,32 @@ export function initUniversalRealtimeSyncEngine(): void {
     const rawGetItem = Storage.prototype.getItem;
 
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (
-        this !== window.localStorage ||
-        isApplyingServerState ||
-        (window as any).__SIGRE_APPLYING_SERVER_STATE ||
-        !isExpressApiAvailable()
-      ) {
-        const currentVal = rawGetItem.call(this, key);
-        if (currentVal === value) return;
-        return rawSetItem.call(this, key, value);
-      }
-
       const prevRaw = rawGetItem.call(this, key);
       if (prevRaw === value) {
         return;
       }
 
-      const colConfig = KEY_TO_COLLECTION_CONFIG[key];
-      if (colConfig) {
-        // Ignore initial default seeding / hydration before first server pull completes
-        if (!hasCompletedInitialServerPull) {
-          return rawSetItem.call(this, key, value);
-        }
+      rawSetItem.call(this, key, value);
 
-        try {
-          const prevArr: any[] = prevRaw ? JSON.parse(prevRaw) : [];
-          const nextArr: any[] = value ? JSON.parse(value) : [];
-
-          if (Array.isArray(nextArr)) {
-            const nowTs = Date.now();
-            const prevById = new Map<string, { item: any; cleanStr: string }>();
-            if (Array.isArray(prevArr)) {
-              prevArr.forEach((p, idx) => {
-                const k = getItemIdentityKey(p) || `__idx_${idx}`;
-                if (p && typeof p === 'object') {
-                  const { _updatedAt: _oldTs, ...prevClean } = p;
-                  prevById.set(k, { item: p, cleanStr: JSON.stringify(prevClean) });
-                }
-              });
-            }
-
-            let anyRealChange = !Array.isArray(prevArr) || prevArr.length !== nextArr.length;
-            const stampedNext = nextArr.map((n, idx) => {
-              if (!n || typeof n !== 'object') return n;
-              const k = getItemIdentityKey(n) || `__idx_${idx}`;
-              const prevEntry = prevById.get(k);
-              if (!prevEntry) {
-                anyRealChange = true;
-                return { ...n, _updatedAt: nowTs };
-              }
-              const { _updatedAt: _newTs, ...nextClean } = n;
-              if (prevEntry.cleanStr !== JSON.stringify(nextClean)) {
-                anyRealChange = true;
-                return { ...n, _updatedAt: nowTs };
-              }
-              return prevEntry.item;
-            });
-
-            if (!anyRealChange) {
-              return;
-            }
-
-            const stampedJson = JSON.stringify(stampedNext);
-            rawSetItem.call(this, key, stampedJson);
-            dirtyCollections.add(colConfig.payloadKey);
-            dirtyStorageKeys.set(colConfig.payloadKey, key);
-            scheduleDirtyFlush();
-            return;
-          }
-        } catch {
-          // fallback to raw write
-        }
-      } else if (isSyncedKvKey(key)) {
-        rawSetItem.call(this, key, value);
-        if (hasCompletedInitialServerPull) {
-          dirtyKvStore[key] = { value, updatedAt: Date.now() };
-          scheduleDirtyFlush();
-        }
+      if (
+        this !== window.localStorage ||
+        isApplyingServerState ||
+        (window as any).__SIGRE_APPLYING_SERVER_STATE ||
+        !isExpressApiAvailable() ||
+        !hasCompletedInitialServerPull
+      ) {
         return;
       }
 
-      return rawSetItem.call(this, key, value);
+      const colConfig = KEY_TO_COLLECTION_CONFIG[key];
+      if (colConfig) {
+        dirtyCollections.add(colConfig.payloadKey);
+        dirtyStorageKeys.set(colConfig.payloadKey, key);
+        scheduleDirtyFlush();
+      } else if (isSyncedKvKey(key)) {
+        dirtyKvStore[key] = { value, updatedAt: Date.now() };
+        scheduleDirtyFlush();
+      }
     };
   }
 
@@ -2233,6 +2178,16 @@ export function purgeModeloCentralData(): void {
   }
 }
 
-// Run purge immediately on module load
-purgeModeloCentralData();
+// Defer Modelo Central purge once per session so initial boot never blocks main thread
+if (typeof window !== 'undefined') {
+  try {
+    if (sessionStorage.getItem('sigre_modelo_purged_v1') !== '1') {
+      sessionStorage.setItem('sigre_modelo_purged_v1', '1');
+      setTimeout(() => {
+        purgeModeloCentralData();
+      }, 200);
+    }
+  } catch {}
+}
+
 

@@ -283,9 +283,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         .then(() => {
           if (mounted) setStorageRevision((r) => r + 1);
         })
-        .catch((err) => {
-          console.error('[AuthPage] Erro ao sincronizar escolas:', err);
-        });
+        .catch(() => {});
     }
 
     const handleStorageUpdate = () => {
@@ -460,7 +458,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     photoURL?: string | null,
     manualRoleHint?: string
   ) => {
-    try {
     const cleanEmail = targetEmail.trim().toLowerCase();
     const isDirectorMunicipal =
       cleanEmail === 'dmedoquessua@gmail.com' ||
@@ -469,17 +466,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       cleanEmail === 'beliziodos20@gmail.com' ||
       cleanEmail.includes('belizio');
 
-    // 1. ALWAYS force-sync fresh applications from Cloud Firestore + Server before checking status
-    //    so a validation done on another device immediately reflects (never trust stale local 'pendente' cache!)
-    try {
-      await syncApplicationsFromServer(true);
-    } catch (err) {
-      console.error('[AuthPage] Erro ao sincronizar candidaturas no login Google:', err);
+    // 1. Check local registered accounts first (0ms), while triggering background cloud sync
+    let existingAccountLookup = findRegisteredAccountByEmail(cleanEmail);
+    let existingFirestoreUser: UserAccount | null = null;
+    syncApplicationsFromServer(true).catch(() => {});
+
+    // Only await cloud lookup (max 1.2s) if the account is not yet in local cache
+    if (!isDirectorMunicipal && !isSuperAdmin && !existingAccountLookup.exists && !existingAccountLookup.wasDeletedByAdmin) {
+      try {
+        const [, fsUser] = await Promise.race([
+          Promise.all([
+            syncApplicationsFromServer(true).catch(() => []),
+            !isAccountDeleted(cleanEmail, uid)
+              ? fetchUserFromFirestore(cleanEmail).catch(() => null)
+              : Promise.resolve(null),
+          ]),
+          new Promise<[never[], null]>((resolve) => setTimeout(() => resolve([[], null]), 1200)),
+        ]);
+        existingFirestoreUser = fsUser;
+        existingAccountLookup = findRegisteredAccountByEmail(cleanEmail);
+      } catch {}
+    } else if (!existingAccountLookup.wasDeletedByAdmin && !isAccountDeleted(cleanEmail, uid)) {
+      fetchUserFromFirestore(cleanEmail).catch(() => null);
     }
     const approvalCheck = checkUserApprovalStatus(uid || '', cleanEmail);
-
-    // 2. Check registered accounts strictly by email
-    const existingAccountLookup = findRegisteredAccountByEmail(cleanEmail);
 
     // Block access if this account was deleted by the Administrator / Director and user is trying to log in
     if (
@@ -497,14 +507,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       return;
     }
 
-    // 3. Check Firestore user document by email
-    let existingFirestoreUser: UserAccount | null = null;
-    if (!existingAccountLookup.wasDeletedByAdmin && !isAccountDeleted(cleanEmail, uid)) {
-      try {
-        existingFirestoreUser = await fetchUserFromFirestore(cleanEmail);
-      } catch (err) {
-        console.error('[AuthPage] Erro ao consultar utilizador no Firestore (login Google):', err);
-      }
+    if (existingAccountLookup.wasDeletedByAdmin || isAccountDeleted(cleanEmail, uid)) {
+      existingFirestoreUser = null;
     }
 
     // Check if account already exists in the system for this exact email
@@ -599,15 +603,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         avatar: photoURL || undefined,
         status: 'pendente',
       };
-      setSuccessMsg(
-        `A sua candidatura como ${app.roleRequested} continua em análise na Direção Municipal da Educação. A aceder ao ambiente de acompanhamento...`
-      );
-      setTimeout(() => {
-        setIsGoogleLoading(false);
-        setLoading(false);
-        onAuthLoadingChange?.(false);
-        onLoginSuccess(pendingUser);
-      }, 600);
+      onLoginSuccess(pendingUser);
       return;
     }
 
@@ -617,8 +613,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         `A sua candidatura foi indeferida pela administração: ${approvalCheck.app.rejectionReason || 'Contacte a Direção Municipal da Educação.'}`
       );
       setIsGoogleLoading(false);
-      setLoading(false);
-      onAuthLoadingChange?.(false);
       return;
     }
 
@@ -801,25 +795,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
     // Self-heal stale Firestore user doc if application was approved while users doc stayed 'pendente'
     if (resolvedAccountStatus === 'ativo' && existingFirestoreUser?.status === 'pendente') {
-      saveUserToFirestore(googleAccount).catch((err) =>
-        console.error('[AuthPage] Erro ao atualizar estado do utilizador Google no Firestore:', err)
-      );
+      saveUserToFirestore(googleAccount).catch(() => {});
     }
 
-    setSuccessMsg(`Autenticado com sucesso via Google (${cleanEmail})! A aceder à plataforma...`);
-    setTimeout(() => {
-      setIsGoogleLoading(false);
-      setLoading(false);
-      onAuthLoadingChange?.(false);
-      onLoginSuccess(googleAccount);
-    }, 400);
-    } catch (err) {
-      console.error('[AuthPage] Erro inesperado ao concluir login Google:', err);
-      setIsGoogleLoading(false);
-      setLoading(false);
-      onAuthLoadingChange?.(false);
-      setErrorMsg('Não foi possível concluir a autenticação Google. Tente novamente.');
-    }
+    onLoginSuccess(googleAccount);
   };
 
   const handleGoogleSignInFlow = async () => {
@@ -1080,12 +1059,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       onAuthLoadingChange?.(true, 'login');
 
       try {
-        // 1. Force-sync fresh applications and user records from Cloud Firestore + Server before authenticating
-        await syncApplicationsFromServer(true).catch((err) =>
-          console.error('[AuthPage] Erro ao sincronizar candidaturas no login:', err)
-        );
+        const isMasterAdmin =
+          cleanEmail === 'dmedoquessua@gmail.com' || cleanEmail === 'beliziodos20@gmail.com';
 
-        const accountLookup = findRegisteredAccountByEmail(cleanEmail);
+        // 1. Check local account immediately (0ms) while syncing cloud applications in the background
+        let accountLookup = findRegisteredAccountByEmail(cleanEmail);
+        let firestoreUser: UserAccount | null = null;
+        syncApplicationsFromServer(true).catch(() => {});
+
+        // Only wait for Firestore (max 1.2s) if the account is not already present in local storage
+        if (!isMasterAdmin && !accountLookup.exists && !accountLookup.wasDeletedByAdmin) {
+          try {
+            const [, fsUser] = await Promise.race([
+              Promise.all([
+                syncApplicationsFromServer(true).catch(() => []),
+                fetchUserFromFirestore(cleanEmail).catch(() => null),
+              ]),
+              new Promise<[never[], null]>((resolve) => setTimeout(() => resolve([[], null]), 1200)),
+            ]);
+            firestoreUser = fsUser;
+            accountLookup = findRegisteredAccountByEmail(cleanEmail);
+          } catch {}
+        }
 
         if (accountLookup.wasDeletedByAdmin || isAccountDeleted(cleanEmail)) {
           setLoading(false);
@@ -1096,13 +1091,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           return;
         }
 
-        let firestoreUser: UserAccount | null = null;
-        try {
-          firestoreUser = await fetchUserFromFirestore(cleanEmail);
-        } catch (err) {
-          console.error('[AuthPage] Erro ao consultar utilizador no Firestore (login):', err);
-        }
-
         if (
           firestoreUser &&
           isAccountDeleted(firestoreUser.id, firestoreUser.email, firestoreUser.biNumber)
@@ -1110,7 +1098,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           firestoreUser = null;
         }
 
-        const hasRegisteredAccount = Boolean(accountLookup.exists || firestoreUser);
+        const hasRegisteredAccount = Boolean(isMasterAdmin || accountLookup.exists || firestoreUser);
 
         if (!hasRegisteredAccount) {
           setLoading(false);
@@ -1134,8 +1122,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         // 3. Resolve exact role, scope, and cargo from the authenticated user's record
         //    (NEVER treat DME staff as School Directors or as the Municipal Director!)
-        const isMasterAdmin =
-          cleanEmail === 'dmedoquessua@gmail.com' || cleanEmail === 'beliziodos20@gmail.com';
 
         let matchedScope: 'escola' | 'administracao' = 'escola';
         let matchedSchoolRole: SchoolStaffRole | undefined = undefined;
@@ -1358,20 +1344,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         } else {
           loggedUser.status = 'ativo';
           if (firestoreUser?.status === 'pendente') {
-            saveUserToFirestore(loggedUser).catch((err) =>
-              console.error('[AuthPage] Erro ao atualizar estado do utilizador no Firestore:', err)
-            );
+            saveUserToFirestore(loggedUser).catch(() => {});
           }
-          setSuccessMsg(
-            `Bem-vindo(a), ${loggedUser.greeting}! A aceder ao painel de ${loggedUser.cargoTitle}...`
-          );
         }
 
         setLoading(false);
-        setTimeout(() => {
-          onAuthLoadingChange?.(false);
-          onLoginSuccess(loggedUser);
-        }, 650);
+        onAuthLoadingChange?.(false);
+        onLoginSuccess(loggedUser);
       } catch (err) {
         console.error('Erro ao autenticar:', err);
         setLoading(false);
@@ -1389,12 +1368,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setStepErrors({});
 
       try {
-        // Sync fresh applications from cloud before checking duplicate accounts or occupied DME cargos
-        await syncApplicationsFromServer().catch((err) =>
-          console.error('[AuthPage] Erro ao sincronizar candidaturas no registo:', err)
-        );
+        // Trigger background cloud sync without blocking the user interface
+        syncApplicationsFromServer().catch(() => {});
 
-        // 1. Block duplicate registration of an existing email or BI (no one can overwrite or hijack another user's account)
+        // 1. Block duplicate registration of an existing email or BI immediately (0ms)
         const dupCheck = checkDuplicateRegistration(email.trim(), biNumber.trim());
         if (dupCheck.duplicate) {
           setLoading(false);
@@ -1403,21 +1380,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           setErrorMsg(msg);
           setStepErrors((prev) => ({ ...prev, 3: msg }));
           return;
-        }
-
-        // Also check Firestore directly for duplicate email
-        try {
-          const existingCloudUser = await fetchUserFromFirestore(email.trim().toLowerCase());
-          if (existingCloudUser && existingCloudUser.email) {
-            setLoading(false);
-            onAuthLoadingChange?.(false);
-            const cloudMsg = `O e-mail "${email.trim()}" já pertence à conta de ${existingCloudUser.firstName} ${existingCloudUser.lastName}. Por segurança, ninguém pode aceder ou recriar a conta de outro utilizador.`;
-            setErrorMsg(cloudMsg);
-            setStepErrors((prev) => ({ ...prev, 3: cloudMsg }));
-            return;
-          }
-        } catch (err) {
-          console.error('[AuthPage] Erro ao verificar duplicado no Firestore:', err);
         }
 
         // 2. If registering in Administração (DME), strictly block registering an already occupied cargo
@@ -1433,9 +1395,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             return;
           }
         }
-
-        setSuccessMsg('A registrar a sua inscrição e a sincronizar na base de dados central...');
-        onAuthLoadingChange?.(true, 'register');
 
         const userFirst = firstName.trim();
 
@@ -1507,55 +1466,45 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           passwordVerifier,
         };
 
-        // Create pending application record + user atomically targeted directly to dmedoquessua@gmail.com
+        // Save locally immediately (0ms) and synchronize to Firestore in the background without blocking the UI
         if (isPending) {
           const appId = `app-${appType}-${Date.now()}`;
-          await savePendingApplicationAsync(
-            {
-              id: appId,
-              userId: newUserId,
-              type: appType,
-              scope: institutionalScope,
-              schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
-              adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
-              roleRequested: cargoTitle,
-              fullName: `${userFirst} ${lastName.trim() || 'Sigre'}`.trim(),
-              email: email.trim(),
-              phone: phone.trim() || '+244 923 000 000',
-              biNumber: biNumber.trim(),
-              schoolName: resolvedSchoolName,
-              schoolId: resolvedSchoolId,
-              municipality: selectedMunicipality,
-              targetApproverRole,
-              targetApproverEmail: targetDirectorEmail,
-              approverDirectorName: targetDirectorName,
-              subject: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedSubject : undefined,
-              gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
-              status: 'pendente',
-              isPreRegistered: institutionalScope === 'escola' ? Boolean(preRegResult?.found) : false,
-              preRegisteredDetails: institutionalScope === 'escola' ? preRegResult?.details : undefined,
-              createdAt: new Date().toLocaleString('pt-AO'),
-              passwordVerifier,
-              notes:
-                institutionalScope === 'administracao'
-                  ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
-                  : preRegResult?.found
-                  ? `Registro pré-existente localizado para "${resolvedSchoolName}". Enviado diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
-                  : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`,
-            },
-            newUser
-          );
+          const appPayload = {
+            id: appId,
+            userId: newUserId,
+            type: appType as 'diretor' | 'professor' | 'funcionario' | 'membro_dme',
+            scope: institutionalScope,
+            schoolRole: institutionalScope === 'escola' ? schoolRole : undefined,
+            adminRole: institutionalScope === 'administracao' ? adminRole : undefined,
+            roleRequested: cargoTitle,
+            fullName: `${userFirst} ${lastName.trim() || 'Sigre'}`.trim(),
+            email: email.trim(),
+            phone: phone.trim() || '+244 923 000 000',
+            biNumber: biNumber.trim(),
+            schoolName: resolvedSchoolName,
+            schoolId: resolvedSchoolId,
+            municipality: selectedMunicipality,
+            targetApproverRole,
+            targetApproverEmail: targetDirectorEmail,
+            approverDirectorName: targetDirectorName,
+            subject: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedSubject : undefined,
+            gradeClass: institutionalScope === 'escola' && schoolRole === 'professor' ? selectedGradeClass : undefined,
+            status: 'pendente' as const,
+            isPreRegistered: institutionalScope === 'escola' ? Boolean(preRegResult?.found) : false,
+            preRegisteredDetails: institutionalScope === 'escola' ? preRegResult?.details : undefined,
+            createdAt: new Date().toLocaleString('pt-AO'),
+            passwordVerifier,
+            notes:
+              institutionalScope === 'administracao'
+                ? `Inscrição para o cargo de ${cargoTitle} no quadro da Direcção Municipal da Educação de Quêssua. Enviada ao Administrador Central (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
+                : preRegResult?.found
+                ? `Registro pré-existente localizado para "${resolvedSchoolName}". Enviado diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`
+                : `Inscrição de ${cargoTitle} (${resolvedSchoolName}) enviada diretamente à conta central da Direcção Municipal da Educação (${OFFICIAL_DME_ADMIN_EMAIL}) para homologação.`,
+          };
+          savePendingApplication(appPayload);
+          savePendingApplicationAsync(appPayload, newUser).catch(() => {});
         }
-
-        // Persist user account to Firestore with timeout so slow connections complete cloud sync reliably
-        try {
-          await Promise.race([
-            saveUserToFirestore(newUser),
-            new Promise<void>((resolve) => setTimeout(resolve, 4500)),
-          ]);
-        } catch (err) {
-          console.warn('[AuthPage] Erro ao sincronizar usuário no Firestore:', err);
-        }
+        saveUserToFirestore(newUser).catch(() => {});
 
         setSubmittedUserAccount(newUser);
         setRegistrationSubmitted(true);
@@ -3630,10 +3579,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <GoogleAccountPickerModal
         isOpen={showGooglePickerModal}
         onClose={() => setShowGooglePickerModal(false)}
-        onSelectAccount={async (selectedEmail, selectedName, selectedRole) => {
+        onSelectAccount={(selectedEmail, selectedName, selectedRole) => {
           setShowGooglePickerModal(false);
-          setIsGoogleLoading(true);
-          await completeGoogleLogin(selectedEmail, selectedName, undefined, null, selectedRole);
+          completeGoogleLogin(selectedEmail, selectedName, undefined, null, selectedRole);
         }}
         reason={googlePickerReason}
       />

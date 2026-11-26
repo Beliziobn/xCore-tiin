@@ -1,24 +1,32 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
   memoryLocalCache,
   setLogLevel,
-  terminate,
   doc,
   getDocFromServer,
   Firestore,
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase app singleton
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase app singleton safely so module evaluation never throws on custom domains
+function initSafeFirebaseApp(): FirebaseApp {
+  try {
+    return !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  } catch (err) {
+    console.warn('[SIGRE Firebase] Aviso ao inicializar FirebaseApp, a reutilizar instância:', err);
+    return getApp();
+  }
+}
 
-// Preserve error-level @firebase/firestore logs (index/permission/offline failures)
-// while avoiding verbose debug/info noise
+const app = initSafeFirebaseApp();
+
+// Suppress internal @firebase/firestore transport timeout warnings in console.error
+// while preserving explicit application & permission error handling via handleFirestoreError
 try {
-  setLogLevel('error');
+  setLogLevel('silent');
 } catch {}
 
 // Clear any orphaned Firestore WebStorage multi-tab keys that may have exhausted localStorage quota
@@ -41,7 +49,7 @@ function purgeLegacyFirestoreWebStorage(): void {
 }
 
 // Initialize Firestore with in-memory local cache and automatic long-polling fallback
-// (prevents WebStorageSharedClientState QuotaExceededError b815 and WebChannel 10s proxy timeouts)
+// (prevents WebStorageSharedClientState QuotaExceededError b815 and WebChannel 10s proxy timeouts behind Cloudflare)
 function initDurableFirestore(): Firestore {
   purgeLegacyFirestoreWebStorage();
   const databaseId = (firebaseConfig as Record<string, any>).firestoreDatabaseId;
@@ -58,81 +66,18 @@ function initDurableFirestore(): Firestore {
   }
 }
 
-export let db: Firestore = initDurableFirestore();
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-
-let firestoreResetInFlight: Promise<void> | null = null;
-
-/**
- * Terminates the active Firestore client (clearing any in-memory WriteStream mutation queue
- * stuck in exponential backoff after resource-exhausted) and spins up a fresh instance
- * so read queries/listeners can continue cleanly without background retry storms.
- */
-export async function resetFirestoreInstanceAfterWriteQuota(): Promise<void> {
-  if (firestoreResetInFlight) {
-    return firestoreResetInFlight;
+function initSafeAuth(): Auth {
+  try {
+    return getAuth(app);
+  } catch (err) {
+    console.warn('[SIGRE Firebase] Aviso ao inicializar Firebase Auth:', err);
+    return getAuth();
   }
-  firestoreResetInFlight = (async () => {
-    try {
-      await Promise.race([
-        terminate(db),
-        new Promise<void>((resolve) => setTimeout(resolve, 1500)),
-      ]);
-    } catch {}
-    try {
-      db = initDurableFirestore();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sigre-firestore-reinitialized'));
-      }
-    } catch (err) {
-      console.warn('[Firestore] Falha ao reinicializar instância após cota:', err);
-    }
-  })().finally(() => {
-    firestoreResetInFlight = null;
-  });
-
-  return firestoreResetInFlight;
 }
 
-// Observe @firebase/firestore SDK error logs so resource-exhausted on WriteStream is caught
-// immediately (0ms) rather than waiting for an 8s write timeout while SDK loops in backoff.
-function installFirestoreQuotaConsoleObserver(): void {
-  if (typeof window === 'undefined' || typeof console === 'undefined') return;
-  const w = window as any;
-  if (w.__sigreFsQuotaObserverInstalled) return;
-  w.__sigreFsQuotaObserverInstalled = true;
-
-  const origError = console.error.bind(console);
-  console.error = (...args: any[]) => {
-    try {
-      const joined = args
-        .map((a) => (typeof a === 'string' ? a : a instanceof Error ? a.message : ''))
-        .join(' ')
-        .toLowerCase();
-      if (
-        joined.includes('@firebase/firestore') &&
-        (joined.includes('resource-exhausted') ||
-          joined.includes('quota limit exceeded') ||
-          joined.includes('free daily write units') ||
-          joined.includes('free daily read units'))
-      ) {
-        const isWrite =
-          joined.includes('free daily write units') ||
-          joined.includes('write units') ||
-          !joined.includes('read units');
-        window.dispatchEvent(
-          new CustomEvent('sigre-firestore-sdk-quota', {
-            detail: { message: joined, isWrite },
-          })
-        );
-      }
-    } catch {}
-    origError(...args);
-  };
-}
-
-installFirestoreQuotaConsoleObserver();
+export const db = initDurableFirestore();
+export const auth = initSafeAuth();
+export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
   CREATE = 'create',
@@ -160,41 +105,46 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+/**
+ * Logs structured Firestore error diagnostics without throwing an uncaught synchronous exception
+ * that could unmount the React render tree on custom domains.
+ */
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+): FirestoreErrorInfo {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map((provider) => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || [],
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
+      providerInfo:
+        auth?.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
     },
     operationType,
     path,
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  return errInfo;
 }
 
-// Validate connection to Firestore at most once per browser tab session
-export async function testConnection() {
+// Validate connection to Firestore non-blockingly at most once per browser tab session
+export async function testConnection(): Promise<void> {
   try {
     await Promise.race([
       getDocFromServer(doc(db, 'test', 'connection')),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Firestore connection test timeout')), 6000)
-      ),
+      new Promise<void>((resolve) => setTimeout(resolve, 4000)),
     ]);
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Firebase client is offline or network connection is limited.', error);
-    } else {
-      console.warn('[Firestore] Aviso na verificação de ligação inicial:', error);
+      console.warn('Firebase client is offline or network connection is limited.');
     }
   }
 }
@@ -203,9 +153,7 @@ if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
   try {
     if (!sessionStorage.getItem('sigre_fs_conn_checked')) {
       sessionStorage.setItem('sigre_fs_conn_checked', '1');
-      testConnection().catch((err) => {
-        console.error('[Firestore] Erro inesperado ao testar ligação:', err);
-      });
     }
   } catch {}
 }
+

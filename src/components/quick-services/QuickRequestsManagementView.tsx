@@ -42,6 +42,7 @@ import type { QuickServiceRequest, QuickServiceStatus, QuickServiceType, UserAcc
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import {
   fetchQuickRequests,
+  getCachedQuickRequests,
   fetchArchivedQuickRequestsPage,
   getQuickRequestsServerCounts,
   submitQuickServiceRequest,
@@ -89,8 +90,8 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
   onOpenNewRequestModal,
   showToast,
 }) => {
-  const [requests, setRequests] = useState<QuickServiceRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [requests, setRequests] = useState<QuickServiceRequest[]>(() => getCachedQuickRequests());
+  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'TODOS' | QuickServiceStatus>('TODOS');
   const [typeFilter, setTypeFilter] = useState<'TODOS' | QuickServiceType>('TODOS');
@@ -174,8 +175,8 @@ export const QuickRequestsManagementView: React.FC<QuickRequestsManagementViewPr
     });
   }, [directStudentName, directStudentBi, activeDirectorSchoolName, directStudentClasse, directStudentTurma]);
 
-  const loadRequests = async () => {
-    setIsLoading(true);
+  const loadRequests = async (showSpinner = false) => {
+    if (showSpinner) setIsLoading(true);
     try {
       const data = await fetchQuickRequests();
       setRequests(data);

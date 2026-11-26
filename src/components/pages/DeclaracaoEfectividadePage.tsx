@@ -37,19 +37,14 @@ import directorSignatureImg from '../../assets/images/assinatura_director_black.
 import type { UserAccount } from '../../types';
 
 const BackupManagerModal = lazy(() => import('../modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
-const QuickRequestsManagementView = lazy(() => import('../quick-services/QuickRequestsManagementView').then((m) => ({ default: m.QuickRequestsManagementView })));
-const DeclaracaoServicoSection = lazy(() => import('./DeclaracaoServicoSection').then((m) => ({ default: m.DeclaracaoServicoSection })));
-const GuiaFeriasSection = lazy(() => import('./GuiaFeriasSection').then((m) => ({ default: m.GuiaFeriasSection })));
-const GuiaColocacaoSection = lazy(() => import('./GuiaColocacaoSection').then((m) => ({ default: m.GuiaColocacaoSection })));
-const FichaAvaliacaoSection = lazy(() => import('./FichaAvaliacaoSection').then((m) => ({ default: m.FichaAvaliacaoSection })));
-const CadastroDocenteVagaSection = lazy(() => import('./CadastroDocenteVagaSection').then((m) => ({ default: m.CadastroDocenteVagaSection })));
+import { QuickRequestsManagementView } from '../quick-services/QuickRequestsManagementView';
+import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
+import { GuiaFeriasSection } from './GuiaFeriasSection';
+import { GuiaColocacaoSection } from './GuiaColocacaoSection';
+import { FichaAvaliacaoSection } from './FichaAvaliacaoSection';
+import { CadastroDocenteVagaSection } from './CadastroDocenteVagaSection';
 
-const TabSectionFallback: React.FC = () => (
-  <div className="w-full py-16 flex flex-col items-center justify-center gap-3">
-    <div className="w-7 h-7 rounded-full border-2 border-slate-200 border-t-[#f75142] animate-spin" />
-    <span className="text-xs font-semibold text-slate-500">A carregar secção...</span>
-  </div>
-);
+const TabSectionFallback: React.FC = () => null;
 import {
   CadastramentoEfectividadeRecord,
   ANGOLA_PROVINCIAS,

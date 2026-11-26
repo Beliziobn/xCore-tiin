@@ -19,7 +19,7 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
 } from 'firebase/firestore';
-import { db, auth, OperationType, resetFirestoreInstanceAfterWriteQuota } from '../firebase';
+import { db, auth, OperationType } from '../firebase';
 import type {
   PendingApplication,
   QuickServiceRequest,
@@ -103,53 +103,8 @@ const BANNED_ENTITY_IDS = new Set([
   'efec-1792963605316-86',
 ]);
 
-const READ_QUOTA_STORAGE_KEY = 'sigre_fs_read_quota_until_v1';
-const WRITE_QUOTA_STORAGE_KEY = 'sigre_fs_write_quota_until_v1';
-const READ_QUOTA_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
-const WRITE_QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 60 minutes (persists across refreshes)
-
 let firestoreReadCooldownUntil = 0;
 let firestoreWriteCooldownUntil = 0;
-
-function readPersistedCooldown(storageKey: string): number {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return 0;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return 0;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writePersistedCooldown(storageKey: string, untilTs: number): void {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-  try {
-    if (untilTs > 0) {
-      localStorage.setItem(storageKey, String(untilTs));
-    } else {
-      localStorage.removeItem(storageKey);
-    }
-  } catch {}
-}
-
-function clearReadQuotaCooldown(): void {
-  firestoreReadCooldownUntil = 0;
-  writePersistedCooldown(READ_QUOTA_STORAGE_KEY, 0);
-}
-
-export function clearFirestoreQuotaCooldowns(): void {
-  const wasRead = isFirestoreReadQuotaExhausted();
-  const wasWrite = isFirestoreWriteQuotaExhausted();
-  firestoreReadCooldownUntil = 0;
-  firestoreWriteCooldownUntil = 0;
-  writePersistedCooldown(READ_QUOTA_STORAGE_KEY, 0);
-  writePersistedCooldown(WRITE_QUOTA_STORAGE_KEY, 0);
-  if (wasRead || wasWrite) {
-    notifyFirestoreQuotaStatus(false, false);
-  }
-}
 
 function notifyFirestoreQuotaStatus(readExhausted: boolean, writeExhausted: boolean): void {
   if (typeof window === 'undefined') return;
@@ -163,26 +118,18 @@ function notifyFirestoreQuotaStatus(readExhausted: boolean, writeExhausted: bool
 }
 
 export function isFirestoreReadQuotaExhausted(): boolean {
-  if (firestoreReadCooldownUntil === 0) {
-    firestoreReadCooldownUntil = readPersistedCooldown(READ_QUOTA_STORAGE_KEY);
-  }
   if (firestoreReadCooldownUntil === 0) return false;
   if (Date.now() >= firestoreReadCooldownUntil) {
     firestoreReadCooldownUntil = 0;
-    writePersistedCooldown(READ_QUOTA_STORAGE_KEY, 0);
     return false;
   }
   return true;
 }
 
 export function isFirestoreWriteQuotaExhausted(): boolean {
-  if (firestoreWriteCooldownUntil === 0) {
-    firestoreWriteCooldownUntil = readPersistedCooldown(WRITE_QUOTA_STORAGE_KEY);
-  }
   if (firestoreWriteCooldownUntil === 0) return false;
   if (Date.now() >= firestoreWriteCooldownUntil) {
     firestoreWriteCooldownUntil = 0;
-    writePersistedCooldown(WRITE_QUOTA_STORAGE_KEY, 0);
     return false;
   }
   return true;
@@ -190,13 +137,6 @@ export function isFirestoreWriteQuotaExhausted(): boolean {
 
 export function isFirestoreQuotaExhausted(): boolean {
   return isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted();
-}
-
-class QuotaAbortedWriteError extends Error {
-  constructor(label: string) {
-    super(`Firestore write aborted due to quota limit in ${label}`);
-    this.name = 'QuotaAbortedWriteError';
-  }
 }
 
 export function markFirestoreQuotaIfExhausted(err: any, operation: 'read' | 'write' = 'read'): void {
@@ -210,107 +150,24 @@ export function markFirestoreQuotaIfExhausted(err: any, operation: 'read' | 'wri
     msg.includes('free daily write units');
   if (!isQuotaErr) return;
 
-  const isWriteSpecific =
-    msg.includes('write units') ||
-    msg.includes('write quota') ||
-    (operation === 'write' && !msg.includes('read units'));
+  const isReadSpecific =
+    msg.includes('read units') ||
+    msg.includes('read quota') ||
+    (operation === 'read' && !msg.includes('write units'));
 
-  if (isWriteSpecific) {
-    const wasWriteExhausted = isFirestoreWriteQuotaExhausted();
-    const until = Date.now() + WRITE_QUOTA_COOLDOWN_MS;
-    firestoreWriteCooldownUntil = until;
-    writePersistedCooldown(WRITE_QUOTA_STORAGE_KEY, until);
-    if (!wasWriteExhausted) {
-      notifyFirestoreQuotaStatus(isFirestoreReadQuotaExhausted(), true);
-    }
-    // Clear any pending MutationQueue inside @firebase/firestore so WriteStream
-    // does not keep retrying in exponential backoff ("Using maximum backoff delay").
-    void resetFirestoreInstanceAfterWriteQuota();
-  } else {
+  if (isReadSpecific) {
     const wasExhausted = isFirestoreReadQuotaExhausted();
-    const until = Date.now() + READ_QUOTA_COOLDOWN_MS;
-    firestoreReadCooldownUntil = until;
-    writePersistedCooldown(READ_QUOTA_STORAGE_KEY, until);
+    firestoreReadCooldownUntil = Date.now() + 120_000;
     if (!wasExhausted) {
       notifyFirestoreQuotaStatus(true, isFirestoreWriteQuotaExhausted());
     }
-  }
-}
-
-if (typeof window !== 'undefined' && !(window as any).__sigreFsSdkQuotaListenerAttached) {
-  (window as any).__sigreFsSdkQuotaListenerAttached = true;
-  window.addEventListener('sigre-firestore-sdk-quota', (ev: Event) => {
-    const detail = (ev as CustomEvent<{ message?: string; isWrite?: boolean }>).detail;
-    markFirestoreQuotaIfExhausted(
-      { code: 'resource-exhausted', message: detail?.message || 'Quota limit exceeded' },
-      detail?.isWrite === false ? 'read' : 'write'
-    );
-  });
-}
-
-const DEFAULT_FIRESTORE_READ_TIMEOUT_MS = 6000;
-const DEFAULT_FIRESTORE_WRITE_TIMEOUT_MS = 8000;
-
-async function withFirestoreTimeout<T>(
-  promise: Promise<T>,
-  label: string,
-  timeoutMs: number = DEFAULT_FIRESTORE_READ_TIMEOUT_MS
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error(`Firestore timeout (${timeoutMs}ms) in ${label}`));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-async function withFirestoreWriteTimeout<T>(
-  promise: Promise<T>,
-  label: string,
-  timeoutMs: number = DEFAULT_FIRESTORE_WRITE_TIMEOUT_MS
-): Promise<T> {
-  if (isFirestoreWriteQuotaExhausted()) {
-    throw new QuotaAbortedWriteError(label);
-  }
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let onQuota: ((ev: Event) => void) | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error(`Firestore timeout (${timeoutMs}ms) in write:${label}`));
-        }, timeoutMs);
-        if (typeof window !== 'undefined') {
-          onQuota = (ev: Event) => {
-            const detail = (ev as CustomEvent<{ writeExhausted?: boolean }>).detail;
-            if (detail?.writeExhausted) {
-              reject(new QuotaAbortedWriteError(label));
-            }
-          };
-          window.addEventListener('sigre-firestore-quota-status', onQuota);
-        }
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-    if (typeof window !== 'undefined' && onQuota) {
-      window.removeEventListener('sigre-firestore-quota-status', onQuota);
+  } else {
+    const wasWriteExhausted = isFirestoreWriteQuotaExhausted();
+    firestoreWriteCooldownUntil = Date.now() + 60_000;
+    if (!wasWriteExhausted) {
+      notifyFirestoreQuotaStatus(isFirestoreReadQuotaExhausted(), true);
     }
   }
-}
-
-function getMaxListLimitForCollection(colName: string): number {
-  if (colName === SCHOOLS_COL) return SCHOOLS_LIST_LIMIT;
-  if (colName === ANNOUNCEMENTS_COL) return ANNOUNCEMENTS_LIMIT;
-  return 50;
 }
 
 function logFirestorePermissionOrQuotaError(
@@ -318,39 +175,23 @@ function logFirestorePermissionOrQuotaError(
   operationType: OperationType,
   path: string
 ): void {
-  const isWriteOp =
-    operationType === OperationType.WRITE ||
-    operationType === OperationType.CREATE ||
-    operationType === OperationType.UPDATE ||
-    operationType === OperationType.DELETE;
-  markFirestoreQuotaIfExhausted(err, isWriteOp ? 'write' : 'read');
-  const code = String((err as any)?.code || '');
+  markFirestoreQuotaIfExhausted(err, operationType === OperationType.WRITE || operationType === OperationType.CREATE || operationType === OperationType.UPDATE || operationType === OperationType.DELETE ? 'write' : 'read');
   const msg = err instanceof Error ? err.message : String(err);
-
-  if (
-    err instanceof QuotaAbortedWriteError ||
-    (isWriteOp && isFirestoreWriteQuotaExhausted()) ||
-    (!isWriteOp && isFirestoreReadQuotaExhausted()) ||
-    (isWriteOp && msg.includes('Firestore timeout'))
-  ) {
-    console.warn(`[Firestore] Gravação diferida localmente (${path}): ${msg}`);
-    return;
+  if (msg.toLowerCase().includes('missing or insufficient permissions') || msg.toLowerCase().includes('permission-denied')) {
+    const errInfo = {
+      error: msg,
+      operationType,
+      path,
+      authInfo: {
+        userId: auth.currentUser?.uid,
+        email: auth.currentUser?.email,
+        emailVerified: auth.currentUser?.emailVerified,
+        isAnonymous: auth.currentUser?.isAnonymous,
+        tenantId: auth.currentUser?.tenantId,
+      },
+    };
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
   }
-
-  const errInfo = {
-    code: code || undefined,
-    error: msg,
-    operationType,
-    path,
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-    },
-  };
-  console.error('Firestore Error:', JSON.stringify(errInfo), err);
 }
 
 function resolveNowTimestamp(existingTs?: any): { nowTs: number; nowIso: string } {
@@ -390,11 +231,11 @@ export interface DashboardStats {
 export async function fetchDashboardStats(): Promise<DashboardStats | null> {
   if (isFirestoreReadQuotaExhausted()) return null;
   try {
-    const snap = await withFirestoreTimeout(
+    const snap = await Promise.race([
       getDoc(doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID)),
-      `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`
-    );
-    if (snap.exists()) {
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
+    ]);
+    if (snap && snap.exists()) {
       return snap.data() as DashboardStats;
     }
     return null;
@@ -408,10 +249,7 @@ export function subscribeToDashboardStats(
   onUpdate: (stats: DashboardStats) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     return onSnapshot(
       doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID),
@@ -426,7 +264,7 @@ export function subscribeToDashboardStats(
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.GET, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -448,10 +286,7 @@ export async function incrementDashboardStats(
       }
     }
     if (!hasNonZero) return;
-    await withFirestoreWriteTimeout(
-      setDoc(doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID), updatePayload, { merge: true }),
-      `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`
-    );
+    await setDoc(doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID), updatePayload, { merge: true });
   } catch (err) {
     logFirestorePermissionOrQuotaError(err, OperationType.UPDATE, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
   }
@@ -462,19 +297,13 @@ export async function fetchCollectionCount(
   filters?: Array<{ field: string; op?: '==' | 'in'; value: any }>
 ): Promise<number> {
   if (isFirestoreReadQuotaExhausted()) return 0;
-  // stats and admins disallow list queries (allow list: if false)
-  if (colName === STATS_COL || colName === 'admins') {
-    return 0;
-  }
   try {
-    const maxLimit = getMaxListLimitForCollection(colName);
     const constraints: QueryConstraint[] = [];
     if (filters && filters.length > 0) {
       filters.forEach((f) => constraints.push(where(f.field, f.op || '==', f.value)));
     }
-    constraints.push(limit(maxLimit));
-    const q = query(collection(db, colName), ...constraints);
-    const snap = await withFirestoreTimeout(getCountFromServer(q), `count:${colName}`);
+    const q = constraints.length > 0 ? query(collection(db, colName), ...constraints) : collection(db, colName);
+    const snap = await getCountFromServer(q);
     return snap.data().count;
   } catch (err) {
     logFirestorePermissionOrQuotaError(err, OperationType.LIST, colName);
@@ -485,8 +314,62 @@ export async function fetchCollectionCount(
 export async function refreshDashboardStatsFromServerCounts(): Promise<DashboardStats | null> {
   if (isFirestoreReadQuotaExhausted()) return null;
   try {
-    // Only single-document getDoc is permitted on stats (allow list: if false)
-    return await fetchDashboardStats();
+    const [
+      totalSchools,
+      totalTeachers,
+      totalStudents,
+      totalDirectors,
+      totalStaff,
+      totalUsers,
+      totalApplications,
+      pendingApplications,
+      approvedApplications,
+      rejectedApplications,
+      totalQuickRequests,
+      pendingQuickRequests,
+      totalEfectividade,
+      totalDeclaracaoServico,
+    ] = await Promise.all([
+      fetchCollectionCount(SCHOOLS_COL),
+      fetchCollectionCount(TEACHERS_COL),
+      fetchCollectionCount(STUDENTS_COL),
+      fetchCollectionCount(DIRECTORS_COL),
+      fetchCollectionCount(STAFF_COL),
+      fetchCollectionCount(USERS_COL),
+      fetchCollectionCount(APPLICATIONS_COL),
+      fetchCollectionCount(APPLICATIONS_COL, [{ field: 'status', value: 'pendente' }]),
+      fetchCollectionCount(APPLICATIONS_COL, [{ field: 'status', value: 'aprovado' }]),
+      fetchCollectionCount(APPLICATIONS_COL, [{ field: 'status', value: 'rejeitado' }]),
+      fetchCollectionCount(QUICK_REQUESTS_COL),
+      fetchCollectionCount(QUICK_REQUESTS_COL, [
+        { field: 'status', op: 'in', value: [...ACTIVE_QUICK_REQUEST_STATUSES] },
+      ]),
+      fetchCollectionCount(EFECTIVIDADE_COL),
+      fetchCollectionCount(DECLARACAO_SERVICO_COL),
+    ]);
+
+    const payload: DashboardStats = {
+      totalSchools,
+      totalTeachers,
+      totalStudents,
+      totalDirectors,
+      totalStaff,
+      totalUsers,
+      totalApplications,
+      pendingApplications,
+      approvedApplications,
+      rejectedApplications,
+      totalQuickRequests,
+      pendingQuickRequests,
+      totalEfectividade,
+      totalDeclaracaoServico,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (!isFirestoreWriteQuotaExhausted()) {
+      await setDoc(doc(db, STATS_COL, DASHBOARD_STATS_DOC_ID), payload, { merge: true }).catch(() => {});
+    }
+    return payload;
   } catch (err) {
     logFirestorePermissionOrQuotaError(err, OperationType.GET, `${STATS_COL}/${DASHBOARD_STATS_DOC_ID}`);
     return null;
@@ -514,16 +397,18 @@ export async function fetchCollectionPage<T = any>(
   if (isFirestoreReadQuotaExhausted()) {
     return { items: [], lastDoc: null, hasMore: false, ok: false, quotaExhausted: true };
   }
-  // stats and admins disallow list queries (allow list: if false)
-  if (colName === STATS_COL || colName === 'admins') {
-    console.error(`[Firestore] Listagem bloqueada pelas regras de segurança para a coleção "${colName}".`);
-    return { items: [], lastDoc: null, hasMore: false, ok: false, quotaExhausted: false };
-  }
-  const maxLimitForCollection = getMaxListLimitForCollection(colName);
+  const maxLimitForCollection =
+    colName === SCHOOLS_COL
+      ? SCHOOLS_LIST_LIMIT
+      : colName === ANNOUNCEMENTS_COL
+      ? ANNOUNCEMENTS_LIMIT
+      : 50;
   const maxPageSize = Math.max(1, maxLimitForCollection - 1);
   const pageSize = Math.min(Math.max(options?.pageSize ?? PAGINATION_PAGE_SIZE, 1), maxPageSize);
   const orderField = options?.orderField || 'updatedAt';
   const orderDirection = options?.orderDirection || 'desc';
+  const hasWhereConstraints = Array.isArray(options?.constraints) && options!.constraints.length > 0;
+
   try {
     const queryParts: QueryConstraint[] = [
       ...(options?.constraints || []),
@@ -531,16 +416,42 @@ export async function fetchCollectionPage<T = any>(
       ...(options?.cursor ? [startAfter(options.cursor)] : []),
       limit(pageSize + 1),
     ];
-    const snap = await withFirestoreTimeout(
+    const snap = await Promise.race([
       getDocs(query(collection(db, colName), ...queryParts)),
-      `page:${colName}`
-    );
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore page read timeout')), 4000)),
+    ]);
     const hasMore = snap.docs.length > pageSize;
     const docs = hasMore ? snap.docs.slice(0, pageSize) : snap.docs;
     const items = docs.map((d) => d.data() as T);
     const lastDoc = docs.length > 0 ? docs[docs.length - 1] : null;
     return { items, lastDoc, hasMore, ok: true, quotaExhausted: false };
   } catch (err) {
+    const errMsg = String((err as any)?.message || err || '').toLowerCase();
+    // Fallback automático caso o índice composto (where + orderBy) ainda esteja a ser construído no Firebase
+    if (hasWhereConstraints && !options?.cursor && (errMsg.includes('index') || errMsg.includes('failed-precondition'))) {
+      try {
+        const fallbackParts: QueryConstraint[] = [
+          ...(options?.constraints || []),
+          limit(pageSize + 1),
+        ];
+        const snap = await Promise.race([
+          getDocs(query(collection(db, colName), ...fallbackParts)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore fallback timeout')), 3500)),
+        ]);
+        const hasMore = snap.docs.length > pageSize;
+        const docs = hasMore ? snap.docs.slice(0, pageSize) : snap.docs;
+        const items = docs
+          .map((d) => d.data() as T)
+          .sort((a: any, b: any) => {
+            const aTs = Number(a?._updatedAt || Date.parse(a?.updatedAt || '') || 0);
+            const bTs = Number(b?._updatedAt || Date.parse(b?.updatedAt || '') || 0);
+            return orderDirection === 'asc' ? aTs - bTs : bTs - aTs;
+          });
+        const lastDoc = docs.length > 0 ? docs[docs.length - 1] : null;
+        return { items, lastDoc, hasMore, ok: true, quotaExhausted: false };
+      } catch {}
+    }
+
     logFirestorePermissionOrQuotaError(err, OperationType.LIST, colName);
     return {
       items: [],
@@ -709,14 +620,14 @@ export function removeEntityTombstone(col: string, id: string): void {
     });
     if (removed) {
       localStorage.setItem(DELETED_ENTITIES_KEY, JSON.stringify(Array.from(set)));
-      if (!isFirestoreWriteQuotaExhausted()) {
-        const candidateDocIds = new Set(
-          [sanitizeDocId(`${col}::${cleanId}`), sanitizeDocId(`${col}:${rawClean}`)].filter(Boolean)
-        );
-        candidateDocIds.forEach((tombDocId) => {
-          deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch((e) => markFirestoreQuotaIfExhausted(e, 'write'));
-        });
-      }
+    }
+    if (!isFirestoreWriteQuotaExhausted()) {
+      const candidateDocIds = new Set(
+        [sanitizeDocId(`${col}::${cleanId}`), sanitizeDocId(`${col}:${rawClean}`)].filter(Boolean)
+      );
+      candidateDocIds.forEach((tombDocId) => {
+        deleteDoc(doc(db, TOMBSTONES_COL, tombDocId)).catch((e) => markFirestoreQuotaIfExhausted(e, 'write'));
+      });
     }
   } catch {}
 }
@@ -810,10 +721,7 @@ export async function saveApplicationToFirestore(app: PendingApplication): Promi
       } catch {}
     }
 
-    await withFirestoreWriteTimeout(
-      setDoc(ref, cleanObject(rawPayload), { merge: true }),
-      `${APPLICATIONS_COL}/${docId}`
-    );
+    await setDoc(ref, cleanObject(rawPayload), { merge: true });
 
     // Keep stats/dashboard atomically synchronized without client full-collection counts
     if (prevStatus === null) {
@@ -890,7 +798,7 @@ export async function fetchApplicationsFromFirestoreWithStatus(
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 5500)),
     ]);
     if (res.ok && firestoreReadCooldownUntil !== 0) {
-      clearReadQuotaCooldown();
+      firestoreReadCooldownUntil = 0;
       notifyFirestoreQuotaStatus(false, isFirestoreWriteQuotaExhausted());
     }
     return {
@@ -928,13 +836,10 @@ export async function updateApplicationInFirestore(
         if (snap.exists()) prevStatus = String(snap.data()?.status || 'pendente');
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...updates, updatedAt: nowIso, _updatedAt: nowTs }),
-        { merge: true }
-      ),
-      `${APPLICATIONS_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...updates, updatedAt: nowIso, _updatedAt: nowTs }),
+      { merge: true }
     );
     if (updates.status && prevStatus !== null && prevStatus !== updates.status) {
       const nextStatus = updates.status;
@@ -1035,10 +940,8 @@ export function subscribeToApplications(
   onUpdate: (apps: PendingApplication[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
+  let fallbackUnsub: Unsubscribe | null = null;
   try {
     const q = query(
       collection(db, APPLICATIONS_COL),
@@ -1046,11 +949,11 @@ export function subscribeToApplications(
       orderBy('updatedAt', 'desc'),
       limit(REALTIME_LISTENER_LIMIT)
     );
-    return onSnapshot(
+    const primaryUnsub = onSnapshot(
       q,
       (snapshot) => {
         if (firestoreReadCooldownUntil !== 0) {
-          clearReadQuotaCooldown();
+          firestoreReadCooldownUntil = 0;
           notifyFirestoreQuotaStatus(false, isFirestoreWriteQuotaExhausted());
         }
         const apps: PendingApplication[] = [];
@@ -1060,12 +963,45 @@ export function subscribeToApplications(
         onUpdate(apps);
       },
       (error) => {
+        const errMsg = String((error as any)?.message || error || '').toLowerCase();
+        if (!fallbackUnsub && (errMsg.includes('index') || errMsg.includes('failed-precondition'))) {
+          try {
+            const fallbackQ = query(
+              collection(db, APPLICATIONS_COL),
+              where('status', '==', 'pendente'),
+              limit(REALTIME_LISTENER_LIMIT)
+            );
+            fallbackUnsub = onSnapshot(
+              fallbackQ,
+              (snap) => {
+                const apps: PendingApplication[] = [];
+                snap.forEach((d) => apps.push(d.data() as PendingApplication));
+                onUpdate(apps);
+              },
+              (fbErr) => {
+                logFirestorePermissionOrQuotaError(fbErr, OperationType.LIST, APPLICATIONS_COL);
+                onError?.(fbErr);
+              }
+            );
+            return;
+          } catch {}
+        }
         logFirestorePermissionOrQuotaError(error, OperationType.LIST, APPLICATIONS_COL);
         onError?.(error);
       }
     );
+    return () => {
+      try {
+        primaryUnsub();
+      } catch {}
+      if (fallbackUnsub) {
+        try {
+          fallbackUnsub();
+        } catch {}
+      }
+    };
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, APPLICATIONS_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -1090,13 +1026,10 @@ export async function saveQuickRequestToFirestore(request: QuickServiceRequest):
         if (snap.exists()) prevStatus = String(snap.data()?.status || '');
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...request, updatedAt: nowIso, _updatedAt: nowTs }),
-        { merge: true }
-      ),
-      `${QUICK_REQUESTS_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...request, updatedAt: nowIso, _updatedAt: nowTs }),
+      { merge: true }
     );
     const isNowActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(request.status as any);
     const isNowCompleted = request.status === 'CONCLUIDO';
@@ -1193,13 +1126,10 @@ export async function updateQuickRequestInFirestore(
         if (snap.exists()) prevStatus = String(snap.data()?.status || '');
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...updates, updatedAt: nowIso, _updatedAt: nowTs }),
-        { merge: true }
-      ),
-      `${QUICK_REQUESTS_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...updates, updatedAt: nowIso, _updatedAt: nowTs }),
+      { merge: true }
     );
     if (updates.status && prevStatus !== null && prevStatus !== updates.status) {
       const wasActive = ACTIVE_QUICK_REQUEST_STATUSES.includes(prevStatus as any);
@@ -1301,10 +1231,8 @@ export function subscribeToQuickRequests(
   onUpdate: (requests: QuickServiceRequest[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
+  let fallbackUnsub: Unsubscribe | null = null;
   try {
     const q = query(
       collection(db, QUICK_REQUESTS_COL),
@@ -1312,7 +1240,7 @@ export function subscribeToQuickRequests(
       orderBy('updatedAt', 'desc'),
       limit(REALTIME_LISTENER_LIMIT)
     );
-    return onSnapshot(
+    const primaryUnsub = onSnapshot(
       q,
       (snapshot) => {
         const list: QuickServiceRequest[] = [];
@@ -1322,12 +1250,45 @@ export function subscribeToQuickRequests(
         onUpdate(list);
       },
       (error) => {
+        const errMsg = String((error as any)?.message || error || '').toLowerCase();
+        if (!fallbackUnsub && (errMsg.includes('index') || errMsg.includes('failed-precondition'))) {
+          try {
+            const fbQ = query(
+              collection(db, QUICK_REQUESTS_COL),
+              where('status', 'in', [...ACTIVE_QUICK_REQUEST_STATUSES]),
+              limit(REALTIME_LISTENER_LIMIT)
+            );
+            fallbackUnsub = onSnapshot(
+              fbQ,
+              (snap) => {
+                const list: QuickServiceRequest[] = [];
+                snap.forEach((d) => list.push(d.data() as QuickServiceRequest));
+                onUpdate(list);
+              },
+              (fbErr) => {
+                logFirestorePermissionOrQuotaError(fbErr, OperationType.LIST, QUICK_REQUESTS_COL);
+                onError?.(fbErr);
+              }
+            );
+            return;
+          } catch {}
+        }
         logFirestorePermissionOrQuotaError(error, OperationType.LIST, QUICK_REQUESTS_COL);
         onError?.(error);
       }
     );
+    return () => {
+      try {
+        primaryUnsub();
+      } catch {}
+      if (fallbackUnsub) {
+        try {
+          fallbackUnsub();
+        } catch {}
+      }
+    };
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, QUICK_REQUESTS_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -1383,10 +1344,7 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(ref, cleanObject(rawUser), { merge: true }),
-      `${USERS_COL}/${docId}`
-    );
+    await setDoc(ref, cleanObject(rawUser), { merge: true });
     if (isNew) {
       incrementDashboardStats({ totalUsers: 1 }).catch(() => {});
     }
@@ -1404,8 +1362,11 @@ export async function fetchUserFromFirestore(userIdOrEmail: string): Promise<Use
       return null;
     }
     const ref = doc(db, USERS_COL, key);
-    const snap = await withFirestoreTimeout(getDoc(ref), `${USERS_COL}/${key}`);
-    if (snap.exists()) {
+    const snap = await Promise.race([
+      getDoc(ref),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2800)),
+    ]);
+    if (snap && snap.exists()) {
       const data = snap.data() as UserAccount;
       if (
         (data?.email && isEntityTombstoned(USERS_COL, data.email)) ||
@@ -1418,7 +1379,8 @@ export async function fetchUserFromFirestore(userIdOrEmail: string): Promise<Use
     }
     return null;
   } catch (error) {
-    logFirestorePermissionOrQuotaError(error, OperationType.GET, USERS_COL);
+    markFirestoreQuotaIfExhausted(error, 'read');
+    console.warn('[Firestore] Erro ao buscar usuário no Firestore:', error);
     return null;
   }
 }
@@ -1442,7 +1404,8 @@ export async function deleteUserFromFirestore(userIdOrEmail: string): Promise<vo
       incrementDashboardStats({ totalUsers: -1 }).catch(() => {});
     }
   } catch (error) {
-    logFirestorePermissionOrQuotaError(error, OperationType.DELETE, USERS_COL);
+    markFirestoreQuotaIfExhausted(error, 'write');
+    console.warn('[Firestore] Erro ao eliminar usuário no Firestore:', error);
   }
 }
 
@@ -1451,10 +1414,7 @@ export function subscribeToSingleUserStatus(
   onUpdate: (user: UserAccount) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const docId = sanitizeDocId((userIdOrEmail || '').trim().toLowerCase());
     if (!docId) return () => {};
@@ -1467,12 +1427,12 @@ export function subscribeToSingleUserStatus(
         }
       },
       (err) => {
-        logFirestorePermissionOrQuotaError(err, OperationType.GET, `${USERS_COL}/${docId}`);
+        markFirestoreQuotaIfExhausted(err, 'read');
         onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.GET, USERS_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -1482,10 +1442,7 @@ export function subscribeToUsers(
   onUpdate: (users: UserAccount[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, USERS_COL),
@@ -1502,11 +1459,12 @@ export function subscribeToUsers(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, USERS_COL);
+        console.warn('[Firestore] Users subscription error:', err);
         onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, USERS_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -1537,17 +1495,14 @@ export async function saveSchoolToFirestore(school: AdminSchool): Promise<void> 
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({
-          ...school,
-          _updatedAt: nowTs,
-          updatedAt: nowIso,
-        }),
-        { merge: true }
-      ),
-      `${SCHOOLS_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({
+        ...school,
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
+      }),
+      { merge: true }
     );
     if (isNew) {
       incrementDashboardStats({ totalSchools: 1 }).catch(() => {});
@@ -1598,7 +1553,11 @@ export async function fetchSchoolsFromFirestore(limitCount: number = SCHOOLS_LIS
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${SCHOOLS_COL}`);
+    const snapshot = await Promise.race([
+      getDocs(q),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
+    ]);
+    if (!snapshot) return [];
     const list: AdminSchool[] = [];
     snapshot.forEach((d) => {
       const data = d.data() as AdminSchool;
@@ -1615,13 +1574,9 @@ export async function fetchSchoolsFromFirestore(limitCount: number = SCHOOLS_LIS
 
 export function subscribeToSchools(
   onUpdate: (schools: AdminSchool[]) => void,
-  maxLimit: number = SCHOOLS_LIST_LIMIT,
-  onError?: (err: unknown) => void
+  maxLimit: number = SCHOOLS_LIST_LIMIT
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const safeLimit = Math.min(Math.max(maxLimit, 1), SCHOOLS_LIST_LIMIT);
     const q = query(
@@ -1643,12 +1598,10 @@ export function subscribeToSchools(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, SCHOOLS_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, SCHOOLS_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1680,20 +1633,17 @@ export async function saveTeacherToFirestore(
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({
-          ...cleanTeacher,
-          id,
-          name: rawName || (cleanTeacher as any).name,
-          nomeCompleto: rawName || (cleanTeacher as any).nomeCompleto,
-          _updatedAt: nowTs,
-          updatedAt: nowIso,
-        }),
-        { merge: true }
-      ),
-      `${TEACHERS_COL}/${id}`
+    await setDoc(
+      ref,
+      cleanObject({
+        ...cleanTeacher,
+        id,
+        name: rawName || (cleanTeacher as any).name,
+        nomeCompleto: rawName || (cleanTeacher as any).nomeCompleto,
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
+      }),
+      { merge: true }
     );
     if (isNew) {
       incrementDashboardStats({ totalTeachers: 1 }).catch(() => {});
@@ -1766,10 +1716,7 @@ export async function fetchTeachersFromFirestore(options?: {
     }
     const safeLimit = Math.min(Math.max(options?.limitCount ?? PAGINATION_PAGE_SIZE, 1), 50);
     constraints.push(orderBy('updatedAt', 'desc'), limit(safeLimit));
-    const snapshot = await withFirestoreTimeout(
-      getDocs(query(collection(db, TEACHERS_COL), ...constraints)),
-      `list:${TEACHERS_COL}`
-    );
+    const snapshot = await getDocs(query(collection(db, TEACHERS_COL), ...constraints));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -1781,13 +1728,9 @@ export async function fetchTeachersFromFirestore(options?: {
 
 export function subscribeToTeachers(
   onUpdate: (teachers: any[]) => void,
-  options?: { schoolId?: string; limitCount?: number },
-  onError?: (err: unknown) => void
+  options?: { schoolId?: string; limitCount?: number }
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const constraints: QueryConstraint[] = [];
     if (options?.schoolId) {
@@ -1804,12 +1747,10 @@ export function subscribeToTeachers(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, TEACHERS_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, TEACHERS_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -1862,24 +1803,21 @@ export async function saveStudentToFirestore(
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({
-          ...flatReg,
-          ...studentRoot,
-          id,
-          nomeCompleto,
-          name: nomeCompleto,
-          schoolId,
-          turma,
-          classe,
-          _updatedAt: nowTs,
-          updatedAt: nowIso,
-        }),
-        { merge: true }
-      ),
-      `${STUDENTS_COL}/${id}`
+    await setDoc(
+      ref,
+      cleanObject({
+        ...flatReg,
+        ...studentRoot,
+        id,
+        nomeCompleto,
+        name: nomeCompleto,
+        schoolId,
+        turma,
+        classe,
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
+      }),
+      { merge: true }
     );
     if (isNew) {
       incrementDashboardStats({ totalStudents: 1 }).catch(() => {});
@@ -1952,10 +1890,7 @@ export async function fetchStudentsFromFirestore(options?: {
     }
     const safeLimit = Math.min(Math.max(options?.limitCount ?? PAGINATION_PAGE_SIZE, 1), 50);
     constraints.push(orderBy('updatedAt', 'desc'), limit(safeLimit));
-    const snapshot = await withFirestoreTimeout(
-      getDocs(query(collection(db, STUDENTS_COL), ...constraints)),
-      `list:${STUDENTS_COL}`
-    );
+    const snapshot = await getDocs(query(collection(db, STUDENTS_COL), ...constraints));
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -1967,13 +1902,9 @@ export async function fetchStudentsFromFirestore(options?: {
 
 export function subscribeToStudents(
   onUpdate: (students: any[]) => void,
-  options?: { schoolId?: string; limitCount?: number },
-  onError?: (err: unknown) => void
+  options?: { schoolId?: string; limitCount?: number }
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const constraints: QueryConstraint[] = [];
     if (options?.schoolId) {
@@ -1990,12 +1921,10 @@ export function subscribeToStudents(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, STUDENTS_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, STUDENTS_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -2025,20 +1954,17 @@ export async function saveDirectorToFirestore(
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({
-          ...cleanDirector,
-          id,
-          name: rawName || (cleanDirector as any).name,
-          nomeCompleto: rawName || (cleanDirector as any).nomeCompleto,
-          _updatedAt: nowTs,
-          updatedAt: nowIso,
-        }),
-        { merge: true }
-      ),
-      `${DIRECTORS_COL}/${id}`
+    await setDoc(
+      ref,
+      cleanObject({
+        ...cleanDirector,
+        id,
+        name: rawName || (cleanDirector as any).name,
+        nomeCompleto: rawName || (cleanDirector as any).nomeCompleto,
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
+      }),
+      { merge: true }
     );
     if (isNew) {
       incrementDashboardStats({ totalDirectors: 1 }).catch(() => {});
@@ -2080,7 +2006,7 @@ export async function fetchDirectorsFromFirestore(limitCount: number = PAGINATIO
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${DIRECTORS_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -2090,14 +2016,8 @@ export async function fetchDirectorsFromFirestore(limitCount: number = PAGINATIO
   }
 }
 
-export function subscribeToDirectors(
-  onUpdate: (directors: any[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToDirectors(onUpdate: (directors: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, DIRECTORS_COL),
@@ -2113,12 +2033,10 @@ export function subscribeToDirectors(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, DIRECTORS_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, DIRECTORS_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -2131,10 +2049,7 @@ export async function saveDmeStaffToFirestore(staff: Record<string, any>): Promi
     removeEntityTombstone(DME_STAFF_COL, id);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, DME_STAFF_COL, id);
-    await withFirestoreWriteTimeout(
-      setDoc(ref, cleanObject({ ...staff, id, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true }),
-      `${DME_STAFF_COL}/${id}`
-    );
+    await setDoc(ref, cleanObject({ ...staff, id, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true });
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, DME_STAFF_COL);
   }
@@ -2161,7 +2076,7 @@ export async function fetchDmeStaffFromFirestore(limitCount: number = PAGINATION
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${DME_STAFF_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -2171,14 +2086,8 @@ export async function fetchDmeStaffFromFirestore(limitCount: number = PAGINATION
   }
 }
 
-export function subscribeToDmeStaff(
-  onUpdate: (staff: any[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToDmeStaff(onUpdate: (staff: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, DME_STAFF_COL),
@@ -2194,12 +2103,10 @@ export function subscribeToDmeStaff(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, DME_STAFF_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, DME_STAFF_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -2229,22 +2136,19 @@ export async function saveStaffToFirestore(staffMember: Record<string, any>): Pr
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({
-          ...staffMember,
-          id,
-          nomeCompleto,
-          name: nomeCompleto,
-          funcao,
-          schoolName,
-          _updatedAt: nowTs,
-          updatedAt: nowIso,
-        }),
-        { merge: true }
-      ),
-      `${STAFF_COL}/${id}`
+    await setDoc(
+      ref,
+      cleanObject({
+        ...staffMember,
+        id,
+        nomeCompleto,
+        name: nomeCompleto,
+        funcao,
+        schoolName,
+        _updatedAt: nowTs,
+        updatedAt: nowIso,
+      }),
+      { merge: true }
     );
     if (isNew) {
       incrementDashboardStats({ totalStaff: 1 }).catch(() => {});
@@ -2286,7 +2190,7 @@ export async function fetchStaffFromFirestore(limitCount: number = PAGINATION_PA
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${STAFF_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -2296,14 +2200,8 @@ export async function fetchStaffFromFirestore(limitCount: number = PAGINATION_PA
   }
 }
 
-export function subscribeToStaff(
-  onUpdate: (staff: any[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToStaff(onUpdate: (staff: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, STAFF_COL),
@@ -2319,12 +2217,10 @@ export function subscribeToStaff(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, STAFF_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, STAFF_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -2339,51 +2235,42 @@ export async function saveBatchStudentsToFirestore(students: Record<string, any>
   );
   const CHUNK_SIZE = 450;
   const { nowTs, nowIso } = resolveNowTimestamp();
-  try {
-    for (let i = 0; i < students.length; i += CHUNK_SIZE) {
-      if (isFirestoreWriteQuotaExhausted()) break;
-      const chunk = students.slice(i, i + CHUNK_SIZE);
-      const batch = writeBatch(db);
-      let chunkCount = 0;
-      chunk.forEach((student) => {
-        const id = sanitizeDocId(student.id || student.nomeCompleto || student.name);
-        if (!id) return;
-        if (!existingIds.has(id)) {
-          existingIds.add(id);
-          newCount++;
-        }
-        const nomeCompleto = student.nomeCompleto || student.name || 'Estudante';
-        const schoolId = student.schoolId || student.escola || student.schoolName || 'escola_municipal';
-        const turma = student.turma || 'Turma A';
-        const classe = student.classe || student.gradeClass || student.classeEtapaModulo || '1ª Classe';
-        const ref = doc(db, STUDENTS_COL, id);
-        batch.set(
-          ref,
-          cleanObject({
-            ...student,
-            id,
-            nomeCompleto,
-            name: nomeCompleto,
-            schoolId,
-            turma,
-            classe,
-            _updatedAt: nowTs,
-            updatedAt: nowIso,
-          }),
-          { merge: true }
-        );
-        chunkCount++;
-      });
-      if (chunkCount > 0) {
-        await withFirestoreWriteTimeout(batch.commit(), `batch:${STUDENTS_COL}`);
-        saved += chunkCount;
+  for (let i = 0; i < students.length; i += CHUNK_SIZE) {
+    const chunk = students.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach((student) => {
+      const id = sanitizeDocId(student.id || student.nomeCompleto || student.name);
+      if (!id) return;
+      if (!existingIds.has(id)) {
+        existingIds.add(id);
+        newCount++;
       }
-    }
-    if (newCount > 0 && !isFirestoreWriteQuotaExhausted()) {
-      incrementDashboardStats({ totalStudents: newCount }).catch(() => {});
-    }
-  } catch (error) {
-    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, STUDENTS_COL);
+      const nomeCompleto = student.nomeCompleto || student.name || 'Estudante';
+      const schoolId = student.schoolId || student.escola || student.schoolName || 'escola_municipal';
+      const turma = student.turma || 'Turma A';
+      const classe = student.classe || student.gradeClass || student.classeEtapaModulo || '1ª Classe';
+      const ref = doc(db, STUDENTS_COL, id);
+      batch.set(
+        ref,
+        cleanObject({
+          ...student,
+          id,
+          nomeCompleto,
+          name: nomeCompleto,
+          schoolId,
+          turma,
+          classe,
+          _updatedAt: nowTs,
+          updatedAt: nowIso,
+        }),
+        { merge: true }
+      );
+      saved++;
+    });
+    await batch.commit();
+  }
+  if (newCount > 0) {
+    incrementDashboardStats({ totalStudents: newCount }).catch(() => {});
   }
   return saved;
 }
@@ -2397,37 +2284,28 @@ export async function saveBatchTeachersToFirestore(teachers: Record<string, any>
   );
   const CHUNK_SIZE = 450;
   const { nowTs, nowIso } = resolveNowTimestamp();
-  try {
-    for (let i = 0; i < teachers.length; i += CHUNK_SIZE) {
-      if (isFirestoreWriteQuotaExhausted()) break;
-      const chunk = teachers.slice(i, i + CHUNK_SIZE);
-      const batch = writeBatch(db);
-      let chunkCount = 0;
-      chunk.forEach((teacher) => {
-        const id = sanitizeDocId(teacher.id || teacher.nomeCompleto || teacher.name);
-        if (!id) return;
-        if (!existingIds.has(id)) {
-          existingIds.add(id);
-          newCount++;
-        }
-        const ref = doc(db, TEACHERS_COL, id);
-        batch.set(
-          ref,
-          cleanObject({ ...teacher, id, _updatedAt: nowTs, updatedAt: nowIso }),
-          { merge: true }
-        );
-        chunkCount++;
-      });
-      if (chunkCount > 0) {
-        await withFirestoreWriteTimeout(batch.commit(), `batch:${TEACHERS_COL}`);
-        saved += chunkCount;
+  for (let i = 0; i < teachers.length; i += CHUNK_SIZE) {
+    const chunk = teachers.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach((teacher) => {
+      const id = sanitizeDocId(teacher.id || teacher.nomeCompleto || teacher.name);
+      if (!id) return;
+      if (!existingIds.has(id)) {
+        existingIds.add(id);
+        newCount++;
       }
-    }
-    if (newCount > 0 && !isFirestoreWriteQuotaExhausted()) {
-      incrementDashboardStats({ totalTeachers: newCount }).catch(() => {});
-    }
-  } catch (error) {
-    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, TEACHERS_COL);
+      const ref = doc(db, TEACHERS_COL, id);
+      batch.set(
+        ref,
+        cleanObject({ ...teacher, id, _updatedAt: nowTs, updatedAt: nowIso }),
+        { merge: true }
+      );
+      saved++;
+    });
+    await batch.commit();
+  }
+  if (newCount > 0) {
+    incrementDashboardStats({ totalTeachers: newCount }).catch(() => {});
   }
   return saved;
 }
@@ -2443,52 +2321,43 @@ export async function saveBatchStaffToFirestore(staffList: Record<string, any>[]
   );
   const CHUNK_SIZE = 450;
   const { nowTs, nowIso } = resolveNowTimestamp();
-  try {
-    for (let i = 0; i < staffList.length; i += CHUNK_SIZE) {
-      if (isFirestoreWriteQuotaExhausted()) break;
-      const chunk = staffList.slice(i, i + CHUNK_SIZE);
-      const batch = writeBatch(db);
-      let chunkCount = 0;
-      chunk.forEach((staffMember) => {
-        const id = sanitizeDocId(
-          staffMember.id || staffMember.bi || staffMember.agente || staffMember.nomeCompleto || staffMember.name
-        );
-        if (!id) return;
-        if (!existingIds.has(id)) {
-          existingIds.add(id);
-          newCount++;
-        }
-        const nomeCompleto = staffMember.nomeCompleto || staffMember.name || 'Funcionário';
-        const funcao = staffMember.funcao || staffMember.role || staffMember.cargo || 'Administrativo / Apoio';
-        const schoolName =
-          staffMember.schoolName || staffMember.escola || staffMember.nomeEscola || 'Direcção Municipal de Educação';
-        const ref = doc(db, STAFF_COL, id);
-        batch.set(
-          ref,
-          cleanObject({
-            ...staffMember,
-            id,
-            nomeCompleto,
-            name: nomeCompleto,
-            funcao,
-            schoolName,
-            _updatedAt: nowTs,
-            updatedAt: nowIso,
-          }),
-          { merge: true }
-        );
-        chunkCount++;
-      });
-      if (chunkCount > 0) {
-        await withFirestoreWriteTimeout(batch.commit(), `batch:${STAFF_COL}`);
-        saved += chunkCount;
+  for (let i = 0; i < staffList.length; i += CHUNK_SIZE) {
+    const chunk = staffList.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach((staffMember) => {
+      const id = sanitizeDocId(
+        staffMember.id || staffMember.bi || staffMember.agente || staffMember.nomeCompleto || staffMember.name
+      );
+      if (!id) return;
+      if (!existingIds.has(id)) {
+        existingIds.add(id);
+        newCount++;
       }
-    }
-    if (newCount > 0 && !isFirestoreWriteQuotaExhausted()) {
-      incrementDashboardStats({ totalStaff: newCount }).catch(() => {});
-    }
-  } catch (error) {
-    logFirestorePermissionOrQuotaError(error, OperationType.WRITE, STAFF_COL);
+      const nomeCompleto = staffMember.nomeCompleto || staffMember.name || 'Funcionário';
+      const funcao = staffMember.funcao || staffMember.role || staffMember.cargo || 'Administrativo / Apoio';
+      const schoolName =
+        staffMember.schoolName || staffMember.escola || staffMember.nomeEscola || 'Direcção Municipal de Educação';
+      const ref = doc(db, STAFF_COL, id);
+      batch.set(
+        ref,
+        cleanObject({
+          ...staffMember,
+          id,
+          nomeCompleto,
+          name: nomeCompleto,
+          funcao,
+          schoolName,
+          _updatedAt: nowTs,
+          updatedAt: nowIso,
+        }),
+        { merge: true }
+      );
+      saved++;
+    });
+    await batch.commit();
+  }
+  if (newCount > 0) {
+    incrementDashboardStats({ totalStaff: newCount }).catch(() => {});
   }
   return saved;
 }
@@ -2512,13 +2381,10 @@ export async function saveEfectividadeToFirestore(record: Record<string, any>): 
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${EFECTIVIDADE_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
     if (isNew) {
       incrementDashboardStats({ totalEfectividade: 1 }).catch(() => {});
@@ -2588,7 +2454,7 @@ export async function fetchEfectividadeFromFirestore(limitCount: number = PAGINA
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${EFECTIVIDADE_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -2598,14 +2464,8 @@ export async function fetchEfectividadeFromFirestore(limitCount: number = PAGINA
   }
 }
 
-export function subscribeToEfectividade(
-  onUpdate: (records: any[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToEfectividade(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, EFECTIVIDADE_COL),
@@ -2621,12 +2481,10 @@ export function subscribeToEfectividade(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, EFECTIVIDADE_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, EFECTIVIDADE_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -2650,13 +2508,10 @@ export async function saveDeclaracaoServicoToFirestore(record: Record<string, an
         isNew = !snap.exists();
       } catch {}
     }
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${DECLARACAO_SERVICO_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
     if (isNew) {
       incrementDashboardStats({ totalDeclaracaoServico: 1 }).catch(() => {});
@@ -2726,7 +2581,7 @@ export async function fetchDeclaracaoServicoFromFirestore(limitCount: number = P
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${DECLARACAO_SERVICO_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -2740,10 +2595,7 @@ export function subscribeToDeclaracaoServico(
   onUpdate: (records: any[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, DECLARACAO_SERVICO_COL),
@@ -2763,7 +2615,7 @@ export function subscribeToDeclaracaoServico(
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, DECLARACAO_SERVICO_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -2783,13 +2635,10 @@ export async function saveMiniPautaToFirestore(record: Record<string, any>): Pro
     if (!docId) return;
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, GRADES_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${GRADES_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, GRADES_COL);
@@ -2805,7 +2654,7 @@ export async function fetchMiniPautasFromFirestore(limitCount: number = PAGINATI
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${GRADES_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -2815,14 +2664,8 @@ export async function fetchMiniPautasFromFirestore(limitCount: number = PAGINATI
   }
 }
 
-export function subscribeToMiniPautas(
-  onUpdate: (records: any[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToMiniPautas(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, GRADES_COL),
@@ -2838,12 +2681,10 @@ export function subscribeToMiniPautas(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, GRADES_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, GRADES_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -2863,13 +2704,10 @@ export async function saveAttendanceToFirestore(
     if (!docId) return;
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, ATTENDANCE_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, attendanceKind: kind, docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${ATTENDANCE_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, attendanceKind: kind, docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ATTENDANCE_COL);
@@ -2897,7 +2735,7 @@ export async function saveBatchAttendanceToFirestore(
         );
       }
     });
-    await withFirestoreWriteTimeout(batch.commit(), `batch:${ATTENDANCE_COL}`);
+    await batch.commit();
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ATTENDANCE_COL);
   }
@@ -2912,7 +2750,7 @@ export async function fetchAttendanceFromFirestore(limitCount: number = PAGINATI
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${ATTENDANCE_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -2922,14 +2760,8 @@ export async function fetchAttendanceFromFirestore(limitCount: number = PAGINATI
   }
 }
 
-export function subscribeToAttendance(
-  onUpdate: (records: any[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToAttendance(onUpdate: (records: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, ATTENDANCE_COL),
@@ -2945,12 +2777,10 @@ export function subscribeToAttendance(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, ATTENDANCE_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, ATTENDANCE_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -2967,13 +2797,10 @@ export async function saveAnnouncementToFirestore(announcement: SchoolAnnounceme
     removeEntityTombstone(ANNOUNCEMENTS_COL, docId);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, ANNOUNCEMENTS_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...announcement, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${ANNOUNCEMENTS_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...announcement, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ANNOUNCEMENTS_COL);
@@ -3003,7 +2830,7 @@ export async function fetchAnnouncementsFromFirestore(
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${ANNOUNCEMENTS_COL}`);
+    const snapshot = await getDocs(q);
     const list: SchoolAnnouncement[] = [];
     snapshot.forEach((d) => list.push(d.data() as SchoolAnnouncement));
     return list;
@@ -3013,14 +2840,8 @@ export async function fetchAnnouncementsFromFirestore(
   }
 }
 
-export function subscribeToAnnouncements(
-  onUpdate: (list: SchoolAnnouncement[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToAnnouncements(onUpdate: (list: SchoolAnnouncement[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, ANNOUNCEMENTS_COL),
@@ -3036,12 +2857,10 @@ export function subscribeToAnnouncements(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, ANNOUNCEMENTS_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, ANNOUNCEMENTS_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -3054,10 +2873,7 @@ export async function saveRoomToFirestore(room: DirectorRoom): Promise<void> {
     removeEntityTombstone(ROOMS_COL, docId);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, ROOMS_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(ref, cleanObject({ ...room, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true }),
-      `${ROOMS_COL}/${docId}`
-    );
+    await setDoc(ref, cleanObject({ ...room, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true });
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, ROOMS_COL);
   }
@@ -3084,7 +2900,7 @@ export async function fetchRoomsFromFirestore(limitCount: number = PAGINATION_PA
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${ROOMS_COL}`);
+    const snapshot = await getDocs(q);
     const list: DirectorRoom[] = [];
     snapshot.forEach((d) => list.push(d.data() as DirectorRoom));
     return list;
@@ -3094,14 +2910,8 @@ export async function fetchRoomsFromFirestore(limitCount: number = PAGINATION_PA
   }
 }
 
-export function subscribeToRooms(
-  onUpdate: (list: DirectorRoom[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToRooms(onUpdate: (list: DirectorRoom[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, ROOMS_COL),
@@ -3117,12 +2927,10 @@ export function subscribeToRooms(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, ROOMS_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, ROOMS_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -3135,10 +2943,7 @@ export async function saveClassToFirestore(cls: DirectorClass): Promise<void> {
     removeEntityTombstone(CLASSES_COL, docId);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, CLASSES_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(ref, cleanObject({ ...cls, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true }),
-      `${CLASSES_COL}/${docId}`
-    );
+    await setDoc(ref, cleanObject({ ...cls, _updatedAt: nowTs, updatedAt: nowIso }), { merge: true });
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, CLASSES_COL);
   }
@@ -3165,7 +2970,7 @@ export async function fetchClassesFromFirestore(limitCount: number = PAGINATION_
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${CLASSES_COL}`);
+    const snapshot = await getDocs(q);
     const list: DirectorClass[] = [];
     snapshot.forEach((d) => list.push(d.data() as DirectorClass));
     return list;
@@ -3175,14 +2980,8 @@ export async function fetchClassesFromFirestore(limitCount: number = PAGINATION_
   }
 }
 
-export function subscribeToClasses(
-  onUpdate: (list: DirectorClass[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToClasses(onUpdate: (list: DirectorClass[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, CLASSES_COL),
@@ -3198,12 +2997,10 @@ export function subscribeToClasses(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, CLASSES_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, CLASSES_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -3215,13 +3012,10 @@ export async function saveChatMessageToFirestore(message: ChatMessage): Promise<
     if (!docId) return;
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, CHAT_MESSAGES_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...message, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${CHAT_MESSAGES_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...message, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, CHAT_MESSAGES_COL);
@@ -3232,10 +3026,7 @@ export function subscribeToChatMessages(
   onUpdate: (list: ChatMessage[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, CHAT_MESSAGES_COL),
@@ -3255,7 +3046,7 @@ export function subscribeToChatMessages(
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, CHAT_MESSAGES_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -3273,13 +3064,10 @@ export async function saveGuiaFeriasToFirestore(record: Record<string, any>): Pr
     removeEntityTombstone(GUIAS_FERIAS_COL, docId);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, GUIAS_FERIAS_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${GUIAS_FERIAS_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, GUIAS_FERIAS_COL);
@@ -3307,7 +3095,7 @@ export async function fetchGuiasFeriasFromFirestore(limitCount: number = PAGINAT
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${GUIAS_FERIAS_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -3321,10 +3109,7 @@ export function subscribeToGuiasFerias(
   onUpdate: (records: any[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, GUIAS_FERIAS_COL),
@@ -3344,7 +3129,7 @@ export function subscribeToGuiasFerias(
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, GUIAS_FERIAS_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -3358,13 +3143,10 @@ export async function saveGuiaColocacaoToFirestore(record: Record<string, any>):
     removeEntityTombstone(GUIAS_COLOCACAO_COL, docId);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, GUIAS_COLOCACAO_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${GUIAS_COLOCACAO_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, GUIAS_COLOCACAO_COL);
@@ -3392,7 +3174,7 @@ export async function fetchGuiasColocacaoFromFirestore(limitCount: number = PAGI
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${GUIAS_COLOCACAO_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -3406,10 +3188,7 @@ export function subscribeToGuiasColocacao(
   onUpdate: (records: any[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, GUIAS_COLOCACAO_COL),
@@ -3429,7 +3208,7 @@ export function subscribeToGuiasColocacao(
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, GUIAS_COLOCACAO_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -3443,13 +3222,10 @@ export async function saveFichaAvaliacaoToFirestore(record: Record<string, any>)
     removeEntityTombstone(FICHAS_AVALIACAO_COL, docId);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, FICHAS_AVALIACAO_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${FICHAS_AVALIACAO_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, FICHAS_AVALIACAO_COL);
@@ -3477,7 +3253,7 @@ export async function fetchFichasAvaliacaoFromFirestore(limitCount: number = PAG
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${FICHAS_AVALIACAO_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -3491,10 +3267,7 @@ export function subscribeToFichasAvaliacao(
   onUpdate: (records: any[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, FICHAS_AVALIACAO_COL),
@@ -3514,7 +3287,7 @@ export function subscribeToFichasAvaliacao(
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, FICHAS_AVALIACAO_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -3528,13 +3301,10 @@ export async function saveCadastroDocenteToFirestore(record: Record<string, any>
     removeEntityTombstone(CADASTRO_DOCENTE_COL, docId);
     const { nowTs, nowIso } = resolveNowTimestamp();
     const ref = doc(db, CADASTRO_DOCENTE_COL, docId);
-    await withFirestoreWriteTimeout(
-      setDoc(
-        ref,
-        cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
-        { merge: true }
-      ),
-      `${CADASTRO_DOCENTE_COL}/${docId}`
+    await setDoc(
+      ref,
+      cleanObject({ ...record, id: record.id || docId, _updatedAt: nowTs, updatedAt: nowIso }),
+      { merge: true }
     );
   } catch (error) {
     logFirestorePermissionOrQuotaError(error, OperationType.WRITE, CADASTRO_DOCENTE_COL);
@@ -3562,7 +3332,7 @@ export async function fetchCadastroDocenteFromFirestore(limitCount: number = PAG
       orderBy('updatedAt', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${CADASTRO_DOCENTE_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -3576,10 +3346,7 @@ export function subscribeToCadastroDocente(
   onUpdate: (records: any[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, CADASTRO_DOCENTE_COL),
@@ -3599,7 +3366,7 @@ export function subscribeToCadastroDocente(
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, CADASTRO_DOCENTE_COL);
+    markFirestoreQuotaIfExhausted(err, 'read');
     onError?.(err);
     return () => {};
   }
@@ -3614,7 +3381,7 @@ export async function fetchAuditLogsFromFirestore(limitCount: number = PAGINATIO
       orderBy('timestamp', 'desc'),
       limit(safeLimit)
     );
-    const snapshot = await withFirestoreTimeout(getDocs(q), `list:${AUDIT_LOGS_COL}`);
+    const snapshot = await getDocs(q);
     const list: any[] = [];
     snapshot.forEach((d) => list.push(d.data()));
     return list;
@@ -3624,14 +3391,8 @@ export async function fetchAuditLogsFromFirestore(limitCount: number = PAGINATIO
   }
 }
 
-export function subscribeToAuditLogs(
-  onUpdate: (logs: any[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToAuditLogs(onUpdate: (logs: any[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, AUDIT_LOGS_COL),
@@ -3647,24 +3408,16 @@ export function subscribeToAuditLogs(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, AUDIT_LOGS_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, AUDIT_LOGS_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
 
-export function subscribeToTombstones(
-  onUpdate: (keys: string[]) => void,
-  onError?: (err: unknown) => void
-): Unsubscribe {
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+export function subscribeToTombstones(onUpdate: (keys: string[]) => void): Unsubscribe {
+  if (isFirestoreReadQuotaExhausted()) return () => {};
   try {
     const q = query(
       collection(db, TOMBSTONES_COL),
@@ -3687,12 +3440,10 @@ export function subscribeToTombstones(
       },
       (err) => {
         logFirestorePermissionOrQuotaError(err, OperationType.LIST, TOMBSTONES_COL);
-        onError?.(err);
       }
     );
   } catch (err) {
-    logFirestorePermissionOrQuotaError(err, OperationType.LIST, TOMBSTONES_COL);
-    onError?.(err);
+    markFirestoreQuotaIfExhausted(err, 'read');
     return () => {};
   }
 }
@@ -3813,8 +3564,8 @@ export function resetRealtimeSyncScopeCache(): void {
     try {
       globalRealtimeUnsubscribe();
     } catch {}
-    globalRealtimeUnsubscribe = null;
   }
+  globalRealtimeUnsubscribe = null;
   activeRealtimeScopeKey = null;
 }
 
@@ -3823,10 +3574,7 @@ export function initViewScopedRealtimeSync(
   onError?: (err: unknown) => void
 ): () => void {
   if (typeof window === 'undefined') return () => {};
-  if (isFirestoreReadQuotaExhausted()) {
-    onError?.(new Error('Firestore read quota exhausted'));
-    return () => {};
-  }
+  if (isFirestoreReadQuotaExhausted()) return () => {};
 
   const scopeKey = `${scope?.view || 'default'}::${scope?.role || 'default'}::${scope?.schoolId || 'all'}`;
   if (globalRealtimeUnsubscribe && activeRealtimeScopeKey === scopeKey) {
@@ -3847,42 +3595,32 @@ export function initViewScopedRealtimeSync(
 
   // 0. DASHBOARD AGGREGATOR LISTENER (Single doc: stats/dashboard)
   unsubs.push(
-    subscribeToDashboardStats(
-      (stats) => {
-        try {
-          window.dispatchEvent(new CustomEvent('sigre-dashboard-stats-updated', { detail: { stats } }));
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao despachar atualização de estatísticas:', err);
-        }
-      },
-      onError
-    )
+    subscribeToDashboardStats((stats) => {
+      try {
+        window.dispatchEvent(new CustomEvent('sigre-dashboard-stats-updated', { detail: { stats } }));
+      } catch {}
+    })
   );
 
   // 0B. REAL-TIME TOMBSTONES MERGE (Bounded limit 30)
   if (enabledCols.has('tombstones')) {
     unsubs.push(
-      subscribeToTombstones(
-        (cloudTombstoneKeys) => {
-          try {
-            if (!Array.isArray(cloudTombstoneKeys)) return;
-            const existingLocal = getEntityTombstones();
-            const normalizedUnion = Array.from(
-              new Set(
-                [...existingLocal, ...cloudTombstoneKeys]
-                  .filter((k) => typeof k === 'string' && k.trim() !== '' && !k.toLowerCase().includes('socienciadaeduca2018'))
-                  .map((k) => k.trim().toLowerCase())
-              )
-            );
-            if (safeWriteJsonIfChanged(DELETED_ENTITIES_KEY, normalizedUnion)) {
-              window.dispatchEvent(new CustomEvent('sigre-data-synced'));
-            }
-          } catch (err) {
-            console.error('[UnifiedSync] Erro ao processar tombstones:', err);
+      subscribeToTombstones((cloudTombstoneKeys) => {
+        try {
+          if (!Array.isArray(cloudTombstoneKeys)) return;
+          const existingLocal = getEntityTombstones();
+          const normalizedUnion = Array.from(
+            new Set(
+              [...existingLocal, ...cloudTombstoneKeys]
+                .filter((k) => typeof k === 'string' && k.trim() !== '' && !k.toLowerCase().includes('socienciadaeduca2018'))
+                .map((k) => k.trim().toLowerCase())
+            )
+          );
+          if (safeWriteJsonIfChanged(DELETED_ENTITIES_KEY, normalizedUnion)) {
+            window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        },
-        onError
-      )
+        } catch {}
+      })
     );
   }
 
@@ -3983,9 +3721,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar escolas:', e);
+          console.warn('[UnifiedSync] Erro ao unificar escolas:', e);
         }
-      }, SCHOOLS_LIST_LIMIT, onError)
+      }, SCHOOLS_LIST_LIMIT)
     );
   }
 
@@ -4141,11 +3879,10 @@ export function initViewScopedRealtimeSync(
               window.dispatchEvent(new CustomEvent('sigre-data-synced'));
             }
           } catch (e) {
-            console.error('[UnifiedSync] Erro ao unificar professores:', e);
+            console.warn('[UnifiedSync] Erro ao unificar professores:', e);
           }
         },
-        scopedSchoolId ? { schoolId: scopedSchoolId } : undefined,
-        onError
+        scopedSchoolId ? { schoolId: scopedSchoolId } : undefined
       )
     );
   }
@@ -4337,11 +4074,10 @@ export function initViewScopedRealtimeSync(
               window.dispatchEvent(new CustomEvent('sigre-data-synced'));
             }
           } catch (e) {
-            console.error('[UnifiedSync] Erro ao unificar alunos:', e);
+            console.warn('[UnifiedSync] Erro ao unificar alunos:', e);
           }
         },
-        scopedSchoolId ? { schoolId: scopedSchoolId } : undefined,
-        onError
+        scopedSchoolId ? { schoolId: scopedSchoolId } : undefined
       )
     );
   }
@@ -4401,9 +4137,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar diretores:', e);
+          console.warn('[UnifiedSync] Erro ao unificar diretores:', e);
         }
-      }, onError)
+      })
     );
   }
 
@@ -4429,9 +4165,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar equipa DME:', e);
+          console.warn('[UnifiedSync] Erro ao unificar equipa DME:', e);
         }
-      }, onError)
+      })
     );
   }
 
@@ -4462,9 +4198,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar efectividade:', e);
+          console.warn('[UnifiedSync] Erro ao unificar efectividade:', e);
         }
-      }, onError)
+      })
     );
   }
 
@@ -4495,9 +4231,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar Declaração de Serviço:', e);
+          console.warn('[UnifiedSync] Erro ao unificar Declaração de Serviço:', e);
         }
-      }, onError)
+      })
     );
   }
 
@@ -4526,9 +4262,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar outros funcionários:', e);
+          console.warn('[UnifiedSync] Erro ao unificar outros funcionários:', e);
         }
-      }, onError)
+      })
     );
   }
 
@@ -4555,9 +4291,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar mini-pautas:', e);
+          console.warn('[UnifiedSync] Erro ao unificar mini-pautas:', e);
         }
-      }, onError)
+      })
     );
   }
 
@@ -4595,9 +4331,9 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
         } catch (e) {
-          console.error('[UnifiedSync] Erro ao unificar presenças:', e);
+          console.warn('[UnifiedSync] Erro ao unificar presenças:', e);
         }
-      }, onError)
+      })
     );
   }
 
@@ -4619,10 +4355,8 @@ export function initViewScopedRealtimeSync(
           if (safeWriteJsonIfChanged('ucore_school_announcements_v1', Array.from(map.values()))) {
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar comunicados:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4643,10 +4377,8 @@ export function initViewScopedRealtimeSync(
           if (safeWriteJsonIfChanged('ucore_director_rooms', Array.from(map.values()))) {
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar salas:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4667,10 +4399,8 @@ export function initViewScopedRealtimeSync(
           if (safeWriteJsonIfChanged('ucore_director_classes', Array.from(map.values()))) {
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar turmas:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4693,10 +4423,8 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-guia-ferias-updated'));
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar guias de férias:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4718,10 +4446,8 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-guia-colocacao-updated'));
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar guias de colocação:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4743,10 +4469,8 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-ficha-avaliacao-updated'));
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar fichas de avaliação:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4769,10 +4493,8 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-cadastro-docente-updated', { detail: { records: merged } }));
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar cadastro docente:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4837,10 +4559,8 @@ export function initViewScopedRealtimeSync(
             window.dispatchEvent(new CustomEvent('sigre-users-updated'));
             window.dispatchEvent(new CustomEvent('sigre-data-synced'));
           }
-        } catch (err) {
-          console.error('[UnifiedSync] Erro ao unificar utilizadores pendentes:', err);
-        }
-      }, onError)
+        } catch {}
+      })
     );
   }
 
@@ -4858,8 +4578,8 @@ export function initViewScopedRealtimeSync(
   return globalRealtimeUnsubscribe;
 }
 
-export function initUnifiedRealtimeDatabaseSync(onError?: (err: unknown) => void): () => void {
-  return initViewScopedRealtimeSync(undefined, onError);
+export function initUnifiedRealtimeDatabaseSync(): () => void {
+  return initViewScopedRealtimeSync();
 }
 
 /**

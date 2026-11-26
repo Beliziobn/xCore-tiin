@@ -34,6 +34,7 @@ import {
   initViewScopedRealtimeSync,
   fetchDashboardStats,
   subscribeToDashboardStats,
+  fetchSchoolsFromFirestore,
   type DashboardStats,
   isFirestoreReadQuotaExhausted,
   isFirestoreWriteQuotaExhausted,
@@ -57,48 +58,50 @@ import { initSmoothScroll, scrollToTop, refreshScrollReveals } from './utils/scr
 import type { SchoolMember } from './components/ui/school-team-section';
 import { AIInputWithLoading } from './components/ui/ai-input-with-loading';
 import { canUserAccessView, getOwnProfileViewForUser } from './utils/authGuard';
+import { GlobalErrorBoundary } from './components/common/GlobalErrorBoundary';
 import { Sparkles, X } from 'lucide-react';
 
-// Lazy-loaded landing, auth, and shared UI sections
-const AuthPage = lazy(() => import('./components/pages/AuthPage').then((m) => ({ default: m.AuthPage })));
-const PublicLandingPage = lazy(() => import('./components/pages/PublicLandingPage').then((m) => ({ default: m.PublicLandingPage })));
-const PendingApprovalPage = lazy(() => import('./components/pages/PendingApprovalPage').then((m) => ({ default: m.PendingApprovalPage })));
-const AccessDeniedGuard = lazy(() => import('./components/common/AccessDeniedGuard').then((m) => ({ default: m.AccessDeniedGuard })));
-const CyanCardsSection = lazy(() => import('./components/CyanCardsSection').then((m) => ({ default: m.CyanCardsSection })));
-const CloudFooter = lazy(() => import('./components/CloudFooter').then((m) => ({ default: m.CloudFooter })));
-const SchoolTeamSection = lazy(() => import('./components/ui/school-team-section'));
-const CookieConsentBanner = lazy(() => import('./components/cookies/CookieConsentBanner').then((m) => ({ default: m.CookieConsentBanner })));
-const FloatingChatButton = lazy(() => import('./components/chat/FloatingChatButton').then((m) => ({ default: m.FloatingChatButton })));
+// Core entry & shell components imported statically for instant initial render and unified React pre-bundling
+import { AuthPage } from './components/pages/AuthPage';
+import { PublicLandingPage } from './components/pages/PublicLandingPage';
+import { PendingApprovalPage } from './components/pages/PendingApprovalPage';
+import { AccessDeniedGuard } from './components/common/AccessDeniedGuard';
+import { CyanCardsSection } from './components/CyanCardsSection';
+import { CloudFooter } from './components/CloudFooter';
+import SchoolTeamSection from './components/ui/school-team-section';
+import { CookieConsentBanner } from './components/cookies/CookieConsentBanner';
+import { FloatingChatButton } from './components/chat/FloatingChatButton';
 
-// Lazy-loaded Director Pages
-const DirectorStatisticsPage = lazy(() => import('./components/pages/director/DirectorStatisticsPage').then((m) => ({ default: m.DirectorStatisticsPage })));
-const DirectorTeachersPage = lazy(() => import('./components/pages/director/DirectorTeachersPage').then((m) => ({ default: m.DirectorTeachersPage })));
-const DirectorStudentsPage = lazy(() => import('./components/pages/director/DirectorStudentsPage').then((m) => ({ default: m.DirectorStudentsPage })));
-const DirectorRoomsPage = lazy(() => import('./components/pages/director/DirectorRoomsPage').then((m) => ({ default: m.DirectorRoomsPage })));
-const DirectorClassesPage = lazy(() => import('./components/pages/director/DirectorClassesPage').then((m) => ({ default: m.DirectorClassesPage })));
-const DirectorProfilePage = lazy(() => import('./components/pages/director/DirectorProfilePage').then((m) => ({ default: m.DirectorProfilePage })));
-const DirectorAttendancePage = lazy(() => import('./components/pages/director/DirectorAttendancePage').then((m) => ({ default: m.DirectorAttendancePage })));
-const DirectorApprovalsPage = lazy(() => import('./components/pages/director/DirectorApprovalsPage').then((m) => ({ default: m.DirectorApprovalsPage })));
-const DirectorPautasPage = lazy(() => import('./components/pages/director/DirectorPautasPage').then((m) => ({ default: m.DirectorPautasPage })));
+// Main Navigation Pages imported statically for 0ms instant navigation without loading spinners
+import { DirectorStatisticsPage } from './components/pages/director/DirectorStatisticsPage';
+import { DirectorTeachersPage } from './components/pages/director/DirectorTeachersPage';
+import { DirectorStudentsPage } from './components/pages/director/DirectorStudentsPage';
+import { DirectorRoomsPage } from './components/pages/director/DirectorRoomsPage';
+import { DirectorClassesPage } from './components/pages/director/DirectorClassesPage';
+import { DirectorProfilePage } from './components/pages/director/DirectorProfilePage';
+import { DirectorAttendancePage } from './components/pages/director/DirectorAttendancePage';
+import { DirectorApprovalsPage } from './components/pages/director/DirectorApprovalsPage';
+import { DirectorPautasPage } from './components/pages/director/DirectorPautasPage';
 
-// Lazy-loaded Admin Pages
-const AdminStatisticsPage = lazy(() => import('./components/pages/admin/AdminStatisticsPage').then((m) => ({ default: m.AdminStatisticsPage })));
-const AdminSchoolsPage = lazy(() => import('./components/pages/admin/AdminSchoolsPage').then((m) => ({ default: m.AdminSchoolsPage })));
-const AdminTeachersPage = lazy(() => import('./components/pages/admin/AdminTeachersPage').then((m) => ({ default: m.AdminTeachersPage })));
-const AdminStudentsPage = lazy(() => import('./components/pages/admin/AdminStudentsPage').then((m) => ({ default: m.AdminStudentsPage })));
-const AdminDirectorsPage = lazy(() => import('./components/pages/admin/AdminDirectorsPage').then((m) => ({ default: m.AdminDirectorsPage })));
-const AdminProfilePage = lazy(() => import('./components/pages/admin/AdminProfilePage').then((m) => ({ default: m.AdminProfilePage })));
-const AdminAnnouncementsPage = lazy(() => import('./components/pages/admin/AdminAnnouncementsPage').then((m) => ({ default: m.AdminAnnouncementsPage })));
-const AdminApprovalsPage = lazy(() => import('./components/pages/admin/AdminApprovalsPage').then((m) => ({ default: m.AdminApprovalsPage })));
+import { AdminStatisticsPage } from './components/pages/admin/AdminStatisticsPage';
+import { AdminSchoolsPage } from './components/pages/admin/AdminSchoolsPage';
+import { AdminTeachersPage } from './components/pages/admin/AdminTeachersPage';
+import { AdminStudentsPage } from './components/pages/admin/AdminStudentsPage';
+import { AdminDirectorsPage } from './components/pages/admin/AdminDirectorsPage';
+import { AdminProfilePage } from './components/pages/admin/AdminProfilePage';
+import { AdminAnnouncementsPage } from './components/pages/admin/AdminAnnouncementsPage';
+import { AdminApprovalsPage } from './components/pages/admin/AdminApprovalsPage';
 
-// Lazy-loaded Teacher & Student Pages
-const TeacherStatisticsPage = lazy(() => import('./components/pages/TeacherStatisticsPage').then((m) => ({ default: m.TeacherStatisticsPage })));
-const TeacherClassPage = lazy(() => import('./components/pages/TeacherClassPage').then((m) => ({ default: m.TeacherClassPage })));
-const TeacherProfilePage = lazy(() => import('./components/pages/TeacherProfilePage').then((m) => ({ default: m.TeacherProfilePage })));
-const TeacherAttendancePage = lazy(() => import('./components/pages/TeacherAttendancePage').then((m) => ({ default: m.TeacherAttendancePage })));
-const StudentProfilePage = lazy(() => import('./components/pages/StudentProfilePage').then((m) => ({ default: m.StudentProfilePage })));
+import { TeacherStatisticsPage } from './components/pages/TeacherStatisticsPage';
+import { TeacherClassPage } from './components/pages/TeacherClassPage';
+import { TeacherProfilePage } from './components/pages/TeacherProfilePage';
+import { TeacherAttendancePage } from './components/pages/TeacherAttendancePage';
+import { StudentProfilePage } from './components/pages/StudentProfilePage';
 
-// Lazy-loaded Institutional, Legal, Meetings & Services Pages
+import { DeclaracaoEfectividadePage } from './components/pages/DeclaracaoEfectividadePage';
+import { QuickServicesPage } from './components/pages/QuickServicesPage';
+
+// Secondary Institutional & Legal Pages
 const AboutPlatformPage = lazy(() => import('./components/pages/legal/AboutPlatformPage').then((m) => ({ default: m.AboutPlatformPage })));
 const TermsOfUsePage = lazy(() => import('./components/pages/legal/TermsOfUsePage').then((m) => ({ default: m.TermsOfUsePage })));
 const PrivacyPolicyPage = lazy(() => import('./components/pages/legal/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
@@ -107,10 +110,8 @@ const MeetingsHubPage = lazy(() => import('./components/pages/MeetingsHubPage').
 const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const ThankYouPage = lazy(() => import('./components/pages/ThankYouPage').then((m) => ({ default: m.ThankYouPage })));
 const CasesPage = lazy(() => import('./components/pages/CasesPage').then((m) => ({ default: m.CasesPage })));
-const DeclaracaoEfectividadePage = lazy(() => import('./components/pages/DeclaracaoEfectividadePage').then((m) => ({ default: m.DeclaracaoEfectividadePage })));
-const QuickServicesPage = lazy(() => import('./components/pages/QuickServicesPage').then((m) => ({ default: m.QuickServicesPage })));
 
-// Lazy-loaded Heavy Modals (downloaded & mounted strictly on demand)
+// Lazy-loaded Heavy Modals (mounted strictly on demand with zero visual spinner fallback)
 const StatDetailModal = lazy(() => import('./components/StatDetailModal').then((m) => ({ default: m.StatDetailModal })));
 const ModuleDetailModal = lazy(() => import('./components/ModuleDetailModal').then((m) => ({ default: m.ModuleDetailModal })));
 const InfoModal = lazy(() => import('./components/InfoModal').then((m) => ({ default: m.InfoModal })));
@@ -125,12 +126,7 @@ const ZoomMeetingModal = lazy(() => import('./components/meetings/ZoomMeetingMod
 const RagIntelligenceModal = lazy(() => import('./components/rag/RagIntelligenceModal').then((m) => ({ default: m.RagIntelligenceModal })));
 const BackupManagerModal = lazy(() => import('./components/modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
 
-const RouteFallback: React.FC = () => (
-  <div className="w-full min-h-[55vh] flex flex-col items-center justify-center gap-3 px-4 py-16">
-    <div className="w-8 h-8 rounded-full border-[2.5px] border-slate-200 border-t-[#f75142] animate-spin" />
-    <span className="text-xs font-semibold text-slate-500 tracking-wide">A carregar módulo...</span>
-  </div>
-);
+const RouteFallback: React.FC = () => null;
 
 import type { 
   EducationalModule, 
@@ -472,6 +468,26 @@ export default function App() {
         console.error('[App] Erro ao sincronizar escolas na inicialização:', err);
         isInitialSyncCompleteRef.current = true;
       });
+
+    // Non-blocking background Firestore schools hydration for static CDN / custom domain deployments
+    fetchSchoolsFromFirestore()
+      .then((cloudSchools) => {
+        if (Array.isArray(cloudSchools) && cloudSchools.length > 0) {
+          setAdminSchools((prev) => {
+            const merged = deduplicateSchoolsCanonical([...prev, ...cloudSchools]);
+            if (merged.length > 0) {
+              try {
+                const nextJson = JSON.stringify(merged);
+                lastRawSyncRef.current.schools = nextJson;
+                localStorage.setItem('ucore_admin_schools', nextJson);
+              } catch {}
+              return merged;
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(() => {});
 
     window.addEventListener('sigre-data-synced', handleSync);
     window.addEventListener('ucore-teachers-updated', handleSync);
@@ -3262,9 +3278,16 @@ export default function App() {
         }
         className="w-full flex-1 flex flex-col focus:outline-none animate-in fade-in duration-100"
       >
-        <Suspense fallback={<RouteFallback />}>
-          {renderCurrentView()}
-        </Suspense>
+        <GlobalErrorBoundary
+          onResetToHome={() => {
+            setCurrentPage('home');
+            setCurrentView('home');
+          }}
+        >
+          <Suspense fallback={<RouteFallback />}>
+            {renderCurrentView()}
+          </Suspense>
+        </GlobalErrorBoundary>
       </div>
 
       {/* Organic Cloud Wave Footer (only visible when session is started) */}

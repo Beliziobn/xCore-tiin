@@ -13,20 +13,20 @@
       ]
     },
     {
-      "source": "/(.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2|woff|ttf|otf|js|css))",
+      "source": "/(.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2|woff|ttf|otf))",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=31536000, s-maxage=31536000, immutable"
+          "value": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400"
         }
       ]
     },
     {
-      "source": "/(robots\\.txt|sitemap\\.xml)",
+      "source": "/(robots\\.txt|sitemap\\.xml|sige_schema\\.json)",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=86400, s-maxage=86400"
+          "value": "public, max-age=3600, s-maxage=3600"
         }
       ]
     },
@@ -35,7 +35,27 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
         }
       ]
     },
@@ -44,15 +64,40 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
         }
       ]
     }
   ],
   "rewrites": [
     {
-      "source": "/((?!api/|assets/|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2|woff|ttf|otf|js|css|json)$).*)",
+      "source": "/((?!api/|assets/|favicon\\.ico|favicon\\.png|robots\\.txt|sitemap\\.xml|sige_schema\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2|woff|ttf|otf|js|css|json)$).*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
 }
+

@@ -667,9 +667,6 @@ export const AdminApprovalsPage: React.FC<AdminApprovalsPageProps> = ({
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                   Homologação Municipal de Quadros & Efectividade
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                  Central única de homologações da conta oficial <strong className="text-slate-800">{OFFICIAL_DME_ADMIN_EMAIL}</strong> — todas as inscrições de Diretores Gerais, Subdiretores, Professores, Secretários, Funcionários e Membros DME são encaminhadas para este painel.
-                </p>
               </div>
 
               {/* Quick Actions in Header */}
