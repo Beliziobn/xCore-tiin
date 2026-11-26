@@ -9,6 +9,7 @@ import type { SystemDataset } from './excelExport';
 import { initialAdminSchools } from '../data/adminData';
 import { getStoredTeachers, getSchoolTeacherQuotaStatus } from './teacherStorage';
 import { getStoredStudents, getSchoolStudentQuotaStatus } from './studentStorage';
+import { doesStudentBelongToSchool } from './schoolMatcher';
 import { SIGE_IDADES_COLUNAS, type SigeAggregatedReport, type GenderCount } from './sigeAggregation';
 
 function norm(str?: string): string {
@@ -204,6 +205,7 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
         presenceRate: ds.attendanceRate ?? 96,
         performanceScore: ds.averageGrade ?? 15,
         schoolName: dsSchool,
+        schoolId: ds.schoolId,
         hasDocuments: ds.possuiDocumento ?? true,
         documentType: ds.documentType || 'Cédula Pessoal',
         attendanceRate: ds.attendanceRate ?? 96,
@@ -375,16 +377,20 @@ export function aggregateSigeDatasetWithSchoolAttribution(dataset: SystemDataset
       );
     }
 
-    // Identificar alunos cadastrados para esta escola (por ID da escola, nome oficial ou código SIGE)
+    // Identificar alunos cadastrados estritamente para esta escola canónica
     const realStudentsForSchool = unifiedStudents.filter(st => {
-      const d = st.registrationData || detailedStudentMap.get(st.id) || detailedStudentMap.get(norm(st.name));
-      const matchSchoolId = Boolean(d?.schoolId && d.schoolId === sc.id);
-      const stSchool = d?.escola || d?.nomeEscola || st.schoolName || '';
-      const matchName = norm(stSchool) === norm(schoolName) || norm(st.schoolName) === norm(schoolName);
-      const matchCode =
-        st.schoolName === sc.id ||
-        Boolean(sc.codigoSIGE && (norm(stSchool) === norm(sc.codigoSIGE) || norm(st.schoolName) === norm(sc.codigoSIGE)));
-      return matchSchoolId || matchName || matchCode;
+      const d = st.registrationData || detailedStudentMap.get(st.id);
+      return doesStudentBelongToSchool(
+        {
+          schoolId: d?.schoolId || st.schoolId,
+          escola: d?.escola,
+          nomeEscola: d?.nomeEscola,
+          schoolName: st.schoolName,
+          registrationData: d,
+        },
+        sc,
+        schools
+      );
     });
 
     // Garantir que todas as categorias/modalidades (A-O) e classes dos alunos cadastrados nesta escola existam em schoolClasses

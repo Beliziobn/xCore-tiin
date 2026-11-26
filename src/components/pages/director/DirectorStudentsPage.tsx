@@ -38,6 +38,10 @@ import {
   getActiveDirectorSchool,
   setActiveDirectorSchoolId,
 } from '../../../utils/studentStorage';
+import {
+  resolveCanonicalSchool,
+  doesStudentBelongToSchool,
+} from '../../../utils/schoolMatcher';
 
 interface DirectorStudentsPageProps {
   onOpenGetStarted: () => void;
@@ -120,36 +124,49 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   }, [currentUser]);
 
   const [selectedDirectorSchoolId, setSelectedDirectorSchoolId] = useState<string>(() => {
-    const initial = getActiveDirectorSchool(propSchools, currentUser?.schoolName, currentUser?.schoolId);
+    const initial = getActiveDirectorSchool(
+      propSchools,
+      currentUser?.schoolName,
+      currentUser?.schoolId,
+      Boolean(currentUser && currentUser.role !== 'admin' && (currentUser.schoolId || currentUser.schoolName))
+    );
     return initial?.id || '';
   });
 
+  // Sync selectedDirectorSchoolId if Admin switched here via "Painel →" or when availableSchools first populates
+  useEffect(() => {
+    if (isSchoolBoundUser) return;
+    const savedOrActive = getActiveDirectorSchool(
+      availableSchools,
+      currentUser?.schoolName,
+      currentUser?.schoolId,
+      false
+    );
+    if (savedOrActive && savedOrActive.id !== selectedDirectorSchoolId) {
+      setSelectedDirectorSchoolId(savedOrActive.id);
+    }
+  }, [availableSchools, isSchoolBoundUser]);
+
   const activeDirectorSchool = useMemo(() => {
     if (isSchoolBoundUser) {
-      const norm = (str?: string) =>
-        (str || '')
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, ' ');
-      const targetId = String(currentUser?.schoolId || '').trim().toLowerCase();
-      const targetName = norm(currentUser?.schoolName);
-      if (targetId) {
-        const byId = availableSchools.find((s) => String(s.id || '').trim().toLowerCase() === targetId);
-        if (byId) return byId;
-      }
-      if (targetName && !targetName.includes('modelo central')) {
-        const byName = availableSchools.find((s) => norm(s.name) === targetName);
-        if (byName) return byName;
-      }
-      return undefined;
+      return resolveCanonicalSchool(availableSchools, {
+        schoolId: currentUser?.schoolId,
+        schoolName: currentUser?.schoolName,
+      });
     }
     if (selectedDirectorSchoolId) {
-      const found = availableSchools.find((s) => s.id === selectedDirectorSchoolId);
+      const found = resolveCanonicalSchool(availableSchools, {
+        schoolId: selectedDirectorSchoolId,
+        schoolName: selectedDirectorSchoolId,
+      });
       if (found) return found;
     }
-    return getActiveDirectorSchool(availableSchools, currentUser?.schoolName, currentUser?.schoolId);
+    return getActiveDirectorSchool(
+      availableSchools,
+      currentUser?.schoolName,
+      currentUser?.schoolId,
+      isSchoolBoundUser
+    );
   }, [availableSchools, selectedDirectorSchoolId, isSchoolBoundUser, currentUser?.schoolName, currentUser?.schoolId]);
 
   const directorSchoolQuota = useMemo(() => {
@@ -225,9 +242,20 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
   // Check demand status for matriculas
   const demandStatus = useMemo(() => getDemandStatus('matriculas'), []);
 
-  // Filtered list
+  // Filtered list scoped to activeDirectorSchool when students have explicit school registration data
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
+      if (activeDirectorSchool) {
+        const reg =
+          s.registrationData ||
+          detailedStudents.find((d) => d.id === s.id);
+        if (reg && (reg.escola || reg.schoolId)) {
+          if (!doesStudentBelongToSchool(reg, activeDirectorSchool, availableSchools)) {
+            return false;
+          }
+        }
+      }
+
       const matchesSearch =
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.gradeClass.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -242,15 +270,36 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
 
       return matchesSearch && matchesDoc;
     });
-  }, [students, searchQuery, docFilter]);
+  }, [students, searchQuery, docFilter, activeDirectorSchool, detailedStudents, availableSchools]);
 
   const currentStudent =
-    students.find((s) => s.id === selectedStudentId) || filteredStudents[0] || students[0];
+    filteredStudents.find((s) => s.id === selectedStudentId) || filteredStudents[0] || students[0];
 
   const handleCreateSuccess = (newStudent: any) => {
     const hasDocs = newStudent.tipoDocumento 
       ? newStudent.tipoDocumento !== 'sem Documento' 
       : (newStudent.hasDocuments ?? true);
+
+    const resolvedTargetSchool = resolveCanonicalSchool(availableSchools, {
+      schoolId: newStudent.schoolId || activeDirectorSchool?.id,
+      schoolName: newStudent.escola || activeDirectorSchool?.name || directorSchoolQuota.schoolName,
+    }) || activeDirectorSchool;
+
+    const finalSchoolName =
+      resolvedTargetSchool?.name ||
+      newStudent.escola ||
+      activeDirectorSchool?.name ||
+      directorSchoolQuota.schoolName ||
+      '';
+    const finalSchoolId =
+      resolvedTargetSchool?.id ||
+      newStudent.schoolId ||
+      activeDirectorSchool?.id;
+
+    if (!isSchoolBoundUser && finalSchoolId && finalSchoolId !== selectedDirectorSchoolId) {
+      setSelectedDirectorSchoolId(finalSchoolId);
+      setActiveDirectorSchoolId(finalSchoolId);
+    }
 
     const formatted: DirectorStudent = {
       id: newStudent.id || `std-${Date.now()}`,
@@ -260,7 +309,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
       turma: newStudent.turma || 'Turma A',
       teacherName: 'Prof. Santar Goes',
       guardianName: newStudent.encarregado || newStudent.guardianName || 'Encarregado Institucional',
-      location: newStudent.endereco || 'Zona Escolar Central',
+      location: newStudent.endereco || finalSchoolName || 'Zona Escolar Central',
       hasDocuments: hasDocs,
       documentType: newStudent.tipoDocumento || (hasDocs ? 'BI' : 'sem Documento'),
       numeroDocumento: newStudent.numeroDocumento,
@@ -271,6 +320,11 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
       anexoDocumentoNome: newStudent.anexoDocumentoNome,
       performanceScore: 8.5,
       presenceRate: 97.0,
+      registrationData: {
+        ...newStudent,
+        escola: finalSchoolName,
+        schoolId: finalSchoolId,
+      },
     };
     setStudents((prev) => {
       const exists = prev.some((s) => s.id === formatted.id);
@@ -284,7 +338,7 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
     setTurmaPdfTurma(normalizeTurmaName(formatted.turma) || 'Turma A');
 
     // Ensure full unified persistence across localStorage and Firestore preserving all registration fields
-    saveStudent({
+    const savedReg = saveStudent({
       ...newStudent,
       id: formatted.id,
       name: formatted.name,
@@ -300,8 +354,8 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
       classe: formatted.gradeClass,
       turma: formatted.turma,
       sala: formatted.room,
-      escola: directorSchoolQuota.schoolName || newStudent.escola || '',
-      schoolId: activeDirectorSchool?.id || currentUser?.schoolId || newStudent.schoolId,
+      escola: finalSchoolName,
+      schoolId: finalSchoolId,
       condicaoMatricula: (formatted.condicaoMatricula as any) || 'primeira_vez',
       alunoRepetente: formatted.condicaoMatricula === 'repetente',
       encarregado: formatted.guardianName,
@@ -329,14 +383,10 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
         foto: formatted.foto,
         anexoDocumentoNome: formatted.anexoDocumentoNome,
         performanceScore: formatted.performanceScore,
-        schoolName: directorSchoolQuota.schoolName || newStudent.escola || '',
-        schoolId: activeDirectorSchool?.id || currentUser?.schoolId || newStudent.schoolId,
+        schoolName: savedReg.escola || finalSchoolName,
+        schoolId: savedReg.schoolId || finalSchoolId,
         schoolType: newStudent.naturezaEscola || 'Pública',
-        registrationData: {
-          ...newStudent,
-          escola: directorSchoolQuota.schoolName || newStudent.escola || '',
-          schoolId: activeDirectorSchool?.id || currentUser?.schoolId || newStudent.schoolId,
-        },
+        registrationData: savedReg,
       };
       onAddStudentGlobal(adminFormatted);
     }
@@ -808,10 +858,10 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
         onClose={() => setIsModalOpen(false)}
         entityType="alunos"
         onSuccess={handleCreateSuccess}
-        schoolName={directorSchoolQuota.schoolName}
-        schoolId={activeDirectorSchool?.id || currentUser?.schoolId}
-        schools={activeDirectorSchool ? [activeDirectorSchool] : undefined}
-        lockSchool={true}
+        schoolName={activeDirectorSchool?.name || directorSchoolQuota.schoolName}
+        schoolId={activeDirectorSchool?.id}
+        schools={activeDirectorSchool ? [activeDirectorSchool] : availableSchools}
+        lockSchool={Boolean(activeDirectorSchool)}
       />
 
       {/* Analytical Matrix Modal */}
@@ -887,14 +937,14 @@ export const DirectorStudentsPage: React.FC<DirectorStudentsPageProps> = ({
           setEditingStudent(null);
         }}
         initialData={editingStudent}
-        onSuccess={(updated) => {
+        onSuccess={(_updated) => {
           setIsEditModalOpen(false);
           setEditingStudent(null);
         }}
-        schoolName={directorSchoolQuota.schoolName || ''}
-        schoolId={activeDirectorSchool?.id || currentUser?.schoolId}
-        schools={activeDirectorSchool ? [activeDirectorSchool] : undefined}
-        lockSchool={true}
+        schoolName={editingStudent?.escola || activeDirectorSchool?.name || directorSchoolQuota.schoolName || ''}
+        schoolId={editingStudent?.schoolId || activeDirectorSchool?.id}
+        schools={activeDirectorSchool ? [activeDirectorSchool] : availableSchools}
+        lockSchool={Boolean(activeDirectorSchool)}
       />
 
       {/* Turma Student List PDF Modal (A-Z) */}

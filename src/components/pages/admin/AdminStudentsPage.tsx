@@ -131,7 +131,11 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
   const getRegistrationDataFromAdminStudent = (st: AdminStudent): StudentRegistrationData => {
     if (st.registrationData) return st.registrationData;
-    const matchingDetailed = detailedStudents.find((d) => d.id === st.id || d.name === st.name);
+    const matchingDetailed = detailedStudents.find(
+      (d) =>
+        d.id === st.id ||
+        (d.name === st.name && (!st.schoolName || !d.escola || d.escola === st.schoolName))
+    );
     if (matchingDetailed) return matchingDetailed;
 
     return {
@@ -154,6 +158,7 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
       turno: 'Manhã',
       sala: st.room || 'Sala 03',
       escola: st.schoolName || schools[0]?.name || '',
+      schoolId: st.schoolId,
       condicaoMatricula: st.condicaoMatricula || 'primeira_vez',
       alunoRepetente: st.condicaoMatricula === 'repetente',
       encarregado: st.guardianName || 'Encarregado Institucional',
@@ -166,11 +171,12 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
 
   const consolidatedStudentsForMatrix = useMemo(() => {
     const map = new Map<string, StudentRegistrationData>();
-    detailedStudents.forEach((ds) => map.set(ds.id || ds.name, ds));
+    detailedStudents.forEach((ds) => map.set(ds.id || `${ds.name}::${ds.escola}`, ds));
     students.forEach((st) => {
       const reg = getRegistrationDataFromAdminStudent(st);
-      if (!map.has(st.id) && !map.has(st.name)) {
-        map.set(st.id, reg);
+      const key = st.id || `${st.name}::${st.schoolName}`;
+      if (!map.has(st.id) && !map.has(key)) {
+        map.set(key, reg);
       }
     });
     return Array.from(map.values());
@@ -179,15 +185,16 @@ export const AdminStudentsPage: React.FC<AdminStudentsPageProps> = ({
   // Filtered students list
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
+      const effectiveSchoolName = student.registrationData?.escola || student.schoolName || '';
       const matchesSearch =
         student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.guardianName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.schoolName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        effectiveSchoolName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.gradeClass.toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!matchesSearch) return false;
-      if (schoolFilter !== 'all' && student.schoolName !== schoolFilter) return false;
+      if (schoolFilter !== 'all' && effectiveSchoolName !== schoolFilter && student.schoolName !== schoolFilter) return false;
       if (docFilter === 'with-docs' && !student.hasDocuments) return false;
       if (docFilter === 'without-docs' && student.hasDocuments) return false;
       return true;

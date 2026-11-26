@@ -32,6 +32,7 @@ import {
   getSchoolRegistrationData,
   syncSchoolsFromServer,
 } from '../../utils/schoolStorage';
+import { resolveCanonicalSchool } from '../../utils/schoolMatcher';
 import { BoletimMatriculaModal } from './BoletimMatriculaModal';
 import {
   validateAngolaBI,
@@ -126,7 +127,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
 
   // Strict school scoping: when a specific school is registering a student, ONLY that school is allowed as a predefined option
   const lockedSchoolObj = useMemo<AdminSchool | null>(() => {
-    const targetId = String(schoolId || '').trim().toLowerCase();
+    const targetId = String(schoolId || '').trim();
     const targetNameNorm = normSchoolText(schoolName);
     const hasExplicitTarget = Boolean(
       targetId || (targetNameNorm && !targetNameNorm.includes('modelo central'))
@@ -134,17 +135,15 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     const shouldLock = Boolean(lockSchool && hasExplicitTarget);
     if (!shouldLock) return null;
 
-    const matched = registeredSchools.find((sc) => {
-      const scId = String(sc.id || '').trim().toLowerCase();
-      if (targetId && scId && scId === targetId) return true;
-      if (targetNameNorm && normSchoolText(sc.name) === targetNameNorm) return true;
-      return false;
+    const matched = resolveCanonicalSchool(registeredSchools, {
+      schoolId: targetId,
+      schoolName,
     });
     if (matched) return matched;
 
     const cleanName = schoolName.trim() || 'Unidade Escolar';
     return {
-      id: schoolId?.trim() || `esc-locked-${normSchoolText(cleanName).replace(/[^a-z0-9]+/g, '-')}`,
+      id: targetId || `esc-locked-${normSchoolText(cleanName).replace(/[^a-z0-9]+/g, '-')}`,
       name: cleanName,
       directorName: '',
       teachersCount: 0,
@@ -176,7 +175,8 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
 
   // Exibir Boletim de Matrícula imediatamente após cadastrar
   const [registeredStudentForBoletim, setRegisteredStudentForBoletim] = useState<StudentRegistrationData | null>(null);
-  const prevIsOpenRef = useRef(isOpen);
+  const prevIsOpenRef = useRef(false);
+  const hasInitializedOpenSessionRef = useRef(false);
 
   // 1. Identificação do Aluno
   const [nomeCompleto, setNomeCompleto] = useState(initialData?.nomeCompleto || initialData?.name || '');
@@ -193,12 +193,19 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   const [municipio, setMunicipio] = useState(initialData?.municipio || 'Quéssua');
 
   // 2. Natureza & Modalidade da Escola
-  const initialTargetSchool = lockedSchoolObj || selectableSchools[0];
+  const initialTargetSchool =
+    lockedSchoolObj ||
+    resolveCanonicalSchool(selectableSchools, {
+      schoolId: initialData?.schoolId || schoolId,
+      schoolName: initialData?.escola || schoolName,
+    }) ||
+    selectableSchools[0];
+
   const [nomeEscola, setNomeEscola] = useState(
-    lockedSchoolObj?.name || initialData?.escola || (initialTargetSchool?.name ?? schoolName)
+    lockedSchoolObj?.name || initialData?.escola || initialTargetSchool?.name || schoolName
   );
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | undefined>(
-    lockedSchoolObj?.id || initialData?.schoolId || initialTargetSchool?.id
+    lockedSchoolObj?.id || initialTargetSchool?.id || initialData?.schoolId || schoolId
   );
   const [tipoEscolaModalidade, setTipoEscolaModalidade] = useState<StudentModalidadeKey>(
     initialData?.tipoEscolaModalidade || getSuggestedModalityForSchool(initialTargetSchool)
@@ -209,11 +216,10 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
 
   const selectedSchoolObj = useMemo(() => {
     if (lockedSchoolObj) return lockedSchoolObj;
-    return selectableSchools.find(
-      (sc) =>
-        (selectedSchoolId && sc.id === selectedSchoolId) ||
-        normSchoolText(sc.name) === normSchoolText(nomeEscola)
-    );
+    return resolveCanonicalSchool(selectableSchools, {
+      schoolId: selectedSchoolId,
+      schoolName: nomeEscola,
+    });
   }, [lockedSchoolObj, selectableSchools, selectedSchoolId, nomeEscola]);
 
   const selectedSchoolStudentQuota = useMemo(() => {
@@ -239,6 +245,11 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
   };
 
   useEffect(() => {
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      hasInitializedOpenSessionRef.current = false;
+      return;
+    }
     if (!prevIsOpenRef.current && isOpen) {
       setRegisteredStudentForBoletim(null);
       if (lockedSchoolObj) {
@@ -249,15 +260,17 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
         }
       } else if (!initialData && selectableSchools.length > 0) {
         const matched =
-          selectableSchools.find((s) => normSchoolText(s.name) === normSchoolText(schoolName)) ||
-          selectableSchools[0];
+          resolveCanonicalSchool(selectableSchools, {
+            schoolId,
+            schoolName,
+          }) || selectableSchools[0];
         if (matched) {
           handleSelectSchoolFromSystem(matched);
         }
       }
     }
     prevIsOpenRef.current = isOpen;
-  }, [isOpen, initialData, lockedSchoolObj, selectableSchools, schoolName]);
+  }, [isOpen, initialData, lockedSchoolObj, selectableSchools, schoolName, schoolId]);
 
   // Continuously enforce locked school while modal is open so no draft/state race can switch schools
   useEffect(() => {
@@ -352,8 +365,10 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
     }
   }, [tipoEscolaModalidade, selectedModalityConfig, calculatedAgeData.suggestedFaixa, calculatedAgeData.suggestedClass]);
 
-  // Sync initialData or draft when provided
+  // Sync initialData or draft ONLY once per open session so background school syncs never overwrite user selections
   useEffect(() => {
+    if (!isOpen) return;
+
     if (initialData) {
       setNomeCompleto(initialData.nomeCompleto || initialData.name || '');
       setTipoDocumento(initialData.tipoDocumento || 'BI');
@@ -370,8 +385,18 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       if (lockedSchoolObj) {
         setNomeEscola(lockedSchoolObj.name);
         setSelectedSchoolId(lockedSchoolObj.id);
-      } else if (initialData.escola) {
-        setNomeEscola(initialData.escola);
+      } else {
+        const matchedInitSchool = resolveCanonicalSchool(selectableSchools, {
+          schoolId: initialData.schoolId,
+          schoolName: initialData.escola,
+        });
+        if (matchedInitSchool) {
+          setNomeEscola(matchedInitSchool.name);
+          setSelectedSchoolId(matchedInitSchool.id);
+        } else if (initialData.escola) {
+          setNomeEscola(initialData.escola);
+          setSelectedSchoolId(initialData.schoolId);
+        }
       }
       if (initialData.tipoEscolaModalidade) setTipoEscolaModalidade(initialData.tipoEscolaModalidade);
       if (initialData.naturezaEscola) setNaturezaEscola(initialData.naturezaEscola);
@@ -389,7 +414,9 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       setFoto(initialData.foto);
       setAnexoDocumento(initialData.anexoDocumento);
       setAnexoDocumentoNome(initialData.anexoDocumentoNome);
-    } else {
+      hasInitializedOpenSessionRef.current = true;
+    } else if (!hasInitializedOpenSessionRef.current) {
+      hasInitializedOpenSessionRef.current = true;
       try {
         const rawDraft = localStorage.getItem(STUDENT_DRAFT_STORAGE_KEY);
         if (rawDraft) {
@@ -406,7 +433,20 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
             if (d.endereco !== undefined) setEndereco(d.endereco);
             if (d.provincia) setProvincia(d.provincia);
             if (d.municipio) setMunicipio(d.municipio);
-            if (!lockedSchoolObj && d.nomeEscola) setNomeEscola(d.nomeEscola);
+            // Only restore draft school when no explicit target school was passed to the modal
+            const hasExplicitCallerSchool = Boolean(
+              lockedSchoolObj || schoolId || (schoolName && !normSchoolText(schoolName).includes('modelo central'))
+            );
+            if (!hasExplicitCallerSchool && (d.nomeEscola || d.selectedSchoolId)) {
+              const matchedDraftSchool = resolveCanonicalSchool(selectableSchools, {
+                schoolId: d.selectedSchoolId,
+                schoolName: d.nomeEscola,
+              });
+              if (matchedDraftSchool) {
+                setNomeEscola(matchedDraftSchool.name);
+                setSelectedSchoolId(matchedDraftSchool.id);
+              }
+            }
             if (d.tipoEscolaModalidade) setTipoEscolaModalidade(d.tipoEscolaModalidade);
             if (d.naturezaEscola) setNaturezaEscola(d.naturezaEscola);
             if (d.classeEtapaModulo) setClasseEtapaModulo(d.classeEtapaModulo);
@@ -422,7 +462,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
         setSelectedSchoolId(lockedSchoolObj.id);
       }
     }
-  }, [initialData, defaultTurma, defaultRoom, lockedSchoolObj]);
+  }, [isOpen, initialData, defaultTurma, defaultRoom, lockedSchoolObj, selectableSchools, schoolName, schoolId]);
 
   const handleSaveDraft = (silent = false) => {
     try {
@@ -439,7 +479,8 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
         endereco,
         provincia,
         municipio,
-        nomeEscola,
+        nomeEscola: selectedSchoolObj?.name || nomeEscola,
+        selectedSchoolId: selectedSchoolObj?.id || selectedSchoolId,
         tipoEscolaModalidade,
         naturezaEscola,
         classeEtapaModulo,
@@ -661,8 +702,16 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
       }
     }
 
-    const effectiveSchoolName = (lockedSchoolObj?.name || nomeEscola).trim();
-    const effectiveSchoolId = lockedSchoolObj?.id || selectedSchoolObj?.id || selectedSchoolId;
+    const canonicalSubmitSchool =
+      lockedSchoolObj ||
+      resolveCanonicalSchool(selectableSchools, {
+        schoolId: selectedSchoolId || selectedSchoolObj?.id,
+        schoolName: nomeEscola || selectedSchoolObj?.name,
+      }) ||
+      selectedSchoolObj;
+
+    const effectiveSchoolName = (canonicalSubmitSchool?.name || lockedSchoolObj?.name || nomeEscola).trim();
+    const effectiveSchoolId = canonicalSubmitSchool?.id || lockedSchoolObj?.id || selectedSchoolObj?.id || selectedSchoolId;
 
     // Validação Dual Simultânea (Frontend + Backend)
     const dualVal = await DualValidationService.validateStudent({

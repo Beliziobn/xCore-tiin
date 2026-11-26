@@ -20,7 +20,11 @@ import {
   saveRegisteredSchool,
   syncSchoolsFromServer,
 } from './utils/schoolStorage';
-import { deduplicateSchoolsCanonical } from './utils/schoolMatcher';
+import {
+  deduplicateSchoolsCanonical,
+  resolveCanonicalSchool,
+  doesStudentBelongToSchool,
+} from './utils/schoolMatcher';
 import {
   syncApplicationsFromServer,
   initRealtimeApplicationsSync,
@@ -44,7 +48,7 @@ import {
   saveDirectorToFirestore,
   saveUserToFirestore,
 } from './utils/firestoreSync';
-import { saveStudent } from './utils/studentStorage';
+import { saveStudent, setActiveDirectorSchoolId } from './utils/studentStorage';
 import {
   initialStudentsData,
   initialTeacherData,
@@ -566,6 +570,27 @@ export default function App() {
 
   const currentUserRef = useRef<UserAccount | null>(currentUser);
   currentUserRef.current = currentUser;
+
+  // Self-heal active session if currentUser.schoolId and currentUser.schoolName were previously out of sync
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'admin' || adminSchools.length === 0) return;
+    if (!currentUser.schoolName && !currentUser.schoolId) return;
+    const canonical = resolveCanonicalSchool(adminSchools, {
+      schoolId: currentUser.schoolId,
+      schoolName: currentUser.schoolName,
+    });
+    if (canonical && (currentUser.schoolId !== canonical.id || currentUser.schoolName !== canonical.name)) {
+      const healedUser: UserAccount = {
+        ...currentUser,
+        schoolId: canonical.id,
+        schoolName: canonical.name,
+      };
+      setCurrentUser(healedUser);
+      try {
+        localStorage.setItem('ucore_active_user', JSON.stringify(healedUser));
+      } catch {}
+    }
+  }, [currentUser, adminSchools]);
 
   // Immediately terminate active session if revoked OR auto-promote if approved on another device
   useEffect(() => {
@@ -2001,7 +2026,10 @@ export default function App() {
           onOpenGetStarted={() => handleOpenAuth('login')}
           students={adminStudents}
           schools={adminSchools}
-          onSwitchToDirectorStudents={(_schoolId, schoolName) => {
+          onSwitchToDirectorStudents={(schoolId, schoolName) => {
+            if (schoolId) {
+              setActiveDirectorSchoolId(schoolId);
+            }
             setActiveRole('diretor');
             setCurrentView('diretor-alunos');
             if (schoolName) {
@@ -2465,8 +2493,8 @@ export default function App() {
                 sala: newStudent.sala || 'Sala 04',
                 periodo: (newStudent.periodo as any) || 'Manhã',
                 turno: (newStudent.periodo as any) || 'Manhã',
-                escola: currentUser?.schoolName || newStudentData.escola || adminSchools[0]?.name || 'Escola Municipal de Quêssua',
-                schoolId: currentUser?.schoolId || newStudentData.schoolId,
+                escola: newStudentData.escola || currentUser?.schoolName || adminSchools[0]?.name || 'Escola Municipal de Quêssua',
+                schoolId: newStudentData.schoolId || currentUser?.schoolId,
                 condicaoMatricula: (newStudent.condicaoMatricula as any) || 'primeira_vez',
                 alunoRepetente: newStudent.condicaoMatricula === 'repetente',
                 encarregado: newStudent.encarregado || 'Encarregado de Educação',
@@ -2476,8 +2504,21 @@ export default function App() {
               showToast(`Aluno(a) ${newStudent.name} matriculado(a) com sucesso!`);
             }}
             students={teacherStudents}
-            schoolName={currentUser?.schoolName || adminSchools[0]?.name || ''}
-            schoolId={currentUser?.schoolId}
+            schoolName={
+              resolveCanonicalSchool(adminSchools, {
+                schoolId: currentUser?.schoolId,
+                schoolName: currentUser?.schoolName,
+              })?.name ||
+              currentUser?.schoolName ||
+              adminSchools[0]?.name ||
+              ''
+            }
+            schoolId={
+              resolveCanonicalSchool(adminSchools, {
+                schoolId: currentUser?.schoolId,
+                schoolName: currentUser?.schoolName,
+              })?.id || currentUser?.schoolId
+            }
             schools={adminSchools}
           />
         </div>
@@ -3437,9 +3478,7 @@ export default function App() {
               );
               setAdminSchools((prevSchools) =>
                 prevSchools.map((sc) => {
-                  const isMatch =
-                    (newStudent.schoolId && newStudent.schoolId === sc.id) ||
-                    newStudent.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase();
+                  const isMatch = doesStudentBelongToSchool(newStudent, sc, prevSchools);
                   if (isMatch) {
                     return {
                       ...sc,

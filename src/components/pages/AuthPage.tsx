@@ -68,7 +68,7 @@ import { initialAdminSchools } from '../../data/adminData';
 import { getRegisteredSchoolsFromStorage } from '../../utils/studentStorage';
 import { getSchoolRegistrationData, getOfferedLevelsBadges, syncSchoolsFromServer } from '../../utils/schoolStorage';
 import { saveUserToFirestore, fetchUserFromFirestore, isEntityTombstoned, isBannedSchoolOrEntity } from '../../utils/firestoreSync';
-import { deduplicateSchoolsCanonical } from '../../utils/schoolMatcher';
+import { deduplicateSchoolsCanonical, resolveCanonicalSchool } from '../../utils/schoolMatcher';
 
 let lastAuthSchoolSyncAt = 0;
 
@@ -627,8 +627,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       ? 'Director Municipal da Educação de Quessua'
       : 'Quadro Institucional';
     let resolvedPrefix = isSuperAdmin ? 'Admin.' : isDirectorMunicipal ? 'Dr.' : 'Sr(a).';
-    let resolvedSchoolName: string | undefined = registeredSchools[0]?.name || 'Unidade Escolar';
-    let resolvedSchoolId: string | undefined = registeredSchools[0]?.id;
+    let resolvedSchoolName: string | undefined = undefined;
+    let resolvedSchoolId: string | undefined = undefined;
 
     if (isSuperAdmin) {
       resolvedRole = 'admin';
@@ -669,7 +669,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         resolvedRole = app.type === 'professor' || app.schoolRole === 'professor' ? 'professor' : 'diretor';
         resolvedCargo = app.roleRequested || schCfg?.label || (resolvedRole === 'professor' ? 'Professor(a) / Docente' : 'Diretor(a) Geral');
         resolvedPrefix = schCfg?.prefix || (resolvedRole === 'professor' ? 'Prof.' : 'Director');
-        resolvedSchoolName = app.schoolName || resolvedSchoolName;
+        resolvedSchoolName = app.schoolName;
         resolvedSchoolId = app.schoolId;
       }
       const appNames = (app.fullName || '').trim().split(' ');
@@ -712,8 +712,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       resolvedAdminRole = undefined;
       resolvedCargo = 'Professor(a) / Docente';
       resolvedPrefix = 'Prof.';
-      resolvedSchoolName = t.schoolName || registeredSchools[0]?.name || 'Unidade Escolar';
-      resolvedSchoolId = registeredSchools[0]?.id;
+      resolvedSchoolName = t.schoolName || (t as any).nomeEscola;
+      resolvedSchoolId = (t as any).schoolId;
       if (t.name) {
         const tNames = t.name.trim().split(' ');
         if (tNames[0]) gFirst = tNames[0];
@@ -727,8 +727,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       resolvedAdminRole = undefined;
       resolvedCargo = 'Director(a) Geral';
       resolvedPrefix = 'Director';
-      resolvedSchoolName = d.schoolName || d.nomeEscola || registeredSchools[0]?.name || 'Unidade Escolar';
-      resolvedSchoolId = registeredSchools[0]?.id;
+      resolvedSchoolName = d.schoolName || d.nomeEscola;
+      resolvedSchoolId = (d as any).schoolId;
       const dirFullName = d.name || d.nomeCompleto || '';
       if (dirFullName) {
         const dNames = dirFullName.trim().split(' ');
@@ -742,8 +742,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       resolvedAdminRole = undefined;
       resolvedCargo = 'Professor(a) / Docente';
       resolvedPrefix = 'Prof.';
-      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
-      resolvedSchoolId = registeredSchools[0]?.id;
     } else if (manualRoleHint === 'diretor') {
       resolvedRole = 'diretor';
       resolvedScope = 'escola';
@@ -751,8 +749,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       resolvedAdminRole = undefined;
       resolvedCargo = 'Director(a) Geral';
       resolvedPrefix = 'Director';
-      resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
-      resolvedSchoolId = registeredSchools[0]?.id;
+    }
+
+    if (resolvedScope === 'escola') {
+      const matchedCanonical = resolveCanonicalSchool(registeredSchools, {
+        schoolId: resolvedSchoolId,
+        schoolName: resolvedSchoolName,
+      });
+      if (matchedCanonical) {
+        resolvedSchoolName = matchedCanonical.name;
+        resolvedSchoolId = matchedCanonical.id;
+      } else if (!resolvedSchoolName) {
+        resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
+        resolvedSchoolId = registeredSchools[0]?.id;
+      }
     }
 
     createGoogleUserSession(cleanEmail, `${gFirst} ${gLast}`.trim(), uid, photoURL);
@@ -781,7 +791,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       adminRole: resolvedAdminRole,
       cargoTitle: resolvedCargo,
       schoolName: resolvedSchoolName || (resolvedScope === 'administracao' ? 'Direcção Municipal da Educação de Quessua' : registeredSchools[0]?.name || 'Unidade Escolar'),
-      schoolId: resolvedSchoolId || (resolvedScope === 'escola' ? registeredSchools[0]?.id : undefined),
+      schoolId: resolvedScope === 'escola' ? resolvedSchoolId : undefined,
       municipalityOrDepartment: 'Quessua',
       titlePrefix: resolvedPrefix,
       greeting: `Olá ${resolvedPrefix} ${gFirst}`,
@@ -1194,8 +1204,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             resolvedRole = isProf ? 'professor' : 'diretor';
             resolvedCargoTitle = app.roleRequested || schCfg.label;
             resolvedPrefix = schCfg.prefix;
-            resolvedSchoolName = app.schoolName || registeredSchools[0]?.name || 'Unidade Escolar';
-            resolvedSchoolId = app.schoolId || registeredSchools[0]?.id;
+            resolvedSchoolName = app.schoolName || '';
+            resolvedSchoolId = app.schoolId;
           }
         } else if (accountLookup.dmeStaff) {
           const staff = accountLookup.dmeStaff;
@@ -1225,7 +1235,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               : 'diretor';
           resolvedCargoTitle = firestoreUser.cargoTitle || 'Utilizador Institucional';
           resolvedPrefix = firestoreUser.titlePrefix || '';
-          resolvedSchoolName = firestoreUser.schoolName || 'Unidade Escolar';
+          resolvedSchoolName = firestoreUser.schoolName || '';
           resolvedSchoolId = firestoreUser.schoolId;
         } else if (accountLookup.teacher) {
           const t = accountLookup.teacher;
@@ -1238,7 +1248,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           resolvedRole = 'professor';
           resolvedCargoTitle = 'Professor(a) / Docente';
           resolvedPrefix = 'Prof.';
-          resolvedSchoolName = t.schoolName || registeredSchools[0]?.name || 'Unidade Escolar';
+          resolvedSchoolName = t.schoolName || (t as any).nomeEscola || '';
+          resolvedSchoolId = (t as any).schoolId;
           resolvedUserId = t.id || resolvedUserId;
         } else if (accountLookup.director) {
           const d = accountLookup.director;
@@ -1251,8 +1262,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           resolvedRole = 'diretor';
           resolvedCargoTitle = 'Diretor(a) Geral';
           resolvedPrefix = 'Diretor Geral';
-          resolvedSchoolName = d.schoolName || d.nomeEscola || registeredSchools[0]?.name || 'Unidade Escolar';
+          resolvedSchoolName = d.schoolName || d.nomeEscola || '';
+          resolvedSchoolId = (d as any).schoolId;
           resolvedUserId = d.id || resolvedUserId;
+        }
+
+        if (matchedScope === 'escola') {
+          const matchedCanonical = resolveCanonicalSchool(registeredSchools, {
+            schoolId: resolvedSchoolId,
+            schoolName: resolvedSchoolName,
+          });
+          if (matchedCanonical) {
+            resolvedSchoolName = matchedCanonical.name;
+            resolvedSchoolId = matchedCanonical.id;
+          } else if (!resolvedSchoolName || resolvedSchoolName === 'Unidade Escolar') {
+            resolvedSchoolName = registeredSchools[0]?.name || 'Unidade Escolar';
+            resolvedSchoolId = registeredSchools[0]?.id;
+          }
         }
 
         const loggedUser: UserAccount = {

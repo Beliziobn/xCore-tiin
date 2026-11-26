@@ -362,3 +362,108 @@ export function deduplicateSchoolsCanonical(
 
   return result.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt'));
 }
+
+/**
+ * Resolves a single canonical AdminSchool from a list of registered schools given
+ * a candidate { schoolId, schoolName }.
+ * CRITICAL: When both schoolName and schoolId are present but point to two DIFFERENT schools
+ * (e.g. because schoolId was historically defaulted to schools[0].id), the explicit non-placeholder
+ * schoolName takes precedence so a record never jumps to schools[0].
+ */
+export function resolveCanonicalSchool(
+  schools: AdminSchool[],
+  candidate?: { schoolId?: string; schoolName?: string }
+): AdminSchool | undefined {
+  if (!schools || schools.length === 0 || !candidate) return undefined;
+
+  const cleanName = (candidate.schoolName || '').trim();
+  const cleanId = (candidate.schoolId || '').trim();
+
+  let byName: AdminSchool | undefined;
+  if (cleanName && !isPlaceholderSchoolName(cleanName)) {
+    const normCand = normalizeSchoolText(cleanName);
+    // 1. Exact normalized text match first
+    byName =
+      schools.find((s) => normalizeSchoolText(s.name) === normCand) ||
+      schools.find((s) => areSameCanonicalSchool({ name: cleanName }, s)) ||
+      schools.find((s) => {
+        const sige = normalizeSchoolText(s.codigoSIGE || s.registrationData?.codigoSIGE);
+        return Boolean(sige && sige !== 'sige 102012' && sige === normCand);
+      });
+  }
+
+  let byId: AdminSchool | undefined;
+  if (cleanId) {
+    const lowerId = cleanId.toLowerCase();
+    byId =
+      schools.find((s) => String(s.id || '').trim().toLowerCase() === lowerId) ||
+      schools.find((s) => areSameCanonicalSchool({ id: cleanId }, s));
+  }
+
+  // If explicit schoolName resolves to a real registered school, prefer it over a conflicting schoolId
+  if (byName) return byName;
+  return byId;
+}
+
+/**
+ * Strictly determines whether a student record belongs to a target school.
+ * Prevents the dual (matchId || matchName) bug where a student with escola="School B"
+ * and a stale/defaulted schoolId="School A" was matched to School A.
+ */
+export function doesStudentBelongToSchool(
+  student: {
+    schoolId?: string;
+    escola?: string;
+    nomeEscola?: string;
+    schoolName?: string;
+    registrationData?: {
+      schoolId?: string;
+      escola?: string;
+      nomeEscola?: string;
+    } | null;
+  },
+  school: AdminSchool,
+  allSchools?: AdminSchool[]
+): boolean {
+  if (!student || !school) return false;
+
+  const rawName = (
+    student.escola ||
+    student.nomeEscola ||
+    student.registrationData?.escola ||
+    student.registrationData?.nomeEscola ||
+    student.schoolName ||
+    ''
+  ).trim();
+
+  const rawId = (student.schoolId || student.registrationData?.schoolId || '').trim();
+  const schoolCodeNorm = normalizeSchoolText(school.codigoSIGE || school.registrationData?.codigoSIGE);
+
+  if (rawName && !isPlaceholderSchoolName(rawName)) {
+    const normRawName = normalizeSchoolText(rawName);
+    const matchesByName =
+      normRawName === normalizeSchoolText(school.name) ||
+      areSameCanonicalSchool({ name: rawName }, school) ||
+      Boolean(schoolCodeNorm && schoolCodeNorm !== 'sige 102012' && normRawName === schoolCodeNorm);
+
+    if (matchesByName) return true;
+
+    // If the student has a real non-placeholder school name that does NOT match this school,
+    // never allow a conflicting schoolId to pull the student into this school!
+    if (allSchools && allSchools.length > 0) {
+      const matchedOther = resolveCanonicalSchool(allSchools, { schoolName: rawName });
+      if (matchedOther && !areSameCanonicalSchool(matchedOther, school)) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  // Only when the student record has no valid/non-placeholder school name, fall back to schoolId
+  if (rawId) {
+    return areSameCanonicalSchool({ id: rawId }, school);
+  }
+
+  return false;
+}
+

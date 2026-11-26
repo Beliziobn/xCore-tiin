@@ -18,7 +18,11 @@ import {
   isEntityTombstoned,
   isBannedSchoolOrEntity,
 } from './firestoreSync';
-import { deduplicateSchoolsCanonical } from './schoolMatcher';
+import {
+  deduplicateSchoolsCanonical,
+  resolveCanonicalSchool,
+  doesStudentBelongToSchool,
+} from './schoolMatcher';
 
 export interface StudentModalityConfig {
   key: StudentModalidadeKey;
@@ -556,11 +560,32 @@ export function getStoredStudents(): StudentRegistrationData[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      const filtered = parsed.filter((s: any) => {
-        const esc = String(s?.escola || s?.nomeEscola || '').trim().toLowerCase();
-        return !esc.includes('modelo central');
-      });
-      if (filtered.length !== parsed.length) {
+      const schools = getRegisteredSchoolsFromStorage();
+      let didHeal = false;
+      const filtered = parsed
+        .filter((s: any) => {
+          const esc = String(s?.escola || s?.nomeEscola || '').trim().toLowerCase();
+          return !esc.includes('modelo central');
+        })
+        .map((s: StudentRegistrationData) => {
+          if (schools.length > 0) {
+            const rawName = (s.escola || (s as any).nomeEscola || '').trim();
+            const canonical = resolveCanonicalSchool(schools, {
+              schoolId: s.schoolId,
+              schoolName: rawName,
+            });
+            if (canonical && (s.schoolId !== canonical.id || s.escola !== canonical.name)) {
+              didHeal = true;
+              return {
+                ...s,
+                escola: canonical.name,
+                schoolId: canonical.id,
+              };
+            }
+          }
+          return s;
+        });
+      if (didHeal || filtered.length !== parsed.length) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
       }
       return filtered;
@@ -681,43 +706,46 @@ export function setActiveDirectorSchoolId(schoolId: string): void {
 export function getActiveDirectorSchool(
   schoolsList?: AdminSchool[],
   currentUserSchoolName?: string,
-  currentUserSchoolId?: string
+  currentUserSchoolId?: string,
+  isSchoolBoundUser?: boolean
 ): AdminSchool | undefined {
   const schools = schoolsList && schoolsList.length > 0 ? schoolsList : getRegisteredSchoolsFromStorage();
   if (schools.length === 0) return undefined;
 
-  const norm = (str?: string) =>
-    (str || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ');
+  const checkSavedDirectorSchool = (): AdminSchool | undefined => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const savedId = localStorage.getItem(ACTIVE_DIRECTOR_SCHOOL_KEY);
+        if (savedId && savedId.trim()) {
+          return resolveCanonicalSchool(schools, {
+            schoolId: savedId,
+            schoolName: savedId,
+          });
+        }
+      } catch {}
+    }
+    return undefined;
+  };
 
-  // 1a. If currentUser has a specific schoolId that matches a registered school, prefer it strictly
-  if (currentUserSchoolId && currentUserSchoolId.trim()) {
-    const targetId = currentUserSchoolId.trim().toLowerCase();
-    const byUserId = schools.find((s) => String(s.id || '').trim().toLowerCase() === targetId);
-    if (byUserId) return byUserId;
+  // If the user is NOT bound to a single school (e.g. Admin viewing Director panel after clicking "Painel →"),
+  // prefer the explicitly selected school in ACTIVE_DIRECTOR_SCHOOL_KEY first.
+  if (isSchoolBoundUser === false) {
+    const saved = checkSavedDirectorSchool();
+    if (saved) return saved;
   }
 
-  // 1b. If currentUser has a specific schoolName that matches a registered school, prefer it strictly
-  if (currentUserSchoolName && !norm(currentUserSchoolName).includes('modelo central')) {
-    const targetName = norm(currentUserSchoolName);
-    const byUser = schools.find((s) => norm(s.name) === targetName);
-    if (byUser) return byUser;
+  // 1. Resolve canonical school for the current user (schoolName takes precedence over conflicting/defaulted schoolId)
+  if (currentUserSchoolName || currentUserSchoolId) {
+    const matchedUserSchool = resolveCanonicalSchool(schools, {
+      schoolId: currentUserSchoolId,
+      schoolName: currentUserSchoolName,
+    });
+    if (matchedUserSchool) return matchedUserSchool;
   }
 
   // 2. Check active director school stored in localStorage
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    try {
-      const savedId = localStorage.getItem(ACTIVE_DIRECTOR_SCHOOL_KEY);
-      if (savedId) {
-        const byId = schools.find((s) => s.id === savedId || norm(s.name) === norm(savedId));
-        if (byId) return byId;
-      }
-    } catch {}
-  }
+  const saved = checkSavedDirectorSchool();
+  if (saved) return saved;
 
   // 3. Default to the first registered school
   return schools[0];
@@ -736,22 +764,18 @@ export function getSchoolStudentQuotaStatus(
 ): SchoolStudentQuotaStatus {
   const norm = (str?: string) => (str || '').trim().toLowerCase();
   const schoolNameNorm = norm(school.name);
-  const schoolCodeNorm = norm(school.codigoSIGE || school.registrationData?.codigoSIGE);
+  const allSchools = getRegisteredSchoolsFromStorage();
 
   const storedDetailed = getStoredStudents();
 
-  // Match detailed students belonging to this school
-  const matchedDetailed = storedDetailed.filter((s) => {
-    const matchId = Boolean(s.schoolId && s.schoolId === school.id);
-    const sSchool = norm(s.escola || (s as any).nomeEscola);
-    const matchName = Boolean(schoolNameNorm && sSchool === schoolNameNorm);
-    const matchCode = Boolean(schoolCodeNorm && sSchool === schoolCodeNorm);
-    return matchId || matchName || matchCode;
-  });
+  // Match detailed students belonging strictly to this school
+  const matchedDetailed = storedDetailed.filter((s) =>
+    doesStudentBelongToSchool(s, school, allSchools)
+  );
 
   const combinedMap = new Map<string, StudentRegistrationData>();
   matchedDetailed.forEach((s) => {
-    const key = s.id || `${norm(s.nomeCompleto || s.name)}::${norm(s.escola)}`;
+    const key = s.id || `${norm(s.nomeCompleto || s.name)}::${school.id}`;
     combinedMap.set(key, s);
   });
 
@@ -760,17 +784,13 @@ export function getSchoolStudentQuotaStatus(
       const isDetailedItem = 'escola' in item || 'nomeCompleto' in item;
       if (isDetailedItem) {
         const s = item as StudentRegistrationData;
-        const matchId = Boolean(s.schoolId && s.schoolId === school.id);
-        const sSchool = norm(s.escola || (s as any).nomeEscola);
-        const matchName = Boolean(schoolNameNorm && sSchool === schoolNameNorm);
-        const matchCode = Boolean(schoolCodeNorm && sSchool === schoolCodeNorm);
-        if (matchId || matchName || matchCode) {
+        if (doesStudentBelongToSchool(s, school, allSchools)) {
           const alreadyById = s.id && combinedMap.has(s.id);
           const alreadyByName = Array.from(combinedMap.values()).some(
             (existing) => norm(existing.nomeCompleto || existing.name) === norm(s.nomeCompleto || s.name)
           );
           if (!alreadyById && !alreadyByName) {
-            combinedMap.set(s.id || `${norm(s.nomeCompleto || s.name)}::${schoolNameNorm}`, s);
+            combinedMap.set(s.id || `${norm(s.nomeCompleto || s.name)}::${school.id}`, s);
           }
         }
         return;
@@ -778,39 +798,41 @@ export function getSchoolStudentQuotaStatus(
 
       const ast = item as AdminStudent;
       const d = ast.registrationData;
-      const matchId = Boolean((ast.schoolId && ast.schoolId === school.id) || (d?.schoolId && d.schoolId === school.id));
-      const astSchool = norm(d?.escola || (d as any)?.nomeEscola || ast.schoolName);
-      const matchName = Boolean(schoolNameNorm && (astSchool === schoolNameNorm || norm(ast.schoolName) === schoolNameNorm));
-      const matchCode = Boolean(schoolCodeNorm && (astSchool === schoolCodeNorm || norm(ast.schoolName) === schoolCodeNorm));
 
-      if (matchId || matchName || matchCode) {
+      if (doesStudentBelongToSchool(ast, school, allSchools)) {
         const alreadyById = ast.id && combinedMap.has(ast.id);
         const alreadyByName = Array.from(combinedMap.values()).some(
           (existing) => norm(existing.nomeCompleto || existing.name) === norm(ast.name)
         );
         if (!alreadyById && !alreadyByName) {
-          const fallbackReg: StudentRegistrationData = d || {
-            id: ast.id,
-            name: ast.name,
-            nomeCompleto: ast.name,
-            genero: ast.gender === 'M' ? 'M' : 'F',
-            dataNascimento: ast.dataNascimento || '2016-05-10',
-            idade: ast.idade || ast.age || 9,
-            tipoDocumento: (ast.documentType as any) || (ast.hasDocuments ? 'BI' : 'sem Documento'),
-            numeroDocumento: ast.numeroDocumento,
-            naturezaEscola: (school.natureza as StudentNaturezaEscola) || 'Pública',
-            tipoEscolaModalidade: getSuggestedModalityForSchool(school),
-            classeEtapaModulo: ast.gradeClass || '1.ª Classe',
-            classe: ast.gradeClass || '1ª Classe',
-            turma: ast.turma || 'Turma A',
-            sala: ast.room || 'Sala 01',
-            escola: school.name,
-            schoolId: school.id,
-            condicaoMatricula: ast.condicaoMatricula || 'primeira_vez',
-            alunoRepetente: ast.condicaoMatricula === 'repetente',
-            encarregado: ast.guardianName || 'Encarregado de Educação',
-            telefone: '+244 923 000 000',
-          };
+          const fallbackReg: StudentRegistrationData = d
+            ? {
+                ...d,
+                escola: school.name,
+                schoolId: school.id,
+              }
+            : {
+                id: ast.id,
+                name: ast.name,
+                nomeCompleto: ast.name,
+                genero: ast.gender === 'M' ? 'M' : 'F',
+                dataNascimento: ast.dataNascimento || '2016-05-10',
+                idade: ast.idade || ast.age || 9,
+                tipoDocumento: (ast.documentType as any) || (ast.hasDocuments ? 'BI' : 'sem Documento'),
+                numeroDocumento: ast.numeroDocumento,
+                naturezaEscola: (school.natureza as StudentNaturezaEscola) || 'Pública',
+                tipoEscolaModalidade: getSuggestedModalityForSchool(school),
+                classeEtapaModulo: ast.gradeClass || '1.ª Classe',
+                classe: ast.gradeClass || '1ª Classe',
+                turma: ast.turma || 'Turma A',
+                sala: ast.room || 'Sala 01',
+                escola: school.name,
+                schoolId: school.id,
+                condicaoMatricula: ast.condicaoMatricula || 'primeira_vez',
+                alunoRepetente: ast.condicaoMatricula === 'repetente',
+                encarregado: ast.guardianName || 'Encarregado de Educação',
+                telefone: '+244 923 000 000',
+              };
           combinedMap.set(ast.id || `${norm(ast.name)}::${schoolNameNorm}`, fallbackReg);
         }
       }
@@ -862,11 +884,23 @@ export function getSchoolStudentQuotaStatus(
 
 export function saveStudent(studentData: StudentRegistrationData): StudentRegistrationData {
   const currentList = getStoredStudents();
+  const registeredSchools = getRegisteredSchoolsFromStorage();
+  const rawInputSchoolName = (studentData.escola || (studentData as any).nomeEscola || '').trim();
+  const canonicalSchool = resolveCanonicalSchool(registeredSchools, {
+    schoolId: studentData.schoolId,
+    schoolName: rawInputSchoolName,
+  });
+
+  const resolvedSchoolName = canonicalSchool?.name || rawInputSchoolName || 'Unidade Escolar';
+  const resolvedSchoolId = canonicalSchool?.id || studentData.schoolId;
+
   let updatedList: StudentRegistrationData[];
 
   const ensuredData: StudentRegistrationData = {
     ...studentData,
     id: studentData.id || `std-${Date.now()}`,
+    escola: resolvedSchoolName,
+    schoolId: resolvedSchoolId,
     dataCadastro: studentData.dataCadastro || new Date().toISOString().substring(0, 10),
     codigoMatricula:
       studentData.codigoMatricula ||
@@ -908,8 +942,8 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
         foto: ensuredData.foto,
         anexoDocumentoNome: ensuredData.anexoDocumentoNome,
         performanceScore: 8.5,
-        schoolName: ensuredData.escola || 'Escola Oficial',
-        schoolId: ensuredData.schoolId,
+        schoolName: resolvedSchoolName,
+        schoolId: resolvedSchoolId,
         schoolType: ensuredData.naturezaEscola || 'Pública',
         registrationData: ensuredData,
       };
@@ -941,7 +975,7 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
         turma: syncedAdminStudent.turma,
         teacherName: 'Docente Titular',
         guardianName: syncedAdminStudent.guardianName,
-        location: 'Complexo Escolar Central',
+        location: resolvedSchoolName,
         hasDocuments: syncedAdminStudent.hasDocuments,
         presenceRate: syncedAdminStudent.presenceRate,
         performanceScore: 8.5,
@@ -989,23 +1023,17 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
       }
       localStorage.setItem('ucore_teacher_students', JSON.stringify(nextTeachStudents));
 
-      // Also sync school student counters in ucore_admin_schools
+      // Also sync school student counters in ucore_admin_schools strictly for the matching canonical school
       const rawSchools = localStorage.getItem('ucore_admin_schools');
       if (rawSchools) {
         const schoolsList: AdminSchool[] = JSON.parse(rawSchools);
         if (Array.isArray(schoolsList) && schoolsList.length > 0) {
           const updatedSchools = schoolsList.map((sc) => {
-            const belongsToSchool = nextAdminStudents.filter(
-              (st) =>
-                (st.schoolId && st.schoolId === sc.id) ||
-                st.schoolName.trim().toLowerCase() === sc.name.trim().toLowerCase() ||
-                (st.registrationData?.escola && st.registrationData.escola.trim().toLowerCase() === sc.name.trim().toLowerCase())
+            const belongsToSchool = nextAdminStudents.filter((st) =>
+              doesStudentBelongToSchool(st, sc, schoolsList)
             );
-            if (
-              (ensuredData.schoolId && ensuredData.schoolId === sc.id) ||
-              (ensuredData.escola && ensuredData.escola.trim().toLowerCase() === sc.name.trim().toLowerCase()) ||
-              belongsToSchool.length > 0
-            ) {
+            const isTargetSchool = doesStudentBelongToSchool(ensuredData, sc, schoolsList);
+            if (isTargetSchool || belongsToSchool.length > 0) {
               const preservedDeclared =
                 typeof sc.declaredStudentsCount === 'number'
                   ? sc.declaredStudentsCount
@@ -1020,7 +1048,9 @@ export function saveStudent(studentData: StudentRegistrationData): StudentRegist
                 studentsWithDocs: withDocs,
                 studentsWithoutDocs: withoutDocs,
               };
-              saveSchoolToFirestore(updatedSc).catch(() => {});
+              if (isTargetSchool) {
+                saveSchoolToFirestore(updatedSc).catch(() => {});
+              }
               return updatedSc;
             }
             return sc;
