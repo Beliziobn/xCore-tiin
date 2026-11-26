@@ -19,7 +19,7 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
 } from 'firebase/firestore';
-import { db, auth, OperationType } from '../firebase';
+import { db, auth, OperationType, resetFirestoreInstanceAfterWriteQuota } from '../firebase';
 import type {
   PendingApplication,
   QuickServiceRequest,
@@ -192,6 +192,13 @@ export function isFirestoreQuotaExhausted(): boolean {
   return isFirestoreReadQuotaExhausted() || isFirestoreWriteQuotaExhausted();
 }
 
+class QuotaAbortedWriteError extends Error {
+  constructor(label: string) {
+    super(`Firestore write aborted due to quota limit in ${label}`);
+    this.name = 'QuotaAbortedWriteError';
+  }
+}
+
 export function markFirestoreQuotaIfExhausted(err: any, operation: 'read' | 'write' = 'read'): void {
   const code = String(err?.code || '').toLowerCase();
   const msg = String(err?.message || err || '').toLowerCase();
@@ -216,6 +223,9 @@ export function markFirestoreQuotaIfExhausted(err: any, operation: 'read' | 'wri
     if (!wasWriteExhausted) {
       notifyFirestoreQuotaStatus(isFirestoreReadQuotaExhausted(), true);
     }
+    // Clear any pending MutationQueue inside @firebase/firestore so WriteStream
+    // does not keep retrying in exponential backoff ("Using maximum backoff delay").
+    void resetFirestoreInstanceAfterWriteQuota();
   } else {
     const wasExhausted = isFirestoreReadQuotaExhausted();
     const until = Date.now() + READ_QUOTA_COOLDOWN_MS;
@@ -225,6 +235,17 @@ export function markFirestoreQuotaIfExhausted(err: any, operation: 'read' | 'wri
       notifyFirestoreQuotaStatus(true, isFirestoreWriteQuotaExhausted());
     }
   }
+}
+
+if (typeof window !== 'undefined' && !(window as any).__sigreFsSdkQuotaListenerAttached) {
+  (window as any).__sigreFsSdkQuotaListenerAttached = true;
+  window.addEventListener('sigre-firestore-sdk-quota', (ev: Event) => {
+    const detail = (ev as CustomEvent<{ message?: string; isWrite?: boolean }>).detail;
+    markFirestoreQuotaIfExhausted(
+      { code: 'resource-exhausted', message: detail?.message || 'Quota limit exceeded' },
+      detail?.isWrite === false ? 'read' : 'write'
+    );
+  });
 }
 
 const DEFAULT_FIRESTORE_READ_TIMEOUT_MS = 6000;
@@ -255,7 +276,35 @@ async function withFirestoreWriteTimeout<T>(
   label: string,
   timeoutMs: number = DEFAULT_FIRESTORE_WRITE_TIMEOUT_MS
 ): Promise<T> {
-  return withFirestoreTimeout(promise, `write:${label}`, timeoutMs);
+  if (isFirestoreWriteQuotaExhausted()) {
+    throw new QuotaAbortedWriteError(label);
+  }
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let onQuota: ((ev: Event) => void) | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`Firestore timeout (${timeoutMs}ms) in write:${label}`));
+        }, timeoutMs);
+        if (typeof window !== 'undefined') {
+          onQuota = (ev: Event) => {
+            const detail = (ev as CustomEvent<{ writeExhausted?: boolean }>).detail;
+            if (detail?.writeExhausted) {
+              reject(new QuotaAbortedWriteError(label));
+            }
+          };
+          window.addEventListener('sigre-firestore-quota-status', onQuota);
+        }
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (typeof window !== 'undefined' && onQuota) {
+      window.removeEventListener('sigre-firestore-quota-status', onQuota);
+    }
+  }
 }
 
 function getMaxListLimitForCollection(colName: string): number {
@@ -269,17 +318,25 @@ function logFirestorePermissionOrQuotaError(
   operationType: OperationType,
   path: string
 ): void {
-  markFirestoreQuotaIfExhausted(
-    err,
+  const isWriteOp =
     operationType === OperationType.WRITE ||
-      operationType === OperationType.CREATE ||
-      operationType === OperationType.UPDATE ||
-      operationType === OperationType.DELETE
-      ? 'write'
-      : 'read'
-  );
+    operationType === OperationType.CREATE ||
+    operationType === OperationType.UPDATE ||
+    operationType === OperationType.DELETE;
+  markFirestoreQuotaIfExhausted(err, isWriteOp ? 'write' : 'read');
   const code = String((err as any)?.code || '');
   const msg = err instanceof Error ? err.message : String(err);
+
+  if (
+    err instanceof QuotaAbortedWriteError ||
+    (isWriteOp && isFirestoreWriteQuotaExhausted()) ||
+    (!isWriteOp && isFirestoreReadQuotaExhausted()) ||
+    (isWriteOp && msg.includes('Firestore timeout'))
+  ) {
+    console.warn(`[Firestore] Gravação diferida localmente (${path}): ${msg}`);
+    return;
+  }
+
   const errInfo = {
     code: code || undefined,
     error: msg,
@@ -3749,6 +3806,16 @@ function resolveScopeCollections(scope?: RealtimeSyncScope): Set<string> {
   }
 
   return active;
+}
+
+export function resetRealtimeSyncScopeCache(): void {
+  if (globalRealtimeUnsubscribe) {
+    try {
+      globalRealtimeUnsubscribe();
+    } catch {}
+    globalRealtimeUnsubscribe = null;
+  }
+  activeRealtimeScopeKey = null;
 }
 
 export function initViewScopedRealtimeSync(

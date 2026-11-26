@@ -5,6 +5,7 @@ import {
   initializeFirestore,
   memoryLocalCache,
   setLogLevel,
+  terminate,
   doc,
   getDocFromServer,
   Firestore,
@@ -57,9 +58,81 @@ function initDurableFirestore(): Firestore {
   }
 }
 
-export const db = initDurableFirestore();
+export let db: Firestore = initDurableFirestore();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+let firestoreResetInFlight: Promise<void> | null = null;
+
+/**
+ * Terminates the active Firestore client (clearing any in-memory WriteStream mutation queue
+ * stuck in exponential backoff after resource-exhausted) and spins up a fresh instance
+ * so read queries/listeners can continue cleanly without background retry storms.
+ */
+export async function resetFirestoreInstanceAfterWriteQuota(): Promise<void> {
+  if (firestoreResetInFlight) {
+    return firestoreResetInFlight;
+  }
+  firestoreResetInFlight = (async () => {
+    try {
+      await Promise.race([
+        terminate(db),
+        new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+      ]);
+    } catch {}
+    try {
+      db = initDurableFirestore();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sigre-firestore-reinitialized'));
+      }
+    } catch (err) {
+      console.warn('[Firestore] Falha ao reinicializar instância após cota:', err);
+    }
+  })().finally(() => {
+    firestoreResetInFlight = null;
+  });
+
+  return firestoreResetInFlight;
+}
+
+// Observe @firebase/firestore SDK error logs so resource-exhausted on WriteStream is caught
+// immediately (0ms) rather than waiting for an 8s write timeout while SDK loops in backoff.
+function installFirestoreQuotaConsoleObserver(): void {
+  if (typeof window === 'undefined' || typeof console === 'undefined') return;
+  const w = window as any;
+  if (w.__sigreFsQuotaObserverInstalled) return;
+  w.__sigreFsQuotaObserverInstalled = true;
+
+  const origError = console.error.bind(console);
+  console.error = (...args: any[]) => {
+    try {
+      const joined = args
+        .map((a) => (typeof a === 'string' ? a : a instanceof Error ? a.message : ''))
+        .join(' ')
+        .toLowerCase();
+      if (
+        joined.includes('@firebase/firestore') &&
+        (joined.includes('resource-exhausted') ||
+          joined.includes('quota limit exceeded') ||
+          joined.includes('free daily write units') ||
+          joined.includes('free daily read units'))
+      ) {
+        const isWrite =
+          joined.includes('free daily write units') ||
+          joined.includes('write units') ||
+          !joined.includes('read units');
+        window.dispatchEvent(
+          new CustomEvent('sigre-firestore-sdk-quota', {
+            detail: { message: joined, isWrite },
+          })
+        );
+      }
+    } catch {}
+    origError(...args);
+  };
+}
+
+installFirestoreQuotaConsoleObserver();
 
 export enum OperationType {
   CREATE = 'create',

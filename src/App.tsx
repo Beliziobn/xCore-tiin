@@ -37,6 +37,7 @@ import {
   type DashboardStats,
   isFirestoreReadQuotaExhausted,
   isFirestoreWriteQuotaExhausted,
+  resetRealtimeSyncScopeCache,
   saveTeacherToFirestore,
   saveStudentToFirestore,
   saveDirectorToFirestore,
@@ -625,6 +626,19 @@ export default function App() {
     return 'diretor'; // default to diretor as requested by user
   });
 
+  const [firestoreReinitTick, setFirestoreReinitTick] = useState(0);
+
+  useEffect(() => {
+    const handleFirestoreReinit = () => {
+      resetRealtimeSyncScopeCache();
+      setFirestoreReinitTick((t) => t + 1);
+    };
+    window.addEventListener('sigre-firestore-reinitialized', handleFirestoreReinit);
+    return () => {
+      window.removeEventListener('sigre-firestore-reinitialized', handleFirestoreReinit);
+    };
+  }, []);
+
   // View-scoped, role-scoped & session-gated real-time Firestore listeners (Rules 1-5):
   // Attaches ONLY listeners needed for the current view/role + single-doc stats/dashboard,
   // and cleanly tears down previous listeners on tab/view change or logout.
@@ -699,7 +713,7 @@ export default function App() {
         } catch {}
       });
     };
-  }, [currentUser?.id, currentUser?.role, currentUser?.status, currentUser?.schoolId, currentView, activeRole]);
+  }, [currentUser?.id, currentUser?.role, currentUser?.status, currentUser?.schoolId, currentView, activeRole, firestoreReinitTick]);
 
   const hasShownWriteQuotaToastRef = useRef(false);
   useEffect(() => {
@@ -1202,15 +1216,15 @@ export default function App() {
     setIsAuthLoading(false);
     setAuthLoadingAction(null);
     const approvalCheck = checkUserApprovalStatus(user.id, user.email, user.biNumber);
-    const normalizedUser: UserAccount =
-      user.status === 'pendente' && approvalCheck.status === 'ativo'
-        ? {
-            ...user,
-            status: 'ativo',
-            approvedAt: approvalCheck.app?.approvedAt || user.approvedAt,
-            approvedBy: approvalCheck.app?.approvedBy || user.approvedBy,
-          }
-        : user;
+    const wasPromotedOnLogin = user.status === 'pendente' && approvalCheck.status === 'ativo';
+    const normalizedUser: UserAccount = wasPromotedOnLogin
+      ? {
+          ...user,
+          status: 'ativo',
+          approvedAt: approvalCheck.app?.approvedAt || user.approvedAt,
+          approvedBy: approvalCheck.app?.approvedBy || user.approvedBy,
+        }
+      : user;
     try {
       sessionStorage.setItem('ucore_session_active', 'true');
       localStorage.setItem('ucore_active_user', JSON.stringify(normalizedUser));
@@ -1218,9 +1232,11 @@ export default function App() {
       // ignore
     }
     setCurrentUser(normalizedUser);
-    saveUserToFirestore(normalizedUser).catch((err) =>
-      console.error('[App] Erro ao gravar utilizador após login:', err)
-    );
+    if (wasPromotedOnLogin) {
+      saveUserToFirestore(normalizedUser).catch((err) =>
+        console.warn('[App] Erro ao gravar utilizador homologado após login:', err)
+      );
+    }
     if (normalizedUser.role === 'admin' || normalizedUser.role === 'diretor' || normalizedUser.role === 'professor') {
       setActiveRole(normalizedUser.role);
     }
