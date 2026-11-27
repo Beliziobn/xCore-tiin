@@ -1,3 +1,5 @@
+import React, { lazy, type ComponentType } from 'react';
+
 /**
  * Blindagem de Carregamento & Recuperação de Runtime para Domínio Personalizado
  * (Cloudflare + GoDaddy + Vercel — sigredmedoquessua.com)
@@ -265,3 +267,33 @@ export function installChunkLoadErrorRecovery(): void {
     }
   });
 }
+
+/**
+ * Wrapper para React.lazy() que interceta falhas de carregamento de chunks dinâmicos
+ * (ChunkLoadError / Failed to fetch dynamically imported module após novo deploy na Vercel),
+ * limpa Service Workers/Cache Storage e força um único reload controlado via sessionStorage
+ * antes que o React exiba uma tela em branco.
+ */
+export function lazyWithChunkRetry<T extends ComponentType<any>>(
+  importer: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return lazy(async () => {
+    try {
+      const mod = await importer();
+      return mod;
+    } catch (error) {
+      console.warn('[SIGRE lazyWithChunkRetry] Falha ao importar chunk dinâmico:', error);
+      if (isChunkOrModuleLoadError(error)) {
+        const reloaded = await triggerControlledCacheBustingReload(
+          error instanceof Error ? error.message : 'Dynamic import chunk load error'
+        );
+        if (reloaded) {
+          // Suspende a árvore enquanto o navegador recarrega a página limpa
+          return new Promise<{ default: T }>(() => {});
+        }
+      }
+      throw error;
+    }
+  });
+}
+

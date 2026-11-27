@@ -36,7 +36,9 @@ import emblemAngolaImg from '../../assets/images/Emblem_of_Angola.svg.webp';
 import directorSignatureImg from '../../assets/images/assinatura_director_black.png';
 import type { UserAccount } from '../../types';
 
-const BackupManagerModal = lazy(() => import('../modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
+import { lazyWithChunkRetry } from '../../utils/runtimeRecovery';
+
+const BackupManagerModal = lazyWithChunkRetry(() => import('../modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
 import { QuickRequestsManagementView } from '../quick-services/QuickRequestsManagementView';
 import { DeclaracaoServicoSection } from './DeclaracaoServicoSection';
 import { GuiaFeriasSection } from './GuiaFeriasSection';

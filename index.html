@@ -7,19 +7,68 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Sigre - Sistema Integrado de Gestão Escolar</title>
-    
-    <!-- Favicon -->
+
+    <!-- Recuperação Precoce de ChunkLoadError / Entry Script 404 (antes do bundle principal carregar) -->
+    <script data-cfasync="false">
+      (function () {
+        var GUARD_KEY = 'sigre_chunk_reload_guard_ts';
+        var COOLDOWN_MS = 20000;
+        function recoverFromStaleChunk(reason) {
+          try {
+            var now = Date.now();
+            var last = Number(sessionStorage.getItem(GUARD_KEY) || '0');
+            if (last > 0 && now - last < COOLDOWN_MS) return;
+            sessionStorage.setItem(GUARD_KEY, String(now));
+          } catch (e) {}
+          try {
+            if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+              navigator.serviceWorker.getRegistrations().then(function (regs) {
+                for (var i = 0; i < regs.length; i++) regs[i].unregister();
+              });
+            }
+            if ('caches' in window && window.caches && window.caches.keys) {
+              window.caches.keys().then(function (keys) {
+                for (var j = 0; j < keys.length; j++) window.caches.delete(keys[j]);
+              });
+            }
+          } catch (e) {}
+          setTimeout(function () {
+            try {
+              var u = new URL(window.location.href);
+              u.searchParams.set('_v', String(Date.now()));
+              window.location.replace(u.toString());
+            } catch (e) {
+              window.location.reload();
+            }
+          }, 80);
+        }
+        window.addEventListener(
+          'error',
+          function (ev) {
+            var t = ev && ev.target;
+            if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+              var url = t.src || t.href || '';
+              if (url.indexOf('/assets/') !== -1 || url.indexOf('/src/main.tsx') !== -1) {
+                recoverFromStaleChunk('Early asset 404: ' + url);
+              }
+            }
+          },
+          true
+        );
+      })();
+    </script>
+
+    <!-- Favicon (caminhos relativos para compatibilidade total entre domínio próprio e Vercel) -->
     <link rel="icon" type="image/png" href="/assets/aistudio/Change_letters_color_acab079b_2K-removebg-preview_d40bc4dd.png" />
     <link rel="shortcut icon" type="image/png" href="/assets/aistudio/Change_letters_color_acab079b_2K-removebg-preview_d40bc4dd.png" />
     <link rel="apple-touch-icon" href="/assets/aistudio/Change_letters_color_acab079b_2K-removebg-preview_d40bc4dd.png" />
-    
+
     <!-- Meta Descriptions & SEO Base -->
     <meta name="description" content="Sigre - Sistema Integrado de Gestão Escolar. Plataforma unificada de organização da Educação para escolas, directores, professores e alunos em Angola. Pautas oficiais, estatística ministerial SIGE, diário de classe digital e portal do encarregado." />
     <meta name="keywords" content="Sigre, Sistema Integrado de Gestão Escolar, gestão escolar Angola, SIGE MED Angola, pautas trimestrais, notas escolares, diário de classe digital, educação Angola, escolas Luanda, escolas Malanje, software escolar Angola" />
     <meta name="author" content="Sigre Angola - Ministério e Gestão Educativa" />
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-    <link rel="canonical" href="https://ais-pre-olovwuhelpu7jvuogt7mk6-7960474755.europe-west2.run.app/" />
-    
+
     <!-- Geo Tags para Angola -->
     <meta name="geo.region" content="AO" />
     <meta name="geo.placename" content="Luanda, Angola" />
@@ -32,7 +81,6 @@
     <meta property="og:site_name" content="Sigre Angola" />
     <meta property="og:title" content="Sigre - Sistema Integrado de Gestão Escolar em Angola" />
     <meta property="og:description" content="Sigre - Sistema Integrado de Gestão Escolar. Priorizamos a melhor organização da Educação para escolas, directores, professores e alunos em Angola." />
-    <meta property="og:url" content="https://ais-pre-olovwuhelpu7jvuogt7mk6-7960474755.europe-west2.run.app/" />
     <meta property="og:image" content="/assets/aistudio/Change_letters_color_acab079b_2K-removebg-preview_d40bc4dd.png" />
 
     <!-- Twitter Card -->
@@ -48,23 +96,21 @@
       "@graph": [
         {
           "@type": "EducationalOrganization",
-          "@id": "https://ais-pre-olovwuhelpu7jvuogt7mk6-7960474755.europe-west2.run.app/#organization",
+          "@id": "#organization",
           "name": "Sigre Angola",
-          "url": "https://ais-pre-olovwuhelpu7jvuogt7mk6-7960474755.europe-west2.run.app/",
           "description": "Sigre - Plataforma integrada de gestão escolar e modernização pedagógica para escolas de Angola.",
           "address": {
             "@type": "PostalAddress",
-            "addressLocality": "Luanda",
+            "addressLocality": "Malanje",
             "addressCountry": "AO"
           }
         },
         {
           "@type": "WebSite",
-          "@id": "https://ais-pre-olovwuhelpu7jvuogt7mk6-7960474755.europe-west2.run.app/#website",
-          "url": "https://ais-pre-olovwuhelpu7jvuogt7mk6-7960474755.europe-west2.run.app/",
+          "@id": "#website",
           "name": "Sigre Angola",
           "publisher": {
-            "@id": "https://ais-pre-olovwuhelpu7jvuogt7mk6-7960474755.europe-west2.run.app/#organization"
+            "@id": "#organization"
           }
         }
       ]
@@ -73,7 +119,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Chau+Philomene+One:ital@0;1&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@700;800;900&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous">
   </head>
   <body>
     <div id="root"></div>

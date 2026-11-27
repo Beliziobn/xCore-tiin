@@ -63,6 +63,7 @@ import type { SchoolMember } from './components/ui/school-team-section';
 import { AIInputWithLoading } from './components/ui/ai-input-with-loading';
 import { canUserAccessView, getOwnProfileViewForUser } from './utils/authGuard';
 import { GlobalErrorBoundary } from './components/common/GlobalErrorBoundary';
+import { lazyWithChunkRetry } from './utils/runtimeRecovery';
 import { Sparkles, X } from 'lucide-react';
 
 // Core entry & shell components imported statically for instant initial render and unified React pre-bundling
@@ -105,30 +106,30 @@ import { StudentProfilePage } from './components/pages/StudentProfilePage';
 import { DeclaracaoEfectividadePage } from './components/pages/DeclaracaoEfectividadePage';
 import { QuickServicesPage } from './components/pages/QuickServicesPage';
 
-// Secondary Institutional & Legal Pages
-const AboutPlatformPage = lazy(() => import('./components/pages/legal/AboutPlatformPage').then((m) => ({ default: m.AboutPlatformPage })));
-const TermsOfUsePage = lazy(() => import('./components/pages/legal/TermsOfUsePage').then((m) => ({ default: m.TermsOfUsePage })));
-const PrivacyPolicyPage = lazy(() => import('./components/pages/legal/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
-const SecurityDataProtectionPage = lazy(() => import('./components/pages/legal/SecurityDataProtectionPage').then((m) => ({ default: m.SecurityDataProtectionPage })));
-const MeetingsHubPage = lazy(() => import('./components/pages/MeetingsHubPage').then((m) => ({ default: m.MeetingsHubPage })));
-const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
-const ThankYouPage = lazy(() => import('./components/pages/ThankYouPage').then((m) => ({ default: m.ThankYouPage })));
-const CasesPage = lazy(() => import('./components/pages/CasesPage').then((m) => ({ default: m.CasesPage })));
+// Secondary Institutional & Legal Pages (wrapped with lazyWithChunkRetry for automatic chunk error recovery after Vercel deploys)
+const AboutPlatformPage = lazyWithChunkRetry(() => import('./components/pages/legal/AboutPlatformPage').then((m) => ({ default: m.AboutPlatformPage })));
+const TermsOfUsePage = lazyWithChunkRetry(() => import('./components/pages/legal/TermsOfUsePage').then((m) => ({ default: m.TermsOfUsePage })));
+const PrivacyPolicyPage = lazyWithChunkRetry(() => import('./components/pages/legal/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
+const SecurityDataProtectionPage = lazyWithChunkRetry(() => import('./components/pages/legal/SecurityDataProtectionPage').then((m) => ({ default: m.SecurityDataProtectionPage })));
+const MeetingsHubPage = lazyWithChunkRetry(() => import('./components/pages/MeetingsHubPage').then((m) => ({ default: m.MeetingsHubPage })));
+const NotFoundPage = lazyWithChunkRetry(() => import('./components/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+const ThankYouPage = lazyWithChunkRetry(() => import('./components/pages/ThankYouPage').then((m) => ({ default: m.ThankYouPage })));
+const CasesPage = lazyWithChunkRetry(() => import('./components/pages/CasesPage').then((m) => ({ default: m.CasesPage })));
 
-// Lazy-loaded Heavy Modals (mounted strictly on demand with zero visual spinner fallback)
-const StatDetailModal = lazy(() => import('./components/StatDetailModal').then((m) => ({ default: m.StatDetailModal })));
-const ModuleDetailModal = lazy(() => import('./components/ModuleDetailModal').then((m) => ({ default: m.ModuleDetailModal })));
-const InfoModal = lazy(() => import('./components/InfoModal').then((m) => ({ default: m.InfoModal })));
-const SessionSettingsModal = lazy(() => import('./components/SessionSettingsModal').then((m) => ({ default: m.SessionSettingsModal })));
-const AdminRegistrationModal = lazy(() => import('./components/pages/admin/AdminRegistrationModal').then((m) => ({ default: m.AdminRegistrationModal })));
-const AdminAuditLogsModal = lazy(() => import('./components/pages/admin/AdminAuditLogsModal').then((m) => ({ default: m.AdminAuditLogsModal })));
-const ExcelExportModal = lazy(() => import('./components/modals/ExcelExportModal').then((m) => ({ default: m.ExcelExportModal })));
-const GoogleSheetsModal = lazy(() => import('./components/modals/GoogleSheetsModal').then((m) => ({ default: m.GoogleSheetsModal })));
-const SupportChatModal = lazy(() => import('./components/chat/SupportChatModal').then((m) => ({ default: m.SupportChatModal })));
-const DemoRequestModal = lazy(() => import('./components/modals/DemoRequestModal').then((m) => ({ default: m.DemoRequestModal })));
-const ZoomMeetingModal = lazy(() => import('./components/meetings/ZoomMeetingModal').then((m) => ({ default: m.ZoomMeetingModal })));
-const RagIntelligenceModal = lazy(() => import('./components/rag/RagIntelligenceModal').then((m) => ({ default: m.RagIntelligenceModal })));
-const BackupManagerModal = lazy(() => import('./components/modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
+// Lazy-loaded Heavy Modals (mounted strictly on demand with zero visual spinner fallback + automatic chunk recovery)
+const StatDetailModal = lazyWithChunkRetry(() => import('./components/StatDetailModal').then((m) => ({ default: m.StatDetailModal })));
+const ModuleDetailModal = lazyWithChunkRetry(() => import('./components/ModuleDetailModal').then((m) => ({ default: m.ModuleDetailModal })));
+const InfoModal = lazyWithChunkRetry(() => import('./components/InfoModal').then((m) => ({ default: m.InfoModal })));
+const SessionSettingsModal = lazyWithChunkRetry(() => import('./components/SessionSettingsModal').then((m) => ({ default: m.SessionSettingsModal })));
+const AdminRegistrationModal = lazyWithChunkRetry(() => import('./components/pages/admin/AdminRegistrationModal').then((m) => ({ default: m.AdminRegistrationModal })));
+const AdminAuditLogsModal = lazyWithChunkRetry(() => import('./components/pages/admin/AdminAuditLogsModal').then((m) => ({ default: m.AdminAuditLogsModal })));
+const ExcelExportModal = lazyWithChunkRetry(() => import('./components/modals/ExcelExportModal').then((m) => ({ default: m.ExcelExportModal })));
+const GoogleSheetsModal = lazyWithChunkRetry(() => import('./components/modals/GoogleSheetsModal').then((m) => ({ default: m.GoogleSheetsModal })));
+const SupportChatModal = lazyWithChunkRetry(() => import('./components/chat/SupportChatModal').then((m) => ({ default: m.SupportChatModal })));
+const DemoRequestModal = lazyWithChunkRetry(() => import('./components/modals/DemoRequestModal').then((m) => ({ default: m.DemoRequestModal })));
+const ZoomMeetingModal = lazyWithChunkRetry(() => import('./components/meetings/ZoomMeetingModal').then((m) => ({ default: m.ZoomMeetingModal })));
+const RagIntelligenceModal = lazyWithChunkRetry(() => import('./components/rag/RagIntelligenceModal').then((m) => ({ default: m.RagIntelligenceModal })));
+const BackupManagerModal = lazyWithChunkRetry(() => import('./components/modals/BackupManagerModal').then((m) => ({ default: m.BackupManagerModal })));
 
 const RouteFallback: React.FC = () => null;
 

@@ -24,6 +24,8 @@ export default defineConfig(() => {
     },
     build: {
       modulePreload: false,
+      cssCodeSplit: false,
+      assetsInlineLimit: 8192,
       rollupOptions: {
         output: {
           manualChunks(id) {
